@@ -1,39 +1,114 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+const signupSchema = z.object({
+  full_name: z.string().min(2, "Full name is required").max(100),
+  id_number: z.string().min(5, "Valid ID number is required").max(50),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone number format"),
+  email: z.string().email("Invalid email address").max(255),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
+type SignupFormData = z.infer<typeof signupSchema>;
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { signIn, signUp, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  const signupForm = useForm<SignupFormData>({
+    resolver: zodResolver(signupSchema),
+  });
+
+  // Redirect if already logged in
+  if (user) {
+    navigate("/home");
+    return null;
+  }
+
+  const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
     
-    // Simulate login
-    setTimeout(() => {
+    try {
+      const { error } = await signIn(data.email, data.password);
+      
+      if (error) {
+        if (error.message.includes("Invalid")) {
+          toast.error("Invalid email or password");
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+      
       toast.success("Welcome back!");
       navigate("/home");
+    } catch (error: any) {
+      toast.error("An unexpected error occurred");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSignup = async (data: SignupFormData) => {
     setIsLoading(true);
     
-    // Simulate signup
-    setTimeout(() => {
-      toast.success("Account created successfully!");
-      navigate("/home");
+    try {
+      const { error } = await signUp({
+        email: data.email,
+        password: data.password,
+        full_name: data.full_name,
+        id_number: data.id_number,
+        phone: data.phone,
+      });
+      
+      if (error) {
+        if (error.message.includes("already registered")) {
+          toast.error("Email already registered");
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+      
+      toast.success("Account created! Please upload your ID documents.");
+      navigate("/kyc-upload");
+    } catch (error: any) {
+      toast.error("An unexpected error occurred");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -73,33 +148,48 @@ const Auth = () => {
                     <CardDescription>Enter your credentials to access your account</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="login-email">Email</Label>
-                        <Input
-                          id="login-email"
-                          type="email"
-                          placeholder="name@example.com"
-                          required
+                    <Form {...loginForm}>
+                      <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+                        <FormField
+                          control={loginForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="email"
+                                  placeholder="name@example.com"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="login-password">Password</Label>
-                        <Input
-                          id="login-password"
-                          type="password"
-                          required
+                        <FormField
+                          control={loginForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </div>
-                      <Button
-                        type="submit"
-                        variant="hero"
-                        className="w-full"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? "Logging in..." : "Login"}
-                      </Button>
-                    </form>
+                        <Button
+                          type="submit"
+                          variant="hero"
+                          className="w-full"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? "Logging in..." : "Login"}
+                        </Button>
+                      </form>
+                    </Form>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -111,42 +201,100 @@ const Auth = () => {
                     <CardDescription>Get started with your financial journey</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <form onSubmit={handleSignup} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-name">Full Name</Label>
-                        <Input
-                          id="signup-name"
-                          type="text"
-                          placeholder="John Doe"
-                          required
+                    <Form {...signupForm}>
+                      <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
+                        <FormField
+                          control={signupForm.control}
+                          name="full_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Full Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="John Doe" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-email">Email</Label>
-                        <Input
-                          id="signup-email"
-                          type="email"
-                          placeholder="name@example.com"
-                          required
+                        <FormField
+                          control={signupForm.control}
+                          name="id_number"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>ID Number</FormLabel>
+                              <FormControl>
+                                <Input placeholder="12345678" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-password">Password</Label>
-                        <Input
-                          id="signup-password"
-                          type="password"
-                          required
+                        <FormField
+                          control={signupForm.control}
+                          name="phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Phone Number</FormLabel>
+                              <FormControl>
+                                <Input placeholder="+254712345678" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </div>
-                      <Button
-                        type="submit"
-                        variant="hero"
-                        className="w-full"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? "Creating account..." : "Sign Up"}
-                      </Button>
-                    </form>
+                        <FormField
+                          control={signupForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="email"
+                                  placeholder="name@example.com"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirm Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="submit"
+                          variant="hero"
+                          className="w-full"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? "Creating account..." : "Sign Up"}
+                        </Button>
+                      </form>
+                    </Form>
                   </CardContent>
                 </Card>
               </TabsContent>

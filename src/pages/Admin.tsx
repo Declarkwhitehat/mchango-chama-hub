@@ -1,10 +1,13 @@
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, TrendingUp, DollarSign, Activity } from "lucide-react";
+import { Users, TrendingUp, DollarSign, Activity, FileCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Admin = () => {
+  const navigate = useNavigate();
   // Mock admin data
   const stats = {
     totalUsers: 1245,
@@ -86,6 +89,31 @@ const Admin = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Detailed Views */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <Button 
+              variant="outline" 
+              className="justify-start"
+              onClick={() => navigate("/admin/kyc")}
+            >
+              <FileCheck className="mr-2 h-4 w-4" />
+              Review KYC Submissions
+            </Button>
+            <Button variant="outline" className="justify-start">
+              <Users className="mr-2 h-4 w-4" />
+              Manage Users
+            </Button>
+            <Button variant="outline" className="justify-start">
+              <Activity className="mr-2 h-4 w-4" />
+              View Reports
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Detailed Views */}
         <Tabs defaultValue="users" className="w-full">
