@@ -29,6 +29,7 @@ const Index = () => {
                   variant="hero" 
                   size="xl"
                   className="w-full sm:w-auto"
+                  onClick={() => window.location.href = '/auth'}
                 >
                   <TrendingUp className="mr-2 h-5 w-5" />
                   Start a Mchango
@@ -37,6 +38,7 @@ const Index = () => {
                   variant="heroSecondary" 
                   size="xl"
                   className="w-full sm:w-auto"
+                  onClick={() => window.location.href = '/auth'}
                 >
                   <Users className="mr-2 h-5 w-5" />
                   Join a Chama
@@ -188,10 +190,10 @@ const Index = () => {
             Join our growing community and take control of your financial future today
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="hero" size="xl">
+            <Button variant="hero" size="xl" onClick={() => window.location.href = '/auth'}>
               Start a Mchango
             </Button>
-            <Button variant="heroSecondary" size="xl">
+            <Button variant="heroSecondary" size="xl" onClick={() => window.location.href = '/auth'}>
               Join a Chama
             </Button>
           </div>
