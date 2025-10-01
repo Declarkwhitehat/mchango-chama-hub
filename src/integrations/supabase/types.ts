@@ -14,16 +14,100 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          email_verified: boolean | null
+          full_name: string
+          id: string
+          id_back_url: string | null
+          id_front_url: string | null
+          id_number: string
+          kyc_rejection_reason: string | null
+          kyc_reviewed_at: string | null
+          kyc_reviewed_by: string | null
+          kyc_status: Database["public"]["Enums"]["kyc_status"]
+          kyc_submitted_at: string | null
+          phone: string
+          phone_verified: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          email_verified?: boolean | null
+          full_name: string
+          id: string
+          id_back_url?: string | null
+          id_front_url?: string | null
+          id_number: string
+          kyc_rejection_reason?: string | null
+          kyc_reviewed_at?: string | null
+          kyc_reviewed_by?: string | null
+          kyc_status?: Database["public"]["Enums"]["kyc_status"]
+          kyc_submitted_at?: string | null
+          phone: string
+          phone_verified?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          email_verified?: boolean | null
+          full_name?: string
+          id?: string
+          id_back_url?: string | null
+          id_front_url?: string | null
+          id_number?: string
+          kyc_rejection_reason?: string | null
+          kyc_reviewed_at?: string | null
+          kyc_reviewed_by?: string | null
+          kyc_status?: Database["public"]["Enums"]["kyc_status"]
+          kyc_submitted_at?: string | null
+          phone?: string
+          phone_verified?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      kyc_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +234,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      kyc_status: ["pending", "approved", "rejected"],
+    },
   },
 } as const
