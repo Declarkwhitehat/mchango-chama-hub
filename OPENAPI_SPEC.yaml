@@ -1,0 +1,596 @@
+openapi: 3.0.3
+info:
+  title: Chama & Mchango Platform API
+  description: |
+    REST API for the Chama & Mchango fundraising and savings platform.
+    
+    ## Authentication
+    All endpoints require Bearer token authentication using JWT from Supabase Auth.
+    Include the token in the Authorization header: `Authorization: Bearer YOUR_JWT_TOKEN`
+    
+    ## Base URL
+    Development: `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1`
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@chamamoto.com
+
+servers:
+  - url: https://ahhcbwbvueimezmtftte.supabase.co/functions/v1
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Mchango
+    description: Fundraising campaigns
+  - name: Chama
+    description: Savings groups
+  - name: Contributions
+    description: Chama member contributions
+  - name: Transactions
+    description: Payment transactions
+  - name: Auth
+    description: Authentication endpoints
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Mchango:
+      type: object
+      required:
+        - title
+        - goal_amount
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          minLength: 5
+          maxLength: 200
+          example: "Medical Emergency Fund"
+        slug:
+          type: string
+          example: "medical-emergency-fund"
+        description:
+          type: string
+          maxLength: 5000
+        goal_amount:
+          type: number
+          format: decimal
+          minimum: 100
+          example: 500000
+        current_amount:
+          type: number
+          format: decimal
+          readOnly: true
+          example: 125000
+        image_url:
+          type: string
+          format: uri
+        category:
+          type: string
+          example: "Medical"
+        whatsapp_link:
+          type: string
+          format: uri
+          example: "https://wa.me/254712345678"
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Chama:
+      type: object
+      required:
+        - name
+        - contribution_amount
+        - contribution_frequency
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: "Tumaini Savings Group"
+        slug:
+          type: string
+          example: "tumaini-savings-group"
+        description:
+          type: string
+          maxLength: 5000
+        contribution_amount:
+          type: number
+          format: decimal
+          minimum: 100
+          example: 5000
+        contribution_frequency:
+          type: string
+          enum: [daily, weekly, monthly]
+          example: "weekly"
+        whatsapp_link:
+          type: string
+          format: uri
+          example: "https://wa.me/254712345678"
+        max_members:
+          type: integer
+          minimum: 2
+          maximum: 100
+          default: 50
+        status:
+          type: string
+          enum: [active, inactive, completed]
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    ChamaMember:
+      type: object
+      required:
+        - chama_id
+        - member_code
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        chama_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+        member_code:
+          type: string
+          example: "TUM001"
+        is_manager:
+          type: boolean
+          default: false
+        joined_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          type: string
+          enum: [active, inactive, left]
+
+    Contribution:
+      type: object
+      required:
+        - chama_id
+        - member_id
+        - amount
+        - payment_reference
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        chama_id:
+          type: string
+          format: uuid
+        member_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+          example: 5000
+        payment_reference:
+          type: string
+          example: "MPESA-REF-12345"
+        contribution_date:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Transaction:
+      type: object
+      required:
+        - amount
+        - payment_reference
+        - transaction_type
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user_id:
+          type: string
+          format: uuid
+          readOnly: true
+        mchango_id:
+          type: string
+          format: uuid
+          nullable: true
+        chama_id:
+          type: string
+          format: uuid
+          nullable: true
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+          example: 25000
+        payment_reference:
+          type: string
+          example: "MPESA-REF-12345"
+        payment_method:
+          type: string
+          example: "M-Pesa"
+        status:
+          type: string
+          enum: [pending, completed, failed, refunded]
+        transaction_type:
+          type: string
+          enum: [donation, contribution, payout]
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Resource not found"
+
+paths:
+  /mchango-crud:
+    get:
+      tags:
+        - Mchango
+      summary: List all active mchangos
+      description: Retrieve a list of all active fundraising campaigns
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Mchango'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - Mchango
+      summary: Create new mchango
+      description: Create a new fundraising campaign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mchango'
+      responses:
+        '201':
+          description: Mchango created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Mchango'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+
+  /mchango-crud/{id}:
+    get:
+      tags:
+        - Mchango
+      summary: Get mchango by ID or slug
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Mchango ID (UUID) or slug
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Mchango'
+        '404':
+          description: Mchango not found
+
+    put:
+      tags:
+        - Mchango
+      summary: Update mchango
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mchango'
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Mchango'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+
+    delete:
+      tags:
+        - Mchango
+      summary: Cancel mchango
+      description: Soft delete by setting status to 'cancelled'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cancelled successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+
+  /chama-crud:
+    get:
+      tags:
+        - Chama
+      summary: List all active chamas
+      description: Retrieve a list of all active savings groups
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Chama'
+
+    post:
+      tags:
+        - Chama
+      summary: Create new chama
+      description: Create a new savings group. Creator is automatically added as first member and manager.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Chama'
+      responses:
+        '201':
+          description: Chama created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Chama'
+
+  /chama-crud/{id}:
+    get:
+      tags:
+        - Chama
+      summary: Get chama by ID or slug
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Chama ID (UUID) or slug
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Chama'
+        '404':
+          description: Chama not found
+
+    put:
+      tags:
+        - Chama
+      summary: Update chama
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Chama'
+      responses:
+        '200':
+          description: Updated successfully
+
+    delete:
+      tags:
+        - Chama
+      summary: Deactivate chama
+      description: Soft delete by setting status to 'inactive'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Deactivated successfully
+
+  /contributions-crud:
+    get:
+      tags:
+        - Contributions
+      summary: List contributions for a chama
+      parameters:
+        - name: chama_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Contribution'
+
+    post:
+      tags:
+        - Contributions
+      summary: Create new contribution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Contribution'
+      responses:
+        '201':
+          description: Contribution created successfully
+
+  /transactions-crud:
+    get:
+      tags:
+        - Transactions
+      summary: List user's transactions
+      description: Get all transactions for the authenticated user
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+
+    post:
+      tags:
+        - Transactions
+      summary: Create new transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Transaction'
+            example:
+              mchango_id: "123e4567-e89b-12d3-a456-426614174000"
+              amount: 25000
+              payment_reference: "MPESA-REF-12345"
+              payment_method: "M-Pesa"
+              transaction_type: "donation"
+      responses:
+        '201':
+          description: Transaction created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Transaction'

@@ -2,3 +2,15 @@ project_id = "ahhcbwbvueimezmtftte"
 
 [functions.send-otp]
 verify_jwt = false
+
+[functions.mchango-crud]
+verify_jwt = true
+
+[functions.chama-crud]
+verify_jwt = true
+
+[functions.contributions-crud]
+verify_jwt = true
+
+[functions.transactions-crud]
+verify_jwt = true

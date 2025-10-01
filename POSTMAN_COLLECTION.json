@@ -1,0 +1,339 @@
+{
+  "info": {
+    "name": "Chama & Mchango Platform API",
+    "description": "Postman collection for testing Chama & Mchango CRUD APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://ahhcbwbvueimezmtftte.supabase.co/functions/v1",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Mchango",
+      "item": [
+        {
+          "name": "List All Mchangos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/mchango-crud",
+              "host": ["{{base_url}}"],
+              "path": ["mchango-crud"]
+            }
+          }
+        },
+        {
+          "name": "Get Mchango by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/mchango-crud/:id",
+              "host": ["{{base_url}}"],
+              "path": ["mchango-crud", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Mchango by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/mchango-crud/medical-emergency-jane-doe",
+              "host": ["{{base_url}}"],
+              "path": ["mchango-crud", "medical-emergency-jane-doe"]
+            }
+          }
+        },
+        {
+          "name": "Create Mchango",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Medical Emergency Fund\",\n  \"description\": \"Help raise funds for urgent medical treatment\",\n  \"goal_amount\": 500000,\n  \"category\": \"Medical\",\n  \"whatsapp_link\": \"https://wa.me/254712345678\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/mchango-crud",
+              "host": ["{{base_url}}"],
+              "path": ["mchango-crud"]
+            }
+          }
+        },
+        {
+          "name": "Update Mchango",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Medical Emergency Fund\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/mchango-crud/:id",
+              "host": ["{{base_url}}"],
+              "path": ["mchango-crud", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel Mchango",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/mchango-crud/:id",
+              "host": ["{{base_url}}"],
+              "path": ["mchango-crud", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chama",
+      "item": [
+        {
+          "name": "List All Chamas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/chama-crud",
+              "host": ["{{base_url}}"],
+              "path": ["chama-crud"]
+            }
+          }
+        },
+        {
+          "name": "Get Chama by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/chama-crud/:id",
+              "host": ["{{base_url}}"],
+              "path": ["chama-crud", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Chama by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/chama-crud/tumaini-savings-group",
+              "host": ["{{base_url}}"],
+              "path": ["chama-crud", "tumaini-savings-group"]
+            }
+          }
+        },
+        {
+          "name": "Create Chama",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tumaini Savings Group\",\n  \"description\": \"Community savings group\",\n  \"contribution_amount\": 5000,\n  \"contribution_frequency\": \"weekly\",\n  \"whatsapp_link\": \"https://wa.me/254712345678\",\n  \"max_members\": 20\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/chama-crud",
+              "host": ["{{base_url}}"],
+              "path": ["chama-crud"]
+            }
+          }
+        },
+        {
+          "name": "Update Chama",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contribution_amount\": 6000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/chama-crud/:id",
+              "host": ["{{base_url}}"],
+              "path": ["chama-crud", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deactivate Chama",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/chama-crud/:id",
+              "host": ["{{base_url}}"],
+              "path": ["chama-crud", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contributions",
+      "item": [
+        {
+          "name": "List Contributions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/contributions-crud?chama_id=",
+              "host": ["{{base_url}}"],
+              "path": ["contributions-crud"],
+              "query": [
+                {
+                  "key": "chama_id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Contribution",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chama_id\": \"\",\n  \"member_id\": \"\",\n  \"amount\": 5000,\n  \"payment_reference\": \"MPESA-REF-12345\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/contributions-crud",
+              "host": ["{{base_url}}"],
+              "path": ["contributions-crud"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "List My Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions-crud",
+              "host": ["{{base_url}}"],
+              "path": ["transactions-crud"]
+            }
+          }
+        },
+        {
+          "name": "Create Transaction (Donation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mchango_id\": \"\",\n  \"amount\": 25000,\n  \"payment_reference\": \"MPESA-REF-98765\",\n  \"payment_method\": \"M-Pesa\",\n  \"transaction_type\": \"donation\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/transactions-crud",
+              "host": ["{{base_url}}"],
+              "path": ["transactions-crud"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

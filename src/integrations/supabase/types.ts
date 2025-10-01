@@ -14,6 +14,310 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string | null
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chama: {
+        Row: {
+          contribution_amount: number
+          contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          max_members: number
+          name: string
+          slug: string
+          status: Database["public"]["Enums"]["chama_status"]
+          updated_at: string
+          whatsapp_link: string | null
+        }
+        Insert: {
+          contribution_amount: number
+          contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          max_members?: number
+          name: string
+          slug: string
+          status?: Database["public"]["Enums"]["chama_status"]
+          updated_at?: string
+          whatsapp_link?: string | null
+        }
+        Update: {
+          contribution_amount?: number
+          contribution_frequency?: Database["public"]["Enums"]["contribution_frequency"]
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          max_members?: number
+          name?: string
+          slug?: string
+          status?: Database["public"]["Enums"]["chama_status"]
+          updated_at?: string
+          whatsapp_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chama_members: {
+        Row: {
+          chama_id: string
+          id: string
+          is_manager: boolean
+          joined_at: string
+          member_code: string
+          status: Database["public"]["Enums"]["member_status"]
+          user_id: string | null
+        }
+        Insert: {
+          chama_id: string
+          id?: string
+          is_manager?: boolean
+          joined_at?: string
+          member_code: string
+          status?: Database["public"]["Enums"]["member_status"]
+          user_id?: string | null
+        }
+        Update: {
+          chama_id?: string
+          id?: string
+          is_manager?: boolean
+          joined_at?: string
+          member_code?: string
+          status?: Database["public"]["Enums"]["member_status"]
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_members_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contributions: {
+        Row: {
+          amount: number
+          chama_id: string
+          contribution_date: string
+          created_at: string
+          id: string
+          member_id: string
+          payment_reference: string
+          status: Database["public"]["Enums"]["transaction_status"]
+        }
+        Insert: {
+          amount: number
+          chama_id: string
+          contribution_date?: string
+          created_at?: string
+          id?: string
+          member_id: string
+          payment_reference: string
+          status?: Database["public"]["Enums"]["transaction_status"]
+        }
+        Update: {
+          amount?: number
+          chama_id?: string
+          contribution_date?: string
+          created_at?: string
+          id?: string
+          member_id?: string
+          payment_reference?: string
+          status?: Database["public"]["Enums"]["transaction_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mchango: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string
+          current_amount: number
+          description: string | null
+          goal_amount: number
+          id: string
+          image_url: string | null
+          slug: string
+          status: Database["public"]["Enums"]["mchango_status"]
+          title: string
+          updated_at: string
+          whatsapp_link: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by: string
+          current_amount?: number
+          description?: string | null
+          goal_amount: number
+          id?: string
+          image_url?: string | null
+          slug: string
+          status?: Database["public"]["Enums"]["mchango_status"]
+          title: string
+          updated_at?: string
+          whatsapp_link?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string
+          current_amount?: number
+          description?: string | null
+          goal_amount?: number
+          id?: string
+          image_url?: string | null
+          slug?: string
+          status?: Database["public"]["Enums"]["mchango_status"]
+          title?: string
+          updated_at?: string
+          whatsapp_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mchango_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payouts: {
+        Row: {
+          amount: number
+          chama_id: string | null
+          id: string
+          mchango_id: string | null
+          payment_reference: string | null
+          processed_at: string | null
+          recipient_id: string
+          requested_at: string
+          status: Database["public"]["Enums"]["payout_status"]
+        }
+        Insert: {
+          amount: number
+          chama_id?: string | null
+          id?: string
+          mchango_id?: string | null
+          payment_reference?: string | null
+          processed_at?: string | null
+          recipient_id: string
+          requested_at?: string
+          status?: Database["public"]["Enums"]["payout_status"]
+        }
+        Update: {
+          amount?: number
+          chama_id?: string | null
+          id?: string
+          mchango_id?: string | null
+          payment_reference?: string | null
+          processed_at?: string | null
+          recipient_id?: string
+          requested_at?: string
+          status?: Database["public"]["Enums"]["payout_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payouts_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_mchango_id_fkey"
+            columns: ["mchango_id"]
+            isOneToOne: false
+            referencedRelation: "mchango"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -71,6 +375,67 @@ export type Database = {
         }
         Relationships: []
       }
+      transactions: {
+        Row: {
+          amount: number
+          chama_id: string | null
+          created_at: string
+          id: string
+          mchango_id: string | null
+          payment_method: string | null
+          payment_reference: string
+          status: Database["public"]["Enums"]["transaction_status"]
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          chama_id?: string | null
+          created_at?: string
+          id?: string
+          mchango_id?: string | null
+          payment_method?: string | null
+          payment_reference: string
+          status?: Database["public"]["Enums"]["transaction_status"]
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          chama_id?: string | null
+          created_at?: string
+          id?: string
+          mchango_id?: string | null
+          payment_method?: string | null
+          payment_reference?: string
+          status?: Database["public"]["Enums"]["transaction_status"]
+          transaction_type?: Database["public"]["Enums"]["transaction_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_mchango_id_fkey"
+            columns: ["mchango_id"]
+            isOneToOne: false
+            referencedRelation: "mchango"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -97,6 +462,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_slug: {
+        Args: { title: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -107,7 +476,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      chama_status: "active" | "inactive" | "completed"
+      contribution_frequency: "daily" | "weekly" | "monthly"
       kyc_status: "pending" | "approved" | "rejected"
+      mchango_status: "active" | "completed" | "cancelled"
+      member_status: "active" | "inactive" | "left"
+      payout_status: "pending" | "processing" | "completed" | "failed"
+      transaction_status: "pending" | "completed" | "failed" | "refunded"
+      transaction_type: "donation" | "contribution" | "payout"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -236,7 +612,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      chama_status: ["active", "inactive", "completed"],
+      contribution_frequency: ["daily", "weekly", "monthly"],
       kyc_status: ["pending", "approved", "rejected"],
+      mchango_status: ["active", "completed", "cancelled"],
+      member_status: ["active", "inactive", "left"],
+      payout_status: ["pending", "processing", "completed", "failed"],
+      transaction_status: ["pending", "completed", "failed", "refunded"],
+      transaction_type: ["donation", "contribution", "payout"],
     },
   },
 } as const
