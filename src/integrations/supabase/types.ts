@@ -206,46 +206,58 @@ export type Database = {
       }
       mchango: {
         Row: {
+          beneficiary_url: string | null
           category: string | null
           created_at: string
           created_by: string
           current_amount: number
           description: string | null
-          goal_amount: number
+          end_date: string | null
           id: string
           image_url: string | null
+          is_public: boolean | null
+          managers: string[] | null
           slug: string
           status: Database["public"]["Enums"]["mchango_status"]
+          target_amount: number
           title: string
           updated_at: string
           whatsapp_link: string | null
         }
         Insert: {
+          beneficiary_url?: string | null
           category?: string | null
           created_at?: string
           created_by: string
           current_amount?: number
           description?: string | null
-          goal_amount: number
+          end_date?: string | null
           id?: string
           image_url?: string | null
+          is_public?: boolean | null
+          managers?: string[] | null
           slug: string
           status?: Database["public"]["Enums"]["mchango_status"]
+          target_amount: number
           title: string
           updated_at?: string
           whatsapp_link?: string | null
         }
         Update: {
+          beneficiary_url?: string | null
           category?: string | null
           created_at?: string
           created_by?: string
           current_amount?: number
           description?: string | null
-          goal_amount?: number
+          end_date?: string | null
           id?: string
           image_url?: string | null
+          is_public?: boolean | null
+          managers?: string[] | null
           slug?: string
           status?: Database["public"]["Enums"]["mchango_status"]
+          target_amount?: number
           title?: string
           updated_at?: string
           whatsapp_link?: string | null
