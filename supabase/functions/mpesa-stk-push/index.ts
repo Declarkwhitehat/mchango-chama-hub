@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,8 +23,8 @@ serve(async (req) => {
 
   try {
     const supabaseClient = createClient(
-      Deno.env.get('VITE_SUPABASE_URL') ?? '',
-      Deno.env.get('VITE_SUPABASE_PUBLISHABLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
           headers: { Authorization: req.headers.get('Authorization')! },
@@ -70,7 +70,7 @@ serve(async (req) => {
     const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET');
     const passkey = Deno.env.get('MPESA_PASSKEY');
     const shortcode = Deno.env.get('MPESA_SHORTCODE') || '174379'; // Default sandbox shortcode
-    const callbackUrl = `${Deno.env.get('VITE_SUPABASE_URL')}/functions/v1/mpesa-callback`;
+    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`;
 
     if (!consumerKey || !consumerSecret) {
       throw new Error('M-PESA credentials not configured');
@@ -175,7 +175,7 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
