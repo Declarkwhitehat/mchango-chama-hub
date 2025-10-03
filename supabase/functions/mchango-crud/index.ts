@@ -26,9 +26,11 @@ serve(async (req) => {
     const pathParts = url.pathname.split('/').filter(Boolean);
     const id = pathParts[pathParts.length - 1];
 
-    // GET /mchango-crud - List all active mchangos
+    // GET /mchango-crud - List all active public mchangos (or user's own)
     if (req.method === 'GET' && !id) {
-      const { data, error } = await supabaseClient
+      const { data: { user } } = await supabaseClient.auth.getUser();
+
+      let query = supabaseClient
         .from('mchango')
         .select(`
           *,
@@ -39,6 +41,13 @@ serve(async (req) => {
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
+
+      // If no user, only show public mchangos
+      if (!user) {
+        query = query.eq('is_public', true);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -84,7 +93,7 @@ serve(async (req) => {
       });
     }
 
-    // POST /mchango-crud - Create new mchango
+    // POST /mchango-crud - Create new mchango (KYC-approved users only)
     if (req.method === 'POST') {
       const body = await req.json();
       const { data: { user } } = await supabaseClient.auth.getUser();
@@ -96,23 +105,85 @@ serve(async (req) => {
         });
       }
 
+      // Verify KYC status
+      const { data: profile, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('kyc_status')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile) {
+        return new Response(JSON.stringify({ error: 'Profile not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (profile.kyc_status !== 'approved') {
+        return new Response(
+          JSON.stringify({ 
+            error: 'KYC verification required',
+            message: 'Only KYC-approved users can create mchangos. Please complete your KYC verification first.',
+            kyc_status: profile.kyc_status
+          }), 
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Validate required fields
+      if (!body.title || !body.target_amount) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required fields: title, target_amount' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
       // Generate slug from title
-      const slug = body.title
+      let slug = body.slug || body.title
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-');
 
+      // Check slug uniqueness, append timestamp if needed
+      const { data: existingSlug } = await supabaseClient
+        .from('mchango')
+        .select('slug')
+        .eq('slug', slug)
+        .maybeSingle();
+
+      if (existingSlug) {
+        slug = `${slug}-${Date.now()}`;
+      }
+
       const { data, error } = await supabaseClient
         .from('mchango')
         .insert({
-          ...body,
-          slug: body.slug || slug,
+          title: body.title,
+          description: body.description,
+          target_amount: body.target_amount,
+          end_date: body.end_date,
+          beneficiary_url: body.beneficiary_url,
+          whatsapp_link: body.whatsapp_link,
+          category: body.category,
+          is_public: body.is_public !== undefined ? body.is_public : true,
+          managers: body.managers || [],
+          slug: slug,
           created_by: user.id,
+          image_url: body.image_url,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating mchango:', error);
+        throw error;
+      }
 
       return new Response(JSON.stringify({ data }), {
         status: 201,
