@@ -1,13 +1,17 @@
 import { Button } from "@/components/ui/button";
 import { FeatureCard } from "@/components/FeatureCard";
+import { Header } from "@/components/Header";
 import { Users, TrendingUp, Heart, Shield } from "lucide-react";
 import heroImage from "@/assets/hero-image.jpg";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      {/* Header */}
+      <Header />
+      
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-hidden pt-16">
         <div className="absolute inset-0 bg-[var(--gradient-hero)] z-0" />
         <div className="container mx-auto px-4 py-12 md:py-20 relative z-10">
           <div className="grid md:grid-cols-2 gap-8 items-center">
@@ -202,8 +206,15 @@ const Index = () => {
 
       {/* Footer */}
       <footer className="bg-card border-t border-border py-8">
-        <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>&copy; 2025 Chama & Mchango. Building financial futures together.</p>
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+            <p className="text-muted-foreground">
+              &copy; 2025 Chama & Mchango. Building financial futures together.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Website created by <span className="font-semibold text-foreground">Declark Chacha</span>
+            </p>
+          </div>
         </div>
       </footer>
     </div>

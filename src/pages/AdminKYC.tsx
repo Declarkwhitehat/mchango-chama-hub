@@ -45,14 +45,22 @@ const AdminKYC = () => {
       return;
     }
 
+    // Check if user has admin role
     const { data, error } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .eq('role', 'admin')
-      .single();
+      .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      console.error('Error checking admin access:', error);
+      toast.error("Error verifying admin access");
+      navigate("/home");
+      return;
+    }
+
+    if (!data) {
       toast.error("Access denied: Admin privileges required");
       navigate("/home");
     }
@@ -60,17 +68,23 @@ const AdminKYC = () => {
 
   const fetchSubmissions = async () => {
     try {
+      // Fetch all profiles with KYC submissions
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .not('kyc_submitted_at', 'is', null)
         .order('kyc_submitted_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Fetch error:', error);
+        throw error;
+      }
+
+      console.log('KYC Submissions fetched:', data?.length || 0);
       setSubmissions(data || []);
     } catch (error: any) {
       console.error('Error fetching submissions:', error);
-      toast.error("Failed to load KYC submissions");
+      toast.error(`Failed to load KYC submissions: ${error.message}`);
     } finally {
       setLoading(false);
     }

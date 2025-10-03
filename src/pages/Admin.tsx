@@ -5,9 +5,55 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, TrendingUp, DollarSign, Activity, FileCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Admin = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Check admin access
+  useEffect(() => {
+    checkAdminAccess();
+  }, []);
+
+  const checkAdminAccess = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking admin:', error);
+      }
+
+      if (!data) {
+        toast.error("Access denied: Admin privileges required");
+        navigate("/home");
+        return;
+      }
+
+      setIsAdmin(true);
+    } catch (error) {
+      console.error('Admin check error:', error);
+      navigate("/home");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Mock admin data
   const stats = {
     totalUsers: 1245,
@@ -27,6 +73,16 @@ const Admin = () => {
     { title: "School Fees", status: "completed", raised: 30000, goal: 30000 },
     { title: "Business Startup", status: "active", raised: 15000, goal: 100000 },
   ];
+
+  if (loading) {
+    return (
+      <Layout showBackButton title="Admin Dashboard">
+        <div className="container px-4 py-6 max-w-6xl mx-auto">
+          <p>Loading...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout showBackButton title="Admin Dashboard">
