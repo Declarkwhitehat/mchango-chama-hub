@@ -19,6 +19,15 @@ const Admin = () => {
     checkAdminAccess();
   }, []);
 
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeCampaigns: 0,
+    activeGroups: 0,
+    totalFundsRaised: 0,
+  });
+  const [recentUsers, setRecentUsers] = useState<any[]>([]);
+  const [recentCampaigns, setRecentCampaigns] = useState<any[]>([]);
+
   const checkAdminAccess = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -37,6 +46,9 @@ const Admin = () => {
 
       if (error) {
         console.error('Error checking admin:', error);
+        toast.error("Error verifying admin access");
+        navigate("/home");
+        return;
       }
 
       if (!data) {
@@ -46,33 +58,87 @@ const Admin = () => {
       }
 
       setIsAdmin(true);
+      await fetchAdminData();
     } catch (error) {
       console.error('Admin check error:', error);
+      toast.error("Error checking admin access");
       navigate("/home");
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock admin data
-  const stats = {
-    totalUsers: 1245,
-    activeCampaigns: 87,
-    activeGroups: 52,
-    totalFundsRaised: 4567000,
+  const fetchAdminData = async () => {
+    try {
+      // Fetch total users count
+      const { count: usersCount, error: usersError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      if (usersError) throw usersError;
+
+      // Fetch active mchangos
+      const { data: mchangos, error: mchangosError } = await supabase
+        .from('mchango')
+        .select('*')
+        .eq('status', 'active');
+
+      if (mchangosError) throw mchangosError;
+
+      // Fetch active chamas
+      const { data: chamas, error: chamasError } = await supabase
+        .from('chama')
+        .select('*')
+        .eq('status', 'active');
+
+      if (chamasError) throw chamasError;
+
+      // Calculate total funds raised
+      const totalFunds = mchangos?.reduce((sum, m) => sum + Number(m.current_amount || 0), 0) || 0;
+
+      setStats({
+        totalUsers: usersCount || 0,
+        activeCampaigns: mchangos?.length || 0,
+        activeGroups: chamas?.length || 0,
+        totalFundsRaised: totalFunds,
+      });
+
+      // Fetch recent users
+      const { data: recentUsersData, error: recentUsersError } = await supabase
+        .from('profiles')
+        .select('full_name, email, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (recentUsersError) throw recentUsersError;
+
+      setRecentUsers(recentUsersData?.map(u => ({
+        name: u.full_name,
+        email: u.email,
+        joined: new Date(u.created_at).toLocaleDateString()
+      })) || []);
+
+      // Fetch recent campaigns
+      const { data: recentCampaignsData, error: recentCampaignsError } = await supabase
+        .from('mchango')
+        .select('title, status, current_amount, target_amount')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (recentCampaignsError) throw recentCampaignsError;
+
+      setRecentCampaigns(recentCampaignsData?.map(c => ({
+        title: c.title,
+        status: c.status,
+        raised: Number(c.current_amount || 0),
+        goal: Number(c.target_amount || 0)
+      })) || []);
+
+    } catch (error: any) {
+      console.error('Error fetching admin data:', error);
+      toast.error("Failed to load admin data");
+    }
   };
-
-  const recentUsers = [
-    { name: "John Doe", email: "john@example.com", joined: "2025-10-01" },
-    { name: "Jane Smith", email: "jane@example.com", joined: "2025-09-30" },
-    { name: "Peter Kamau", email: "peter@example.com", joined: "2025-09-29" },
-  ];
-
-  const recentCampaigns = [
-    { title: "Medical Emergency", status: "active", raised: 32000, goal: 50000 },
-    { title: "School Fees", status: "completed", raised: 30000, goal: 30000 },
-    { title: "Business Startup", status: "active", raised: 15000, goal: 100000 },
-  ];
 
   if (loading) {
     return (

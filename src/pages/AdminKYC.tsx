@@ -45,23 +45,30 @@ const AdminKYC = () => {
       return;
     }
 
-    // Check if user has admin role
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
+    try {
+      // Check if user has admin role
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
 
-    if (error) {
-      console.error('Error checking admin access:', error);
-      toast.error("Error verifying admin access");
-      navigate("/home");
-      return;
-    }
+      if (error) {
+        console.error('Error checking admin access:', error);
+        toast.error("Error verifying admin access");
+        navigate("/home");
+        return;
+      }
 
-    if (!data) {
-      toast.error("Access denied: Admin privileges required");
+      if (!data) {
+        toast.error("Access denied: Admin privileges required");
+        navigate("/home");
+        return;
+      }
+    } catch (error) {
+      console.error('Admin check error:', error);
+      toast.error("Error checking admin access");
       navigate("/home");
     }
   };
