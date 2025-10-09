@@ -138,7 +138,9 @@ const ChamaCreate = () => {
           <Alert className="mb-4 border-warning bg-warning/10">
             <AlertCircle className="h-4 w-4 text-warning" />
             <AlertDescription>
-              You must complete KYC verification before creating a chama.{" "}
+              <strong>You must complete verification before creating a Chama.</strong>
+              <br />
+              Only KYC-approved users can create chamas.{" "}
               <a href="/kyc-upload" className="underline font-medium">
                 Complete KYC now
               </a>

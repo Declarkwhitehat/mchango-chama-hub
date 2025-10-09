@@ -13,15 +13,15 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') || undefined;
+    const authHeader = req.headers.get('Authorization');
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
+      authHeader ? {
         global: {
-          headers: authHeader ? { Authorization: authHeader } : {},
+          headers: { Authorization: authHeader },
         },
-      }
+      } : {}
     );
 
     const url = new URL(req.url);
@@ -135,8 +135,9 @@ serve(async (req) => {
 
       if (profile.kyc_status !== 'approved') {
         return new Response(JSON.stringify({ 
-          error: 'KYC verification required',
-          message: 'You must complete KYC verification before creating a chama'
+          error: 'You must complete verification before creating a Chama.',
+          message: 'Only KYC-approved users can create chamas. Please complete your KYC verification first.',
+          kyc_status: profile.kyc_status
         }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

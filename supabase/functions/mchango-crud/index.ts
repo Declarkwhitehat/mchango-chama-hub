@@ -13,15 +13,17 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') || undefined;
+    const authHeader = req.headers.get('Authorization');
+    console.log('mchango-crud request', { method: req.method, hasAuth: !!authHeader });
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
+      authHeader ? {
         global: {
-          headers: authHeader ? { Authorization: authHeader } : {},
+          headers: { Authorization: authHeader },
         },
-      }
+      } : {}
     );
 
     const url = new URL(req.url);
@@ -127,7 +129,7 @@ serve(async (req) => {
       if (profile.kyc_status !== 'approved') {
         return new Response(
           JSON.stringify({ 
-            error: 'KYC verification required',
+            error: 'You must complete verification before creating a Mchango.',
             message: 'Only KYC-approved users can create mchangos. Please complete your KYC verification first.',
             kyc_status: profile.kyc_status
           }), 
