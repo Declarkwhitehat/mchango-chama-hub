@@ -14,14 +14,19 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
+    
+    // Create Supabase client with auth header for user context
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      authHeader ? {
+      {
         global: {
-          headers: { Authorization: authHeader },
+          headers: authHeader ? { Authorization: authHeader } : {},
         },
-      } : {}
+        auth: {
+          persistSession: false,
+        },
+      }
     );
 
     const url = new URL(req.url);
