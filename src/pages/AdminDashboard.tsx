@@ -1,0 +1,258 @@
+import { useState } from "react";
+import { Layout } from "@/components/Layout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SearchBar } from "@/components/admin/SearchBar";
+import { TransactionsTable } from "@/components/admin/TransactionsTable";
+import { AuditLogsTable } from "@/components/admin/AuditLogsTable";
+import { AccountAdjustment } from "@/components/admin/AccountAdjustment";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Search, Users, TrendingUp, Activity, ExternalLink } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
+
+interface SearchResults {
+  users: any[];
+  members: any[];
+  mchangos: any[];
+  chamas: any[];
+  transactions: any[];
+}
+
+const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearch = async (query: string, type: string) => {
+    setIsSearching(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session");
+
+      const { data, error } = await supabase.functions.invoke('admin-search', {
+        body: { query, type },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      setSearchResults(data.data);
+    } catch (error: any) {
+      console.error('Search error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to perform search",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchResults(null);
+  };
+
+  return (
+    <Layout showBackButton title="Admin Dashboard">
+      <div className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <p className="text-muted-foreground">Search, manage, and audit all platform data</p>
+        </div>
+
+        {/* Global Search */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Universal Search
+            </CardTitle>
+            <CardDescription>
+              Search users, member codes, mchango slugs, transaction IDs, and more
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SearchBar
+              onSearch={handleSearch}
+              onClear={handleClearSearch}
+              isLoading={isSearching}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Search Results */}
+        {searchResults && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Search Results</h2>
+
+            {/* Users Results */}
+            {searchResults.users.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Users ({searchResults.users.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {searchResults.users.map((user) => (
+                      <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{user.full_name}</p>
+                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            ID: {user.id_number} | Phone: {user.phone}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={
+                            user.kyc_status === 'approved' ? 'default' :
+                            user.kyc_status === 'rejected' ? 'destructive' : 'secondary'
+                          }>
+                            {user.kyc_status}
+                          </Badge>
+                          <Button size="sm" variant="outline" onClick={() => navigate(`/admin/kyc`)}>
+                            View KYC
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Members Results */}
+            {searchResults.members.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Members ({searchResults.members.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {searchResults.members.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{member.member_code}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {member.profiles?.full_name} • {member.chama?.name}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/chama/${member.chama?.slug}`)}>
+                          View Chama
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Mchangos Results */}
+            {searchResults.mchangos.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Mchangos ({searchResults.mchangos.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {searchResults.mchangos.map((mchango) => (
+                      <div key={mchango.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{mchango.title}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {mchango.slug} • KES {mchango.current_amount.toLocaleString()} / {mchango.target_amount.toLocaleString()}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/mchango/${mchango.slug}`)}>
+                          View
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Transactions Results */}
+            {searchResults.transactions.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Transactions ({searchResults.transactions.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {searchResults.transactions.map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div>
+                          <p className="font-medium">KES {tx.amount.toLocaleString()}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {tx.payment_reference} • {tx.profiles?.full_name || 'Unknown'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(tx.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'}>
+                          {tx.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* No Results */}
+            {searchResults.users.length === 0 &&
+             searchResults.members.length === 0 &&
+             searchResults.mchangos.length === 0 &&
+             searchResults.chamas.length === 0 &&
+             searchResults.transactions.length === 0 && (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground">No results found</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Management Tabs */}
+        <Tabs defaultValue="transactions" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+            <TabsTrigger value="adjustment">Account Adjustment</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="transactions">
+            <TransactionsTable />
+          </TabsContent>
+
+          <TabsContent value="audit">
+            <AuditLogsTable />
+          </TabsContent>
+
+          <TabsContent value="adjustment">
+            <AccountAdjustment />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </Layout>
+  );
+};
+
+export default AdminDashboard;

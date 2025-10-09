@@ -24,6 +24,12 @@ verify_jwt = true
 [functions.member-dashboard]
 verify_jwt = true
 
+[functions.admin-search]
+verify_jwt = true
+
+[functions.admin-export]
+verify_jwt = true
+
 [functions.mpesa-stk-push]
 verify_jwt = true
 

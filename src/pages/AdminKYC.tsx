@@ -69,11 +69,19 @@ const AdminKYC = () => {
 
   const loadDocumentImages = async (submission: KYCSubmission) => {
     try {
+      // Extract path from full URL for signed URL generation
+      const extractPath = (fullUrl: string) => {
+        // URLs come in format: https://.../storage/v1/object/public/id-documents/{user_id}/file.jpg
+        const match = fullUrl.match(/id-documents\/(.+)$/);
+        return match ? match[1] : fullUrl;
+      };
+
       // Get signed URLs for the ID documents
       if (submission.id_front_url) {
+        const path = extractPath(submission.id_front_url);
         const { data: frontData } = await supabase.storage
           .from('id-documents')
-          .createSignedUrl(submission.id_front_url, 3600); // 1 hour expiry
+          .createSignedUrl(path, 3600); // 1 hour expiry
         
         if (frontData) {
           setIdFrontUrl(frontData.signedUrl);
@@ -81,9 +89,10 @@ const AdminKYC = () => {
       }
 
       if (submission.id_back_url) {
+        const path = extractPath(submission.id_back_url);
         const { data: backData } = await supabase.storage
           .from('id-documents')
-          .createSignedUrl(submission.id_back_url, 3600);
+          .createSignedUrl(path, 3600);
         
         if (backData) {
           setIdBackUrl(backData.signedUrl);

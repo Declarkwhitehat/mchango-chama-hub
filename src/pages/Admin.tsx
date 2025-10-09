@@ -194,7 +194,7 @@ const Admin = () => {
                   {stats.pendingKyc} pending verification{stats.pendingKyc !== 1 ? 's' : ''}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <Button
                   variant="default"
                   onClick={() => navigate("/admin/kyc")}
@@ -202,6 +202,13 @@ const Admin = () => {
                 >
                   <FileCheck className="mr-2 h-4 w-4" />
                   Open KYC Review Page
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/admin/dashboard")}
+                  className="w-full"
+                >
+                  Advanced Search & Tools
                 </Button>
               </CardContent>
             </Card>

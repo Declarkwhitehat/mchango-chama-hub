@@ -15,6 +15,7 @@ import ChamaJoin from "./pages/ChamaJoin";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import AdminKYC from "./pages/AdminKYC";
+import AdminDashboard from "./pages/AdminDashboard";
 import KYCUpload from "./pages/KYCUpload";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminProtectedRoute><Admin /></AdminProtectedRoute>} />
           <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />
+          <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
