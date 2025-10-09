@@ -43,12 +43,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isFetchingProfile, setIsFetchingProfile] = useState(false);
 
   const fetchProfile = async (userId: string, retryCount = 0): Promise<void> => {
-    // Prevent concurrent fetches
-    if (isFetchingProfile) return;
-    setIsFetchingProfile(true);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -69,14 +65,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('Error fetching profile:', error);
       // Don't throw - allow user to remain authenticated even if profile fetch fails
       // Profile will be null but user/session will be valid
-    } finally {
-      setIsFetchingProfile(false);
     }
   };
 
   useEffect(() => {
     let mounted = true;
-    let profileFetchTimeout: NodeJS.Timeout | null = null;
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -88,20 +81,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Clear any pending profile fetch
-          if (profileFetchTimeout) {
-            clearTimeout(profileFetchTimeout);
-          }
-          
-          // Debounce profile fetching to prevent rapid successive calls
-          profileFetchTimeout = setTimeout(() => {
-            if (mounted && !isFetchingProfile) {
+          // Use queueMicrotask instead of setTimeout for better performance
+          queueMicrotask(() => {
+            if (mounted) {
               fetchProfile(session.user.id);
             }
-          }, 300);
+          });
         } else {
           setProfile(null);
-          setIsFetchingProfile(false);
         }
       }
     );
@@ -124,12 +111,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       mounted = false;
-      if (profileFetchTimeout) {
-        clearTimeout(profileFetchTimeout);
-      }
       subscription.unsubscribe();
     };
-  }, [isFetchingProfile]);
+  }, []);
 
   const signUp = async (data: {
     email: string;
