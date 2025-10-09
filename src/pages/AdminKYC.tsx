@@ -43,9 +43,12 @@ const AdminKYC = () => {
 
   const checkAdminAccess = async () => {
     if (!user) {
+      console.log('AdminKYC: No user found, redirecting to auth');
       navigate("/auth");
       return;
     }
+
+    console.log('AdminKYC: Current user:', user.email, user.id);
 
     try {
       // Check if user has admin role
@@ -56,11 +59,13 @@ const AdminKYC = () => {
         .eq('role', 'admin')
         .maybeSingle();
 
+      console.log('AdminKYC: Admin role check:', { data, error, userId: user.id });
+
       if (error) {
-        console.error('Error checking admin access:', error);
+        console.error('AdminKYC: Error checking admin access:', error);
         toast({
           title: "Error",
-          description: "Error verifying admin access",
+          description: `Error verifying admin access: ${error.message}`,
           variant: "destructive",
         });
         navigate("/home");
@@ -68,16 +73,19 @@ const AdminKYC = () => {
       }
 
       if (!data) {
+        console.log('AdminKYC: User is not an admin');
         toast({
           title: "Access Denied",
-          description: "Admin privileges required",
+          description: `Admin privileges required. Current user: ${user.email}`,
           variant: "destructive",
         });
         navigate("/home");
         return;
       }
+
+      console.log('AdminKYC: Admin access granted');
     } catch (error) {
-      console.error('Admin check error:', error);
+      console.error('AdminKYC: Admin check error:', error);
       toast({
         title: "Error",
         description: "Error checking admin access",
