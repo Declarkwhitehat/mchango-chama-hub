@@ -112,8 +112,8 @@ serve(async (req) => {
       });
     }
 
-    // POST /chama-crud - Create new chama
-    if (req.method === 'POST') {
+    // POST /chama-crud - Create new chama (but also handle GET-style invocations with ID)
+    if (req.method === 'POST' && !id) {
       const body = await req.json();
       const userRes = token
         ? await supabaseClient.auth.getUser(token)
@@ -222,6 +222,57 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({ data }), {
         status: 201,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // POST /chama-crud/:id - Handle as GET for viewing chama details
+    if (req.method === 'POST' && id) {
+      let query = supabaseClient
+        .from('chama')
+        .select(`
+          *,
+          profiles:created_by (
+            full_name,
+            email,
+            phone
+          ),
+          chama_members (
+            id,
+            user_id,
+            member_code,
+            is_manager,
+            joined_at,
+            status,
+            approval_status,
+            order_index,
+            profiles (
+              full_name,
+              email
+            )
+          )
+        `);
+
+      // Try by slug first, then by ID
+      const { data: bySlug } = await query.eq('slug', id).maybeSingle();
+      
+      if (bySlug) {
+        return new Response(JSON.stringify({ data: bySlug }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data, error } = await query.eq('id', id).maybeSingle();
+      
+      if (error) throw error;
+      if (!data) {
+        return new Response(JSON.stringify({ error: 'Chama not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
