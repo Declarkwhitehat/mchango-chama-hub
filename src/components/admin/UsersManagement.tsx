@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Shield, ShieldOff, Eye, Loader2 } from "lucide-react";
+import { Search, Shield, ShieldOff, Eye, Loader2, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
 interface User {
@@ -23,6 +24,7 @@ interface UserRole {
 }
 
 export const UsersManagement = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [userRoles, setUserRoles] = useState<Record<string, UserRole[]>>({});
   const [loading, setLoading] = useState(true);
@@ -222,6 +224,14 @@ export const UsersManagement = () => {
                   </div>
                   
                   <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(`/admin/user/${user.id}`)}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      View Details
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"

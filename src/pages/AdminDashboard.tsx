@@ -118,8 +118,8 @@ const AdminDashboard = () => {
                           }>
                             {user.kyc_status}
                           </Badge>
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/admin/kyc`)}>
-                            View KYC
+                          <Button size="sm" variant="outline" onClick={() => navigate(`/admin/user/${user.id}`)}>
+                            View Details
                           </Button>
                         </div>
                       </div>
