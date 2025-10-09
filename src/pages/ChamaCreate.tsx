@@ -49,6 +49,17 @@ const ChamaCreate = () => {
     setIsLoading(true);
 
     try {
+      // Ensure session is valid before submitting
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({
+          title: "Session expired",
+          description: "Please log in again",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
+      }
       const formData = new FormData(e.currentTarget);
       
       const chamaData = {

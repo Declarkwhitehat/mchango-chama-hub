@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
 };
 
 serve(async (req) => {
@@ -27,6 +28,7 @@ serve(async (req) => {
     const pathParts = url.pathname.split('/').filter(Boolean);
     const lastPart = pathParts[pathParts.length - 1];
     const id = lastPart === 'mchango-crud' ? null : lastPart;
+    console.log('mchango-crud request', { method: req.method, path: url.pathname, hasAuth: !!authHeader });
 
     // GET /mchango-crud - List all active public mchangos (or user's own)
     if (req.method === 'GET' && !id) {
@@ -99,6 +101,7 @@ serve(async (req) => {
     if (req.method === 'POST') {
       const body = await req.json();
       const { data: { user } } = await supabaseClient.auth.getUser();
+      console.log('mchango-crud POST user', { hasUser: !!user, userId: user?.id });
 
       if (!user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {

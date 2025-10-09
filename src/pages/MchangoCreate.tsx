@@ -41,6 +41,13 @@ const MchangoCreate = () => {
     setIsLoading(true);
 
     try {
+      // Ensure session is valid before submitting
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error("Session expired. Please log in again");
+        navigate("/auth");
+        return;
+      }
       const formData = new FormData(e.currentTarget);
       
       const mchangoData = {
