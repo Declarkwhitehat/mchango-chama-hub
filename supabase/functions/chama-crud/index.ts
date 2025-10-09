@@ -14,11 +14,12 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '').trim() || null;
     
-    // Create Supabase client with auth header for user context
+    // Create Supabase client with anon key and forward Authorization for user context
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
           headers: authHeader ? { Authorization: authHeader } : {},
@@ -114,7 +115,10 @@ serve(async (req) => {
     // POST /chama-crud - Create new chama
     if (req.method === 'POST') {
       const body = await req.json();
-      const { data: { user } } = await supabaseClient.auth.getUser();
+      const userRes = token
+        ? await supabaseClient.auth.getUser(token)
+        : await supabaseClient.auth.getUser();
+      const user = userRes.data.user;
       console.log('chama-crud POST user', { hasUser: !!user, userId: user?.id });
 
       if (!user) {
