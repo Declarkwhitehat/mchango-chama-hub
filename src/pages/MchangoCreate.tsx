@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ const MchangoCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     const checkKycStatus = async () => {
@@ -50,7 +51,11 @@ const MchangoCreate = () => {
         navigate("/auth");
         return;
       }
-      const formData = new FormData(e.currentTarget);
+      const form = formRef.current;
+      if (!form) {
+        throw new Error("Form not found");
+      }
+      const formData = new FormData(form);
       
       const mchangoData = {
         title: formData.get("title") as string,
@@ -134,7 +139,7 @@ const MchangoCreate = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="title">Campaign Title</Label>
                 <Input
