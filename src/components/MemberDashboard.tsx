@@ -7,6 +7,7 @@ import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { CheckCircle2, TrendingUp, Calendar, CreditCard, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface MemberDashboardProps {
   chamaId: string;
@@ -18,6 +19,28 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
 
   useEffect(() => {
     loadDashboard();
+
+    // Set up realtime subscription for contributions
+    const channel: RealtimeChannel = supabase
+      .channel('contributions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contributions',
+          filter: `chama_id=eq.${chamaId}`
+        },
+        () => {
+          console.log('Contribution changed, reloading dashboard...');
+          loadDashboard();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [chamaId]);
 
   const loadDashboard = async () => {
@@ -32,13 +55,7 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('member-dashboard', {
-        body: {},
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        method: 'GET',
-      });
+      const { data, error } = await supabase.functions.invoke('member-dashboard');
 
       if (error) throw error;
 
@@ -228,27 +245,39 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
                 {payment_history.map((payment: any) => (
                   <TableRow key={payment.id}>
                     <TableCell>
-                      {new Date(payment.contribution_date).toLocaleDateString()}
+                      <div>
+                        <p>{new Date(payment.contribution_date).toLocaleDateString()}</p>
+                        {payment.payment_notes && (
+                          <p className="text-xs text-muted-foreground mt-1">{payment.payment_notes}</p>
+                        )}
+                      </div>
                     </TableCell>
-                  <TableCell className="font-medium">
-                    KES {payment.amount.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {payment.payment_reference}
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'}>
-                        {payment.status}
-                      </Badge>
-                      {payment.status === 'completed' && (
-                        <p className="text-xs text-muted-foreground">
-                          Net: KES {(payment.amount * (1 - (chama.commission_rate || 0.05))).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  </TableCell>
-                  </TableRow>
+                   <TableCell className="font-medium">
+                     <div>
+                       <p>KES {payment.amount.toLocaleString()}</p>
+                       {payment.paid_by_member_id !== payment.member_id && (
+                         <p className="text-xs text-muted-foreground mt-1">
+                           Paid by another member
+                         </p>
+                       )}
+                     </div>
+                   </TableCell>
+                   <TableCell className="text-muted-foreground">
+                     {payment.payment_reference}
+                   </TableCell>
+                   <TableCell>
+                     <div className="space-y-1">
+                       <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'}>
+                         {payment.status}
+                       </Badge>
+                       {payment.status === 'completed' && (
+                         <p className="text-xs text-muted-foreground">
+                           Net: KES {(payment.amount * (1 - (chama.commission_rate || 0.05))).toLocaleString()}
+                         </p>
+                       )}
+                     </div>
+                   </TableCell>
+                   </TableRow>
                 ))}
               </TableBody>
             </Table>

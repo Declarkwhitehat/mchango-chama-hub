@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChamaInviteManager } from "@/components/ChamaInviteManager";
 import { MemberDashboard } from "@/components/MemberDashboard";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
+import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 import { Users, Calendar, TrendingUp, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -165,6 +166,16 @@ const ChamaDetail = () => {
         {/* Manager Tools */}
         {isManager && (
           <ChamaInviteManager chamaId={chama.id} isManager={true} />
+        )}
+
+        {/* Payment Form - Only visible to approved members */}
+        {isMember && (
+          <ChamaPaymentForm
+            chamaId={chama.id}
+            currentMemberId={currentUserMembership.id}
+            contributionAmount={chama.contribution_amount}
+            onPaymentSuccess={loadChama}
+          />
         )}
 
         {/* Tabs - Only visible to approved members */}

@@ -293,6 +293,8 @@ export type Database = {
           created_at: string
           id: string
           member_id: string
+          paid_by_member_id: string | null
+          payment_notes: string | null
           payment_reference: string
           status: Database["public"]["Enums"]["transaction_status"]
         }
@@ -303,6 +305,8 @@ export type Database = {
           created_at?: string
           id?: string
           member_id: string
+          paid_by_member_id?: string | null
+          payment_notes?: string | null
           payment_reference: string
           status?: Database["public"]["Enums"]["transaction_status"]
         }
@@ -313,6 +317,8 @@ export type Database = {
           created_at?: string
           id?: string
           member_id?: string
+          paid_by_member_id?: string | null
+          payment_notes?: string | null
           payment_reference?: string
           status?: Database["public"]["Enums"]["transaction_status"]
         }
@@ -327,6 +333,13 @@ export type Database = {
           {
             foreignKeyName: "contributions_member_id_fkey"
             columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_paid_by_member_id_fkey"
+            columns: ["paid_by_member_id"]
             isOneToOne: false
             referencedRelation: "chama_members"
             referencedColumns: ["id"]

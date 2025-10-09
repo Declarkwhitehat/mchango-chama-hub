@@ -38,7 +38,14 @@ serve(async (req) => {
         .from('contributions')
         .select(`
           *,
-          chama_members (
+          chama_members!contributions_member_id_fkey (
+            member_code,
+            profiles (
+              full_name,
+              email
+            )
+          ),
+          paid_by:chama_members!contributions_paid_by_member_id_fkey (
             member_code,
             profiles (
               full_name,
@@ -70,12 +77,28 @@ serve(async (req) => {
 
       console.log('Creating contribution:', body);
 
-      // Get member info to verify membership
+      // Get member info to verify membership (the member receiving the payment)
       const { data: member, error: memberError } = await supabaseClient
         .from('chama_members')
         .select('*, chama(contribution_amount)')
         .eq('id', body.member_id)
         .single();
+
+      // Verify the payer is also a member (if different from recipient)
+      if (body.paid_by_member_id && body.paid_by_member_id !== body.member_id) {
+        const { data: payer, error: payerError } = await supabaseClient
+          .from('chama_members')
+          .select('id, chama_id')
+          .eq('id', body.paid_by_member_id)
+          .single();
+
+        if (payerError || !payer || payer.chama_id !== member.chama_id) {
+          return new Response(JSON.stringify({ error: 'Payer must be a member of the same chama' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
 
       if (memberError || !member) {
         return new Response(JSON.stringify({ error: 'Member not found' }), {
