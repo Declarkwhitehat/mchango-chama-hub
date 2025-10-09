@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CheckCircle, XCircle, Clock, Eye } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +32,8 @@ const AdminKYC = () => {
   const [selectedSubmission, setSelectedSubmission] = useState<KYCSubmission | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [idFrontUrl, setIdFrontUrl] = useState<string | null>(null);
+  const [idBackUrl, setIdBackUrl] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is admin
@@ -56,19 +58,31 @@ const AdminKYC = () => {
 
       if (error) {
         console.error('Error checking admin access:', error);
-        toast.error("Error verifying admin access");
+        toast({
+          title: "Error",
+          description: "Error verifying admin access",
+          variant: "destructive",
+        });
         navigate("/home");
         return;
       }
 
       if (!data) {
-        toast.error("Access denied: Admin privileges required");
+        toast({
+          title: "Access Denied",
+          description: "Admin privileges required",
+          variant: "destructive",
+        });
         navigate("/home");
         return;
       }
     } catch (error) {
       console.error('Admin check error:', error);
-      toast.error("Error checking admin access");
+      toast({
+        title: "Error",
+        description: "Error checking admin access",
+        variant: "destructive",
+      });
       navigate("/home");
     }
   };
@@ -91,9 +105,40 @@ const AdminKYC = () => {
       setSubmissions(data || []);
     } catch (error: any) {
       console.error('Error fetching submissions:', error);
-      toast.error(`Failed to load KYC submissions: ${error.message}`);
+      toast({
+        title: "Error",
+        description: `Failed to load KYC submissions: ${error.message}`,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDocumentImages = async (submission: KYCSubmission) => {
+    try {
+      // Get signed URLs for the ID documents
+      if (submission.id_front_url) {
+        const { data: frontData } = await supabase.storage
+          .from('id-documents')
+          .createSignedUrl(submission.id_front_url, 3600); // 1 hour expiry
+        
+        if (frontData) {
+          setIdFrontUrl(frontData.signedUrl);
+        }
+      }
+
+      if (submission.id_back_url) {
+        const { data: backData } = await supabase.storage
+          .from('id-documents')
+          .createSignedUrl(submission.id_back_url, 3600);
+        
+        if (backData) {
+          setIdBackUrl(backData.signedUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading document images:', error);
     }
   };
 
@@ -111,12 +156,21 @@ const AdminKYC = () => {
 
       if (error) throw error;
 
-      toast.success("KYC approved successfully");
+      toast({
+        title: "Success!",
+        description: "KYC approved successfully",
+      });
       fetchSubmissions();
       setSelectedSubmission(null);
+      setIdFrontUrl(null);
+      setIdBackUrl(null);
     } catch (error: any) {
       console.error('Error approving KYC:', error);
-      toast.error("Failed to approve KYC");
+      toast({
+        title: "Error",
+        description: "Failed to approve KYC",
+        variant: "destructive",
+      });
     } finally {
       setProcessing(false);
     }
@@ -124,7 +178,11 @@ const AdminKYC = () => {
 
   const handleReject = async (submissionId: string) => {
     if (!rejectionReason.trim()) {
-      toast.error("Please provide a rejection reason");
+      toast({
+        title: "Error",
+        description: "Please provide a rejection reason",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -142,17 +200,32 @@ const AdminKYC = () => {
 
       if (error) throw error;
 
-      toast.success("KYC rejected");
+      toast({
+        title: "Success",
+        description: "KYC rejected",
+      });
       fetchSubmissions();
       setSelectedSubmission(null);
       setRejectionReason("");
+      setIdFrontUrl(null);
+      setIdBackUrl(null);
     } catch (error: any) {
       console.error('Error rejecting KYC:', error);
-      toast.error("Failed to reject KYC");
+      toast({
+        title: "Error",
+        description: "Failed to reject KYC",
+        variant: "destructive",
+      });
     } finally {
       setProcessing(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedSubmission) {
+      loadDocumentImages(selectedSubmission);
+    }
+  }, [selectedSubmission]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -229,24 +302,30 @@ const AdminKYC = () => {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-2">Front Side</p>
-                    {selectedSubmission.id_front_url ? (
+                    {idFrontUrl ? (
                       <img
-                        src={selectedSubmission.id_front_url}
+                        src={idFrontUrl}
                         alt="ID Front"
-                        className="w-full rounded border"
+                        className="w-full rounded border cursor-pointer hover:opacity-90"
+                        onClick={() => window.open(idFrontUrl, '_blank')}
                       />
+                    ) : selectedSubmission.id_front_url ? (
+                      <p className="text-sm text-muted-foreground">Loading...</p>
                     ) : (
                       <p className="text-sm text-muted-foreground">No image uploaded</p>
                     )}
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-2">Back Side</p>
-                    {selectedSubmission.id_back_url ? (
+                    {idBackUrl ? (
                       <img
-                        src={selectedSubmission.id_back_url}
+                        src={idBackUrl}
                         alt="ID Back"
-                        className="w-full rounded border"
+                        className="w-full rounded border cursor-pointer hover:opacity-90"
+                        onClick={() => window.open(idBackUrl, '_blank')}
                       />
+                    ) : selectedSubmission.id_back_url ? (
+                      <p className="text-sm text-muted-foreground">Loading...</p>
                     ) : (
                       <p className="text-sm text-muted-foreground">No image uploaded</p>
                     )}

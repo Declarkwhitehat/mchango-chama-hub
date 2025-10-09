@@ -3,11 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UsersManagement } from "@/components/admin/UsersManagement";
+import { CampaignsManagement } from "@/components/admin/CampaignsManagement";
+import { ChamaManagement } from "@/components/admin/ChamaManagement";
 import { Users, TrendingUp, DollarSign, Activity, FileCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -24,9 +27,8 @@ const Admin = () => {
     activeCampaigns: 0,
     activeGroups: 0,
     totalFundsRaised: 0,
+    pendingKyc: 0,
   });
-  const [recentUsers, setRecentUsers] = useState<any[]>([]);
-  const [recentCampaigns, setRecentCampaigns] = useState<any[]>([]);
 
   const checkAdminAccess = async () => {
     try {
@@ -46,13 +48,21 @@ const Admin = () => {
 
       if (error) {
         console.error('Error checking admin:', error);
-        toast.error("Error verifying admin access");
+        toast({
+          title: "Error",
+          description: "Error verifying admin access",
+          variant: "destructive",
+        });
         navigate("/home");
         return;
       }
 
       if (!data) {
-        toast.error("Access denied: Admin privileges required");
+        toast({
+          title: "Access Denied",
+          description: "Admin privileges required",
+          variant: "destructive",
+        });
         navigate("/home");
         return;
       }
@@ -61,7 +71,11 @@ const Admin = () => {
       await fetchAdminData();
     } catch (error) {
       console.error('Admin check error:', error);
-      toast.error("Error checking admin access");
+      toast({
+        title: "Error",
+        description: "Error checking admin access",
+        variant: "destructive",
+      });
       navigate("/home");
     } finally {
       setLoading(false);
@@ -96,47 +110,28 @@ const Admin = () => {
       // Calculate total funds raised
       const totalFunds = mchangos?.reduce((sum, m) => sum + Number(m.current_amount || 0), 0) || 0;
 
+      // Get pending KYC count
+      const { count: pendingKycCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('kyc_status', 'pending')
+        .not('kyc_submitted_at', 'is', null);
+
       setStats({
         totalUsers: usersCount || 0,
         activeCampaigns: mchangos?.length || 0,
         activeGroups: chamas?.length || 0,
         totalFundsRaised: totalFunds,
+        pendingKyc: pendingKycCount || 0,
       });
-
-      // Fetch recent users
-      const { data: recentUsersData, error: recentUsersError } = await supabase
-        .from('profiles')
-        .select('full_name, email, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (recentUsersError) throw recentUsersError;
-
-      setRecentUsers(recentUsersData?.map(u => ({
-        name: u.full_name,
-        email: u.email,
-        joined: new Date(u.created_at).toLocaleDateString()
-      })) || []);
-
-      // Fetch recent campaigns
-      const { data: recentCampaignsData, error: recentCampaignsError } = await supabase
-        .from('mchango')
-        .select('title, status, current_amount, target_amount')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (recentCampaignsError) throw recentCampaignsError;
-
-      setRecentCampaigns(recentCampaignsData?.map(c => ({
-        title: c.title,
-        status: c.status,
-        raised: Number(c.current_amount || 0),
-        goal: Number(c.target_amount || 0)
-      })) || []);
 
     } catch (error: any) {
       console.error('Error fetching admin data:', error);
-      toast.error("Failed to load admin data");
+      toast({
+        title: "Error",
+        description: "Failed to load admin data",
+        variant: "destructive",
+      });
     }
   };
 
@@ -154,7 +149,7 @@ const Admin = () => {
     <Layout showBackButton title="Admin Dashboard">
       <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Total Users</CardDescription>
@@ -164,6 +159,20 @@ const Admin = () => {
                 <Users className="h-4 w-4 text-muted-foreground" />
                 <span className="text-2xl font-bold text-foreground">
                   {stats.totalUsers.toLocaleString()}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Pending KYC</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <FileCheck className="h-4 w-4 text-muted-foreground" />
+                <span className="text-2xl font-bold text-foreground">
+                  {stats.pendingKyc}
                 </span>
               </div>
             </CardContent>
@@ -213,100 +222,52 @@ const Admin = () => {
         </div>
 
         {/* Detailed Views */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            <Button 
-              variant="outline" 
-              className="justify-start"
-              onClick={() => navigate("/admin/kyc")}
-            >
-              <FileCheck className="mr-2 h-4 w-4" />
-              Review KYC Submissions
-            </Button>
-            <Button variant="outline" className="justify-start">
-              <Users className="mr-2 h-4 w-4" />
-              Manage Users
-            </Button>
-            <Button variant="outline" className="justify-start">
-              <Activity className="mr-2 h-4 w-4" />
-              View Reports
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Detailed Views */}
-        <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="kyc" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="kyc">
+              KYC Queue
+              {stats.pendingKyc > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {stats.pendingKyc}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
             <TabsTrigger value="groups">Groups</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="users">
+          <TabsContent value="kyc">
             <Card>
               <CardHeader>
-                <CardTitle>Recent Users</CardTitle>
-                <CardDescription>Newly registered members</CardDescription>
+                <CardTitle>KYC Review Queue</CardTitle>
+                <CardDescription>
+                  {stats.pendingKyc} pending verification{stats.pendingKyc !== 1 ? 's' : ''}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {recentUsers.map((user, index) => (
-                    <div key={index} className="flex items-center justify-between pb-4 border-b border-border last:border-0">
-                      <div>
-                        <p className="font-medium text-foreground">{user.name}</p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                      </div>
-                      <span className="text-sm text-muted-foreground">{user.joined}</span>
-                    </div>
-                  ))}
-                </div>
+                <Button
+                  variant="default"
+                  onClick={() => navigate("/admin/kyc")}
+                  className="w-full"
+                >
+                  <FileCheck className="mr-2 h-4 w-4" />
+                  Open KYC Review Page
+                </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="users">
+            <UsersManagement />
           </TabsContent>
 
           <TabsContent value="campaigns">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Campaigns</CardTitle>
-                <CardDescription>Latest fundraising activities</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentCampaigns.map((campaign, index) => (
-                    <div key={index} className="flex items-center justify-between pb-4 border-b border-border last:border-0">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-foreground">{campaign.title}</p>
-                          <Badge variant={campaign.status === "active" ? "default" : "secondary"}>
-                            {campaign.status}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          KES {campaign.raised.toLocaleString()} / {campaign.goal.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <CampaignsManagement />
           </TabsContent>
 
           <TabsContent value="groups">
-            <Card>
-              <CardHeader>
-                <CardTitle>Chama Groups</CardTitle>
-                <CardDescription>Active savings groups</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>Group management features coming soon</p>
-                </div>
-              </CardContent>
-            </Card>
+            <ChamaManagement />
           </TabsContent>
         </Tabs>
       </div>
