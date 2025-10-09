@@ -3,6 +3,7 @@ import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
 import { Users, TrendingUp, Heart, Shield } from "lucide-react";
 import heroImage from "@/assets/hero-image.jpg";
+import profilePhoto from "@/assets/profile-photo.png";
 
 const Index = () => {
   return (
@@ -211,9 +212,16 @@ const Index = () => {
             <p className="text-muted-foreground">
               &copy; 2025 Chama & Mchango. Building financial futures together.
             </p>
-            <p className="text-sm text-muted-foreground">
-              Website created by <span className="font-semibold text-foreground">Declark Chacha</span>
-            </p>
+            <div className="flex items-center gap-3">
+              <img 
+                src={profilePhoto} 
+                alt="Declark Chacha" 
+                className="w-12 h-12 rounded-full object-cover border-2 border-primary/20 shadow-md"
+              />
+              <p className="text-sm text-muted-foreground">
+                Website created by <span className="font-semibold text-foreground">Declark Chacha</span>
+              </p>
+            </div>
           </div>
         </div>
       </footer>
