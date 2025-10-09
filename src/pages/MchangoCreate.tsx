@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -6,27 +6,107 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AlertCircle, CheckCircle } from "lucide-react";
 
 const MchangoCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkKycStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("kyc_status")
+        .eq("id", user.id)
+        .single();
+
+      setKycStatus(profile?.kyc_status || null);
+    };
+
+    checkKycStatus();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate campaign creation
-    setTimeout(() => {
+    try {
+      const formData = new FormData(e.currentTarget);
+      
+      const mchangoData = {
+        title: formData.get("title") as string,
+        description: formData.get("description") as string,
+        target_amount: Number(formData.get("goal")),
+        category: formData.get("category") as string,
+        image_url: formData.get("image") as string || null,
+        end_date: new Date(Date.now() + Number(formData.get("duration")) * 24 * 60 * 60 * 1000).toISOString(),
+      };
+
+      const { data, error } = await supabase.functions.invoke("mchango-crud", {
+        body: mchangoData,
+        method: "POST",
+      });
+
+      if (error) throw error;
+
       toast.success("Campaign created successfully!");
-      navigate("/home");
+      navigate(`/mchango/${data.data.slug}`);
+    } catch (error: any) {
+      console.error("Error creating campaign:", error);
+      toast.error(error.message || "Failed to create campaign");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
+
+  if (kycStatus === null) {
+    return (
+      <Layout showBackButton title="Create Mchango">
+        <div className="container px-4 py-6 max-w-2xl mx-auto">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-center text-muted-foreground">Loading...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout showBackButton title="Create Mchango">
       <div className="container px-4 py-6 max-w-2xl mx-auto">
+        {kycStatus !== "approved" && (
+          <Alert className="mb-4 border-warning bg-warning/10">
+            <AlertCircle className="h-4 w-4 text-warning" />
+            <AlertDescription>
+              You must complete KYC verification before creating a campaign.{" "}
+              <a href="/kyc-upload" className="underline font-medium">
+                Complete KYC now
+              </a>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {kycStatus === "approved" && (
+          <Alert className="mb-4 border-success bg-success/10">
+            <CheckCircle className="h-4 w-4 text-success" />
+            <AlertDescription>
+              Your KYC is approved. You can now create a campaign.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Start a Fundraiser</CardTitle>
@@ -40,8 +120,10 @@ const MchangoCreate = () => {
                 <Label htmlFor="title">Campaign Title</Label>
                 <Input
                   id="title"
+                  name="title"
                   placeholder="e.g., Medical Emergency Fund"
                   required
+                  disabled={kycStatus !== "approved"}
                 />
               </div>
 
@@ -49,9 +131,11 @@ const MchangoCreate = () => {
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
+                  name="description"
                   placeholder="Tell your story and explain why you need support..."
                   rows={5}
                   required
+                  disabled={kycStatus !== "approved"}
                 />
               </div>
 
@@ -60,10 +144,12 @@ const MchangoCreate = () => {
                   <Label htmlFor="goal">Goal Amount (KES)</Label>
                   <Input
                     id="goal"
+                    name="goal"
                     type="number"
                     placeholder="50000"
                     min="1000"
                     required
+                    disabled={kycStatus !== "approved"}
                   />
                 </div>
 
@@ -71,11 +157,13 @@ const MchangoCreate = () => {
                   <Label htmlFor="duration">Duration (days)</Label>
                   <Input
                     id="duration"
+                    name="duration"
                     type="number"
                     placeholder="30"
                     min="1"
                     max="90"
                     required
+                    disabled={kycStatus !== "approved"}
                   />
                 </div>
               </div>
@@ -84,8 +172,10 @@ const MchangoCreate = () => {
                 <Label htmlFor="category">Category</Label>
                 <select
                   id="category"
+                  name="category"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   required
+                  disabled={kycStatus !== "approved"}
                 >
                   <option value="">Select a category</option>
                   <option value="medical">Medical</option>
@@ -100,17 +190,19 @@ const MchangoCreate = () => {
                 <Label htmlFor="image">Campaign Image URL (optional)</Label>
                 <Input
                   id="image"
+                  name="image"
                   type="url"
                   placeholder="https://example.com/image.jpg"
+                  disabled={kycStatus !== "approved"}
                 />
               </div>
 
               <div className="pt-4">
                 <Button
                   type="submit"
-                  variant="hero"
+                  variant="default"
                   className="w-full"
-                  disabled={isLoading}
+                  disabled={isLoading || kycStatus !== "approved"}
                 >
                   {isLoading ? "Creating..." : "Create Campaign"}
                 </Button>
