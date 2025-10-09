@@ -52,15 +52,24 @@ const MchangoCreate = () => {
         end_date: new Date(Date.now() + Number(formData.get("duration")) * 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      const { data, error } = await supabase.functions.invoke("mchango-crud", {
+      const res = await supabase.functions.invoke("mchango-crud", {
         body: mchangoData,
-        method: "POST",
       });
 
-      if (error) throw error;
+      if (res.error) {
+        console.error("Mchango create invoke error:", res.error, res.data);
+        const apiError = (res.data as any)?.error || (res.data as any)?.message;
+        throw new Error(apiError || res.error.message || "Failed to create campaign");
+      }
+
+      const created = (res.data as any)?.data;
+      if (!created?.slug) {
+        console.error("Unexpected response from mchango-crud:", res.data);
+        throw new Error("Unexpected response from server");
+      }
 
       toast.success("Campaign created successfully!");
-      navigate(`/mchango/${data.data.slug}`);
+      navigate(`/mchango/${created.slug}`);
     } catch (error: any) {
       console.error("Error creating campaign:", error);
       toast.error(error.message || "Failed to create campaign");

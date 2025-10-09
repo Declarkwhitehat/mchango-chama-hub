@@ -64,19 +64,28 @@ const ChamaCreate = () => {
         whatsapp_link: formData.get("whatsapp_link") as string || null,
       };
 
-      const { data, error } = await supabase.functions.invoke("chama-crud", {
+      const res = await supabase.functions.invoke("chama-crud", {
         body: chamaData,
-        method: "POST",
       });
 
-      if (error) throw error;
+      if (res.error) {
+        console.error("Chama create invoke error:", res.error, res.data);
+        const apiError = (res.data as any)?.error || (res.data as any)?.message;
+        throw new Error(apiError || res.error.message || "Failed to create chama");
+      }
+
+      const created = (res.data as any)?.data;
+      if (!created?.slug) {
+        console.error("Unexpected response from chama-crud:", res.data);
+        throw new Error("Unexpected response from server");
+      }
 
       toast({
         title: "Success!",
         description: "Chama created successfully",
       });
       
-      navigate(`/chama/${data.data.slug}`);
+      navigate(`/chama/${created.slug}`);
     } catch (error: any) {
       console.error("Error creating chama:", error);
       toast({
