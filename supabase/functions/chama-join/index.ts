@@ -34,37 +34,34 @@ serve(async (req) => {
       });
     }
 
-    // POST /chama-join - Join chama using invite code
+    // POST /chama-join - Join chama directly (no invite code needed)
     if (req.method === 'POST') {
       const body = await req.json();
-      const { code } = body;
+      const { chama_id } = body;
 
-      if (!code) {
-        return new Response(JSON.stringify({ error: 'Invite code is required' }), {
+      if (!chama_id) {
+        return new Response(JSON.stringify({ error: 'Chama ID is required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Validate invite code
-      const { data: inviteCode, error: inviteError } = await supabaseClient
-        .from('chama_invite_codes')
-        .select('*, chama(*)')
-        .eq('code', code.toUpperCase())
-        .eq('is_active', true)
-        .is('used_by', null)
+      // Verify chama exists and is public/active
+      const { data: chama, error: chamaError } = await supabaseClient
+        .from('chama')
+        .select('id, name, is_public, status')
+        .eq('id', chama_id)
         .single();
 
-      if (inviteError || !inviteCode) {
-        return new Response(JSON.stringify({ error: 'Invalid or expired invite code' }), {
+      if (chamaError || !chama) {
+        return new Response(JSON.stringify({ error: 'Chama not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Check expiration
-      if (inviteCode.expires_at && new Date(inviteCode.expires_at) < new Date()) {
-        return new Response(JSON.stringify({ error: 'Invite code has expired' }), {
+      if (!chama.is_public || chama.status !== 'active') {
+        return new Response(JSON.stringify({ error: 'This chama is not accepting new members' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -74,7 +71,7 @@ serve(async (req) => {
       const { data: existingMember } = await supabaseClient
         .from('chama_members')
         .select('id, status, approval_status')
-        .eq('chama_id', inviteCode.chama_id)
+        .eq('chama_id', chama_id)
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -101,7 +98,7 @@ serve(async (req) => {
       const { data: members } = await supabaseClient
         .from('chama_members')
         .select('order_index')
-        .eq('chama_id', inviteCode.chama_id)
+        .eq('chama_id', chama_id)
         .not('order_index', 'is', null)
         .order('order_index', { ascending: false })
         .limit(1);
@@ -113,7 +110,7 @@ serve(async (req) => {
       // Generate member code
       const { data: memberCodeData } = await supabaseClient
         .rpc('generate_member_code', { 
-          p_chama_id: inviteCode.chama_id,
+          p_chama_id: chama_id,
           p_order_index: nextOrderIndex 
         });
 
@@ -121,7 +118,7 @@ serve(async (req) => {
       const { data: newMember, error: memberError } = await supabaseClient
         .from('chama_members')
         .insert({
-          chama_id: inviteCode.chama_id,
+          chama_id: chama_id,
           user_id: user.id,
           member_code: memberCodeData,
           order_index: nextOrderIndex,
@@ -137,17 +134,7 @@ serve(async (req) => {
         throw memberError;
       }
 
-      // Mark invite code as used
-      await supabaseClient
-        .from('chama_invite_codes')
-        .update({ 
-          used_by: user.id,
-          used_at: new Date().toISOString(),
-          is_active: false
-        })
-        .eq('id', inviteCode.id);
-
-      console.log(`User ${user.id} joined chama ${inviteCode.chama_id} with code ${code}`);
+      console.log(`User ${user.id} requested to join chama ${chama_id}`);
 
       return new Response(JSON.stringify({ 
         data: newMember,
