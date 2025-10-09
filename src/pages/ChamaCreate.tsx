@@ -51,12 +51,14 @@ const ChamaCreate = () => {
     try {
       // Ensure session is valid before submitting
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
+      const { data: userCheck } = await supabase.auth.getUser();
+      if (!session?.access_token || !userCheck?.user) {
         toast({
           title: "Session expired",
           description: "Please log in again",
           variant: "destructive",
         });
+        await supabase.auth.signOut();
         navigate("/auth");
         return;
       }
@@ -77,6 +79,7 @@ const ChamaCreate = () => {
 
       const res = await supabase.functions.invoke("chama-crud", {
         body: chamaData,
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (res.error) {

@@ -43,8 +43,10 @@ const MchangoCreate = () => {
     try {
       // Ensure session is valid before submitting
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
+      const { data: userCheck } = await supabase.auth.getUser();
+      if (!session?.access_token || !userCheck?.user) {
         toast.error("Session expired. Please log in again");
+        await supabase.auth.signOut();
         navigate("/auth");
         return;
       }
@@ -61,6 +63,7 @@ const MchangoCreate = () => {
 
       const res = await supabase.functions.invoke("mchango-crud", {
         body: mchangoData,
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (res.error) {
