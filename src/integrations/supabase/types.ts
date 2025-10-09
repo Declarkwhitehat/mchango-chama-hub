@@ -720,6 +720,7 @@ export type Database = {
           amount: number
           chama_id: string | null
           commission_amount: number
+          completed_at: string | null
           created_at: string
           id: string
           mchango_id: string | null
@@ -738,6 +739,7 @@ export type Database = {
           amount: number
           chama_id?: string | null
           commission_amount?: number
+          completed_at?: string | null
           created_at?: string
           id?: string
           mchango_id?: string | null
@@ -756,6 +758,7 @@ export type Database = {
           amount?: number
           chama_id?: string | null
           commission_amount?: number
+          completed_at?: string | null
           created_at?: string
           id?: string
           mchango_id?: string | null
