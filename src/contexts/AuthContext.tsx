@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, retryCount = 0): Promise<void> => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -52,24 +52,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If profile doesn't exist yet, retry up to 3 times with exponential backoff
+        if (error.code === 'PGRST116' && retryCount < 3) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+          return fetchProfile(userId, retryCount + 1);
+        }
+        throw error;
+      }
       setProfile(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching profile:', error);
+      // Don't throw - allow user to remain authenticated even if profile fetch fails
+      // Profile will be null but user/session will be valid
     }
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (!mounted) return;
+
+        console.log('Auth state changed:', event);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
+          // Use queueMicrotask instead of setTimeout for better performance
+          queueMicrotask(() => {
+            if (mounted) {
+              fetchProfile(session.user.id);
+            }
+          });
         } else {
           setProfile(null);
         }
@@ -78,17 +95,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
+        fetchProfile(session.user.id).finally(() => {
+          if (mounted) setLoading(false);
+        });
       } else {
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (data: {
