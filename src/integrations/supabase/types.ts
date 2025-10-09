@@ -60,42 +60,57 @@ export type Database = {
       }
       chama: {
         Row: {
+          commission_rate: number | null
           contribution_amount: number
           contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
           created_at: string
           created_by: string
           description: string | null
+          every_n_days_count: number | null
           id: string
+          is_public: boolean | null
           max_members: number
+          min_members: number | null
           name: string
+          payout_order: string | null
           slug: string
           status: Database["public"]["Enums"]["chama_status"]
           updated_at: string
           whatsapp_link: string | null
         }
         Insert: {
+          commission_rate?: number | null
           contribution_amount: number
           contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
           created_at?: string
           created_by: string
           description?: string | null
+          every_n_days_count?: number | null
           id?: string
+          is_public?: boolean | null
           max_members?: number
+          min_members?: number | null
           name: string
+          payout_order?: string | null
           slug: string
           status?: Database["public"]["Enums"]["chama_status"]
           updated_at?: string
           whatsapp_link?: string | null
         }
         Update: {
+          commission_rate?: number | null
           contribution_amount?: number
           contribution_frequency?: Database["public"]["Enums"]["contribution_frequency"]
           created_at?: string
           created_by?: string
           description?: string | null
+          every_n_days_count?: number | null
           id?: string
+          is_public?: boolean | null
           max_members?: number
+          min_members?: number | null
           name?: string
+          payout_order?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["chama_status"]
           updated_at?: string
@@ -545,7 +560,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       chama_status: "active" | "inactive" | "completed"
-      contribution_frequency: "daily" | "weekly" | "monthly"
+      contribution_frequency: "daily" | "weekly" | "monthly" | "every_n_days"
       kyc_status: "pending" | "approved" | "rejected"
       mchango_status: "active" | "completed" | "cancelled"
       member_status: "active" | "inactive" | "left"
@@ -681,7 +696,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       chama_status: ["active", "inactive", "completed"],
-      contribution_frequency: ["daily", "weekly", "monthly"],
+      contribution_frequency: ["daily", "weekly", "monthly", "every_n_days"],
       kyc_status: ["pending", "approved", "rejected"],
       mchango_status: ["active", "completed", "cancelled"],
       member_status: ["active", "inactive", "left"],

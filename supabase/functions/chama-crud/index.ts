@@ -114,6 +114,63 @@ serve(async (req) => {
         });
       }
 
+      // Check KYC status
+      const { data: profile, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('kyc_status')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile) {
+        return new Response(JSON.stringify({ error: 'Profile not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (profile.kyc_status !== 'approved') {
+        return new Response(JSON.stringify({ 
+          error: 'KYC verification required',
+          message: 'You must complete KYC verification before creating a chama'
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Validate constraints
+      const minMembers = body.min_members || 5;
+      const maxMembers = body.max_members || 50;
+
+      if (minMembers < 5) {
+        return new Response(JSON.stringify({ error: 'Minimum members must be at least 5' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (maxMembers > 100) {
+        return new Response(JSON.stringify({ error: 'Maximum members cannot exceed 100' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (maxMembers < minMembers) {
+        return new Response(JSON.stringify({ error: 'Maximum members must be greater than minimum members' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Validate every_n_days_count if frequency is every_n_days
+      if (body.contribution_frequency === 'every_n_days' && (!body.every_n_days_count || body.every_n_days_count < 1)) {
+        return new Response(JSON.stringify({ error: 'Every N days count must be specified and greater than 0' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       // Generate slug from name
       const slug = body.name
         .toLowerCase()
@@ -123,26 +180,30 @@ serve(async (req) => {
       const { data, error } = await supabaseClient
         .from('chama')
         .insert({
-          ...body,
+          name: body.name,
+          description: body.description,
           slug: body.slug || slug,
+          contribution_amount: body.contribution_amount,
+          contribution_frequency: body.contribution_frequency,
+          every_n_days_count: body.every_n_days_count,
+          min_members: minMembers,
+          max_members: maxMembers,
+          is_public: body.is_public !== undefined ? body.is_public : true,
+          payout_order: body.payout_order || 'join_date',
+          commission_rate: body.commission_rate || 0.05,
+          whatsapp_link: body.whatsapp_link,
           created_by: user.id,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Chama creation error:', error);
+        throw error;
+      }
 
-      // Add creator as first member and manager
-      const memberCode = `${slug.substring(0, 3).toUpperCase()}001`;
-      await supabaseClient
-        .from('chama_members')
-        .insert({
-          chama_id: data.id,
-          user_id: user.id,
-          member_code: memberCode,
-          is_manager: true,
-          status: 'active',
-        });
+      // Creator is automatically added as manager via trigger
+      console.log('Chama created successfully:', data.id);
 
       return new Response(JSON.stringify({ data }), {
         status: 201,
