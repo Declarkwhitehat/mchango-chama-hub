@@ -15,11 +15,10 @@ import { toast } from "@/hooks/use-toast";
 const Admin = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  
-  // Check admin access
+
+  // Load admin data on mount
   useEffect(() => {
-    checkAdminAccess();
+    fetchAdminData();
   }, []);
 
   const [stats, setStats] = useState({
@@ -29,65 +28,6 @@ const Admin = () => {
     totalFundsRaised: 0,
     pendingKyc: 0,
   });
-
-  const checkAdminAccess = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      console.log('Current user:', user?.email);
-      
-      if (!user) {
-        console.log('No user found, redirecting to auth');
-        navigate("/auth");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      console.log('Admin role check:', { data, error });
-
-      if (error) {
-        console.error('Error checking admin:', error);
-        toast({
-          title: "Error",
-          description: `Error verifying admin access: ${error.message}`,
-          variant: "destructive",
-        });
-        navigate("/home");
-        return;
-      }
-
-      if (!data) {
-        console.log('User is not an admin');
-        toast({
-          title: "Access Denied",
-          description: `Admin privileges required. Current user: ${user.email}`,
-          variant: "destructive",
-        });
-        navigate("/home");
-        return;
-      }
-
-      console.log('Admin access granted');
-      setIsAdmin(true);
-      await fetchAdminData();
-    } catch (error) {
-      console.error('Admin check error:', error);
-      toast({
-        title: "Error",
-        description: "Error checking admin access",
-        variant: "destructive",
-      });
-      navigate("/home");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchAdminData = async () => {
     try {
@@ -139,6 +79,8 @@ const Admin = () => {
         description: "Failed to load admin data",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 

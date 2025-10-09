@@ -18,6 +18,7 @@ import AdminKYC from "./pages/AdminKYC";
 import KYCUpload from "./pages/KYCUpload";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -39,8 +40,8 @@ const App = () => (
           <Route path="/chama/join" element={<ProtectedRoute><ChamaJoin /></ProtectedRoute>} />
           <Route path="/chama/:id" element={<ChamaDetail />} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-          <Route path="/admin/kyc" element={<ProtectedRoute><AdminKYC /></ProtectedRoute>} />
+          <Route path="/admin" element={<AdminProtectedRoute><Admin /></AdminProtectedRoute>} />
+          <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
