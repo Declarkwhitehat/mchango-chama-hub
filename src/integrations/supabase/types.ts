@@ -187,33 +187,45 @@ export type Database = {
       chama_members: {
         Row: {
           approval_status: string | null
+          balance_credit: number | null
+          balance_deficit: number | null
           chama_id: string
           id: string
           is_manager: boolean
           joined_at: string
+          last_payment_date: string | null
           member_code: string
+          next_due_date: string | null
           order_index: number | null
           status: Database["public"]["Enums"]["member_status"]
           user_id: string | null
         }
         Insert: {
           approval_status?: string | null
+          balance_credit?: number | null
+          balance_deficit?: number | null
           chama_id: string
           id?: string
           is_manager?: boolean
           joined_at?: string
+          last_payment_date?: string | null
           member_code: string
+          next_due_date?: string | null
           order_index?: number | null
           status?: Database["public"]["Enums"]["member_status"]
           user_id?: string | null
         }
         Update: {
           approval_status?: string | null
+          balance_credit?: number | null
+          balance_deficit?: number | null
           chama_id?: string
           id?: string
           is_manager?: boolean
           joined_at?: string
+          last_payment_date?: string | null
           member_code?: string
+          next_due_date?: string | null
           order_index?: number | null
           status?: Database["public"]["Enums"]["member_status"]
           user_id?: string | null
@@ -231,6 +243,44 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contribution_cycles: {
+        Row: {
+          chama_id: string
+          created_at: string | null
+          cycle_number: number
+          due_amount: number
+          end_date: string
+          id: string
+          start_date: string
+        }
+        Insert: {
+          chama_id: string
+          created_at?: string | null
+          cycle_number: number
+          due_amount: number
+          end_date: string
+          id?: string
+          start_date: string
+        }
+        Update: {
+          chama_id?: string
+          created_at?: string | null
+          cycle_number?: number
+          due_amount?: number
+          end_date?: string
+          id?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contribution_cycles_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
             referencedColumns: ["id"]
           },
         ]
@@ -403,6 +453,54 @@ export type Database = {
             columns: ["mchango_id"]
             isOneToOne: false
             referencedRelation: "mchango"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_cycle_payments: {
+        Row: {
+          amount_due: number
+          amount_paid: number | null
+          created_at: string | null
+          cycle_id: string
+          id: string
+          is_paid: boolean | null
+          member_id: string
+          paid_at: string | null
+        }
+        Insert: {
+          amount_due: number
+          amount_paid?: number | null
+          created_at?: string | null
+          cycle_id: string
+          id?: string
+          is_paid?: boolean | null
+          member_id: string
+          paid_at?: string | null
+        }
+        Update: {
+          amount_due?: number
+          amount_paid?: number | null
+          created_at?: string | null
+          cycle_id?: string
+          id?: string
+          is_paid?: boolean | null
+          member_id?: string
+          paid_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_cycle_payments_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "contribution_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_cycle_payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
             referencedColumns: ["id"]
           },
         ]
@@ -609,6 +707,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_next_due_date: {
+        Args: { p_chama_id: string; p_last_payment_date: string }
+        Returns: string
+      }
       generate_invite_code: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -620,6 +722,14 @@ export type Database = {
       generate_slug: {
         Args: { title: string }
         Returns: string
+      }
+      get_member_payout_position: {
+        Args: { p_member_id: string }
+        Returns: {
+          estimated_amount: number
+          estimated_payout_date: string
+          position_in_queue: number
+        }[]
       }
       has_role: {
         Args: {

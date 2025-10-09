@@ -68,6 +68,40 @@ serve(async (req) => {
         });
       }
 
+      console.log('Creating contribution:', body);
+
+      // Get member info to verify membership
+      const { data: member, error: memberError } = await supabaseClient
+        .from('chama_members')
+        .select('*, chama(contribution_amount)')
+        .eq('id', body.member_id)
+        .single();
+
+      if (memberError || !member) {
+        return new Response(JSON.stringify({ error: 'Member not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const expectedAmount = member.chama.contribution_amount;
+      const paidAmount = body.amount;
+
+      // Calculate overpayment or underpayment
+      let creditDelta = 0;
+      let deficitDelta = 0;
+
+      if (paidAmount > expectedAmount) {
+        // Overpayment - add to credit
+        creditDelta = paidAmount - expectedAmount;
+        console.log('Overpayment detected:', { paidAmount, expectedAmount, creditDelta });
+      } else if (paidAmount < expectedAmount) {
+        // Underpayment - add to deficit
+        deficitDelta = expectedAmount - paidAmount;
+        console.log('Underpayment detected:', { paidAmount, expectedAmount, deficitDelta });
+      }
+
+      // Insert contribution
       const { data, error } = await supabaseClient
         .from('contributions')
         .insert(body)
@@ -76,7 +110,31 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      return new Response(JSON.stringify({ data }), {
+      // Update member balance
+      if (creditDelta > 0 || deficitDelta > 0) {
+        const { error: updateError } = await supabaseClient
+          .from('chama_members')
+          .update({
+            balance_credit: member.balance_credit + creditDelta,
+            balance_deficit: member.balance_deficit + deficitDelta,
+            last_payment_date: new Date().toISOString(),
+          })
+          .eq('id', body.member_id);
+
+        if (updateError) {
+          console.error('Error updating member balance:', updateError);
+        } else {
+          console.log('Member balance updated:', { creditDelta, deficitDelta });
+        }
+      }
+
+      return new Response(JSON.stringify({ 
+        data,
+        balance_update: {
+          credit_added: creditDelta,
+          deficit_added: deficitDelta,
+        }
+      }), {
         status: 201,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

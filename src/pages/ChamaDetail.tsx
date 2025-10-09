@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChamaInviteManager } from "@/components/ChamaInviteManager";
+import { MemberDashboard } from "@/components/MemberDashboard";
 import { Users, Calendar, TrendingUp, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -156,11 +157,16 @@ const ChamaDetail = () => {
 
         {/* Tabs - Only visible to approved members */}
         {isMember && (
-          <Tabs defaultValue="members" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+          <Tabs defaultValue="dashboard" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="members">Members</TabsTrigger>
               <TabsTrigger value="details">Details</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="dashboard">
+              <MemberDashboard chamaId={chama.id} />
+            </TabsContent>
 
             <TabsContent value="members">
               <Card>
