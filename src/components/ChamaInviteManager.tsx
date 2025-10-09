@@ -1,28 +1,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Copy, Check, X, AlertCircle, Users } from "lucide-react";
+import { Copy, Check, X, Link2, Users } from "lucide-react";
 import { format } from "date-fns";
-
-interface InviteCode {
-  id: string;
-  code: string;
-  created_at: string;
-  used_by: string | null;
-  used_at: string | null;
-  is_active: boolean;
-  expires_at: string | null;
-  used_profile?: {
-    full_name: string;
-    email: string;
-  };
-}
 
 interface PendingMember {
   id: string;
@@ -38,38 +22,19 @@ interface PendingMember {
 
 interface ChamaInviteManagerProps {
   chamaId: string;
+  chamaSlug: string;
   isManager: boolean;
 }
 
-export const ChamaInviteManager = ({ chamaId, isManager }: ChamaInviteManagerProps) => {
-  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
+export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInviteManagerProps) => {
   const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
-  const [generateCount, setGenerateCount] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     if (isManager) {
-      loadInviteCodes();
       loadPendingMembers();
     }
   }, [chamaId, isManager]);
-
-  const loadInviteCodes = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return;
-    
-    const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-    
-    if (error) {
-      console.error("Error loading invite codes:", error);
-      return;
-    }
-
-    setInviteCodes(data.data || []);
-  };
 
   const loadPendingMembers = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -87,65 +52,15 @@ export const ChamaInviteManager = ({ chamaId, isManager }: ChamaInviteManagerPro
     setPendingMembers(data.data || []);
   };
 
-  const handleGenerateCodes = async () => {
-    if (generateCount < 1 || generateCount > 20) {
-      toast({
-        title: "Invalid count",
-        description: "Please generate between 1 and 20 codes at a time",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast({
-          title: "Error",
-          description: "Please log in to continue",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke("chama-invite/generate", {
-        body: {
-          chama_id: chamaId,
-          count: generateCount,
-        },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success!",
-        description: `Generated ${data.data.length} invite code(s)`,
-      });
-
-      await loadInviteCodes();
-      setGenerateCount(1);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to generate invite codes",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const copyToClipboard = async (code: string) => {
-    const inviteUrl = `${window.location.origin}/chama/join?code=${code}`;
+  const copyInviteLink = async () => {
+    const inviteUrl = `${window.location.origin}/chama/join/${chamaSlug}`;
     await navigator.clipboard.writeText(inviteUrl);
-    setCopiedCode(code);
+    setCopiedLink(true);
     toast({
       title: "Copied!",
       description: "Invite link copied to clipboard",
     });
-    setTimeout(() => setCopiedCode(null), 2000);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleApproval = async (memberId: string, action: "approve" | "reject") => {
@@ -189,6 +104,48 @@ export const ChamaInviteManager = ({ chamaId, isManager }: ChamaInviteManagerPro
 
   return (
     <div className="space-y-6">
+      {/* Invite Link */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5" />
+            Invite Link
+          </CardTitle>
+          <CardDescription>
+            Share this link with people you want to invite to join the Chama
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
+              {`${window.location.origin}/chama/join/${chamaSlug}`}
+            </div>
+            <Button
+              onClick={copyInviteLink}
+              variant="outline"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="h-4 w-4 mr-1" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 mr-1" />
+                  Copy
+                </>
+              )}
+            </Button>
+          </div>
+          <Alert>
+            <Users className="h-4 w-4" />
+            <AlertDescription>
+              Anyone with this link can request to join. You'll need to approve their request before they become members.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+
       {/* Pending Join Requests */}
       {pendingMembers.length > 0 && (
         <Card>
@@ -239,110 +196,6 @@ export const ChamaInviteManager = ({ chamaId, isManager }: ChamaInviteManagerPro
           </CardContent>
         </Card>
       )}
-
-      {/* Generate Invite Codes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Generate Invite Codes</CardTitle>
-          <CardDescription>
-            Create unique invite codes for new members. Each code can be used once.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <Label htmlFor="count">Number of Codes</Label>
-              <Input
-                id="count"
-                type="number"
-                min="1"
-                max="20"
-                value={generateCount}
-                onChange={(e) => setGenerateCount(Number(e.target.value))}
-              />
-            </div>
-            <Button onClick={handleGenerateCodes} disabled={isLoading}>
-              {isLoading ? "Generating..." : "Generate"}
-            </Button>
-          </div>
-
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Generate codes based on available spots. Each code is one-time use and must be approved by managers.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-
-      {/* Invite Codes List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Invite Codes ({inviteCodes.length})</CardTitle>
-          <CardDescription>
-            Share these codes with people you want to invite
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {inviteCodes.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4">
-              No invite codes generated yet
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {inviteCodes.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <code className="text-lg font-mono font-bold">{invite.code}</code>
-                      {invite.used_by ? (
-                        <Badge variant="secondary">Used</Badge>
-                      ) : invite.is_active ? (
-                        <Badge>Active</Badge>
-                      ) : (
-                        <Badge variant="outline">Inactive</Badge>
-                      )}
-                    </div>
-                    {invite.used_by && invite.used_profile && (
-                      <p className="text-sm text-muted-foreground">
-                        Used by: {invite.used_profile.full_name} on{" "}
-                        {format(new Date(invite.used_at!), "PPp")}
-                      </p>
-                    )}
-                    {!invite.used_by && (
-                      <p className="text-xs text-muted-foreground">
-                        Created: {format(new Date(invite.created_at), "PPp")}
-                      </p>
-                    )}
-                  </div>
-                  {!invite.used_by && invite.is_active && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => copyToClipboard(invite.code)}
-                    >
-                      {copiedCode === invite.code ? (
-                        <>
-                          <Check className="h-4 w-4 mr-1" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4 mr-1" />
-                          Copy Link
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 };

@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Users, Loader2, AlertCircle } from "lucide-react";
 
 interface ChamaInfo {
   id: string;
@@ -21,78 +20,54 @@ interface ChamaInfo {
 
 const ChamaJoin = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const codeFromUrl = searchParams.get("code");
+  const { slug } = useParams();
 
-  const [code, setCode] = useState(codeFromUrl || "");
   const [chamaInfo, setChamaInfo] = useState<ChamaInfo | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isJoining, setIsJoining] = useState(false);
-  const [isValid, setIsValid] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthAndLoadChama = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        navigate("/auth", { state: { returnTo: `/chama/join${codeFromUrl ? `?code=${codeFromUrl}` : ""}` } });
+        navigate("/auth", { state: { returnTo: `/chama/join/${slug}` } });
+        return;
       }
+
+      await loadChama();
     };
 
-    checkAuth();
+    checkAuthAndLoadChama();
+  }, [slug, navigate]);
 
-    if (codeFromUrl) {
-      validateCode(codeFromUrl);
-    }
-  }, [codeFromUrl, navigate]);
-
-  const validateCode = async (inviteCode: string) => {
-    if (!inviteCode || inviteCode.length < 6) {
-      setErrorMessage("Please enter a valid invite code");
-      setIsValid(false);
-      return;
-    }
-
-    setIsValidating(true);
+  const loadChama = async () => {
+    setIsLoading(true);
     setErrorMessage("");
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setErrorMessage("Please log in to validate invite codes");
-        setIsValid(false);
-        return;
-      }
+      const { data, error } = await supabase.functions.invoke(`chama-crud/${slug}`);
 
-      const { data, error } = await supabase.functions.invoke(
-        `chama-invite/validate?code=${inviteCode.toUpperCase()}`,
-        {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        }
-      );
+      if (error) throw error;
 
-      if (error || !data.valid) {
-        setErrorMessage(data?.error || "Invalid or expired invite code");
-        setIsValid(false);
-        setChamaInfo(null);
-        return;
-      }
-
-      setIsValid(true);
-      setChamaInfo(data.data.chama);
+      setChamaInfo({
+        id: data.data.id,
+        name: data.data.name,
+        slug: data.data.slug,
+        description: data.data.description,
+        contribution_amount: data.data.contribution_amount,
+        contribution_frequency: data.data.contribution_frequency,
+      });
     } catch (error: any) {
-      setErrorMessage(error.message || "Failed to validate code");
-      setIsValid(false);
+      setErrorMessage(error.message || "Failed to load chama details");
     } finally {
-      setIsValidating(false);
+      setIsLoading(false);
     }
   };
 
-  const handleValidate = () => {
-    validateCode(code);
-  };
-
   const handleJoin = async () => {
+    if (!chamaInfo) return;
+
     setIsJoining(true);
 
     try {
@@ -107,7 +82,7 @@ const ChamaJoin = () => {
       }
 
       const { data, error } = await supabase.functions.invoke("chama-join", {
-        body: { code: code.toUpperCase() },
+        body: { chama_id: chamaInfo.id },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
@@ -115,11 +90,11 @@ const ChamaJoin = () => {
 
       toast({
         title: "Success!",
-        description: data.message || "Join request submitted successfully",
+        description: data.message || "Join request submitted successfully! Waiting for manager approval.",
       });
 
       // Navigate to chama detail page
-      navigate(`/chama/${chamaInfo?.slug}`);
+      navigate(`/chama/${chamaInfo.slug}`);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -131,68 +106,39 @@ const ChamaJoin = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <Layout showBackButton title="Join Chama">
+        <div className="container px-4 py-6 max-w-2xl mx-auto flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout showBackButton title="Join Chama">
       <div className="container px-4 py-6 max-w-2xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>Join a Chama</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Join {chamaInfo?.name || "Chama"}
+            </CardTitle>
             <CardDescription>
-              Enter your invite code to join a chama group
+              Submit your request to join this chama group
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="code">Invite Code</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="code"
-                    placeholder="Enter 8-character code"
-                    value={code}
-                    onChange={(e) => {
-                      setCode(e.target.value.toUpperCase());
-                      setIsValid(false);
-                      setErrorMessage("");
-                    }}
-                    maxLength={8}
-                    className="font-mono"
-                  />
-                  <Button
-                    onClick={handleValidate}
-                    disabled={isValidating || code.length < 6}
-                  >
-                    {isValidating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Validating...
-                      </>
-                    ) : (
-                      "Validate"
-                    )}
-                  </Button>
-                </div>
-              </div>
+            {errorMessage && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
 
-              {errorMessage && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{errorMessage}</AlertDescription>
-                </Alert>
-              )}
-
-              {isValid && chamaInfo && (
-                <Alert className="border-success bg-success/10">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  <AlertDescription>
-                    Valid invite code! You can join this chama.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-
-            {isValid && chamaInfo && (
-              <div className="space-y-4 pt-4 border-t">
+            {chamaInfo && (
+              <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Chama Details</h3>
                 
                 <div className="space-y-3">
@@ -222,7 +168,7 @@ const ChamaJoin = () => {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    Your join request will be pending until a manager approves it.
+                    Your join request will be pending until a manager approves it. You'll be notified once approved.
                   </AlertDescription>
                 </Alert>
 
@@ -234,7 +180,7 @@ const ChamaJoin = () => {
                   {isJoining ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Joining...
+                      Submitting...
                     </>
                   ) : (
                     "Submit Join Request"

@@ -40,7 +40,7 @@ const App = () => (
           <Route path="/mchango/create" element={<ProtectedRoute requireKYC><MchangoCreate /></ProtectedRoute>} />
           <Route path="/mchango/:id" element={<MchangoDetail />} />
           <Route path="/chama/create" element={<ProtectedRoute requireKYC><ChamaCreate /></ProtectedRoute>} />
-          <Route path="/chama/join" element={<ProtectedRoute><ChamaJoin /></ProtectedRoute>} />
+          <Route path="/chama/join/:slug" element={<ProtectedRoute><ChamaJoin /></ProtectedRoute>} />
           <Route path="/chama/:id" element={<ChamaDetail />} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminProtectedRoute><Admin /></AdminProtectedRoute>} />

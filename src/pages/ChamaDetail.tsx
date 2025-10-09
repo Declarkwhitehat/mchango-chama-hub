@@ -229,7 +229,7 @@ const ChamaDetail = () => {
 
         {/* Manager Tools */}
         {isManager && (
-          <ChamaInviteManager chamaId={chama.id} isManager={true} />
+          <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
         )}
 
         {/* Withdrawal Button - Only for member whose turn it is */}
