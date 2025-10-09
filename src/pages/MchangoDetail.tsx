@@ -11,6 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { DonationForm } from "@/components/DonationForm";
 import { DonorsList } from "@/components/DonorsList";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
+import { WithdrawalButton } from "@/components/WithdrawalButton";
+import { WithdrawalHistory } from "@/components/WithdrawalHistory";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Campaign {
   id: string;
@@ -31,8 +34,10 @@ interface Campaign {
 const MchangoDetail = () => {
   const { id } = useParams(); // This will be the slug
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isCreator, setIsCreator] = useState(false);
 
   useEffect(() => {
     fetchCampaign();
@@ -59,6 +64,7 @@ const MchangoDetail = () => {
       }
 
       setCampaign(data);
+      setIsCreator(user?.id === data.created_by);
     } catch (error: any) {
       console.error('Error fetching campaign:', error);
       toast.error("Failed to load campaign");
@@ -168,6 +174,19 @@ const MchangoDetail = () => {
           type="mchango"
           showBreakdown={true}
         />
+
+        {/* Withdrawal Button - Only for creators */}
+        {isCreator && (
+          <WithdrawalButton
+            mchangoId={campaign.id}
+            totalAvailable={campaign.current_amount}
+            commissionRate={0.15}
+            onSuccess={fetchCampaign}
+          />
+        )}
+
+        {/* Withdrawal History - Visible to all */}
+        <WithdrawalHistory mchangoId={campaign.id} />
 
         {/* Two Column Layout: Donate Form & Contributors */}
         <div className="grid md:grid-cols-2 gap-6">

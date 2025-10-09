@@ -715,6 +715,78 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawals: {
+        Row: {
+          amount: number
+          chama_id: string | null
+          commission_amount: number
+          created_at: string
+          id: string
+          mchango_id: string | null
+          net_amount: number
+          notes: string | null
+          payment_reference: string | null
+          rejection_reason: string | null
+          requested_at: string
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          chama_id?: string | null
+          commission_amount?: number
+          created_at?: string
+          id?: string
+          mchango_id?: string | null
+          net_amount: number
+          notes?: string | null
+          payment_reference?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          chama_id?: string | null
+          commission_amount?: number
+          created_at?: string
+          id?: string
+          mchango_id?: string | null
+          net_amount?: number
+          notes?: string | null
+          payment_reference?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawals_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "withdrawals_mchango_id_fkey"
+            columns: ["mchango_id"]
+            isOneToOne: false
+            referencedRelation: "mchango"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -10,6 +10,8 @@ import { ChamaInviteManager } from "@/components/ChamaInviteManager";
 import { MemberDashboard } from "@/components/MemberDashboard";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
+import { WithdrawalButton } from "@/components/WithdrawalButton";
+import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { Users, Calendar, TrendingUp, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -165,7 +167,16 @@ const ChamaDetail = () => {
 
         {/* Manager Tools */}
         {isManager && (
-          <ChamaInviteManager chamaId={chama.id} isManager={true} />
+          <>
+            <ChamaInviteManager chamaId={chama.id} isManager={true} />
+            
+            <WithdrawalButton
+              chamaId={chama.id}
+              totalAvailable={totalSavings}
+              commissionRate={chama.commission_rate || 0.05}
+              onSuccess={loadChama}
+            />
+          </>
         )}
 
         {/* Payment Form - Only visible to approved members */}
@@ -176,6 +187,11 @@ const ChamaDetail = () => {
             contributionAmount={chama.contribution_amount}
             onPaymentSuccess={loadChama}
           />
+        )}
+
+        {/* Withdrawal History - Visible to all approved members */}
+        {isMember && (
+          <WithdrawalHistory chamaId={chama.id} />
         )}
 
         {/* Tabs - Only visible to approved members */}

@@ -6,6 +6,7 @@ import { SearchBar } from "@/components/admin/SearchBar";
 import { TransactionsTable } from "@/components/admin/TransactionsTable";
 import { AuditLogsTable } from "@/components/admin/AuditLogsTable";
 import { AccountAdjustment } from "@/components/admin/AccountAdjustment";
+import { WithdrawalsManagement } from "@/components/admin/WithdrawalsManagement";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Users, TrendingUp, Activity, ExternalLink } from "lucide-react";
@@ -231,12 +232,17 @@ const AdminDashboard = () => {
         )}
 
         {/* Management Tabs */}
-        <Tabs defaultValue="transactions" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="withdrawals" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="audit">Audit Logs</TabsTrigger>
-            <TabsTrigger value="adjustment">Account Adjustment</TabsTrigger>
+            <TabsTrigger value="adjustment">Adjustment</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="withdrawals">
+            <WithdrawalsManagement />
+          </TabsContent>
 
           <TabsContent value="transactions">
             <TransactionsTable />
