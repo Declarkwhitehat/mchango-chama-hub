@@ -1,12 +1,13 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, User, Menu, ArrowLeft } from "lucide-react";
+import { Home, User, Menu, ArrowLeft, Shield } from "lucide-react";
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,6 +19,25 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   const location = useLocation();
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/home";
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    checkAdminStatus();
+  }, []);
+
+  const checkAdminStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    setIsAdmin(!!data);
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -68,11 +88,14 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                     Profile
                   </Button>
                 </Link>
-                <Link to="/admin">
-                  <Button variant="ghost" className="w-full justify-start text-muted-foreground">
-                    Admin
-                  </Button>
-                </Link>
+                {isAdmin && (
+                  <Link to="/admin">
+                    <Button variant="ghost" className="w-full justify-start">
+                      <Shield className="mr-2 h-4 w-4" />
+                      Admin Panel
+                    </Button>
+                  </Link>
+                )}
               </nav>
             </SheetContent>
           </Sheet>

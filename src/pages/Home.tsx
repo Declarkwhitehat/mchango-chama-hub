@@ -36,6 +36,7 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState("mchango");
   const [mchangoList, setMchangoList] = useState<Mchango[]>([]);
   const [chamaList, setChamaList] = useState<Chama[]>([]);
+  const [memberChamaList, setMemberChamaList] = useState<Chama[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -71,7 +72,7 @@ const Home = () => {
       if (mchangoError) throw mchangoError;
       setMchangoList(mchangos || []);
 
-      // Fetch user's chamas
+      // Fetch user's chamas (created by user)
       const { data: chamas, error: chamaError } = await supabase
         .from('chama')
         .select('*')
@@ -81,6 +82,32 @@ const Home = () => {
 
       if (chamaError) throw chamaError;
       setChamaList(chamas || []);
+
+      // Fetch chamas where user is a member
+      const { data: memberChamas, error: memberChamaError } = await supabase
+        .from('chama_members')
+        .select(`
+          chama:chama_id (
+            id,
+            name,
+            slug,
+            description,
+            created_at,
+            contribution_amount,
+            contribution_frequency
+          )
+        `)
+        .eq('user_id', user?.id)
+        .eq('approval_status', 'approved');
+
+      if (memberChamaError) throw memberChamaError;
+      
+      // Filter out nulls and extract chama data
+      const memberChamasData = memberChamas
+        ?.map(m => m.chama)
+        .filter(c => c !== null) as Chama[] || [];
+      
+      setMemberChamaList(memberChamasData);
     } catch (error: any) {
       console.error('Error fetching user data:', error);
       toast.error("Failed to load your data");
@@ -206,50 +233,114 @@ const Home = () => {
                   <p className="text-muted-foreground">Loading groups...</p>
                 </CardContent>
               </Card>
-            ) : chamaList.length === 0 ? (
+            ) : chamaList.length === 0 && memberChamaList.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center space-y-4">
-                  <p className="text-muted-foreground">You haven't created any chama groups yet</p>
-                  <Link to="/chama/create">
-                    <Button variant="heroSecondary">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Your First Group
-                    </Button>
-                  </Link>
+                  <p className="text-muted-foreground">You haven't joined any chama groups yet</p>
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                    <Link to="/chama/create">
+                      <Button variant="heroSecondary">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Your First Group
+                      </Button>
+                    </Link>
+                    <Link to="/chama/join">
+                      <Button variant="outline">
+                        Join Existing Group
+                      </Button>
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {chamaList.map((group) => (
-                  <Link key={group.id} to={`/chama/${group.slug}`}>
-                    <Card className="hover:shadow-md transition-shadow">
-                      <CardHeader>
-                        <CardTitle className="text-lg">{group.name}</CardTitle>
-                        <CardDescription>{group.description}</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex justify-between">
-                          <div>
-                            <p className="text-sm text-muted-foreground">Contribution</p>
-                            <p className="text-xl font-bold text-foreground">
-                              KES {Number(group.contribution_amount).toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Frequency</p>
-                            <p className="text-lg font-semibold text-foreground capitalize">
-                              {group.contribution_frequency.replace('_', ' ')}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-border">
-                          <Calendar className="h-4 w-4" />
-                          Created: {new Date(group.created_at).toLocaleDateString()}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
+              <div className="space-y-6">
+                {/* Created Chamas */}
+                {chamaList.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Created by You
+                    </h3>
+                    <div className="space-y-4">
+                      {chamaList.map((group) => (
+                        <Link key={group.id} to={`/chama/${group.slug}`}>
+                          <Card className="hover:shadow-md transition-shadow">
+                            <CardHeader>
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <CardTitle className="text-lg">{group.name}</CardTitle>
+                                  <CardDescription>{group.description}</CardDescription>
+                                </div>
+                                <Badge variant="default">Manager</Badge>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div className="flex justify-between">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Contribution</p>
+                                  <p className="text-xl font-bold text-foreground">
+                                    KES {Number(group.contribution_amount).toLocaleString()}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm text-muted-foreground">Frequency</p>
+                                  <p className="text-lg font-semibold text-foreground capitalize">
+                                    {group.contribution_frequency.replace('_', ' ')}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-border">
+                                <Calendar className="h-4 w-4" />
+                                Created: {new Date(group.created_at).toLocaleDateString()}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Member Chamas */}
+                {memberChamaList.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Member Groups
+                    </h3>
+                    <div className="space-y-4">
+                      {memberChamaList.map((group) => (
+                        <Link key={group.id} to={`/chama/${group.slug}`}>
+                          <Card className="hover:shadow-md transition-shadow">
+                            <CardHeader>
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <CardTitle className="text-lg">{group.name}</CardTitle>
+                                  <CardDescription>{group.description}</CardDescription>
+                                </div>
+                                <Badge variant="secondary">Member</Badge>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div className="flex justify-between">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Contribution</p>
+                                  <p className="text-xl font-bold text-foreground">
+                                    KES {Number(group.contribution_amount).toLocaleString()}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm text-muted-foreground">Frequency</p>
+                                  <p className="text-lg font-semibold text-foreground capitalize">
+                                    {group.contribution_frequency.replace('_', ' ')}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
