@@ -12,19 +12,21 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization') || undefined;
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: authHeader ? { Authorization: authHeader } : {},
         },
       }
     );
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
-    const id = pathParts[pathParts.length - 1];
+    const lastPart = pathParts[pathParts.length - 1];
+    const id = lastPart === 'mchango-crud' ? null : lastPart;
 
     // GET /mchango-crud - List all active public mchangos (or user's own)
     if (req.method === 'GET' && !id) {
