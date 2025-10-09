@@ -4,10 +4,10 @@ project_id = "ahhcbwbvueimezmtftte"
 verify_jwt = false
 
 [functions.mchango-crud]
-verify_jwt = true
+verify_jwt = false
 
 [functions.chama-crud]
-verify_jwt = true
+verify_jwt = false
 
 [functions.contributions-crud]
 verify_jwt = true
