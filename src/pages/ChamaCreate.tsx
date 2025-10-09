@@ -103,6 +103,8 @@ const ChamaCreate = () => {
         title: "Success!",
         description: "Chama created successfully",
       });
+      // Notify dashboard to refresh lists
+      window.dispatchEvent(new CustomEvent('chama:created', { detail: created }));
       
       navigate(`/chama/${created.slug}`);
     } catch (error: any) {

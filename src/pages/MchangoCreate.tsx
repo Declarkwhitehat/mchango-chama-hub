@@ -83,6 +83,8 @@ const MchangoCreate = () => {
         throw new Error("Unexpected response from server");
       }
 
+      // Notify dashboard to refresh lists
+      window.dispatchEvent(new CustomEvent('mchango:created', { detail: created }));
       toast.success("Campaign created successfully!");
       navigate(`/mchango/${created.slug}`);
     } catch (error: any) {

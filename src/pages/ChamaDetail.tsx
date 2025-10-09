@@ -53,7 +53,9 @@ const ChamaDetail = () => {
 
   const loadChama = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke(`chama-crud/${id}`);
+      const { data, error } = await supabase.functions.invoke(`chama-crud/${id}`, {
+        method: 'GET',
+      });
 
       if (error) throw error;
 

@@ -45,6 +45,17 @@ const Home = () => {
     }
   }, [user]);
 
+  // Refresh dashboard lists when a new Chama/Mchango is created
+  useEffect(() => {
+    const onCreated = () => { fetchUserData(); };
+    window.addEventListener('mchango:created', onCreated);
+    window.addEventListener('chama:created', onCreated);
+    return () => {
+      window.removeEventListener('mchango:created', onCreated);
+      window.removeEventListener('chama:created', onCreated);
+    };
+  }, []);
+
   const fetchUserData = async () => {
     try {
       setLoading(true);
