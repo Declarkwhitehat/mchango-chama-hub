@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,50 +7,85 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
 import { TrendingUp, Users, Plus, Calendar } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+
+interface Mchango {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  target_amount: number;
+  current_amount: number;
+  end_date: string;
+  created_at: string;
+}
+
+interface Chama {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  created_at: string;
+  contribution_amount: number;
+  contribution_frequency: string;
+}
 
 const Home = () => {
   const [activeTab, setActiveTab] = useState("mchango");
+  const [mchangoList, setMchangoList] = useState<Mchango[]>([]);
+  const [chamaList, setChamaList] = useState<Chama[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
-  // Mock data
-  const mchangoList = [
-    {
-      id: "1",
-      title: "Medical Emergency Fund",
-      description: "Help cover urgent medical expenses",
-      goal: 50000,
-      raised: 32000,
-      contributors: 45,
-      daysLeft: 12,
-    },
-    {
-      id: "2",
-      title: "School Fees Support",
-      description: "Support education for bright students",
-      goal: 30000,
-      raised: 28000,
-      contributors: 62,
-      daysLeft: 5,
-    },
-  ];
+  useEffect(() => {
+    if (user) {
+      fetchUserData();
+    }
+  }, [user]);
 
-  const chamaList = [
-    {
-      id: "1",
-      name: "Women Empowerment Group",
-      description: "Monthly savings for business growth",
-      members: 24,
-      totalSavings: 120000,
-      nextMeeting: "2025-10-08",
-    },
-    {
-      id: "2",
-      name: "Youth Investment Circle",
-      description: "Building wealth through collective savings",
-      members: 18,
-      totalSavings: 85000,
-      nextMeeting: "2025-10-15",
-    },
-  ];
+  const fetchUserData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch user's mchangos
+      const { data: mchangos, error: mchangoError } = await supabase
+        .from('mchango')
+        .select('*')
+        .eq('created_by', user?.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (mchangoError) throw mchangoError;
+      setMchangoList(mchangos || []);
+
+      // Fetch user's chamas
+      const { data: chamas, error: chamaError } = await supabase
+        .from('chama')
+        .select('*')
+        .eq('created_by', user?.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (chamaError) throw chamaError;
+      setChamaList(chamas || []);
+    } catch (error: any) {
+      console.error('Error fetching user data:', error);
+      toast.error("Failed to load your data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getDaysLeft = (endDate: string) => {
+    if (!endDate) return null;
+    const now = new Date();
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
 
   return (
     <Layout>
@@ -78,43 +113,69 @@ const Home = () => {
               <Link to="/mchango/create">
                 <Button variant="hero" size="sm">
                   <Plus className="h-4 w-4 mr-2" />
-                  Create
+                  Create Campaign
                 </Button>
               </Link>
             </div>
 
-            <div className="space-y-4">
-              {mchangoList.map((campaign) => (
-                <Link key={campaign.id} to={`/mchango/${campaign.id}`}>
-                  <Card className="hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">{campaign.title}</CardTitle>
-                          <CardDescription>{campaign.description}</CardDescription>
-                        </div>
-                        <Badge variant="secondary">{campaign.daysLeft} days</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          KES {campaign.raised.toLocaleString()} raised
-                        </span>
-                        <span className="font-semibold text-foreground">
-                          of KES {campaign.goal.toLocaleString()}
-                        </span>
-                      </div>
-                      <Progress value={(campaign.raised / campaign.goal) * 100} />
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        {campaign.contributors} contributors
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+            {loading ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <p className="text-muted-foreground">Loading campaigns...</p>
+                </CardContent>
+              </Card>
+            ) : mchangoList.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center space-y-4">
+                  <p className="text-muted-foreground">You haven't created any campaigns yet</p>
+                  <Link to="/mchango/create">
+                    <Button variant="hero">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Campaign
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {mchangoList.map((campaign) => {
+                  const progress = (Number(campaign.current_amount) / Number(campaign.target_amount)) * 100;
+                  const daysLeft = getDaysLeft(campaign.end_date);
+
+                  return (
+                    <Link key={campaign.id} to={`/mchango/${campaign.slug}`}>
+                      <Card className="hover:shadow-md transition-shadow">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-lg">{campaign.title}</CardTitle>
+                              <CardDescription>{campaign.description}</CardDescription>
+                            </div>
+                            {daysLeft !== null && (
+                              <Badge variant="secondary">{daysLeft} days</Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              KES {Number(campaign.current_amount).toLocaleString()} raised
+                            </span>
+                            <span className="font-semibold text-foreground">
+                              of KES {Number(campaign.target_amount).toLocaleString()}
+                            </span>
+                          </div>
+                          <Progress value={progress} />
+                          <div className="text-sm text-muted-foreground">
+                            {progress.toFixed(1)}% funded
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="chama" className="space-y-4">
@@ -123,41 +184,63 @@ const Home = () => {
               <Link to="/chama/create">
                 <Button variant="heroSecondary" size="sm">
                   <Plus className="h-4 w-4 mr-2" />
-                  Create
+                  Create Group
                 </Button>
               </Link>
             </div>
 
-            <div className="space-y-4">
-              {chamaList.map((group) => (
-                <Link key={group.id} to={`/chama/${group.id}`}>
-                  <Card className="hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="text-lg">{group.name}</CardTitle>
-                      <CardDescription>{group.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Total Savings</p>
-                          <p className="text-xl font-bold text-foreground">
-                            KES {group.totalSavings.toLocaleString()}
-                          </p>
+            {loading ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <p className="text-muted-foreground">Loading groups...</p>
+                </CardContent>
+              </Card>
+            ) : chamaList.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center space-y-4">
+                  <p className="text-muted-foreground">You haven't created any chama groups yet</p>
+                  <Link to="/chama/create">
+                    <Button variant="heroSecondary">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Group
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {chamaList.map((group) => (
+                  <Link key={group.id} to={`/chama/${group.slug}`}>
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <CardTitle className="text-lg">{group.name}</CardTitle>
+                        <CardDescription>{group.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex justify-between">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Contribution</p>
+                            <p className="text-xl font-bold text-foreground">
+                              KES {Number(group.contribution_amount).toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Frequency</p>
+                            <p className="text-lg font-semibold text-foreground capitalize">
+                              {group.contribution_frequency.replace('_', ' ')}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Members</p>
-                          <p className="text-xl font-bold text-foreground">{group.members}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-border">
+                          <Calendar className="h-4 w-4" />
+                          Created: {new Date(group.created_at).toLocaleDateString()}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-border">
-                        <Calendar className="h-4 w-4" />
-                        Next meeting: {new Date(group.nextMeeting).toLocaleDateString()}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
