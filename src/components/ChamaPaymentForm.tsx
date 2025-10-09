@@ -8,12 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, CreditCard, Users } from "lucide-react";
+import { Loader2, CreditCard, Users, TrendingDown, Wallet } from "lucide-react";
+import { CHAMA_DEFAULT_COMMISSION_RATE, calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
 
 interface ChamaPaymentFormProps {
   chamaId: string;
   currentMemberId: string;
   contributionAmount: number;
+  commissionRate?: number;
   onPaymentSuccess?: () => void;
 }
 
@@ -21,6 +23,7 @@ export const ChamaPaymentForm = ({
   chamaId, 
   currentMemberId, 
   contributionAmount,
+  commissionRate = CHAMA_DEFAULT_COMMISSION_RATE,
   onPaymentSuccess 
 }: ChamaPaymentFormProps) => {
   const [paymentType, setPaymentType] = useState<"self" | "other">("self");
@@ -226,6 +229,38 @@ export const ChamaPaymentForm = ({
               </p>
             )}
           </div>
+
+          {parseFloat(amount || "0") > 0 && (
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Your Payment</span>
+                  <span className="font-semibold">KES {parseFloat(amount).toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                    <TrendingDown className="h-3 w-3" />
+                    Commission ({(commissionRate * 100)}%)
+                  </span>
+                  <span className="font-medium text-orange-600 dark:text-orange-400">
+                    - KES {calculateCommission(parseFloat(amount), commissionRate).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-primary/20">
+                  <span className="flex items-center gap-1 font-medium text-primary">
+                    <Wallet className="h-4 w-4" />
+                    Chama Pool Receives
+                  </span>
+                  <span className="font-bold text-lg text-primary">
+                    KES {calculateNetBalance(parseFloat(amount), commissionRate).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground italic">
+                  * Commission is deducted immediately to cover platform costs
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (Optional)</Label>

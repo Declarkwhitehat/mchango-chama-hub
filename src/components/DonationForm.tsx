@@ -7,7 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, TrendingDown, Wallet } from "lucide-react";
+import { MCHANGO_COMMISSION_RATE, calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
 
 interface DonationFormProps {
   mchangoId: string;
@@ -103,9 +104,13 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
         }
       }
 
+      const donationAmount = parseFloat(amount);
+      const commission = calculateCommission(donationAmount, MCHANGO_COMMISSION_RATE);
+      const netAmount = calculateNetBalance(donationAmount, MCHANGO_COMMISSION_RATE);
+
       toast({
         title: "Payment Initiated",
-        description: "Please check your phone to complete the payment",
+        description: `Donating KES ${donationAmount.toLocaleString()}. After ${(MCHANGO_COMMISSION_RATE * 100)}% commission (KES ${commission.toLocaleString()}), the campaign receives KES ${netAmount.toLocaleString()}`,
       });
 
       // Reset form
@@ -152,6 +157,38 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
               min="1"
             />
           </div>
+
+          {parseFloat(amount || "0") > 0 && (
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Your Donation</span>
+                  <span className="font-semibold">KES {parseFloat(amount).toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                    <TrendingDown className="h-3 w-3" />
+                    Commission (15%)
+                  </span>
+                  <span className="font-medium text-orange-600 dark:text-orange-400">
+                    - KES {calculateCommission(parseFloat(amount), MCHANGO_COMMISSION_RATE).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-primary/20">
+                  <span className="flex items-center gap-1 font-medium text-primary">
+                    <Wallet className="h-4 w-4" />
+                    Campaign Receives
+                  </span>
+                  <span className="font-bold text-lg text-primary">
+                    KES {calculateNetBalance(parseFloat(amount), MCHANGO_COMMISSION_RATE).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground italic">
+                  * Commission is deducted immediately to cover platform costs
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {!user && (
             <>
