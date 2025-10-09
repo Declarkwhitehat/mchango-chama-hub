@@ -34,7 +34,10 @@ const Admin = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      console.log('Current user:', user?.email);
+      
       if (!user) {
+        console.log('No user found, redirecting to auth');
         navigate("/auth");
         return;
       }
@@ -46,11 +49,13 @@ const Admin = () => {
         .eq('role', 'admin')
         .maybeSingle();
 
+      console.log('Admin role check:', { data, error });
+
       if (error) {
         console.error('Error checking admin:', error);
         toast({
           title: "Error",
-          description: "Error verifying admin access",
+          description: `Error verifying admin access: ${error.message}`,
           variant: "destructive",
         });
         navigate("/home");
@@ -58,15 +63,17 @@ const Admin = () => {
       }
 
       if (!data) {
+        console.log('User is not an admin');
         toast({
           title: "Access Denied",
-          description: "Admin privileges required",
+          description: `Admin privileges required. Current user: ${user.email}`,
           variant: "destructive",
         });
         navigate("/home");
         return;
       }
 
+      console.log('Admin access granted');
       setIsAdmin(true);
       await fetchAdminData();
     } catch (error) {
