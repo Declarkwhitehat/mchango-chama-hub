@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Upload, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 
 const KYCUpload = () => {
   const navigate = useNavigate();

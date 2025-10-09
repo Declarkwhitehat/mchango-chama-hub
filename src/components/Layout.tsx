@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Home, User, Menu, ArrowLeft, Shield } from "lucide-react";
 import {
@@ -20,13 +21,13 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/home";
   const [isAdmin, setIsAdmin] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     checkAdminStatus();
-  }, []);
+  }, [user]);
 
   const checkAdminStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { data } = await supabase

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CheckCircle, XCircle, Clock, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 interface KYCSubmission {

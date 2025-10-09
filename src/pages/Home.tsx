@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
 import { TrendingUp, Users, Plus, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 interface Mchango {
