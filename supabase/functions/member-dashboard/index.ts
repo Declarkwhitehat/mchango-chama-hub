@@ -136,6 +136,7 @@ serve(async (req) => {
         name: chama.name,
         contribution_amount: chama.contribution_amount,
         contribution_frequency: chama.contribution_frequency,
+        commission_rate: chama.commission_rate || 0.05,
         member_count: memberCount || 0,
       },
       current_cycle: currentCyclePayment ? {

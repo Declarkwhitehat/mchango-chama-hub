@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { formatDistanceToNow } from "date-fns";
 
 interface Donation {
@@ -74,32 +73,12 @@ export const DonorsList = ({ mchangoId, totalAmount }: DonorsListProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Financial Summary</CardTitle>
+        <CardTitle>Recent Contributors</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Total Collected:</span>
-            <span className="font-semibold">KES {totalAmount.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Commission (15%):</span>
-            <span className="font-semibold text-red-600">- KES {commission.toLocaleString()}</span>
-          </div>
-          <Separator />
-          <div className="flex justify-between">
-            <span className="font-semibold">Net Balance:</span>
-            <span className="font-bold text-lg text-green-600">
-              KES {netBalance.toLocaleString()}
-            </span>
-          </div>
-        </div>
-
-        <Separator />
-
         <div>
           <h3 className="font-semibold mb-3">
-            Contributors ({completedDonations.length})
+            Recent Donations ({completedDonations.length})
           </h3>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading contributors...</p>
@@ -127,6 +106,9 @@ export const DonorsList = ({ mchangoId, totalAmount }: DonorsListProps) => {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">KES {donation.amount.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Net: KES {(donation.amount * (1 - COMMISSION_RATE)).toLocaleString()}
+                    </p>
                   </div>
                 </div>
               ))}

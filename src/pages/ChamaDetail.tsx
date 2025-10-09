@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChamaInviteManager } from "@/components/ChamaInviteManager";
 import { MemberDashboard } from "@/components/MemberDashboard";
+import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { Users, Calendar, TrendingUp, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -20,6 +21,7 @@ interface ChamaData {
   contribution_amount: number;
   contribution_frequency: string;
   max_members: number;
+  commission_rate: number;
   created_at: string;
   profiles: {
     full_name: string;
@@ -149,6 +151,16 @@ const ChamaDetail = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Commission Display - Visible to all approved members */}
+        {isMember && (
+          <CommissionDisplay 
+            totalCollected={totalSavings}
+            commissionRate={chama.commission_rate || 0.05}
+            type="chama"
+            showBreakdown={true}
+          />
+        )}
 
         {/* Manager Tools */}
         {isManager && (

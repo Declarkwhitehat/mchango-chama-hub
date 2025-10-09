@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { CheckCircle2, TrendingUp, Calendar, CreditCard, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -80,9 +81,22 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
 
   const { member, chama, current_cycle, payment_history, payout_schedule } = dashboardData;
   const netBalance = member.balance_credit - member.balance_deficit;
+  
+  // Calculate total pool for commission display
+  const totalContributions = payment_history.reduce((sum: number, payment: any) => 
+    sum + (payment.status === 'completed' ? payment.amount : 0), 0
+  );
 
   return (
     <div className="space-y-6">
+      {/* Commission Display - Show chama-wide commission info */}
+      <CommissionDisplay 
+        totalCollected={totalContributions}
+        commissionRate={chama.commission_rate || 0.05}
+        type="chama"
+        showBreakdown={true}
+      />
+
       {/* Member Info Card */}
       <Card>
         <CardHeader>
@@ -216,17 +230,24 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
                     <TableCell>
                       {new Date(payment.contribution_date).toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="font-medium">
-                      KES {payment.amount.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {payment.payment_reference}
-                    </TableCell>
-                    <TableCell>
+                  <TableCell className="font-medium">
+                    KES {payment.amount.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {payment.payment_reference}
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
                       <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'}>
                         {payment.status}
                       </Badge>
-                    </TableCell>
+                      {payment.status === 'completed' && (
+                        <p className="text-xs text-muted-foreground">
+                          Net: KES {(payment.amount * (1 - (chama.commission_rate || 0.05))).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

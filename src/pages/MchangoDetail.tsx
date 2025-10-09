@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DonationForm } from "@/components/DonationForm";
 import { DonorsList } from "@/components/DonorsList";
+import { CommissionDisplay } from "@/components/CommissionDisplay";
 
 interface Campaign {
   id: string;
@@ -159,6 +160,14 @@ const MchangoDetail = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Commission Display */}
+        <CommissionDisplay 
+          totalCollected={campaign.current_amount}
+          commissionRate={0.15}
+          type="mchango"
+          showBreakdown={true}
+        />
 
         {/* Two Column Layout: Donate Form & Contributors */}
         <div className="grid md:grid-cols-2 gap-6">
