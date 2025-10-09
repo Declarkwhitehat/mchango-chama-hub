@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -53,7 +54,23 @@ const Auth = () => {
 
   // Redirect if already logged in
   if (user) {
-    navigate("/home");
+    // Check if user is admin and redirect to appropriate page
+    const checkAdminAndRedirect = async () => {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (data) {
+        navigate("/admin");
+      } else {
+        navigate("/home");
+      }
+    };
+    
+    checkAdminAndRedirect();
     return null;
   }
 
@@ -73,7 +90,23 @@ const Auth = () => {
       }
       
       toast.success("Welcome back!");
-      navigate("/home");
+      
+      // Check if user is admin and redirect appropriately
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user) {
+        const { data: adminRole } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userData.user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+
+        if (adminRole) {
+          navigate("/admin");
+        } else {
+          navigate("/home");
+        }
+      }
     } catch (error: any) {
       toast.error("An unexpected error occurred");
     } finally {
