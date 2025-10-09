@@ -628,6 +628,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_chama_manager: {
+        Args: { _chama_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"
