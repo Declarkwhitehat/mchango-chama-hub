@@ -272,6 +272,62 @@ export type Database = {
           },
         ]
       }
+      mchango_donations: {
+        Row: {
+          amount: number
+          completed_at: string | null
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          is_anonymous: boolean
+          mchango_id: string
+          payment_method: string | null
+          payment_reference: string
+          payment_status: string
+          phone: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          completed_at?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          is_anonymous?: boolean
+          mchango_id: string
+          payment_method?: string | null
+          payment_reference: string
+          payment_status?: string
+          phone?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          completed_at?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          is_anonymous?: boolean
+          mchango_id?: string
+          payment_method?: string | null
+          payment_reference?: string
+          payment_status?: string
+          phone?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mchango_donations_mchango_id_fkey"
+            columns: ["mchango_id"]
+            isOneToOne: false
+            referencedRelation: "mchango"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payouts: {
         Row: {
           amount: number

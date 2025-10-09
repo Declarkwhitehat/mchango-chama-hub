@@ -28,6 +28,57 @@ serve(async (req) => {
     const resultCode = stkCallback.ResultCode;
     const resultDesc = stkCallback.ResultDesc;
 
+    // Determine transaction status based on result code
+    let status = resultCode === 0 ? 'completed' : 'failed';
+    let mpesaReceiptNumber = null;
+
+    if (resultCode === 0) {
+      // Extract M-PESA receipt number from callback items
+      const callbackMetadata = stkCallback.CallbackMetadata?.Item || [];
+      const receiptItem = callbackMetadata.find((item: any) => item.Name === 'MpesaReceiptNumber');
+      if (receiptItem) {
+        mpesaReceiptNumber = receiptItem.Value;
+      }
+    }
+
+    // First, check if this is a donation by looking up mchango_donations table
+    const { data: donations } = await supabaseClient
+      .from('mchango_donations')
+      .select('*')
+      .eq('payment_reference', checkoutRequestId);
+
+    if (donations && donations.length > 0) {
+      // This is a donation - update mchango_donations table
+      const donation = donations[0];
+      
+      const { data: updatedDonation, error: donationError } = await supabaseClient
+        .from('mchango_donations')
+        .update({
+          payment_status: status,
+          completed_at: status === 'completed' ? new Date().toISOString() : null,
+        })
+        .eq('id', donation.id)
+        .select()
+        .single();
+
+      if (donationError) {
+        console.error('Error updating donation:', donationError);
+        throw donationError;
+      }
+
+      console.log('Donation updated:', updatedDonation);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Donation callback processed successfully',
+          donation: updatedDonation,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Original transaction handling code (for non-donation payments)
     // Find the transaction by checkout request ID
     const { data: transactions } = await supabaseClient
       .from('transactions')
@@ -44,26 +95,14 @@ serve(async (req) => {
 
     const transaction = transactions[0];
 
-    // Determine transaction status based on result code
-    let status = 'failed';
-    let mpesaReceiptNumber = null;
-
-    if (resultCode === 0) {
-      status = 'confirmed';
-      
-      // Extract M-PESA receipt number from callback items
-      const callbackMetadata = stkCallback.CallbackMetadata?.Item || [];
-      const receiptItem = callbackMetadata.find((item: any) => item.Name === 'MpesaReceiptNumber');
-      if (receiptItem) {
-        mpesaReceiptNumber = receiptItem.Value;
-      }
-    }
+    // Update transaction with proper status
+    const transactionStatus = resultCode === 0 ? 'confirmed' : 'failed';
 
     // Update transaction
     const { data: updatedTransaction, error: updateError } = await supabaseClient
       .from('transactions')
       .update({
-        status: status,
+        status: transactionStatus,
         mpesa_receipt_number: mpesaReceiptNumber,
         metadata: {
           ...transaction.metadata,
@@ -82,7 +121,7 @@ serve(async (req) => {
     }
 
     // If payment confirmed, update contribution and mchango totals
-    if (status === 'confirmed' && transaction.mchango_id) {
+    if (transactionStatus === 'confirmed' && transaction.mchango_id) {
       // Update contribution record
       const { data: contribution } = await supabaseClient
         .from('contributions')

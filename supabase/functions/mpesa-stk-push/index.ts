@@ -11,9 +11,14 @@ interface STKPushRequest {
   amount: number;
   account_reference: string;
   transaction_desc: string;
-  payment_reference: string;
+  payment_reference?: string;
   chama_id?: string;
   mchango_id?: string;
+  callback_metadata?: {
+    donation_id?: string;
+    mchango_id?: string;
+    [key: string]: any;
+  };
 }
 
 serve(async (req) => {
@@ -32,37 +37,53 @@ serve(async (req) => {
       }
     );
 
+    // Get user if authenticated (optional for guest donations)
     const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) {
-      throw new Error('Unauthorized');
-    }
 
     const requestBody: STKPushRequest = await req.json();
-    const { phone_number, amount, account_reference, transaction_desc, payment_reference, chama_id, mchango_id } = requestBody;
+    const { 
+      phone_number, 
+      amount, 
+      account_reference, 
+      transaction_desc, 
+      payment_reference, 
+      chama_id, 
+      mchango_id,
+      callback_metadata 
+    } = requestBody;
 
     // Validate required fields
-    if (!phone_number || !amount || !payment_reference) {
+    if (!phone_number || !amount) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
+        JSON.stringify({ error: 'Missing required fields: phone_number and amount' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check for idempotency - if payment_reference already exists, return existing transaction
-    const { data: existingTransaction } = await supabaseClient
-      .from('transactions')
-      .select('*')
-      .eq('payment_reference', payment_reference)
-      .single();
+    // Generate payment reference if not provided
+    const finalPaymentReference = payment_reference || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    if (existingTransaction) {
-      return new Response(
-        JSON.stringify({ 
-          message: 'Transaction already exists',
-          transaction: existingTransaction 
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Check if this is a donation (has callback_metadata with donation_id)
+    const isDonation = callback_metadata?.donation_id;
+
+    // For donations, skip transaction check (donations are tracked separately)
+    if (!isDonation) {
+      // Check for idempotency - if payment_reference already exists, return existing transaction
+      const { data: existingTransaction } = await supabaseClient
+        .from('transactions')
+        .select('*')
+        .eq('payment_reference', finalPaymentReference)
+        .maybeSingle();
+
+      if (existingTransaction) {
+        return new Response(
+          JSON.stringify({ 
+            message: 'Transaction already exists',
+            transaction: existingTransaction 
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Get M-PESA credentials from secrets
@@ -117,7 +138,7 @@ serve(async (req) => {
       PartyB: shortcode,
       PhoneNumber: formattedPhone,
       CallBackURL: callbackUrl,
-      AccountReference: account_reference || payment_reference,
+      AccountReference: account_reference || finalPaymentReference,
       TransactionDesc: transaction_desc || 'Payment',
     };
 
@@ -136,7 +157,27 @@ serve(async (req) => {
 
     const stkData = await stkResponse.json();
 
-    // Step 4: Create pending transaction record
+    console.log('M-PESA STK Response:', stkData);
+
+    // For donations, we don't create a transaction record (handled by mchango_donations table)
+    // Just return the STK response with callback metadata
+    if (isDonation) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'STK Push sent successfully',
+          mpesa_response: stkData,
+          callback_metadata: callback_metadata,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Step 4: Create pending transaction record (for non-donation payments only)
+    if (!user) {
+      throw new Error('User authentication required for non-donation payments');
+    }
+
     const { data: transaction, error: transactionError } = await supabaseClient
       .from('transactions')
       .insert({
@@ -144,11 +185,10 @@ serve(async (req) => {
         chama_id: chama_id || null,
         mchango_id: mchango_id || null,
         amount: amount,
-        type: 'contribution',
+        transaction_type: 'donation',
         status: 'pending',
-        payment_reference: payment_reference,
-        mpesa_receipt_number: null,
-        description: transaction_desc || 'M-PESA payment',
+        payment_reference: finalPaymentReference,
+        payment_method: 'mpesa',
         metadata: {
           phone_number: formattedPhone,
           merchant_request_id: stkData.MerchantRequestID,

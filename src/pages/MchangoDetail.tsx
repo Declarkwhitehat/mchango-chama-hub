@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Users, Calendar, Share2, Heart, Loader2 } from "lucide-react";
+import { Calendar, Share2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { DonationForm } from "@/components/DonationForm";
+import { DonorsList } from "@/components/DonorsList";
 
 interface Campaign {
   id: string;
@@ -31,10 +30,8 @@ interface Campaign {
 const MchangoDetail = () => {
   const { id } = useParams(); // This will be the slug
   const navigate = useNavigate();
-  const [amount, setAmount] = useState("");
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
-  const [contributing, setContributing] = useState(false);
 
   useEffect(() => {
     fetchCampaign();
@@ -70,6 +67,11 @@ const MchangoDetail = () => {
     }
   };
 
+  const handleDonationSuccess = () => {
+    // Refresh campaign data after successful donation
+    fetchCampaign();
+  };
+
   const getDaysLeft = (endDate: string) => {
     if (!endDate) return null;
     const now = new Date();
@@ -77,25 +79,6 @@ const MchangoDetail = () => {
     const diffTime = end.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
-  };
-
-  const handleContribute = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      toast.error("Please enter a valid amount");
-      return;
-    }
-
-    setContributing(true);
-    try {
-      // TODO: Implement actual payment integration (M-Pesa STK Push)
-      toast.success(`Initiating payment of KES ${amount}...`);
-      setAmount("");
-    } catch (error: any) {
-      console.error('Contribution error:', error);
-      toast.error("Failed to process contribution");
-    } finally {
-      setContributing(false);
-    }
   };
 
   const handleShare = () => {
@@ -123,18 +106,24 @@ const MchangoDetail = () => {
 
   return (
     <Layout showBackButton>
-      <div className="container px-4 py-6 max-w-2xl mx-auto space-y-6">
+      <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
         {/* Campaign Header */}
         <Card>
           <CardHeader>
             <div className="flex justify-between items-start mb-2">
               {campaign.category && <Badge variant="secondary">{campaign.category}</Badge>}
-              {daysLeft !== null && (
-                <Badge variant={daysLeft < 7 ? "destructive" : "default"}>
-                  <Calendar className="h-3 w-3 mr-1" />
-                  {daysLeft} days left
-                </Badge>
-              )}
+              <div className="flex gap-2">
+                {daysLeft !== null && (
+                  <Badge variant={daysLeft < 7 ? "destructive" : "default"}>
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {daysLeft} days left
+                  </Badge>
+                )}
+                <Button variant="outline" size="sm" onClick={handleShare}>
+                  <Share2 className="h-3 w-3 mr-1" />
+                  Share
+                </Button>
+              </div>
             </div>
             <CardTitle className="text-2xl">{campaign.title}</CardTitle>
             <CardDescription>
@@ -171,44 +160,19 @@ const MchangoDetail = () => {
           </CardContent>
         </Card>
 
-        {/* Contribute Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Make a Contribution</CardTitle>
-            <CardDescription>Support this campaign</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount (KES)</Label>
-              <Input
-                id="amount"
-                type="number"
-                placeholder="1000"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={contributing}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="default"
-                className="flex-1"
-                onClick={handleContribute}
-                disabled={contributing}
-              >
-                {contributing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Heart className="mr-2 h-4 w-4" />
-                )}
-                {contributing ? "Processing..." : "Contribute"}
-              </Button>
-              <Button variant="outline" size="icon" onClick={handleShare}>
-                <Share2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Two Column Layout: Donate Form & Contributors */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <DonationForm 
+            mchangoId={campaign.id} 
+            mchangoTitle={campaign.title}
+            onSuccess={handleDonationSuccess}
+          />
+          
+          <DonorsList 
+            mchangoId={campaign.id} 
+            totalAmount={campaign.current_amount}
+          />
+        </div>
 
         {/* WhatsApp Link */}
         {campaign.whatsapp_link && (
