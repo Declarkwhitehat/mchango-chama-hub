@@ -26,6 +26,7 @@ interface ChamaData {
   max_members: number;
   commission_rate: number;
   created_at: string;
+  every_n_days_count?: number;
   profiles: {
     full_name: string;
     email: string;
@@ -49,6 +50,8 @@ const ChamaDetail = () => {
   const [chama, setChama] = useState<ChamaData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserMembership, setCurrentUserMembership] = useState<any>(null);
+  const [currentTurnMemberId, setCurrentTurnMemberId] = useState<string | null>(null);
+  const [nextTurnDates, setNextTurnDates] = useState<Record<string, Date>>({});
 
   useEffect(() => {
     loadChama();
@@ -70,6 +73,9 @@ const ChamaDetail = () => {
         );
         setCurrentUserMembership(membership);
       }
+
+      // Calculate whose turn it is and next turn dates
+      await calculateTurns(data.data);
     } catch (error: any) {
       console.error("Error loading chama:", error);
       toast({
@@ -79,6 +85,61 @@ const ChamaDetail = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const calculateTurns = async (chamaData: ChamaData) => {
+    try {
+      const approvedMembers = chamaData.chama_members
+        ?.filter(m => m.approval_status === 'approved')
+        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0)) || [];
+
+      if (approvedMembers.length === 0) return;
+
+      // Get completed withdrawals for this chama
+      const { data: completedWithdrawals } = await supabase
+        .from('withdrawals')
+        .select('*')
+        .eq('chama_id', chamaData.id)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: true });
+
+      const withdrawalCount = completedWithdrawals?.length || 0;
+      const currentTurnIndex = withdrawalCount % approvedMembers.length;
+      const currentTurnMember = approvedMembers[currentTurnIndex];
+      
+      setCurrentTurnMemberId(currentTurnMember.id);
+
+      // Calculate estimated turn dates for each member
+      const turnDates: Record<string, Date> = {};
+      const cycleLength = getCycleLengthInDays(chamaData.contribution_frequency, chamaData.every_n_days_count);
+      const createdDate = new Date(chamaData.created_at);
+
+      approvedMembers.forEach((member, index) => {
+        // Calculate how many full cycles until this member's turn
+        let turnsUntilMember = index - currentTurnIndex;
+        if (turnsUntilMember < 0) turnsUntilMember += approvedMembers.length;
+        
+        const daysUntilTurn = turnsUntilMember * cycleLength * approvedMembers.length;
+        const memberTurnDate = new Date(createdDate);
+        memberTurnDate.setDate(memberTurnDate.getDate() + daysUntilTurn + (withdrawalCount * cycleLength * approvedMembers.length));
+        
+        turnDates[member.id] = memberTurnDate;
+      });
+
+      setNextTurnDates(turnDates);
+    } catch (error) {
+      console.error("Error calculating turns:", error);
+    }
+  };
+
+  const getCycleLengthInDays = (frequency: string, everyNDays?: number): number => {
+    switch (frequency) {
+      case 'daily': return 1;
+      case 'weekly': return 7;
+      case 'monthly': return 30;
+      case 'every_n_days': return everyNDays || 7;
+      default: return 7;
     }
   };
 
@@ -110,6 +171,7 @@ const ChamaDetail = () => {
   const isManager = currentUserMembership?.is_manager && currentUserMembership?.approval_status === 'approved';
   const isMember = currentUserMembership?.approval_status === 'approved';
   const isPending = currentUserMembership?.approval_status === 'pending';
+  const isMyTurn = currentUserMembership?.id === currentTurnMemberId;
 
   // Calculate total contributions (mock for now)
   const totalSavings = approvedMembers.length * chama.contribution_amount;
@@ -167,16 +229,39 @@ const ChamaDetail = () => {
 
         {/* Manager Tools */}
         {isManager && (
-          <>
-            <ChamaInviteManager chamaId={chama.id} isManager={true} />
-            
-            <WithdrawalButton
-              chamaId={chama.id}
-              totalAvailable={totalSavings}
-              commissionRate={chama.commission_rate || 0.05}
-              onSuccess={loadChama}
-            />
-          </>
+          <ChamaInviteManager chamaId={chama.id} isManager={true} />
+        )}
+
+        {/* Withdrawal Button - Only for member whose turn it is */}
+        {isMember && isMyTurn && (
+          <WithdrawalButton
+            chamaId={chama.id}
+            totalAvailable={totalSavings}
+            commissionRate={chama.commission_rate || 0.05}
+            onSuccess={loadChama}
+          />
+        )}
+
+        {/* Show turn information to all members */}
+        {isMember && !isMyTurn && currentTurnMemberId && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  {approvedMembers.find(m => m.id === currentTurnMemberId)?.profiles.full_name}'s turn to withdraw
+                </p>
+                {nextTurnDates[currentUserMembership.id] && (
+                  <p className="text-lg font-semibold text-primary">
+                    Your turn: {nextTurnDates[currentUserMembership.id].toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Payment Form - Only visible to approved members */}
@@ -215,7 +300,7 @@ const ChamaDetail = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {approvedMembers
+                     {approvedMembers
                       .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
                       .map((member) => (
                         <div key={member.id} className="flex items-center justify-between">
@@ -231,10 +316,18 @@ const ChamaDetail = () => {
                                 {member.is_manager && (
                                   <Badge variant="outline" className="ml-2">Manager</Badge>
                                 )}
+                                {member.id === currentTurnMemberId && (
+                                  <Badge variant="default" className="ml-2">Current Turn</Badge>
+                                )}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {member.member_code} • Position #{member.order_index}
                               </p>
+                              {nextTurnDates[member.id] && (
+                                <p className="text-xs text-muted-foreground">
+                                  Next turn: {nextTurnDates[member.id].toLocaleDateString()}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>

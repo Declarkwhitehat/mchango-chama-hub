@@ -42,6 +42,7 @@ serve(async (req) => {
 
       // Verify creator ownership
       let isCreator = false;
+      let isManager = false;
       let totalAvailable = 0;
       let commissionRate = 0.05;
 
@@ -61,6 +62,52 @@ serve(async (req) => {
 
         isCreator = chama.created_by === user.id;
         commissionRate = chama.commission_rate || 0.05;
+
+        // Check if user is a manager
+        const { data: membership } = await supabaseClient
+          .from('chama_members')
+          .select('is_manager, id, order_index')
+          .eq('chama_id', chama_id)
+          .eq('user_id', user.id)
+          .eq('approval_status', 'approved')
+          .maybeSingle();
+
+        isManager = membership?.is_manager || false;
+
+        // If not a manager, check if it's their turn
+        if (!isManager) {
+          // Get all approved members
+          const { data: members } = await supabaseClient
+            .from('chama_members')
+            .select('id, order_index')
+            .eq('chama_id', chama_id)
+            .eq('approval_status', 'approved')
+            .order('order_index', { ascending: true });
+
+          if (members && members.length > 0) {
+            // Get completed withdrawals
+            const { data: completedWithdrawals } = await supabaseClient
+              .from('withdrawals')
+              .select('id')
+              .eq('chama_id', chama_id)
+              .eq('status', 'completed')
+              .order('completed_at', { ascending: true });
+
+            const withdrawalCount = completedWithdrawals?.length || 0;
+            const currentTurnIndex = withdrawalCount % members.length;
+            const currentTurnMember = members[currentTurnIndex];
+
+            if (membership && membership.id !== currentTurnMember.id) {
+              return new Response(JSON.stringify({ 
+                error: 'It is not your turn to withdraw. Please wait for your turn or contact the manager.',
+                current_turn_member_id: currentTurnMember.id
+              }), {
+                status: 403,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+          }
+        }
 
         // Calculate available balance from contributions
         const { data: contributions } = await supabaseClient
@@ -90,8 +137,8 @@ serve(async (req) => {
         totalAvailable = Number(mchango.current_amount);
       }
 
-      if (!isCreator) {
-        return new Response(JSON.stringify({ error: 'Only creators can request withdrawals' }), {
+      if (!isCreator && !isManager) {
+        return new Response(JSON.stringify({ error: 'Only creators or managers can request withdrawals' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
