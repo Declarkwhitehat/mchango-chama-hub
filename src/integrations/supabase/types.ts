@@ -126,31 +126,95 @@ export type Database = {
           },
         ]
       }
+      chama_invite_codes: {
+        Row: {
+          chama_id: string
+          code: string
+          created_at: string | null
+          created_by: string
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          chama_id: string
+          code: string
+          created_at?: string | null
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          chama_id?: string
+          code?: string
+          created_at?: string | null
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_invite_codes_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_invite_codes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_invite_codes_used_by_fkey"
+            columns: ["used_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chama_members: {
         Row: {
+          approval_status: string | null
           chama_id: string
           id: string
           is_manager: boolean
           joined_at: string
           member_code: string
+          order_index: number | null
           status: Database["public"]["Enums"]["member_status"]
           user_id: string | null
         }
         Insert: {
+          approval_status?: string | null
           chama_id: string
           id?: string
           is_manager?: boolean
           joined_at?: string
           member_code: string
+          order_index?: number | null
           status?: Database["public"]["Enums"]["member_status"]
           user_id?: string | null
         }
         Update: {
+          approval_status?: string | null
           chama_id?: string
           id?: string
           is_manager?: boolean
           joined_at?: string
           member_code?: string
+          order_index?: number | null
           status?: Database["public"]["Enums"]["member_status"]
           user_id?: string | null
         }
@@ -545,6 +609,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_invite_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_member_code: {
+        Args: { p_chama_id: string; p_order_index: number }
+        Returns: string
+      }
       generate_slug: {
         Args: { title: string }
         Returns: string
