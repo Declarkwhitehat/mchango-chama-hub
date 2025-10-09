@@ -9,6 +9,12 @@ verify_jwt = false
 [functions.chama-crud]
 verify_jwt = false
 
+[functions.chama-invite]
+verify_jwt = true
+
+[functions.chama-join]
+verify_jwt = true
+
 [functions.contributions-crud]
 verify_jwt = true
 

@@ -57,8 +57,18 @@ const ChamaJoin = () => {
     setErrorMessage("");
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setErrorMessage("Please log in to validate invite codes");
+        setIsValid(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke(
-        `chama-invite/validate?code=${inviteCode.toUpperCase()}`
+        `chama-invite/validate?code=${inviteCode.toUpperCase()}`,
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }
       );
 
       if (error || !data.valid) {
@@ -86,8 +96,19 @@ const ChamaJoin = () => {
     setIsJoining(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({
+          title: "Error",
+          description: "Please log in to continue",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("chama-join", {
         body: { code: code.toUpperCase() },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (error) throw error;

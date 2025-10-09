@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
 };
 
 serve(async (req) => {
@@ -12,15 +13,18 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization') || undefined;
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: authHeader ? { Authorization: authHeader } : {},
         },
       }
     );
+    
+    console.log('chama-invite request', { method: req.method, path: req.url, hasAuth: !!authHeader });
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);

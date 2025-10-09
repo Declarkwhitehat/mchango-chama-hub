@@ -56,7 +56,12 @@ export const ChamaInviteManager = ({ chamaId, isManager }: ChamaInviteManagerPro
   }, [chamaId, isManager]);
 
   const loadInviteCodes = async () => {
-    const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    
+    const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
     
     if (error) {
       console.error("Error loading invite codes:", error);
@@ -67,7 +72,12 @@ export const ChamaInviteManager = ({ chamaId, isManager }: ChamaInviteManagerPro
   };
 
   const loadPendingMembers = async () => {
-    const { data, error } = await supabase.functions.invoke(`chama-join/pending/${chamaId}`);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    
+    const { data, error } = await supabase.functions.invoke(`chama-join/pending/${chamaId}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
     
     if (error) {
       console.error("Error loading pending members:", error);
@@ -89,11 +99,22 @@ export const ChamaInviteManager = ({ chamaId, isManager }: ChamaInviteManagerPro
 
     setIsLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({
+          title: "Error",
+          description: "Please log in to continue",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("chama-invite/generate", {
         body: {
           chama_id: chamaId,
           count: generateCount,
         },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (error) throw error;
@@ -129,9 +150,20 @@ export const ChamaInviteManager = ({ chamaId, isManager }: ChamaInviteManagerPro
 
   const handleApproval = async (memberId: string, action: "approve" | "reject") => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({
+          title: "Error",
+          description: "Please log in to continue",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error } = await supabase.functions.invoke(`chama-join/approve/${memberId}`, {
         body: { action },
         method: "PUT",
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (error) throw error;
