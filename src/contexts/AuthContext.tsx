@@ -95,7 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           
           // Debounce profile fetching to prevent rapid successive calls
           profileFetchTimeout = setTimeout(() => {
-            if (mounted && !isFetchingProfile) {
+            if (mounted) {
               fetchProfile(session.user.id);
             }
           }, 300);
@@ -129,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       subscription.unsubscribe();
     };
-  }, [isFetchingProfile]);
+  }, []);
 
   const signUp = async (data: {
     email: string;
