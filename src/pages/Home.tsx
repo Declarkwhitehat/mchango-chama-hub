@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,24 +88,9 @@ const Home = () => {
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      fetchUserData();
-    }
-  }, [user]);
-
-  // Refresh dashboard lists when a new Chama/Mchango is created
-  useEffect(() => {
-    const onCreated = () => { fetchUserData(); };
-    window.addEventListener('mchango:created', onCreated);
-    window.addEventListener('chama:created', onCreated);
-    return () => {
-      window.removeEventListener('mchango:created', onCreated);
-      window.removeEventListener('chama:created', onCreated);
-    };
-  }, []);
-
-  const fetchUserData = async () => {
+  const fetchUserData = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
       setLoading(true);
 
@@ -113,7 +98,7 @@ const Home = () => {
       const { data: mchangos, error: mchangoError } = await supabase
         .from('mchango')
         .select('*')
-        .eq('created_by', user?.id)
+        .eq('created_by', user.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
@@ -124,7 +109,7 @@ const Home = () => {
       const { data: chamas, error: chamaError } = await supabase
         .from('chama')
         .select('*')
-        .eq('created_by', user?.id)
+        .eq('created_by', user.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
@@ -145,7 +130,7 @@ const Home = () => {
             contribution_frequency
           )
         `)
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .eq('approval_status', 'approved');
 
       if (memberChamaError) throw memberChamaError;
@@ -162,7 +147,24 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserData();
+    }
+  }, [user, fetchUserData]);
+
+  // Refresh dashboard lists when a new Chama/Mchango is created
+  useEffect(() => {
+    const onCreated = () => { fetchUserData(); };
+    window.addEventListener('mchango:created', onCreated);
+    window.addEventListener('chama:created', onCreated);
+    return () => {
+      window.removeEventListener('mchango:created', onCreated);
+      window.removeEventListener('chama:created', onCreated);
+    };
+  }, [fetchUserData]);
 
   const getDaysLeft = (endDate: string) => {
     if (!endDate) return null;
