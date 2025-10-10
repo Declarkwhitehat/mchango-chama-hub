@@ -77,6 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let mounted = true;
     let profileFetchTimeout: NodeJS.Timeout | null = null;
+    let isInitialized = false;
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -84,6 +85,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!mounted) return;
 
         console.log('Auth state changed:', event);
+        
+        // Only process after initial session is loaded
+        if (!isInitialized && event !== 'INITIAL_SESSION') return;
+        if (event === 'INITIAL_SESSION') isInitialized = true;
+
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -93,12 +99,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             clearTimeout(profileFetchTimeout);
           }
           
-          // Debounce profile fetching to prevent rapid successive calls
-          profileFetchTimeout = setTimeout(() => {
-            if (mounted) {
-              fetchProfile(session.user.id);
-            }
-          }, 300);
+          // Only fetch profile on actual auth changes, not token refreshes
+          if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
+            profileFetchTimeout = setTimeout(() => {
+              if (mounted) {
+                fetchProfile(session.user.id);
+              }
+            }, 300);
+          }
         } else {
           setProfile(null);
           setIsFetchingProfile(false);
