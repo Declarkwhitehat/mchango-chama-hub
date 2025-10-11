@@ -77,19 +77,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let mounted = true;
     let profileFetchTimeout: NodeJS.Timeout | null = null;
-    let isInitialized = false;
+    let isInitializing = true;
 
-    // Set up auth state listener
+    console.log('[AuthDebug] AuthContext mounting');
+
+    // Set up auth state listener FIRST (before getSession)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (!mounted) return;
 
-        console.log('Auth state changed:', event);
+        console.log('[AuthDebug] Auth event:', event, 'hasSession:', !!session, 'user:', session?.user?.email);
         
-        // Only process after initial session is loaded
-        if (!isInitialized && event !== 'INITIAL_SESSION') return;
-        if (event === 'INITIAL_SESSION') isInitialized = true;
-
+        // Update session and user state immediately
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -99,87 +98,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             clearTimeout(profileFetchTimeout);
           }
           
-          // Only fetch profile on actual auth changes, not token refreshes
+          // Fetch profile on sign-in events, but not token refreshes
           if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
+            console.log('[AuthDebug] Fetching profile for user:', session.user.id);
             profileFetchTimeout = setTimeout(() => {
               if (mounted) {
-                fetchProfile(session.user.id);
+                fetchProfile(session.user.id).finally(() => {
+                  // Only set loading false after initial session is processed
+                  if (isInitializing) {
+                    console.log('[AuthDebug] Initial session loaded');
+                    isInitializing = false;
+                    setLoading(false);
+                  }
+                });
               }
-            }, 300);
+            }, 100);
+          } else if (isInitializing && event === 'TOKEN_REFRESHED') {
+            // If initial load triggers a token refresh, we're done initializing
+            console.log('[AuthDebug] Initial token refresh completed');
+            isInitializing = false;
+            setLoading(false);
           }
         } else {
+          // No session - clear profile and finish loading
+          console.log('[AuthDebug] No session, clearing profile');
           setProfile(null);
           setIsFetchingProfile(false);
+          if (isInitializing) {
+            isInitializing = false;
+            setLoading(false);
+          }
         }
       }
     );
 
-    // Check for existing session and handle OAuth/magic-link callbacks
-    const hasAuthParams =
-      (typeof window !== 'undefined' && (
-        window.location.hash.includes('access_token') ||
-        window.location.search.includes('code=')
-      ));
-
-    if (hasAuthParams && !sessionStorage.getItem('sb_session_exchanged')) {
-      // Defer to avoid running inside auth callback and to prevent deadlocks
-      setLoading(true);
-      setTimeout(async () => {
-        try {
-          const { data, error } = await supabase.auth.exchangeCodeForSession?.(window.location.href as any);
-          console.log('[AuthDebug] exchangeCodeForSession ->', { hasSession: !!data?.session, error });
-          if (!error && data?.session) {
-            if (!mounted) return;
-            setSession(data.session);
-            setUser(data.session.user);
-            sessionStorage.setItem('sb_session_exchanged', '1');
-            // Clean URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-
-            fetchProfile(data.session.user.id).finally(() => {
-              if (mounted) setLoading(false);
-            });
-            return; // Skip normal restore
-          }
-        } catch (e) {
-          console.log('[AuthDebug] exchangeCodeForSession error', e);
-          // fall through to normal restore
+    // Check for existing session AFTER setting up listener
+    // Supabase will automatically handle PKCE code exchange via detectSessionInUrl: true
+    setTimeout(() => {
+      supabase.auth.getSession().then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('[AuthDebug] Error getting session:', error);
         }
-
-        // Fallback normal restore after attempting URL exchange
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (!mounted) return;
-          setSession(session);
-          setUser(session?.user ?? null);
-
-          if (session?.user) {
-            fetchProfile(session.user.id).finally(() => {
-              if (mounted) setLoading(false);
-            });
-          } else {
-            setLoading(false);
-          }
-        });
-      }, 0);
-    } else {
-      // Normal restore
-      supabase.auth.getSession().then(({ data: { session } }) => {
+        console.log('[AuthDebug] Initial getSession result:', !!session, 'user:', session?.user?.email);
+        
         if (!mounted) return;
         
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          fetchProfile(session.user.id).finally(() => {
-            if (mounted) setLoading(false);
-          });
-        } else {
+        // If we have a session immediately, update state
+        // (onAuthStateChange will also fire with INITIAL_SESSION)
+        if (session) {
+          setSession(session);
+          setUser(session.user);
+        } else if (!session && isInitializing) {
+          // No session and still initializing - safe to finish loading
+          console.log('[AuthDebug] No initial session found');
+          isInitializing = false;
           setLoading(false);
         }
       });
-    }
+    }, 0);
 
     return () => {
+      console.log('[AuthDebug] AuthContext unmounting');
       mounted = false;
       if (profileFetchTimeout) {
         clearTimeout(profileFetchTimeout);
