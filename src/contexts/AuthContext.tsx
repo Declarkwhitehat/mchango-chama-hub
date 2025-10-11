@@ -114,21 +114,70 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => {
-          if (mounted) setLoading(false);
+    // Check for existing session and handle OAuth/magic-link callbacks
+    const hasAuthParams =
+      (typeof window !== 'undefined' && (
+        window.location.hash.includes('access_token') ||
+        window.location.search.includes('code=')
+      ));
+
+    if (hasAuthParams && !sessionStorage.getItem('sb_session_exchanged')) {
+      // Defer to avoid running inside auth callback and to prevent deadlocks
+      setLoading(true);
+      setTimeout(async () => {
+        try {
+          const { data, error } = await supabase.auth.exchangeCodeForSession?.(window.location.href as any);
+          console.log('[AuthDebug] exchangeCodeForSession ->', { hasSession: !!data?.session, error });
+          if (!error && data?.session) {
+            if (!mounted) return;
+            setSession(data.session);
+            setUser(data.session.user);
+            sessionStorage.setItem('sb_session_exchanged', '1');
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            fetchProfile(data.session.user.id).finally(() => {
+              if (mounted) setLoading(false);
+            });
+            return; // Skip normal restore
+          }
+        } catch (e) {
+          console.log('[AuthDebug] exchangeCodeForSession error', e);
+          // fall through to normal restore
+        }
+
+        // Fallback normal restore after attempting URL exchange
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!mounted) return;
+          setSession(session);
+          setUser(session?.user ?? null);
+
+          if (session?.user) {
+            fetchProfile(session.user.id).finally(() => {
+              if (mounted) setLoading(false);
+            });
+          } else {
+            setLoading(false);
+          }
         });
-      } else {
-        setLoading(false);
-      }
-    });
+      }, 0);
+    } else {
+      // Normal restore
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!mounted) return;
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          fetchProfile(session.user.id).finally(() => {
+            if (mounted) setLoading(false);
+          });
+        } else {
+          setLoading(false);
+        }
+      });
+    }
 
     return () => {
       mounted = false;
