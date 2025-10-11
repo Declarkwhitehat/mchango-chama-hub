@@ -28,37 +28,43 @@ const ChamaJoin = () => {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    const checkAuthAndLoadChama = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth", { state: { returnTo: `/chama/join/${slug}` } });
-        return;
-      }
-
-      await loadChama();
-    };
-
-    checkAuthAndLoadChama();
-  }, [slug, navigate]);
+    // Load chama details without requiring authentication first
+    loadChama();
+  }, [slug]);
 
   const loadChama = async () => {
     setIsLoading(true);
     setErrorMessage("");
 
     try {
-      const { data, error } = await supabase.functions.invoke(`chama-crud/${slug}`);
+      // Query database directly using RLS policies (public can view active chamas)
+      const { data, error } = await supabase
+        .from('chama')
+        .select(`
+          id,
+          name,
+          slug,
+          description,
+          contribution_amount,
+          contribution_frequency,
+          status,
+          is_public
+        `)
+        .eq('slug', slug)
+        .eq('status', 'active')
+        .eq('is_public', true)
+        .single();
 
       if (error) throw error;
 
-      setChamaInfo({
-        id: data.data.id,
-        name: data.data.name,
-        slug: data.data.slug,
-        description: data.data.description,
-        contribution_amount: data.data.contribution_amount,
-        contribution_frequency: data.data.contribution_frequency,
-      });
+      if (!data) {
+        setErrorMessage("Chama not found or is not public");
+        return;
+      }
+
+      setChamaInfo(data);
     } catch (error: any) {
+      console.error('Error loading chama:', error);
       setErrorMessage(error.message || "Failed to load chama details");
     } finally {
       setIsLoading(false);
@@ -67,6 +73,14 @@ const ChamaJoin = () => {
 
   const handleJoin = async () => {
     if (!chamaInfo) return;
+
+    // Check if user is authenticated before joining
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      // Redirect to auth with return URL
+      navigate("/auth", { state: { returnTo: `/chama/join/${slug}` } });
+      return;
+    }
 
     setIsJoining(true);
 
