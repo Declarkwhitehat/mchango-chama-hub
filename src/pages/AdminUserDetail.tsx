@@ -41,13 +41,45 @@ const AdminUserDetail = () => {
   const [mchangos, setMchangos] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [contributions, setContributions] = useState<any[]>([]);
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
-
+const [withdrawals, setWithdrawals] = useState<any[]>([]);
+const [frontSignedUrl, setFrontSignedUrl] = useState<string | null>(null);
+const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
   useEffect(() => {
     if (userId) {
       loadUserDetails();
     }
   }, [userId]);
+
+  // Build signed URLs for KYC documents when URLs change
+  useEffect(() => {
+    const extractPath = (fullUrl: string) => {
+      const match = fullUrl?.match(/id-documents\/(.+)$/);
+      return match ? match[1] : fullUrl;
+    };
+
+    const build = async () => {
+      try {
+        setFrontSignedUrl(null);
+        setBackSignedUrl(null);
+        if (!user) return;
+
+        if (user.id_front_url) {
+          const path = extractPath(user.id_front_url);
+          const { data } = await supabase.storage.from('id-documents').createSignedUrl(path, 3600);
+          if (data?.signedUrl) setFrontSignedUrl(data.signedUrl);
+        }
+        if (user.id_back_url) {
+          const path = extractPath(user.id_back_url);
+          const { data } = await supabase.storage.from('id-documents').createSignedUrl(path, 3600);
+          if (data?.signedUrl) setBackSignedUrl(data.signedUrl);
+        }
+      } catch (e) {
+        console.error('Error creating signed URLs', e);
+      }
+    };
+
+    build();
+  }, [user?.id_front_url, user?.id_back_url]);
 
   const loadUserDetails = async () => {
     try {
@@ -428,7 +460,7 @@ const AdminUserDetail = () => {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <img
-                          src={user.id_front_url}
+                          src={frontSignedUrl || ''}
                           alt="ID Front"
                           className="w-full h-48 object-cover rounded-lg border"
                         />
@@ -436,7 +468,8 @@ const AdminUserDetail = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open(user.id_front_url!, '_blank')}
+                            disabled={!frontSignedUrl}
+                            onClick={() => frontSignedUrl && window.open(frontSignedUrl, '_blank')}
                             className="flex-1"
                           >
                             <Eye className="h-4 w-4 mr-1" />
@@ -463,7 +496,7 @@ const AdminUserDetail = () => {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <img
-                          src={user.id_back_url}
+                          src={backSignedUrl || ''}
                           alt="ID Back"
                           className="w-full h-48 object-cover rounded-lg border"
                         />
@@ -471,7 +504,8 @@ const AdminUserDetail = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open(user.id_back_url!, '_blank')}
+                            disabled={!backSignedUrl}
+                            onClick={() => backSignedUrl && window.open(backSignedUrl, '_blank')}
                             className="flex-1"
                           >
                             <Eye className="h-4 w-4 mr-1" />
