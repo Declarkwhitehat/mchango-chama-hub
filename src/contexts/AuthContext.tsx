@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             clearTimeout(profileFetchTimeout);
           }
           
-          // Only fetch profile for INITIAL_SESSION to prevent duplicate fetches
+          // Only fetch profile once after initial session
           if (event === 'INITIAL_SESSION') {
             console.log('[AuthDebug] Fetching profile for user:', session.user.id);
             fetchProfile(session.user.id).finally(() => {
@@ -109,8 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setLoading(false);
               }
             });
-          } else if (isInitializing) {
-            // Any other event during initialization - just finish loading
+          } else if (isInitializing && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+            // Finish initialization on first non-initial event
             isInitializing = false;
             setLoading(false);
           }
@@ -127,9 +127,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // Check for existing session AFTER setting up listener
-    // Supabase will automatically handle PKCE code exchange via detectSessionInUrl: true
-    setTimeout(() => {
+    // Handle OAuth/magic link redirect if present, then check for session
+    (async () => {
+      try {
+        // Attempt code exchange once; ignore errors if not applicable
+        const { data: exchangeData } = await supabase.auth.exchangeCodeForSession(window.location.href);
+        console.log('[AuthDebug] exchangeCodeForSession ->', !!exchangeData?.session);
+        if (exchangeData?.session) {
+          // Clean URL after successful exchange
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (e) {
+        console.log('[AuthDebug] exchangeCodeForSession skipped/failed');
+      }
+
+      // Proceed to read current session (INITIAL_SESSION event will also fire)
       supabase.auth.getSession().then(({ data: { session }, error }) => {
         if (error) {
           console.error('[AuthDebug] Error getting session:', error);
@@ -138,19 +150,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (!mounted) return;
         
-        // If we have a session immediately, update state
-        // (onAuthStateChange will also fire with INITIAL_SESSION)
         if (session) {
           setSession(session);
           setUser(session.user);
         } else if (!session && isInitializing) {
-          // No session and still initializing - safe to finish loading
           console.log('[AuthDebug] No initial session found');
           isInitializing = false;
           setLoading(false);
         }
       });
-    }, 0);
+    })();
 
     return () => {
       console.log('[AuthDebug] AuthContext unmounting');

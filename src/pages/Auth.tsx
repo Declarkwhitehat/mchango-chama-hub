@@ -56,24 +56,28 @@ const Auth = () => {
   });
 
   // Redirect if already logged in
-  if (user) {
-    // Check if user is admin and redirect to appropriate page
-    const checkAdminAndRedirect = async () => {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      if (data) {
-        navigate("/admin");
-      } else {
-        navigate("/home");
+  // Move redirect to effect to avoid running navigation during render
+  // and to prevent redirect loops
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const [didRedirect, setDidRedirect] = useState(false);
+  if (user && !didRedirect) {
+    // defer redirect until after paint
+    setTimeout(async () => {
+      if (didRedirect) return;
+      try {
+        const { data } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        setDidRedirect(true);
+        navigate(data ? "/admin" : "/home", { replace: true });
+      } catch {
+        setDidRedirect(true);
+        navigate("/home", { replace: true });
       }
-    };
-    
-    checkAdminAndRedirect();
+    }, 0);
     return null;
   }
 
