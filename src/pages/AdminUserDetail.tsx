@@ -157,9 +157,16 @@ const AdminUserDetail = () => {
 
   const downloadDocument = async (url: string, filename: string) => {
     try {
+      // Extract path from full URL (format: https://.../storage/v1/object/public/id-documents/{user_id}/file.jpg)
+      const extractPath = (fullUrl: string) => {
+        const match = fullUrl.match(/id-documents\/(.+)$/);
+        return match ? match[1] : fullUrl;
+      };
+
+      const path = extractPath(url);
       const { data, error } = await supabase.storage
         .from('id-documents')
-        .download(url.split('/').pop()!);
+        .download(path);
 
       if (error) throw error;
 
@@ -176,7 +183,7 @@ const AdminUserDetail = () => {
       console.error('Download error:', error);
       toast({
         title: "Error",
-        description: "Failed to download document",
+        description: error.message || "Failed to download document",
         variant: "destructive",
       });
     }
