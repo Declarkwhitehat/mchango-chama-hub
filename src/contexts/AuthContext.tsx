@@ -44,6 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
+  const lastProcessedUserId = useState<string | null>(null)[0];
 
   const fetchProfile = async (userId: string, retryCount = 0): Promise<void> => {
     // Prevent concurrent fetches
@@ -88,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         console.log('[AuthDebug] Auth event:', event, 'hasSession:', !!session, 'user:', session?.user?.email);
         
-        // Update session and user state immediately
+        // Update session and user state
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -98,24 +99,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             clearTimeout(profileFetchTimeout);
           }
           
-          // Fetch profile on sign-in events, but not token refreshes
-          if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
+          // Only fetch profile for INITIAL_SESSION to prevent duplicate fetches
+          if (event === 'INITIAL_SESSION') {
             console.log('[AuthDebug] Fetching profile for user:', session.user.id);
-            profileFetchTimeout = setTimeout(() => {
-              if (mounted) {
-                fetchProfile(session.user.id).finally(() => {
-                  // Only set loading false after initial session is processed
-                  if (isInitializing) {
-                    console.log('[AuthDebug] Initial session loaded');
-                    isInitializing = false;
-                    setLoading(false);
-                  }
-                });
+            fetchProfile(session.user.id).finally(() => {
+              if (isInitializing) {
+                console.log('[AuthDebug] Initial session loaded');
+                isInitializing = false;
+                setLoading(false);
               }
-            }, 100);
-          } else if (isInitializing && event === 'TOKEN_REFRESHED') {
-            // If initial load triggers a token refresh, we're done initializing
-            console.log('[AuthDebug] Initial token refresh completed');
+            });
+          } else if (isInitializing) {
+            // Any other event during initialization - just finish loading
             isInitializing = false;
             setLoading(false);
           }

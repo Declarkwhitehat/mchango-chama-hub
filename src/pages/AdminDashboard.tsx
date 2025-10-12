@@ -107,9 +107,10 @@ const AdminDashboard = () => {
                         <div>
                           <p className="font-medium">{user.full_name}</p>
                           <p className="text-sm text-muted-foreground">{user.email}</p>
-                          <p className="text-xs text-muted-foreground">
-                            ID: {user.id_number} | Phone: {user.phone}
-                          </p>
+                          <div className="flex gap-4 text-xs text-muted-foreground mt-1">
+                            <span className="font-mono">ID: {user.id_number}</span>
+                            <span>Phone: {user.phone}</span>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant={

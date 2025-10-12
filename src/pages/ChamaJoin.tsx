@@ -72,7 +72,7 @@ const ChamaJoin = () => {
   };
 
   const handleJoin = async () => {
-    if (!chamaInfo) return;
+    if (!chamaInfo || isJoining) return;
 
     // Check if user is authenticated before joining
     const { data: { user } } = await supabase.auth.getUser();
