@@ -13,6 +13,7 @@ import MchangoDetail from "./pages/MchangoDetail";
 import ChamaCreate from "./pages/ChamaCreate";
 import ChamaDetail from "./pages/ChamaDetail";
 import ChamaJoin from "./pages/ChamaJoin";
+import ChamaList from "./pages/ChamaList";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import AdminKYC from "./pages/AdminKYC";
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/mchango" element={<MchangoList />} />
           <Route path="/mchango/create" element={<ProtectedRoute requireKYC><MchangoCreate /></ProtectedRoute>} />
           <Route path="/mchango/:id" element={<MchangoDetail />} />
+          <Route path="/chama" element={<ChamaList />} />
           <Route path="/chama/create" element={<ProtectedRoute requireKYC><ChamaCreate /></ProtectedRoute>} />
           <Route path="/chama/join/:slug" element={<ChamaJoin />} />
           <Route path="/chama/:id" element={<ChamaDetail />} />

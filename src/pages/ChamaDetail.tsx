@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChamaInviteManager } from "@/components/ChamaInviteManager";
+import { ChamaPendingRequests } from "@/components/ChamaPendingRequests";
 import { MemberDashboard } from "@/components/MemberDashboard";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
@@ -232,6 +233,15 @@ const ChamaDetail = () => {
           <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
         )}
 
+        {/* Pending Join Requests - Visible to all members */}
+        {isMember && (
+          <ChamaPendingRequests 
+            chamaId={chama.id} 
+            isManager={isManager} 
+            onUpdate={loadChama}
+          />
+        )}
+
         {/* Withdrawal Button - Only for member whose turn it is */}
         {isMember && isMyTurn && (
           <WithdrawalButton
@@ -369,9 +379,12 @@ const ChamaDetail = () => {
         {/* Pending approval message */}
         {isPending && (
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 space-y-2">
+              <p className="text-center text-lg font-semibold text-primary">
+                Pending Approval
+              </p>
               <p className="text-center text-muted-foreground">
-                Your join request is pending manager approval
+                Your join request is being reviewed by the chama manager. You'll be notified once approved.
               </p>
             </CardContent>
           </Card>

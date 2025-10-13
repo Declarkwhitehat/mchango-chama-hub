@@ -92,6 +92,7 @@ const ChamaJoin = () => {
           description: "Please log in to continue",
           variant: "destructive",
         });
+        setIsJoining(false);
         return;
       }
 
@@ -103,18 +104,28 @@ const ChamaJoin = () => {
       if (error) throw error;
 
       toast({
-        title: "Success!",
-        description: data.message || "Join request submitted successfully! Waiting for manager approval.",
+        title: "Request Sent Successfully!",
+        description: "Your join request is now pending manager approval. You'll be notified once approved.",
       });
 
-      // Navigate to chama detail page
+      // Navigate to chama detail page to see pending status
       navigate(`/chama/${chamaInfo.slug}`);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to join chama",
-        variant: "destructive",
-      });
+      const errorMessage = error.message || "Failed to submit join request";
+      
+      if (errorMessage.includes("already a member") || errorMessage.includes("already exists")) {
+        toast({
+          title: "Already Requested",
+          description: "You have already submitted a join request for this chama.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsJoining(false);
     }
