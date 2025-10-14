@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AdjustMemberLimitDialog } from "@/components/admin/AdjustMemberLimitDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Search, Ban, PlayCircle, Loader2, ExternalLink, Users } from "lucide-react";
@@ -230,6 +231,13 @@ export const ChamaManagement = () => {
                       <ExternalLink className="h-4 w-4 mr-1" />
                       View
                     </Button>
+
+                    <AdjustMemberLimitDialog
+                      chamaId={chama.id}
+                      chamaName={chama.name}
+                      currentLimit={chama.max_members}
+                      onSuccess={fetchChamas}
+                    />
                     
                     {chama.status === 'active' && (
                       <Button
