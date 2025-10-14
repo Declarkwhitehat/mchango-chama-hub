@@ -94,12 +94,14 @@ serve(async (req) => {
         }
       }
 
-      // Get next order_index
+      // Get next order_index - strictly based on join date order
+      // Order index is automatically assigned and CANNOT be changed by managers
       const { data: members } = await supabaseClient
         .from('chama_members')
-        .select('order_index')
+        .select('order_index, joined_at')
         .eq('chama_id', chama_id)
         .not('order_index', 'is', null)
+        .order('joined_at', { ascending: true })
         .order('order_index', { ascending: false })
         .limit(1);
 
