@@ -145,16 +145,16 @@ serve(async (req) => {
       });
     }
 
-    // PUT /chama-join/approve/:member_id - Approve join request
+    // PUT /chama-join/approve/:member_id - Approve or reject join request
     if (req.method === 'PUT') {
       const url = new URL(req.url);
       const pathParts = url.pathname.split('/').filter(Boolean);
       const memberId = pathParts[pathParts.length - 1];
       const body = await req.json();
-      const { action } = body; // 'approve' or 'reject'
+      const { approved } = body; // boolean: true for approve, false for reject
 
-      if (!['approve', 'reject'].includes(action)) {
-        return new Response(JSON.stringify({ error: 'Action must be approve or reject' }), {
+      if (typeof approved !== 'boolean') {
+        return new Response(JSON.stringify({ error: 'approved must be a boolean (true or false)' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -163,7 +163,7 @@ serve(async (req) => {
       // Get member details
       const { data: member, error: memberFetchError } = await supabaseClient
         .from('chama_members')
-        .select('chama_id, approval_status')
+        .select('chama_id, approval_status, user_id')
         .eq('id', memberId)
         .single();
 
@@ -184,14 +184,14 @@ serve(async (req) => {
         .single();
 
       if (!requesterMembership || !requesterMembership.is_manager) {
-        return new Response(JSON.stringify({ error: 'Only managers can approve join requests' }), {
+        return new Response(JSON.stringify({ error: 'Only managers can approve or reject join requests' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
       // Update approval status
-      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      const newStatus = approved ? 'approved' : 'rejected';
       const { data, error } = await supabaseClient
         .from('chama_members')
         .update({ approval_status: newStatus })
@@ -205,7 +205,9 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({ 
         data,
-        message: `Join request ${newStatus}` 
+        message: approved 
+          ? 'Join request approved! Member has been added to the chama.' 
+          : 'Join request rejected.' 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

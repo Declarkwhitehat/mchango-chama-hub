@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogIn, UserPlus } from "lucide-react";
+import { Menu, X, LogIn, UserPlus, Users, Heart } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -23,6 +23,22 @@ export const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/chama')}
+              className="gap-2"
+            >
+              <Users className="h-4 w-4" />
+              Browse Chamas
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/mchango')}
+              className="gap-2"
+            >
+              <Heart className="h-4 w-4" />
+              Browse Campaigns
+            </Button>
             <Button 
               variant="ghost" 
               onClick={() => navigate('/auth')}
@@ -58,6 +74,28 @@ export const Header = () => {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-border">
             <nav className="flex flex-col gap-2">
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  navigate('/chama');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full justify-start gap-2"
+              >
+                <Users className="h-4 w-4" />
+                Browse Chamas
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  navigate('/mchango');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full justify-start gap-2"
+              >
+                <Heart className="h-4 w-4" />
+                Browse Campaigns
+              </Button>
               <Button 
                 variant="ghost" 
                 onClick={() => {

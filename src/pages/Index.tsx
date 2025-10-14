@@ -34,19 +34,19 @@ const Index = () => {
                   variant="hero" 
                   size="xl"
                   className="w-full sm:w-auto"
-                  onClick={() => window.location.href = '/auth'}
+                  onClick={() => window.location.href = '/mchango'}
                 >
-                  <TrendingUp className="mr-2 h-5 w-5" />
-                  Start a Mchango
+                  <Heart className="mr-2 h-5 w-5" />
+                  Browse Campaigns
                 </Button>
                 <Button 
                   variant="heroSecondary" 
                   size="xl"
                   className="w-full sm:w-auto"
-                  onClick={() => window.location.href = '/auth'}
+                  onClick={() => window.location.href = '/chama'}
                 >
                   <Users className="mr-2 h-5 w-5" />
-                  Join a Chama
+                  Browse Chamas
                 </Button>
               </div>
             </div>
