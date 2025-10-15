@@ -7,6 +7,7 @@ import { TransactionsTable } from "@/components/admin/TransactionsTable";
 import { AuditLogsTable } from "@/components/admin/AuditLogsTable";
 import { AccountAdjustment } from "@/components/admin/AccountAdjustment";
 import { WithdrawalsManagement } from "@/components/admin/WithdrawalsManagement";
+import { PlatformStatistics } from "@/components/admin/PlatformStatistics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Users, TrendingUp, Activity, ExternalLink } from "lucide-react";
@@ -65,6 +66,9 @@ const AdminDashboard = () => {
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
           <p className="text-muted-foreground">Search, manage, and audit all platform data</p>
         </div>
+
+        {/* Platform Statistics */}
+        <PlatformStatistics />
 
         {/* Global Search */}
         <Card>

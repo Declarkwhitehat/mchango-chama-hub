@@ -190,6 +190,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         emailRedirectTo: `${window.location.origin}/kyc-upload`,
       },
     });
+
+    // Capture IP address on signup
+    if (!error) {
+      setTimeout(async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await supabase.functions.invoke('capture-login-ip', {
+              body: { is_signup: true },
+              headers: { Authorization: `Bearer ${session.access_token}` }
+            });
+          }
+        } catch (ipError) {
+          console.error('Failed to capture signup IP:', ipError);
+          // Don't block signup flow if IP capture fails
+        }
+      }, 0);
+    }
+
     return { error };
   };
 
@@ -198,6 +217,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       password,
     });
+
+    // Capture IP address on login
+    if (!error) {
+      setTimeout(async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await supabase.functions.invoke('capture-login-ip', {
+              body: { is_signup: false },
+              headers: { Authorization: `Bearer ${session.access_token}` }
+            });
+          }
+        } catch (ipError) {
+          console.error('Failed to capture login IP:', ipError);
+          // Don't block login flow if IP capture fails
+        }
+      }, 0);
+    }
+
     return { error };
   };
 

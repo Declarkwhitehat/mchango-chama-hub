@@ -591,8 +591,11 @@ export type Database = {
           kyc_reviewed_by: string | null
           kyc_status: Database["public"]["Enums"]["kyc_status"]
           kyc_submitted_at: string | null
+          last_login_at: string | null
+          last_login_ip: unknown | null
           phone: string
           phone_verified: boolean | null
+          signup_ip: unknown | null
           updated_at: string
         }
         Insert: {
@@ -609,8 +612,11 @@ export type Database = {
           kyc_reviewed_by?: string | null
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_submitted_at?: string | null
+          last_login_at?: string | null
+          last_login_ip?: unknown | null
           phone: string
           phone_verified?: boolean | null
+          signup_ip?: unknown | null
           updated_at?: string
         }
         Update: {
@@ -627,8 +633,11 @@ export type Database = {
           kyc_reviewed_by?: string | null
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_submitted_at?: string | null
+          last_login_at?: string | null
+          last_login_ip?: unknown | null
           phone?: string
           phone_verified?: boolean | null
+          signup_ip?: unknown | null
           updated_at?: string
         }
         Relationships: []

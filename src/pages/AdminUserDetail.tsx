@@ -399,7 +399,32 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
                     <div>
                       <p className="text-sm text-muted-foreground flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
-                        IP Addresses ({ipAddresses.length})
+                        Signup IP
+                      </p>
+                      <p className="font-mono text-sm bg-muted px-2 py-1 rounded inline-block">
+                        {(user as any).signup_ip || 'Not recorded'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Last Login IP
+                      </p>
+                      <p className="font-mono text-sm bg-muted px-2 py-1 rounded inline-block">
+                        {(user as any).last_login_ip || 'Not recorded'}
+                      </p>
+                      {(user as any).last_login_at && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {format(new Date((user as any).last_login_at), "PPP 'at' p")}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Historical IPs ({ipAddresses.length})
                       </p>
                       <div className="space-y-1 mt-2">
                         {ipAddresses.slice(0, 5).map((ip, index) => (
