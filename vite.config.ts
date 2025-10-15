@@ -36,7 +36,7 @@ export default defineConfig(async ({ mode }) => {
     // 👇 Allow your Render domain to access the deployed site
     preview: {
       // allowedHosts should be hostnames (no protocol)
-      allowedHosts: [""],https://mchango-chama-hub-1.onrender.com
+      allowedHosts:["mchango-chama-hub-1.onrender.com"],
       port: 8080, // optional, matches server port
     },
 
