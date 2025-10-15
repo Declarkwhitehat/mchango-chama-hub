@@ -94,20 +94,23 @@ serve(async (req) => {
         }
       }
 
-      // Get next order_index - strictly based on join date order
-      // Order index is automatically assigned and CANNOT be changed by managers
+      // Get next order_index - STRICTLY based on join date order
+      // Order index determines payout position and is automatically assigned
+      // IMPORTANT: Once assigned, order_index CANNOT be modified by anyone (enforced by database trigger)
+      // This ensures fair, transparent payout order based solely on when members joined
       const { data: members } = await supabaseClient
         .from('chama_members')
         .select('order_index, joined_at')
         .eq('chama_id', chama_id)
         .not('order_index', 'is', null)
-        .order('joined_at', { ascending: true })
         .order('order_index', { ascending: false })
         .limit(1);
 
+      // Calculate next sequential order index
+      // Creator has order_index = 1, subsequent members get 2, 3, 4, etc.
       const nextOrderIndex = members && members.length > 0 
         ? (members[0].order_index || 0) + 1 
-        : 2; // Start at 2 (creator is 1)
+        : 2; // Start at 2 (creator is always 1)
 
       // Generate member code
       const { data: memberCodeData } = await supabaseClient
