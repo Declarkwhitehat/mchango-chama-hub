@@ -35,3 +35,9 @@ verify_jwt = true
 
 [functions.mpesa-callback]
 verify_jwt = false
+
+[functions.capture-login-ip]
+verify_jwt = true
+
+[functions.withdrawals-crud]
+verify_jwt = true
