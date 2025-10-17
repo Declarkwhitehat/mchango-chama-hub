@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
-// Use the project's supabase client path (matches other files)
-import { supabase } from "@/integrations/supabase/client";
+// Layout is a named export in your project; import it as such
+import { Layout } from "@/components/Layout";
 
-// Use your app's component paths (match your project alias usage)
-import Layout from "@/components/Layout";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
