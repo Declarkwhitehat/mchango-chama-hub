@@ -11,14 +11,9 @@ interface STKPushRequest {
   amount: number;
   account_reference: string;
   transaction_desc: string;
-  payment_reference?: string;
   chama_id?: string;
   mchango_id?: string;
-  callback_metadata?: {
-    donation_id?: string;
-    mchango_id?: string;
-    [key: string]: any;
-  };
+  callback_metadata?: Record<string, any>;
 }
 
 serve(async (req) => {
@@ -29,197 +24,99 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get user if authenticated (optional for guest donations)
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const body: STKPushRequest = await req.json();
+    console.log('Incoming STK push request:', body);
 
-    const requestBody: STKPushRequest = await req.json();
-    const { 
-      phone_number, 
-      amount, 
-      account_reference, 
-      transaction_desc, 
-      payment_reference, 
-      chama_id, 
-      mchango_id,
-      callback_metadata 
-    } = requestBody;
+    const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY') ?? '';
+    const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? '';
+    const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? '174379'; // sandbox default
+    const passkey = Deno.env.get('MPESA_PASSKEY') ?? '';
 
-    // Validate required fields
-    if (!phone_number || !amount) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields: phone_number and amount' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Generate payment reference if not provided
-    const finalPaymentReference = payment_reference || `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Check if this is a donation (has callback_metadata with donation_id)
-    const isDonation = callback_metadata?.donation_id;
-
-    // For donations, skip transaction check (donations are tracked separately)
-    if (!isDonation) {
-      // Check for idempotency - if payment_reference already exists, return existing transaction
-      const { data: existingTransaction } = await supabaseClient
-        .from('transactions')
-        .select('*')
-        .eq('payment_reference', finalPaymentReference)
-        .maybeSingle();
-
-      if (existingTransaction) {
-        return new Response(
-          JSON.stringify({ 
-            message: 'Transaction already exists',
-            transaction: existingTransaction 
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Get M-PESA credentials from secrets
-    const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY');
-    const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET');
-    const passkey = Deno.env.get('MPESA_PASSKEY');
-    const shortcode = Deno.env.get('MPESA_SHORTCODE') || '174379'; // Default sandbox shortcode
-    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`;
-
-    if (!consumerKey || !consumerSecret) {
-      throw new Error('M-PESA credentials not configured');
-    }
-
-    // Step 1: Get OAuth token
+    // --- Step 1: Get Access Token ---
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
     const tokenResponse = await fetch(
       'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-      {
-        headers: {
-          'Authorization': `Basic ${auth}`,
-        },
-      }
+      { headers: { Authorization: `Basic ${auth}` } }
     );
+    const tokenData = await tokenResponse.json();
+    console.log('Access Token Response:', tokenData);
 
-    if (!tokenResponse.ok) {
-      throw new Error('Failed to get M-PESA access token');
+    if (!tokenData.access_token) {
+      throw new Error('Failed to get access token from Safaricom.');
     }
 
-    const { access_token } = await tokenResponse.json();
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-T:.Z]/g, '')
+      .slice(0, 14);
+    const password = btoa(shortcode + passkey + timestamp);
 
-    // Step 2: Prepare STK Push request
-    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
-    const password = btoa(`${shortcode}${passkey || ''}${timestamp}`);
-    
-    // Format phone number (remove + and ensure it starts with 254)
-    let formattedPhone = phone_number.replace(/\D/g, '');
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '254' + formattedPhone.slice(1);
-    } else if (formattedPhone.startsWith('+254')) {
-      formattedPhone = formattedPhone.slice(1);
-    } else if (!formattedPhone.startsWith('254')) {
-      formattedPhone = '254' + formattedPhone;
-    }
+    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`;
+    console.log('Using Callback URL:', callbackUrl);
 
-    const stkPushPayload = {
+    // --- Step 2: Prepare STK Push Payload ---
+    const payload = {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: Math.round(amount),
-      PartyA: formattedPhone,
+      Amount: body.amount,
+      PartyA: body.phone_number,
       PartyB: shortcode,
-      PhoneNumber: formattedPhone,
+      PhoneNumber: body.phone_number,
       CallBackURL: callbackUrl,
-      AccountReference: account_reference || finalPaymentReference,
-      TransactionDesc: transaction_desc || 'Payment',
+      AccountReference: body.account_reference || 'Donation',
+      TransactionDesc: body.transaction_desc || 'Donation Payment',
     };
 
-    // Step 3: Send STK Push
+    console.log('STK Push payload:', payload);
+
+    // --- Step 3: Send STK Push ---
     const stkResponse = await fetch(
       'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${access_token}`,
+          Authorization: `Bearer ${tokenData.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(stkPushPayload),
+        body: JSON.stringify(payload),
       }
     );
 
-    const stkData = await stkResponse.json();
+    const result = await stkResponse.json();
+    console.log('STK Push API Response:', result);
 
-    console.log('M-PESA STK Response:', stkData);
+    // --- Step 4: Save Transaction (Optional) ---
+    if (result.CheckoutRequestID) {
+      const { error } = await supabaseClient
+        .from('donations')
+        .insert([
+          {
+            phone_number: body.phone_number,
+            amount: body.amount,
+            chama_id: body.chama_id || null,
+            mchango_id: body.mchango_id || null,
+            status: 'PENDING',
+            checkout_request_id: result.CheckoutRequestID,
+            merchant_request_id: result.MerchantRequestID,
+          },
+        ]);
 
-    // For donations, we don't create a transaction record (handled by mchango_donations table)
-    // Just return the STK response with callback metadata
-    if (isDonation) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'STK Push sent successfully',
-          mpesa_response: stkData,
-          callback_metadata: callback_metadata,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (error) console.error('Supabase insert error:', error);
     }
 
-    // Step 4: Create pending transaction record (for non-donation payments only)
-    if (!user) {
-      throw new Error('User authentication required for non-donation payments');
-    }
-
-    const { data: transaction, error: transactionError } = await supabaseClient
-      .from('transactions')
-      .insert({
-        user_id: user.id,
-        chama_id: chama_id || null,
-        mchango_id: mchango_id || null,
-        amount: amount,
-        transaction_type: 'donation',
-        status: 'pending',
-        payment_reference: finalPaymentReference,
-        payment_method: 'mpesa',
-        metadata: {
-          phone_number: formattedPhone,
-          merchant_request_id: stkData.MerchantRequestID,
-          checkout_request_id: stkData.CheckoutRequestID,
-          response_code: stkData.ResponseCode,
-          response_description: stkData.ResponseDescription,
-        },
-      })
-      .select()
-      .single();
-
-    if (transactionError) {
-      console.error('Transaction creation error:', transactionError);
-      throw transactionError;
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'STK Push sent successfully',
-        transaction: transaction,
-        mpesa_response: stkData,
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error: any) {
-    console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('STK Push Error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
