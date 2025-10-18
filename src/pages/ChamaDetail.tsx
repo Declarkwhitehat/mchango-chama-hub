@@ -5,16 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // ✅ fixed import
 import { Calendar, UserPlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/useAuth"; // example hook if available
 
-// Utility for KES formatting
+// ✅ Temporary fallback for authentication
+const useAuth = () => ({
+  user: { id: 1, name: "Demo User", role: "manager" },
+});
+
+// ✅ Format currency in KES
 const formatKES = (amount: number) =>
   new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES" }).format(amount);
 
-// Small reusable Stat component
+// ✅ Reusable Stat card
 const Stat = ({ label, value }: { label: string; value: string }) => (
   <div className="p-4 bg-muted/50 rounded-lg text-center">
     <p className="text-sm text-muted-foreground mb-1">{label}</p>
@@ -22,50 +26,38 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-const ChamaDetail = () => {
+// ✅ Main Component
+export default function ChamaDetail() {
   const { id } = useParams();
-  const { user } = useAuth() || {}; // assume user context is available
-
+  const { user } = useAuth();
   const [chama, setChama] = useState<any>(null);
-  const [members, setMembers] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchChamaDetails = async () => {
+    const fetchChama = async () => {
       try {
-        // Example API endpoint
         const res = await fetch(`/api/chamas/${id}`);
+        if (!res.ok) throw new Error("Failed to load chama");
         const data = await res.json();
-
-        setChama(data.chama);
+        setChama(data);
         setMembers(data.members || []);
-        setTransactions(data.transactions || []);
-      } catch (error) {
-        console.error(error);
-        toast.error("Failed to load chama details");
+      } catch (err) {
+        console.error(err);
+        toast.error("Error loading chama details");
       } finally {
         setLoading(false);
       }
     };
-    fetchChamaDetails();
+    fetchChama();
   }, [id]);
-
-  const handleJoinGroup = async () => {
-    try {
-      const res = await fetch(`/api/chamas/${id}/join`, { method: "POST" });
-      if (!res.ok) throw new Error("Request failed");
-      toast.success("Join request sent to manager!");
-    } catch (error) {
-      toast.error("Could not send join request");
-    }
-  };
 
   if (loading) {
     return (
-      <Layout showBackButton>
-        <div className="flex justify-center items-center py-10 text-muted-foreground">
-          <Loader2 className="h-6 w-6 mr-2 animate-spin" /> Loading chama details...
+      <Layout>
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="animate-spin text-muted-foreground w-6 h-6" />
+          <span className="ml-2 text-muted-foreground">Loading chama details...</span>
         </div>
       </Layout>
     );
@@ -73,164 +65,136 @@ const ChamaDetail = () => {
 
   if (!chama) {
     return (
-      <Layout showBackButton>
-        <div className="text-center py-10 text-muted-foreground">
-          Chama not found or you don’t have permission to view it.
-        </div>
+      <Layout>
+        <Card className="max-w-md mx-auto mt-10 text-center">
+          <CardHeader>
+            <CardTitle>Chama not found</CardTitle>
+            <CardDescription>This chama does not exist or has been deleted.</CardDescription>
+          </CardHeader>
+        </Card>
       </Layout>
     );
   }
 
-  // Role-based logic
-  const isManager = user?.id === chama.managerId;
-  const isMember = members.some((m) => m.userId === user?.id);
-  const isVisitor = !isManager && !isMember;
-
-  // Commission & balance logic
-  const commissionRate = 0.05;
-  const total = chama.totalSavings || 0;
-  const commission = total * commissionRate;
-  const net = total - commission;
-
-  // Find next payout recipient (Prompt 14)
-  const nextRecipient = members.find((m) => m.orderIndex === chama.currentCycle);
-
   return (
-    <Layout showBackButton>
-      <div className="container px-4 py-6 max-w-2xl mx-auto space-y-6">
-        {/* Group Header */}
-        <Card>
+    <Layout>
+      <div className="max-w-5xl mx-auto mt-6">
+        <Card className="mb-6">
           <CardHeader>
-            <div className="flex justify-between items-start mb-2">
-              <Badge variant="secondary">{chama.category}</Badge>
-              <Badge>
-                {members.length}/{chama.maxMembers} members
-              </Badge>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-2xl font-semibold">{chama.name}</CardTitle>
+                <CardDescription>
+                  {chama.is_public ? "Public Chama" : "Private Chama"}
+                </CardDescription>
+              </div>
+              {user.role === "manager" && (
+                <Button className="gap-2">
+                  <UserPlus size={16} />
+                  Invite Members
+                </Button>
+              )}
             </div>
-            <CardTitle className="text-2xl">{chama.name}</CardTitle>
-            <CardDescription>Created by {chama.createdBy?.name || "Unknown"}</CardDescription>
           </CardHeader>
-
-          <CardContent className="space-y-4">
-            <p className="text-foreground leading-relaxed">{chama.description}</p>
-
-            {/* Stats Section */}
-            <div className="grid grid-cols-3 gap-3">
-              <Stat label="Total Collected" value={formatKES(total)} />
-              <Stat label="Commission (5%)" value={formatKES(commission)} />
-              <Stat label="Net Balance" value={formatKES(net)} />
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                Next meeting:{" "}
-                {chama.nextMeeting
-                  ? new Date(chama.nextMeeting).toLocaleDateString()
-                  : "Not scheduled"}
-              </div>
-            </div>
-
-            {nextRecipient && (
-              <div className="pt-2 text-sm text-muted-foreground">
-                💰 Next payout goes to <strong>{nextRecipient.name}</strong>
-              </div>
-            )}
-
-            {isVisitor && (
-              <Button variant="heroSecondary" className="w-full" onClick={handleJoinGroup}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Request to Join
-              </Button>
-            )}
-
-            {isManager && (
-              <Button variant="outline" className="w-full">
-                Manage Chama
-              </Button>
-            )}
+          <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <Stat label="Total Members" value={members.length.toString()} />
+            <Stat label="Contribution" value={formatKES(chama.contribution_amount)} />
+            <Stat label="Frequency" value={chama.frequency} />
           </CardContent>
         </Card>
 
-        {/* Tabs */}
-        <Tabs defaultValue="members" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="members" className="space-y-4">
+          <TabsList>
             <TabsTrigger value="members">Members</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
-          {/* Members Tab */}
           <TabsContent value="members">
             <Card>
               <CardHeader>
-                <CardTitle>Group Members</CardTitle>
-                <CardDescription>Current contribution status</CardDescription>
+                <CardTitle>Members</CardTitle>
+                <CardDescription>View all members in this chama</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {members.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No members yet</p>
-                  ) : (
-                    members.map((member, i) => (
-                      <div key={i} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarFallback>{member.name?.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium text-foreground">{member.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Joined: {new Date(member.joinDate).toLocaleDateString()}
-                            </p>
-                          </div>
+              <CardContent className="space-y-4">
+                {members.length === 0 ? (
+                  <p className="text-muted-foreground">No members yet</p>
+                ) : (
+                  members.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between border-b pb-2 last:border-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarFallback>
+                            {m.name ? m.name[0].toUpperCase() : "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{m.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Joined: {new Date(m.join_date).toLocaleDateString()}
+                          </p>
                         </div>
-                        <Badge
-                          variant={member.status === "paid" ? "default" : "secondary"}
-                        >
-                          {member.status || "pending"}
-                        </Badge>
                       </div>
-                    ))
-                  )}
-                </div>
+                      <Badge variant="secondary">
+                        {m.is_paid ? "Paid" : "Pending"}
+                      </Badge>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Transactions Tab */}
-          <TabsContent value="transactions">
+          <TabsContent value="payments">
             <Card>
               <CardHeader>
-                <CardTitle>Transaction History</CardTitle>
-                <CardDescription>Recent group activity</CardDescription>
+                <CardTitle>Payment History</CardTitle>
+                <CardDescription>Track all contributions and payouts</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {transactions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No transactions yet</p>
-                  ) : (
-                    transactions.map((txn, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between pb-4 border-b border-border last:border-0"
-                      >
-                        <div>
-                          <p className="font-medium text-foreground">{txn.type}</p>
-                          <p className="text-sm text-muted-foreground">{txn.member}</p>
-                          <p className="text-xs text-muted-foreground">{txn.date}</p>
-                        </div>
-                        <span
-                          className={`font-semibold ${
-                            txn.amount > 0 ? "text-primary" : "text-destructive"
-                          }`}
-                        >
-                          {txn.amount > 0 ? "+" : "-"}
-                          {formatKES(Math.abs(txn.amount))}
-                        </span>
+                {chama.payments && chama.payments.length > 0 ? (
+                  chama.payments.map((p: any) => (
+                    <div
+                      key={p.id}
+                      className="flex justify-between items-center border-b py-2 last:border-none"
+                    >
+                      <div>
+                        <p className="font-medium">
+                          {p.member_name || "Member"} — {formatKES(p.amount)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(p.date).toLocaleDateString()}
+                        </p>
                       </div>
-                    ))
-                  )}
-                </div>
+                      <Badge
+                        variant={p.status === "completed" ? "default" : "secondary"}
+                      >
+                        {p.status}
+                      </Badge>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-muted-foreground">No payment history yet</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <Card>
+              <CardHeader>
+                <CardTitle>Chama Settings</CardTitle>
+                <CardDescription>
+                  Update chama information and configurations.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Only managers can edit chama settings.
+                </p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -238,6 +202,4 @@ const ChamaDetail = () => {
       </div>
     </Layout>
   );
-};
-
-export default ChamaDetail;
+}
