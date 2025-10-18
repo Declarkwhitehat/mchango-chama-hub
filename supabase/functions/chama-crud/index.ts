@@ -12,6 +12,12 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables");
 }
 
+// CORS headers for browser calls
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 // Create two clients:
 // - publicClient: uses anon key (subject to RLS) — used for reading chama row
 // - adminClient: uses service_role key (bypasses RLS) — used only to read chama_members safely
@@ -47,8 +53,8 @@ async function handleGet(req: Request) {
       id = url.searchParams.get("id") || url.searchParams.get("slug");
     }
 
-    if (!id) {
-      return new Response(JSON.stringify({ error: "Missing id or slug in request" }), { status: 400 });
+if (!id) {
+      return new Response(JSON.stringify({ error: "Missing id or slug in request" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // First try to fetch the chama row via public client.
@@ -70,14 +76,14 @@ const { data: chamaById, error: errById } = await readClient
   .limit(1)
   .maybeSingle();
 
-    if (errById) {
+if (errById) {
       console.error("Error fetching chama (public client):", errById);
       // If it's a permission error from RLS on chama table, propagate it.
-      return new Response(JSON.stringify({ error: errById.message || "Error loading chama" }), { status: 500 });
+      return new Response(JSON.stringify({ error: errById.message || "Error loading chama" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (!chamaById) {
-      return new Response(JSON.stringify({ error: "Chama not found" }), { status: 404 });
+if (!chamaById) {
+      return new Response(JSON.stringify({ error: "Chama not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Prepare result object
@@ -135,13 +141,13 @@ const { data: chamaById, error: errById } = await readClient
       }
     }
 
-    return new Response(JSON.stringify({ data: result }), {
+return new Response(JSON.stringify({ data: result }), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err: any) {
+} catch (err: any) {
     console.error("Unhandled error in chama-crud GET handler:", err);
-    return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500 });
+    return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 }
 
@@ -161,7 +167,7 @@ async function handlePost(req: Request) {
     if (id) {
       const url = new URL(req.url);
       url.searchParams.set("id", String(id));
-      const getReq = new Request(url.toString(), { method: "GET" });
+      const getReq = new Request(url.toString(), { method: "GET", headers: req.headers });
       return await handleGet(getReq);
     }
 
@@ -178,14 +184,14 @@ addEventListener("fetch", (event: any) => {
     (async () => {
       const req = event.request as Request;
       try {
-        // Support CORS preflight and both GET/POST
-        if (req.method === "OPTIONS") return new Response("ok", { status: 200 });
+// Support CORS preflight and both GET/POST
+        if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
         if (req.method === "GET") return await handleGet(req);
         if (req.method === "POST") return await handlePost(req);
-        return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+        return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       } catch (err: any) {
         console.error("Error in chama-crud:", err);
-        return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500 });
+return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     })()
   );
