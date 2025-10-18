@@ -95,8 +95,7 @@ const ChamaDetail = () => {
         .from("chama")
         .select(`
           *,
-          profiles:created_by ( full_name, email, phone ),
-          chama_members ( id, user_id, member_code, is_manager, joined_at, status, approval_status, order_index, profiles ( full_name, email ) )
+          profiles:created_by ( full_name, email, phone )
         `)
         .eq("id", id)
         .maybeSingle();
@@ -104,11 +103,7 @@ const ChamaDetail = () => {
       if (errById) console.warn("Direct query by id error:", errById);
       if (byId) {
         setChama(byId);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && byId.chama_members) {
-          const membership = byId.chama_members.find((m: any) => m.user_id === user.id);
-          setCurrentUserMembership(membership ?? null);
-        }
+        
         return;
       }
 
@@ -117,8 +112,7 @@ const ChamaDetail = () => {
         .from("chama")
         .select(`
           *,
-          profiles:created_by ( full_name, email, phone ),
-          chama_members ( id, user_id, member_code, is_manager, joined_at, status, approval_status, order_index, profiles ( full_name, email ) )
+          profiles:created_by ( full_name, email, phone )
         `)
         .eq("slug", id)
         .maybeSingle();
@@ -126,11 +120,7 @@ const ChamaDetail = () => {
       if (errBySlug) console.warn("Direct query by slug error:", errBySlug);
       if (bySlug) {
         setChama(bySlug);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && bySlug.chama_members) {
-          const membership = bySlug.chama_members.find((m: any) => m.user_id === user.id);
-          setCurrentUserMembership(membership ?? null);
-        }
+        
         return;
       }
 

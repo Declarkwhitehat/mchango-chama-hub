@@ -36,6 +36,12 @@ if (SUPABASE_SERVICE_ROLE_KEY) {
 
 async function handleGet(req: Request) {
   try {
+    console.log("chama-crud request", {
+      method: req.method,
+      url: req.url,
+      hasAuth: !!req.headers.get("Authorization"),
+    });
+
     // Accept id in JSON body, or query string? we'll support both.
     let id: string | null = null;
     try {
