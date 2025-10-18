@@ -50,6 +50,7 @@ type Chama = {
   contribution_frequency?: string;
   commission_rate?: number;
   chama_members?: ChamaMember[];
+  profiles?: Profile;
 };
 
 export default function ChamaDetail() {
@@ -61,6 +62,7 @@ export default function ChamaDetail() {
   const [paidMemberIds, setPaidMemberIds] = useState<Record<string, boolean>>({});
   const [totalCollected, setTotalCollected] = useState<number>(0);
   const [showPaymentModalFor, setShowPaymentModalFor] = useState<string | null>(null);
+  const [currentUserMemberId, setCurrentUserMemberId] = useState<string | null>(null);
   const [nextReceiver, setNextReceiver] = useState<ChamaMember | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -74,8 +76,9 @@ export default function ChamaDetail() {
     try {
       if (!id) throw new Error("Missing chama id/slug in route.");
 
+      // ✅ Correct table name here: chama (not chamas)
       const { data: chamaData, error: chamaErr } = await supabase
-        .from("chamas")
+        .from("chama")
         .select("*")
         .or(`id.eq.${id},slug.eq.${id}`)
         .maybeSingle();
@@ -86,6 +89,7 @@ export default function ChamaDetail() {
         return;
       }
 
+      // ✅ correct related table: chama_members
       const { data: membersData } = await supabase
         .from("chama_members")
         .select(`
@@ -104,9 +108,258 @@ export default function ChamaDetail() {
         .eq("chama_id", chamaData.id)
         .order("order_index", { ascending: true });
 
-      const fullChama = { ...chamaData, chama_members: membersData || [] };
-      setChama(fullChama);
-      setMembers(membersData || []);
+      const assembled = { ...chamaData, chama_members: membersData || [] };
+      await applyChamaPayload(assembled);
+    } catch (err: any) {
+      console.error("Error loading chama:", err);
+      toast({ title: "Error", description: err?.message || "Failed to load chama" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyChamaPayload = async (payload: any) => {
+    setChama(payload);
+    const mems: ChamaMember[] = payload.chama_members || [];
+    setMembers(mems);
+    await detectCurrentUser(mems);
+    await loadCycleAndPayments(payload.id, mems);
+    await computeNextReceiver(payload.id, mems);
+  };
+
+  const detectCurrentUser = async (mems: ChamaMember[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const found = mems.find((m) => m.user_id === user.id);
+        if (found) setCurrentUserMemberId(found.id);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadCycleAndPayments = async (chamaId: string, mems: ChamaMember[]) => {
+    try {
+      const now = new Date().toISOString();
+      const { data: cycles } = await supabase
+        .from("contribution_cycles")
+        .select("*")
+        .eq("chama_id", chamaId)
+        .lte("start_date", now)
+        .gte("end_date", now);
+
+      let active = null;
+      if (cycles && cycles.length) active = cycles[0];
+      else {
+        const { data: lastCycle } = await supabase
+          .from("contribution_cycles")
+          .select("*")
+          .eq("chama_id", chamaId)
+          .order("start_date", { ascending: false })
+          .limit(1);
+        active = lastCycle?.[0] ?? null;
+      }
+      setCurrentCycle(active);
+
+      let contributions: any[] = [];
+      if (active) {
+        const { data } = await supabase
+          .from("contributions")
+          .select("member_id,amount,contribution_date,status")
+          .eq("chama_id", chamaId)
+          .gte("contribution_date", active.start_date)
+          .lte("contribution_date", active.end_date);
+        contributions = data || [];
+      }
+
+      const paidSet: Record<string, boolean> = {};
+      let total = 0;
+      for (const c of contributions) {
+        paidSet[c.member_id] = true;
+        total += parseFloat(c.amount || 0);
+      }
+      setPaidMemberIds(paidSet);
+      setTotalCollected(total);
+    } catch (err) {
+      console.error("Error loading payments:", err);
+    }
+  };
+
+  const computeNextReceiver = async (chamaId: string, mems: ChamaMember[]) => {
+    try {
+      const approved = mems
+        .filter((m) => m.approval_status === "approved")
+        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+
+      if (!approved.length) {
+        setNextReceiver(null);
+        return;
+      }
+
+      let lastReceiverId: string | null = null;
+      const { data: last } = await supabase
+        .from("withdrawals")
+        .select("member_id,created_at")
+        .eq("chama_id", chamaId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (last && last.length) lastReceiverId = last[0].member_id;
+      if (!lastReceiverId) {
+        setNextReceiver(approved[0]);
+        return;
+      }
+
+      const lastIndex = approved.findIndex((m) => m.id === lastReceiverId);
+      if (lastIndex === -1) setNextReceiver(approved[0]);
+      else setNextReceiver(approved[(lastIndex + 1) % approved.length]);
+    } catch (err) {
+      console.error("Error computing next receiver:", err);
+    }
+  };
+
+  const paidCount = useMemo(() => Object.keys(paidMemberIds).length, [paidMemberIds]);
+  const memberCount = members.length;
+
+  const onPaymentSuccess = async () => {
+    if (!chama) return;
+    await loadCycleAndPayments(chama.id, members);
+    await computeNextReceiver(chama.id, members);
+    setShowPaymentModalFor(null);
+    toast({ title: "Payment recorded" });
+  };
+
+  const refresh = () => setRefreshKey((k) => k + 1);
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="max-w-5xl mx-auto p-4">
+          <Card>
+            <CardContent className="py-12 flex justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!chama) {
+    return (
+      <Layout>
+        <div className="max-w-4xl mx-auto p-4">
+          <Card>
+            <CardContent>
+              <p className="text-center text-muted-foreground">Chama not found.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="max-w-6xl mx-auto p-4 space-y-6">
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h1 className="text-2xl font-semibold mb-1">{chama.name}</h1>
+          <p className="text-muted-foreground">{chama.description || "No description"}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Badge>Contribution: KES {chama.contribution_amount}</Badge>
+            <Badge variant="secondary">{chama.contribution_frequency}</Badge>
+            <Badge variant="outline">{memberCount} members</Badge>
+          </div>
+        </div>
+
+        {/* Member List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Members</CardTitle>
+            <CardDescription>
+              Paid and pending members in this chama
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y">
+            {members.map((m) => {
+              const paid = Boolean(paidMemberIds[m.id]);
+              return (
+                <div key={m.id} className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarFallback>
+                        {(m.profiles?.full_name || "U").slice(0, 1)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">
+                        {m.profiles?.full_name || m.member_code}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {m.profiles?.email || m.profiles?.phone}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {m.is_manager && <Badge variant="secondary">Manager</Badge>}
+                    {paid ? (
+                      <Badge>Paid</Badge>
+                    ) : (
+                      <Badge variant="destructive">Not Paid</Badge>
+                    )}
+                    <Button size="sm" onClick={() => setShowPaymentModalFor(m.id)}>
+                      <DollarSign className="h-4 w-4 mr-2" /> Pay
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        {/* Invite & Manager */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Invite & Management</CardTitle>
+            <CardDescription>Approve, reject or invite members</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Label>Invite link</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={`${window.location.origin}/chama/join/${chama.slug}`}
+              />
+              <Button
+                size="sm"
+                onClick={() =>
+                  navigator.clipboard.writeText(
+                    `${window.location.origin}/chama/join/${chama.slug}`
+                  )
+                }
+              >
+                <Link2 className="h-4 w-4 mr-2" /> Copy
+              </Button>
+            </div>
+
+            <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager />
+            <ChamaPendingRequests chamaId={chama.id} isManager onUpdate={refresh} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {showPaymentModalFor && (
+        <ChamaPaymentForm
+          chamaId={chama.id}
+          memberId={showPaymentModalFor}
+          onSuccess={onPaymentSuccess}
+          onCancel={() => setShowPaymentModalFor(null)}
+        />
+      )}
+    </Layout>
+  );
+             }      setMembers(membersData || []);
 
       await loadCycleAndPayments(chamaData.id, membersData || []);
       await computeNextReceiver(chamaData.id, membersData || []);
