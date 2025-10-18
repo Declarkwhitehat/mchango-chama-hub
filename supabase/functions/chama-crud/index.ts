@@ -54,12 +54,21 @@ async function handleGet(req: Request) {
     // First try to fetch the chama row via public client.
     // We will not request nested chama_members here to avoid policies running on chama_members
     // that may cause recursion. We'll fetch members separately using admin client.
-    const { data: chamaById, error: errById } = await publicClient
-      .from("chama")
-      .select("*")
-      .or(`id.eq.${id},slug.eq.${id}`)
-      .limit(1)
-      .maybeSingle();
+// Use user-scoped client when Authorization header is present so creator can see private chamas
+const authHeader = req.headers.get("Authorization") || undefined;
+const readClient = authHeader
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authHeader } },
+    })
+  : publicClient;
+
+const { data: chamaById, error: errById } = await readClient
+  .from("chama")
+  .select("*")
+  .or(`id.eq.${id},slug.eq.${id}`)
+  .limit(1)
+  .maybeSingle();
 
     if (errById) {
       console.error("Error fetching chama (public client):", errById);
@@ -137,9 +146,31 @@ async function handleGet(req: Request) {
 }
 
 async function handlePost(req: Request) {
-  // If your function supports create/update via POST, keep your existing logic here.
-  // For safety I return 405 to avoid accidental behavior. You can implement create/update using adminClient.
-  return new Response(JSON.stringify({ error: "POST not implemented in this handler. Use designated create endpoint." }), { status: 405 });
+  try {
+    // Accept id/slug in POST body and delegate to GET handler for unified logic
+    let id: string | null = null;
+    try {
+      const j = await req.json().catch(() => null);
+      if (j && (j.id || j.slug)) {
+        id = j.id ?? j.slug;
+      }
+    } catch (_) {
+      // ignore
+    }
+
+    if (id) {
+      const url = new URL(req.url);
+      url.searchParams.set("id", String(id));
+      const getReq = new Request(url.toString(), { method: "GET" });
+      return await handleGet(getReq);
+    }
+
+    // Fallback to GET logic (will try query params too)
+    return await handleGet(req);
+  } catch (err: any) {
+    console.error("Unhandled error in chama-crud POST handler:", err);
+    return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500 });
+  }
 }
 
 addEventListener("fetch", (event: any) => {
@@ -147,7 +178,8 @@ addEventListener("fetch", (event: any) => {
     (async () => {
       const req = event.request as Request;
       try {
-        // Support GET and POST if needed
+        // Support CORS preflight and both GET/POST
+        if (req.method === "OPTIONS") return new Response("ok", { status: 200 });
         if (req.method === "GET") return await handleGet(req);
         if (req.method === "POST") return await handlePost(req);
         return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
