@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-
-// Layout is a named export in your project; import it as such
 import { Layout } from "@/components/Layout";
-
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { ChamaInviteManager } from "@/components/ChamaInviteManager";
+import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
+import { ChamaPendingRequests } from "@/components/ChamaPendingRequests";
 
 type Profile = {
   full_name?: string;
@@ -21,93 +23,72 @@ type ChamaMember = {
   id: string;
   user_id: string;
   member_code?: string;
-  is_manager?: boolean;
-  joined_at?: string;
-  status?: string;
-  approval_status?: string;
   order_index?: number;
   profiles?: Profile;
+  approval_status?: string;
+  is_manager?: boolean;
+  joined_at?: string;
+  balance_credit?: number;
+  balance_deficit?: number;
+  last_payment_date?: string | null;
 };
 
-type ChamaData = {
+type Chama = {
   id: string;
-  slug?: string;
-  title?: string;
-  name?: string;
+  name: string;
+  slug: string;
   description?: string;
-  category?: string;
   contribution_amount?: number;
   contribution_frequency?: string;
-  created_at?: string;
-  created_by?: string | Profile;
+  commission_rate?: number;
   chama_members?: ChamaMember[];
   profiles?: Profile;
-  [key: string]: any;
 };
 
-const ChamaDetail = () => {
-  const { id } = useParams<{ id: string }>();
-  const [chama, setChama] = useState<ChamaData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentUserMembership, setCurrentUserMembership] = useState<ChamaMember | null>(null);
+const ChamaDetail: React.FC = () => {
+  const { id } = useParams(); // slug or id
+  const [chama, setChama] = useState<Chama | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentCycle, setCurrentCycle] = useState<any>(null);
+  const [paidMemberIds, setPaidMemberIds] = useState<Record<string, boolean>>({});
+  const [showPaymentForMember, setShowPaymentForMember] = useState<string | null>(null);
+  const [currentUserMemberId, setCurrentUserMemberId] = useState<string | null>(null);
+  const [nextReceiverMember, setNextReceiverMember] = useState<ChamaMember | null>(null);
 
   useEffect(() => {
     loadChama();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadChama = async () => {
-    setIsLoading(true);
+    setLoading(true);
     try {
-      if (!id) {
-        throw new Error("Missing chama id/slug in route.");
-      }
+      if (!id) throw new Error("Missing chama id/slug in route.");
 
-      // Try server function first (pass id in body)
+      // Try the chama-crud function (returns chama with members and useful data)
       try {
         const res = await supabase.functions.invoke("chama-crud", {
           body: { id },
         });
 
-        console.log("chama-crud invoke response:", res);
-
-        if (res?.error) {
-          const apiError = (res.data as any)?.error || (res.data as any)?.message || res.error.message;
-          throw new Error(apiError || "Server function error");
-        }
-
-        const returned = (res.data as any)?.data ?? res.data;
-        if (returned) {
-          setChama(returned);
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user && returned.chama_members) {
-            const membership = returned.chama_members.find((m: any) => m.user_id === user.id);
-            setCurrentUserMembership(membership ?? null);
+        if (!res || (res as any).error) {
+          console.warn("chama-crud returned error or empty, falling back to direct query", res);
+        } else {
+          const payload = (res as any).data || (res as any);
+          if (payload) {
+            setChama(payload);
+            // fetch cycle + payments after setting chama
+            await loadCurrentCycleAndPayments(payload.id, payload.chama_members || []);
+            await detectCurrentUserMember(payload.chama_members || []);
+            await computeNextReceiver(payload.chama_members || []);
+            setLoading(false);
+            return;
           }
-          return;
         }
-      } catch (fnErr) {
-        console.warn("chama-crud function failed, will fallback to direct queries. Error:", fnErr);
+      } catch (err) {
+        console.warn("chama-crud invoke failed:", err);
       }
 
-      // Fallback: direct supabase query by id
-      const { data: byId, error: errById } = await supabase
-        .from("chama")
-        .select(`
-          *,
-          profiles:created_by ( full_name, email, phone )
-        `)
-        .eq("id", id)
-        .maybeSingle();
-
-      if (errById) console.warn("Direct query by id error:", errById);
-      if (byId) {
-        setChama(byId);
-        
-        return;
-      }
-
-      // Fallback 2: direct query by slug
+      // Fallback: direct query by slug
       const { data: bySlug, error: errBySlug } = await supabase
         .from("chama")
         .select(`
@@ -119,32 +100,189 @@ const ChamaDetail = () => {
 
       if (errBySlug) console.warn("Direct query by slug error:", errBySlug);
       if (bySlug) {
-        setChama(bySlug);
-        
-        return;
+        // fetch members attached separately (ordered)
+        const { data: members } = await supabase
+          .from("chama_members")
+          .select("id,user_id,member_code,order_index,approval_status,is_manager,joined_at,profiles(id,full_name,email,phone),balance_credit,balance_deficit,last_payment_date")
+          .eq("chama_id", bySlug.id)
+          .order("order_index", { ascending: true });
+
+        const assembled = { ...bySlug, chama_members: members || [] };
+        setChama(assembled as any);
+        await loadCurrentCycleAndPayments(assembled.id, assembled.chama_members || []);
+        await detectCurrentUserMember(assembled.chama_members || []);
+        await computeNextReceiver(assembled.chama_members || []);
       }
 
-      throw new Error("Chama not found");
-    } catch (err: any) {
-      console.error("Failed to load chama details:", err);
-      toast({
-        title: "Failed to load chama details",
-        description: err.message || "Please try again later.",
-      });
+    } catch (error: any) {
+      console.error("Error loading chama detail", error);
+      toast({ title: "Error", description: error.message || "Failed to load chama" });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  if (isLoading) {
+  const detectCurrentUserMember = async (members: ChamaMember[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const found = members.find(m => m.user_id === user.id);
+        if (found) setCurrentUserMemberId(found.id);
+      }
+    } catch (e) {
+      console.warn("Could not detect current user membership", e);
+    }
+  };
+
+  const loadCurrentCycleAndPayments = async (chamaId: string, members: ChamaMember[]) => {
+    try {
+      // 1) Find the active/current contribution cycle for this chama
+      const { data: cycles, error: cycleErr } = await supabase
+        .from("contribution_cycles")
+        .select("*")
+        .eq("chama_id", chamaId)
+        .lte("start_date", new Date().toISOString())
+        .gte("end_date", new Date().toISOString()); // try to find a cycle that contains now
+
+      let activeCycle = null;
+      if (cycleErr) {
+        console.warn("Error fetching contribution_cycles:", cycleErr);
+      }
+      if (cycles && cycles.length) {
+        activeCycle = cycles[0];
+      } else {
+        // fallback: load latest cycle (last one)
+        const { data: lastCycles } = await supabase
+          .from("contribution_cycles")
+          .select("*")
+          .eq("chama_id", chamaId)
+          .order("start_date", { ascending: false })
+          .limit(1);
+        activeCycle = lastCycles?.[0] ?? null;
+      }
+      setCurrentCycle(activeCycle);
+
+      // 2) If we have an active cycle, fetch contributions within that cycle to determine who has paid
+      let paidSet: Record<string, boolean> = {};
+      if (activeCycle) {
+        const { data: contributions } = await supabase
+          .from("contributions")
+          .select("member_id,amount,contribution_date,status")
+          .eq("chama_id", chamaId)
+          .gte("contribution_date", activeCycle.start_date)
+          .lte("contribution_date", activeCycle.end_date);
+
+        if (contributions && contributions.length) {
+          for (const c of contributions) {
+            paidSet[c.member_id] = true;
+          }
+        }
+      } else {
+        // If cycles are not present, fall back to checking contributions in the last 30 days
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 30);
+        const { data: contributions } = await supabase
+          .from("contributions")
+          .select("member_id,amount,contribution_date,status")
+          .eq("chama_id", chamaId)
+          .gte("contribution_date", cutoff.toISOString())
+          .order("contribution_date", { ascending: false })
+          .limit(500);
+
+        if (contributions && contributions.length) {
+          // pick the most recent contribution_date and mark payers within that date as paid
+          const latestDate = contributions[0].contribution_date;
+          for (const c of contributions) {
+            if (c.contribution_date === latestDate) paidSet[c.member_id] = true;
+          }
+        }
+      }
+
+      setPaidMemberIds(paidSet);
+
+    } catch (err) {
+      console.error("Error loading cycle/payments", err);
+    }
+  };
+
+  const computeNextReceiver = async (members: ChamaMember[]) => {
+    try {
+      if (!members || !members.length) {
+        setNextReceiverMember(null);
+        return;
+      }
+
+      // Attempt to find last withdrawal/payout recorded (withdrawals table or transactions)
+      // We'll try to read the last completed withdrawal with a receiver (withdrawals table)
+      let lastReceiverMemberId: string | null = null;
+      try {
+        const { data: lastWithdrawals } = await supabase
+          .from("withdrawals")
+          .select("member_id,created_at")
+          .eq("chama_id", chama?.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (lastWithdrawals && lastWithdrawals.length) {
+          lastReceiverMemberId = lastWithdrawals[0].member_id;
+        }
+      } catch (e) {
+        console.debug("withdrawals table query failed (maybe different table name):", e);
+      }
+
+      // If we could not find a last receiver from withdrawals, fall back to using the last payout transaction
+      if (!lastReceiverMemberId) {
+        try {
+          const { data: lastPayout } = await supabase
+            .from("transactions")
+            .select("meta->>'withdrawal_member_id' as member_id, created_at")
+            .eq("chama_id", chama?.id)
+            .eq("transaction_type", "payout")
+            .order("created_at", { ascending: false })
+            .limit(1);
+          if (lastPayout && lastPayout.length && lastPayout[0].member_id) {
+            lastReceiverMemberId = lastPayout[0].member_id;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // If still not found, assume rotation starts at the smallest order_index
+      let nextMember: ChamaMember | null = null;
+      const approvedMembers = members.filter(m => m.approval_status === "approved").sort((a,b)=> (a.order_index||0)-(b.order_index||0));
+      if (!approvedMembers.length) {
+        setNextReceiverMember(null);
+        return;
+      }
+
+      if (!lastReceiverMemberId) {
+        nextMember = approvedMembers[0];
+      } else {
+        const last = approvedMembers.find(m => m.id === lastReceiverMemberId);
+        if (!last) {
+          nextMember = approvedMembers[0];
+        } else {
+          const idx = approvedMembers.indexOf(last);
+          const nextIdx = (idx + 1) % approvedMembers.length;
+          nextMember = approvedMembers[nextIdx];
+        }
+      }
+
+      setNextReceiverMember(nextMember ?? null);
+    } catch (err) {
+      console.error("Error computing next receiver", err);
+    }
+  };
+
+  if (loading) {
     return (
       <Layout>
-        <div className="container px-4 py-6 max-w-4xl mx-auto">
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin mr-2" />
-            Loading...
-          </div>
-        </div>
+        <Card>
+          <CardContent className="py-12 flex justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </CardContent>
+        </Card>
       </Layout>
     );
   }
@@ -152,66 +290,186 @@ const ChamaDetail = () => {
   if (!chama) {
     return (
       <Layout>
-        <div className="container px-4 py-6 max-w-4xl mx-auto">
-          <Card>
-            <CardContent>
-              <h3 className="text-lg font-semibold">Chama not found</h3>
-              <p>We couldn't find the chama. It might be private or removed.</p>
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardContent>
+            <p>Chama not found.</p>
+          </CardContent>
+        </Card>
       </Layout>
     );
   }
 
+  const members = chama.chama_members || [];
+  const manager = members.find(m => m.is_manager);
+
   return (
     <Layout>
-      <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
-        <Card>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <Avatar>
-                <AvatarFallback>
-                  {(typeof chama.created_by === 'object' && chama.created_by?.full_name 
-                    ? chama.created_by.full_name 
-                    : chama.profiles?.full_name || "C").slice(0, 1)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="font-semibold">{chama.title ?? chama.name}</div>
-                <div className="text-sm text-muted-foreground">{chama.created_at}</div>
-              </div>
-            </div>
-            <div className="mt-4">
-              <p className="text-sm text-muted-foreground">{chama.description}</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="space-y-6">
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>{chama.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-muted-foreground">Description</Label>
+                  <p className="text-sm">{chama.description}</p>
+                </div>
 
-        <div>
-          <h3 className="text-lg font-semibold mb-3">Members</h3>
-          <div className="grid grid-cols-1 gap-3">
-            {chama.chama_members?.map((m: ChamaMember) => (
-              <Card key={m.id}>
-                <CardContent className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback>{(m.profiles?.full_name || m.user_id).slice(0, 1)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{m.profiles?.full_name || m.user_id}</div>
-                      <div className="text-sm text-muted-foreground">{m.member_code}</div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Contribution</Label>
+                    <p className="font-medium">KES {Number(chama.contribution_amount || 0).toLocaleString()}</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-muted-foreground">Frequency</Label>
+                    <p className="font-medium">{chama.contribution_frequency}</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-muted-foreground">Members</Label>
+                    <p className="font-medium">{members.length}</p>
+                  </div>
+                </div>
+
+                {nextReceiverMember && (
+                  <div className="mt-4 p-3 border rounded">
+                    <Label className="text-muted-foreground">Next receiver</Label>
+                    <div className="flex items-center justify-between mt-2">
+                      <div>
+                        <p className="font-medium">{nextReceiverMember.profiles?.full_name || nextReceiverMember.member_code}</p>
+                        <p className="text-xs text-muted-foreground">Order #{nextReceiverMember.order_index}</p>
+                      </div>
+                      <div>
+                        <Badge variant="secondary">Upcoming</Badge>
+                      </div>
                     </div>
                   </div>
-                  <div>{m.is_manager && <Badge variant="secondary">Manager</Badge>}</div>
-                </CardContent>
-              </Card>
-            ))}
+                )}
 
-            {!chama.chama_members?.length && <div>No members yet.</div>}
+                <div className="mt-4">
+                  <Label className="text-muted-foreground">Manager tools</Label>
+                  <div className="mt-2 space-y-2">
+                    {manager && (
+                      <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
+                    )}
+                    <ChamaPendingRequests chamaId={chama.id} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 gap-4">
+              {members.length === 0 ? (
+                <Card>
+                  <CardContent>No members yet</CardContent>
+                </Card>
+              ) : members.map(m => (
+                <Card key={m.id}>
+                  <CardContent className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <Avatar>
+                        <AvatarFallback>{(m.profiles?.full_name || "U").slice(0,1)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{m.profiles?.full_name || m.member_code}</p>
+                        <p className="text-xs text-muted-foreground">{m.profiles?.email}</p>
+                        <p className="text-xs text-muted-foreground">Order #{m.order_index}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <div>
+                        {m.is_manager && <Badge variant="secondary">Manager</Badge>}
+                      </div>
+
+                      <div>
+                        {paidMemberIds[m.id] ? (
+                          <Badge>Paid</Badge>
+                        ) : (
+                          <Badge variant="destructive">Not paid</Badge>
+                        )}
+                      </div>
+
+                      <div>
+                        <Button size="sm" onClick={() => setShowPaymentForMember(m.id)}>Pay</Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <div className="col-span-1 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-muted-foreground">Invite link</Label>
+                  <div className="mt-2">
+                    <p className="text-sm">{`${window.location.origin}/chama/join/${chama.slug}`}</p>
+                    <p className="text-xs text-muted-foreground">Anyone with this link can request to join (manager approval required).</p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground">Payments</Label>
+                  <p className="text-sm">Use the pay buttons on member cards to pay for yourself or another member.</p>
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground">Members</Label>
+                  <p className="text-sm">{members.length} total</p>
+                </div>
+
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Current cycle</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {currentCycle ? (
+                  <>
+                    <p className="text-sm">Cycle: {new Date(currentCycle.start_date).toLocaleDateString()} — {new Date(currentCycle.end_date).toLocaleDateString()}</p>
+                    <p className="text-sm mt-2">Paid: {Object.keys(paidMemberIds).length} / {members.length}</p>
+                  </>
+                ) : (
+                  <p className="text-sm">No active cycle found</p>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
+
+      {showPaymentForMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Make a payment</h3>
+              <Button variant="ghost" onClick={() => setShowPaymentForMember(null)}>Close</Button>
+            </div>
+            <ChamaPaymentForm
+              chamaId={chama.id}
+              currentMemberId={currentUserMemberId}
+              defaultTargetMemberId={showPaymentForMember}
+              onSuccess={async () => {
+                toast({ title: "Payment recorded" });
+                setShowPaymentForMember(null);
+                // reload payments to update UI
+                await loadCurrentCycleAndPayments(chama.id, members);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
