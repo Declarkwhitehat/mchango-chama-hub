@@ -76,7 +76,7 @@ export default function ChamaDetail() {
     try {
       if (!id) throw new Error("Missing chama id/slug in route.");
 
-      // ✅ Correct table name here: chama (not chamas)
+      // Use singular table name 'chama' as your DB uses
       const { data: chamaData, error: chamaErr } = await supabase
         .from("chama")
         .select("*")
@@ -89,8 +89,7 @@ export default function ChamaDetail() {
         return;
       }
 
-      // ✅ correct related table: chama_members
-      const { data: membersData } = await supabase
+      const { data: membersData, error: membersErr } = await supabase
         .from("chama_members")
         .select(`
           id,
@@ -108,11 +107,16 @@ export default function ChamaDetail() {
         .eq("chama_id", chamaData.id)
         .order("order_index", { ascending: true });
 
+      if (membersErr) throw membersErr;
+
       const assembled = { ...chamaData, chama_members: membersData || [] };
       await applyChamaPayload(assembled);
     } catch (err: any) {
       console.error("Error loading chama:", err);
-      toast({ title: "Error", description: err?.message || "Failed to load chama" });
+      toast({
+        title: "Error loading chama",
+        description: err?.message || "Unable to load chama details.",
+      });
     } finally {
       setLoading(false);
     }
@@ -129,13 +133,15 @@ export default function ChamaDetail() {
 
   const detectCurrentUser = async (mems: ChamaMember[]) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getUser();
+      const user = (data as any)?.user;
       if (user) {
         const found = mems.find((m) => m.user_id === user.id);
         if (found) setCurrentUserMemberId(found.id);
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      // ignore auth errors in UI
+      console.warn("auth detection failed", e);
     }
   };
 
@@ -263,92 +269,189 @@ export default function ChamaDetail() {
   return (
     <Layout>
       <div className="max-w-6xl mx-auto p-4 space-y-6">
-        <div className="bg-white p-4 rounded-lg border shadow-sm">
-          <h1 className="text-2xl font-semibold mb-1">{chama.name}</h1>
-          <p className="text-muted-foreground">{chama.description || "No description"}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Badge>Contribution: KES {chama.contribution_amount}</Badge>
-            <Badge variant="secondary">{chama.contribution_frequency}</Badge>
-            <Badge variant="outline">{memberCount} members</Badge>
+        {/* HERO */}
+        <div className="bg-gradient-to-r from-slate-50 to-white p-4 rounded-lg shadow-sm">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+            <div className="flex items-center space-x-4 col-span-2">
+              <div className="p-3 rounded-full bg-slate-100 border">
+                <Users className="h-8 w-8" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-semibold">{chama.name}</h1>
+                <p className="text-sm text-muted-foreground">
+                  {chama.description || "No description provided"}
+                </p>
+                <div className="mt-2 flex items-center gap-3">
+                  <Badge>Contribution: KES {Number(chama.contribution_amount || 0).toLocaleString()}</Badge>
+                  <Badge variant="secondary">{chama.contribution_frequency || "Not set"}</Badge>
+                  <Badge variant="outline">{memberCount} members</Badge>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-span-1">
+              <div className="bg-white p-3 rounded border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total collected</p>
+                    <p className="text-lg font-semibold">KES {Number(totalCollected || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Next receiver</p>
+                    {nextReceiver ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback>{(nextReceiver.profiles?.full_name || "U").slice(0,1)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium">{nextReceiver.profiles?.full_name || nextReceiver.member_code}</p>
+                          <p className="text-xs text-muted-foreground">Order #{nextReceiver.order_index}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground mt-1">No receiver set</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={refresh}>
+                    <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+                  </Button>
+                  <Button size="sm" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/chama/join/${chama.slug}`)}>
+                    <Link2 className="h-4 w-4 mr-2" /> Copy Invite
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Member List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Members</CardTitle>
-            <CardDescription>
-              Paid and pending members in this chama
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y">
-            {members.map((m) => {
-              const paid = Boolean(paidMemberIds[m.id]);
-              return (
-                <div key={m.id} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback>
-                        {(m.profiles?.full_name || "U").slice(0, 1)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">
-                        {m.profiles?.full_name || m.member_code}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {m.profiles?.email || m.profiles?.phone}
-                      </p>
-                    </div>
+        {/* MEMBERS */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Members</CardTitle>
+                <CardDescription>See who has paid for the current cycle and make payments on behalf of others.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {members.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No members yet.</p>
+                ) : (
+                  <div className="divide-y rounded">
+                    {members.map((m) => {
+                      const paid = Boolean(paidMemberIds[m.id]);
+                      return (
+                        <div key={m.id} className="flex items-center justify-between p-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarFallback>{(m.profiles?.full_name || m.member_code || "U").slice(0,1)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{m.profiles?.full_name || m.member_code}</p>
+                              <p className="text-xs text-muted-foreground">{m.profiles?.email || m.profiles?.phone}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {m.is_manager && <Badge variant="secondary">Manager</Badge>}
+                            {paid ? <Badge>Paid</Badge> : <Badge variant="destructive">Not paid</Badge>}
+                            <Button size="sm" onClick={() => setShowPaymentModalFor(m.id)}>
+                              <DollarSign className="h-4 w-4 mr-2" /> Pay
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {m.is_manager && <Badge variant="secondary">Manager</Badge>}
-                    {paid ? (
-                      <Badge>Paid</Badge>
-                    ) : (
-                      <Badge variant="destructive">Not Paid</Badge>
-                    )}
-                    <Button size="sm" onClick={() => setShowPaymentModalFor(m.id)}>
-                      <DollarSign className="h-4 w-4 mr-2" /> Pay
-                    </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Cycle & Payment summary</CardTitle>
+                <CardDescription>{currentCycle ? `Cycle: ${new Date(currentCycle.start_date).toLocaleDateString()} — ${new Date(currentCycle.end_date).toLocaleDateString()}` : "No active cycle found"}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Members paid</p>
+                    <p className="font-medium text-lg">{paidCount} / {memberCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Contribution amount</p>
+                    <p className="font-medium text-lg">KES {Number(chama.contribution_amount || 0).toLocaleString()}</p>
                   </div>
                 </div>
-              );
-            })}
-          </CardContent>
-        </Card>
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground">Total this cycle</p>
+                  <p className="font-semibold">KES {Number(totalCollected || 0).toLocaleString()}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Invite & Manager */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Invite & Management</CardTitle>
-            <CardDescription>Approve, reject or invite members</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Label>Invite link</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                readOnly
-                value={`${window.location.origin}/chama/join/${chama.slug}`}
-              />
-              <Button
-                size="sm"
-                onClick={() =>
-                  navigator.clipboard.writeText(
-                    `${window.location.origin}/chama/join/${chama.slug}`
-                  )
-                }
-              >
-                <Link2 className="h-4 w-4 mr-2" /> Copy
-              </Button>
-            </div>
+          {/* RIGHT SIDEBAR */}
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invite & Quick Actions</CardTitle>
+                <CardDescription>Share invite link, view pending requests, manager actions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Label className="text-muted-foreground">Invite link</Label>
+                <div className="mt-2 flex items-center gap-2">
+                  <Input readOnly value={`${window.location.origin}/chama/join/${chama.slug}`} />
+                  <Button size="sm" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/chama/join/${chama.slug}`)}>Copy</Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Anyone with the link can request to join — manager approval required.</p>
 
-            <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager />
-            <ChamaPendingRequests chamaId={chama.id} isManager onUpdate={refresh} />
-          </CardContent>
-        </Card>
+                <div className="pt-2">
+                  <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground">Pending requests</Label>
+                  <div className="mt-2">
+                    <ChamaPendingRequests chamaId={chama.id} isManager={true} onUpdate={refresh} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer overview</CardTitle>
+                <CardDescription>Quick stats</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Members</p>
+                    <p className="font-medium">{memberCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Paid</p>
+                    <p className="font-medium">{paidCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total collected</p>
+                    <p className="font-medium">KES {Number(totalCollected || 0).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Commission</p>
+                    <p className="font-medium">{chama.commission_rate ? `${chama.commission_rate}%` : "N/A"}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
 
+      {/* Payment modal */}
       {showPaymentModalFor && (
         <ChamaPaymentForm
           chamaId={chama.id}
@@ -359,234 +462,4 @@ export default function ChamaDetail() {
       )}
     </Layout>
   );
-             }      setMembers(membersData || []);
-
-      await loadCycleAndPayments(chamaData.id, membersData || []);
-      await computeNextReceiver(chamaData.id, membersData || []);
-    } catch (err: any) {
-      console.error("Error loading chama:", err);
-      toast({
-        title: "Error loading chama",
-        description: err?.message || "Unable to load chama details.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCycleAndPayments = async (chamaId: string, mems: ChamaMember[]) => {
-    try {
-      const now = new Date().toISOString();
-      const { data: cycles } = await supabase
-        .from("contribution_cycles")
-        .select("*")
-        .eq("chama_id", chamaId)
-        .lte("start_date", now)
-        .gte("end_date", now);
-
-      let active = null;
-      if (cycles && cycles.length) active = cycles[0];
-      setCurrentCycle(active);
-
-      let contributions: any[] = [];
-      if (active) {
-        const { data } = await supabase
-          .from("contributions")
-          .select("member_id,amount")
-          .eq("chama_id", chamaId)
-          .gte("contribution_date", active.start_date)
-          .lte("contribution_date", active.end_date);
-        contributions = data || [];
-      }
-
-      const paidSet: Record<string, boolean> = {};
-      let total = 0;
-      for (const c of contributions) {
-        paidSet[c.member_id] = true;
-        total += parseFloat(c.amount || 0);
-      }
-      setPaidMemberIds(paidSet);
-      setTotalCollected(total);
-    } catch (err) {
-      console.error("Error loading cycle/payments:", err);
-    }
-  };
-
-  const computeNextReceiver = async (chamaId: string, mems: ChamaMember[]) => {
-    const approved = mems
-      .filter((m) => m.approval_status === "approved")
-      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-
-    if (!approved.length) {
-      setNextReceiver(null);
-      return;
-    }
-
-    const { data: last } = await supabase
-      .from("withdrawals")
-      .select("member_id")
-      .eq("chama_id", chamaId)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (!last?.length) {
-      setNextReceiver(approved[0]);
-      return;
-    }
-
-    const lastIndex = approved.findIndex((m) => m.id === last[0].member_id);
-    setNextReceiver(approved[(lastIndex + 1) % approved.length]);
-  };
-
-  const refresh = () => setRefreshKey((k) => k + 1);
-
-  const paidCount = useMemo(() => Object.keys(paidMemberIds).length, [paidMemberIds]);
-  const memberCount = members.length;
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex justify-center py-20">
-          <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!chama) {
-    return (
-      <Layout>
-        <div className="max-w-3xl mx-auto py-10">
-          <Card>
-            <CardContent className="text-center py-10">
-              <p className="text-muted-foreground">No chama details found.</p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
-  return (
-    <Layout>
-      <div className="max-w-6xl mx-auto p-4 space-y-6">
-        {/* Hero section */}
-        <div className="bg-gradient-to-r from-slate-50 to-white p-4 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold">{chama.name}</h1>
-              <p className="text-sm text-muted-foreground">{chama.description}</p>
-              <div className="flex gap-2 mt-2">
-                <Badge>Contribution: KES {chama.contribution_amount}</Badge>
-                <Badge variant="secondary">{chama.contribution_frequency}</Badge>
-                <Badge variant="outline">{members.length} members</Badge>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Total collected</p>
-              <p className="text-lg font-bold">
-                KES {Number(totalCollected || 0).toLocaleString()}
-              </p>
-              {nextReceiver && (
-                <div className="mt-2 text-sm">
-                  <p className="text-xs text-muted-foreground">Next receiver:</p>
-                  <p>{nextReceiver.profiles?.full_name || nextReceiver.member_code}</p>
-                </div>
-              )}
-              <Button
-                size="sm"
-                className="mt-2"
-                onClick={() =>
-                  navigator.clipboard.writeText(
-                    `${window.location.origin}/chama/join/${chama.slug}`
-                  )
-                }
-              >
-                <Link2 className="h-4 w-4 mr-1" /> Copy Invite Link
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Members section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Members</CardTitle>
-            <CardDescription>
-              See who has paid for the current cycle.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {members.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No members yet.</p>
-            ) : (
-              <div className="divide-y rounded">
-                {members.map((m) => {
-                  const paid = paidMemberIds[m.id];
-                  return (
-                    <div key={m.id} className="flex items-center justify-between py-2">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback>
-                            {(m.profiles?.full_name || "U").slice(0, 1)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{m.profiles?.full_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {m.profiles?.email || m.profiles?.phone}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {m.is_manager && <Badge variant="secondary">Manager</Badge>}
-                        {paid ? (
-                          <Badge>Paid</Badge>
-                        ) : (
-                          <Badge variant="destructive">Not Paid</Badge>
-                        )}
-                        <Button
-                          size="sm"
-                          onClick={() => setShowPaymentModalFor(m.id)}
-                        >
-                          <DollarSign className="h-4 w-4 mr-2" /> Pay
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Invite & Pending Requests */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Invite & Requests</CardTitle>
-            <CardDescription>Manage invites and requests</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager />
-            <div className="mt-4">
-              <ChamaPendingRequests chamaId={chama.id} isManager onUpdate={refresh} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {showPaymentModalFor && (
-        <ChamaPaymentForm
-          chamaId={chama.id}
-          memberId={showPaymentModalFor}
-          onSuccess={() => {
-            setShowPaymentModalFor(null);
-            refresh();
-          }}
-          onCancel={() => setShowPaymentModalFor(null)}
-        />
-      )}
-    </Layout>
-  );
-  }
+        }
