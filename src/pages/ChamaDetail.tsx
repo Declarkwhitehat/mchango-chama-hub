@@ -39,8 +39,9 @@ type ChamaData = {
   contribution_amount?: number;
   contribution_frequency?: string;
   created_at?: string;
-  created_by?: Profile;
+  created_by?: string | Profile;
   chama_members?: ChamaMember[];
+  profiles?: Profile;
   [key: string]: any;
 };
 
@@ -180,7 +181,11 @@ const ChamaDetail = () => {
           <CardContent>
             <div className="flex items-center gap-4">
               <Avatar>
-                <AvatarFallback>{(chama.created_by?.full_name || "C").slice(0, 1)}</AvatarFallback>
+                <AvatarFallback>
+                  {(typeof chama.created_by === 'object' && chama.created_by?.full_name 
+                    ? chama.created_by.full_name 
+                    : chama.profiles?.full_name || "C").slice(0, 1)}
+                </AvatarFallback>
               </Avatar>
               <div>
                 <div className="font-semibold">{chama.title ?? chama.name}</div>
