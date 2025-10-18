@@ -1,252 +1,100 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2, Users, Link2, DollarSign, RefreshCw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Users, Calendar, TrendingUp, UserPlus } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { ChamaInviteManager } from "@/components/ChamaInviteManager";
-import { ChamaPendingRequests } from "@/components/ChamaPendingRequests";
-import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
-
-type Profile = {
-  full_name?: string;
-  email?: string;
-  phone?: string;
-  avatar_url?: string;
-};
 
 type ChamaMember = {
   id: string;
-  user_id: string;
-  member_code?: string;
-  order_index?: number;
-  profiles?: Profile;
-  approval_status?: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
   is_manager?: boolean;
-  joined_at?: string;
-  balance_credit?: number;
-  balance_deficit?: number;
-  last_payment_date?: string | null;
+};
+
+type Transaction = {
+  id: string;
+  description?: string | null;
+  amount: number;
+  created_at?: string | null;
+  member_name?: string | null;
 };
 
 type Chama = {
   id: string;
   name: string;
-  slug: string;
-  description?: string;
-  contribution_amount?: number;
-  contribution_frequency?: string;
-  commission_rate?: number;
+  description?: string | null;
+  is_private?: boolean;
+  created_at?: string | null;
   chama_members?: ChamaMember[];
-  profiles?: Profile;
+  transactions?: Transaction[];
 };
 
-export default function ChamaDetail() {
-  const { id } = useParams();
+const ChamaDetail: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const [chama, setChama] = useState<Chama | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [members, setMembers] = useState<ChamaMember[]>([]);
-  const [currentCycle, setCurrentCycle] = useState<any | null>(null);
-  const [paidMemberIds, setPaidMemberIds] = useState<Record<string, boolean>>({});
-  const [totalCollected, setTotalCollected] = useState<number>(0);
-  const [showPaymentModalFor, setShowPaymentModalFor] = useState<string | null>(null);
-  const [currentUserMemberId, setCurrentUserMemberId] = useState<string | null>(null);
-  const [nextReceiver, setNextReceiver] = useState<ChamaMember | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, refreshKey]);
-
-  const loadAll = async () => {
-    setLoading(true);
-    try {
-      if (!id) throw new Error("Missing chama id/slug in route.");
-
-      // Use singular table name 'chama' as your DB uses
-      const { data: chamaData, error: chamaErr } = await supabase
-        .from("chama")
-        .select("*")
-        .or(`id.eq.${id},slug.eq.${id}`)
-        .maybeSingle();
-
-      if (chamaErr) throw chamaErr;
-      if (!chamaData) {
-        setChama(null);
-        return;
-      }
-
-      const { data: membersData, error: membersErr } = await supabase
-        .from("chama_members")
-        .select(`
-          id,
-          user_id,
-          member_code,
-          order_index,
-          approval_status,
-          is_manager,
-          joined_at,
-          profiles(id, full_name, email, phone, avatar_url),
-          balance_credit,
-          balance_deficit,
-          last_payment_date
-        `)
-        .eq("chama_id", chamaData.id)
-        .order("order_index", { ascending: true });
-
-      if (membersErr) throw membersErr;
-
-      const assembled = { ...chamaData, chama_members: membersData || [] };
-      await applyChamaPayload(assembled);
-    } catch (err: any) {
-      console.error("Error loading chama:", err);
-      toast({
-        title: "Error loading chama",
-        description: err?.message || "Unable to load chama details.",
-      });
-    } finally {
+    if (!id) {
       setLoading(false);
+      return;
     }
-  };
 
-  const applyChamaPayload = async (payload: any) => {
-    setChama(payload);
-    const mems: ChamaMember[] = payload.chama_members || [];
-    setMembers(mems);
-    await detectCurrentUser(mems);
-    await loadCycleAndPayments(payload.id, mems);
-    await computeNextReceiver(payload.id, mems);
-  };
+    const load = async () => {
+      setLoading(true);
+      try {
+        // Example fetch: adjust select and relationships to match your DB schema
+        // We expect a chama table with related chama_members and transactions
+        const { data, error } = await supabase
+          .from("chama")
+          .select(
+            `id, name, description, is_private, created_at,
+             chama_members ( id, name, phone, email, avatar_url, is_manager ),
+             transactions ( id, description, amount, created_at, member_name )`
+          )
+          .eq("id", id)
+          .single();
 
-  const detectCurrentUser = async (mems: ChamaMember[]) => {
-    try {
-      const { data } = await supabase.auth.getUser();
-      const user = (data as any)?.user;
-      if (user) {
-        const found = mems.find((m) => m.user_id === user.id);
-        if (found) setCurrentUserMemberId(found.id);
+        if (error && error.code !== "PGRST116") {
+          // PGRST116 sometimes occurs when .single() finds nothing - treat as not found
+          throw error;
+        }
+
+        if (!data) {
+          setChama(null);
+        } else {
+          setChama(data as Chama);
+        }
+      } catch (err: any) {
+        console.error("Fetch chama error:", err);
+        toast({
+          title: "Failed to load chama",
+          description: err?.message || String(err),
+        });
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      // ignore auth errors in UI
-      console.warn("auth detection failed", e);
-    }
-  };
+    };
 
-  const loadCycleAndPayments = async (chamaId: string, mems: ChamaMember[]) => {
-    try {
-      const now = new Date().toISOString();
-      const { data: cycles } = await supabase
-        .from("contribution_cycles")
-        .select("*")
-        .eq("chama_id", chamaId)
-        .lte("start_date", now)
-        .gte("end_date", now);
-
-      let active = null;
-      if (cycles && cycles.length) active = cycles[0];
-      else {
-        const { data: lastCycle } = await supabase
-          .from("contribution_cycles")
-          .select("*")
-          .eq("chama_id", chamaId)
-          .order("start_date", { ascending: false })
-          .limit(1);
-        active = lastCycle?.[0] ?? null;
-      }
-      setCurrentCycle(active);
-
-      let contributions: any[] = [];
-      if (active) {
-        const { data } = await supabase
-          .from("contributions")
-          .select("member_id,amount,contribution_date,status")
-          .eq("chama_id", chamaId)
-          .gte("contribution_date", active.start_date)
-          .lte("contribution_date", active.end_date);
-        contributions = data || [];
-      }
-
-      const paidSet: Record<string, boolean> = {};
-      let total = 0;
-      for (const c of contributions) {
-        paidSet[c.member_id] = true;
-        total += parseFloat(c.amount || 0);
-      }
-      setPaidMemberIds(paidSet);
-      setTotalCollected(total);
-    } catch (err) {
-      console.error("Error loading payments:", err);
-    }
-  };
-
-  const computeNextReceiver = async (chamaId: string, mems: ChamaMember[]) => {
-    try {
-      const approved = mems
-        .filter((m) => m.approval_status === "approved")
-        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-
-      if (!approved.length) {
-        setNextReceiver(null);
-        return;
-      }
-
-      let lastReceiverId: string | null = null;
-      const { data: last } = await supabase
-        .from("withdrawals")
-        .select("member_id,created_at")
-        .eq("chama_id", chamaId)
-        .order("created_at", { ascending: false })
-        .limit(1);
-
-      if (last && last.length) lastReceiverId = last[0].member_id;
-      if (!lastReceiverId) {
-        setNextReceiver(approved[0]);
-        return;
-      }
-
-      const lastIndex = approved.findIndex((m) => m.id === lastReceiverId);
-      if (lastIndex === -1) setNextReceiver(approved[0]);
-      else setNextReceiver(approved[(lastIndex + 1) % approved.length]);
-    } catch (err) {
-      console.error("Error computing next receiver:", err);
-    }
-  };
-
-  const paidCount = useMemo(() => Object.keys(paidMemberIds).length, [paidMemberIds]);
-  const memberCount = members.length;
-
-  const onPaymentSuccess = async () => {
-    if (!chama) return;
-    await loadCycleAndPayments(chama.id, members);
-    await computeNextReceiver(chama.id, members);
-    setShowPaymentModalFor(null);
-    toast({ title: "Payment recorded" });
-  };
-
-  const refresh = () => setRefreshKey((k) => k + 1);
+    load();
+  }, [id]);
 
   if (loading) {
     return (
       <Layout>
-        <div className="max-w-5xl mx-auto p-4">
-          <Card>
-            <CardContent className="py-12 flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </CardContent>
-          </Card>
+        <div className="container px-4 py-6 max-w-4xl mx-auto">
+          <div className="flex items-center gap-2">
+            <Loader2 className="animate-spin" />
+            <span>Loading chama...</span>
+          </div>
         </div>
       </Layout>
     );
@@ -255,10 +103,11 @@ export default function ChamaDetail() {
   if (!chama) {
     return (
       <Layout>
-        <div className="max-w-4xl mx-auto p-4">
+        <div className="container px-4 py-6 max-w-4xl mx-auto">
           <Card>
             <CardContent>
-              <p className="text-center text-muted-foreground">Chama not found.</p>
+              <h3 className="text-lg font-semibold">Chama not found</h3>
+              <p>We couldn't find that chama. It may be private or removed.</p>
             </CardContent>
           </Card>
         </div>
@@ -266,200 +115,104 @@ export default function ChamaDetail() {
     );
   }
 
+  // Render the chama details (based on the older working UI)
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto p-4 space-y-6">
-        {/* HERO */}
-        <div className="bg-gradient-to-r from-slate-50 to-white p-4 rounded-lg shadow-sm">
-          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-            <div className="flex items-center space-x-4 col-span-2">
-              <div className="p-3 rounded-full bg-slate-100 border">
-                <Users className="h-8 w-8" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold">{chama.name}</h1>
-                <p className="text-sm text-muted-foreground">
-                  {chama.description || "No description provided"}
-                </p>
-                <div className="mt-2 flex items-center gap-3">
-                  <Badge>Contribution: KES {Number(chama.contribution_amount || 0).toLocaleString()}</Badge>
-                  <Badge variant="secondary">{chama.contribution_frequency || "Not set"}</Badge>
-                  <Badge variant="outline">{memberCount} members</Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="col-span-1">
-              <div className="bg-white p-3 rounded border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total collected</p>
-                    <p className="text-lg font-semibold">KES {Number(totalCollected || 0).toLocaleString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Next receiver</p>
-                    {nextReceiver ? (
-                      <div className="flex items-center gap-2 mt-1">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>{(nextReceiver.profiles?.full_name || "U").slice(0,1)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-medium">{nextReceiver.profiles?.full_name || nextReceiver.member_code}</p>
-                          <p className="text-xs text-muted-foreground">Order #{nextReceiver.order_index}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground mt-1">No receiver set</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <Button size="sm" variant="ghost" onClick={refresh}>
-                    <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-                  </Button>
-                  <Button size="sm" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/chama/join/${chama.slug}`)}>
-                    <Link2 className="h-4 w-4 mr-2" /> Copy Invite
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className="container px-4 py-6 max-w-4xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">{chama.name}</h1>
+          {chama.description && <p className="text-sm text-muted-foreground">{chama.description}</p>}
         </div>
 
-        {/* MEMBERS */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Members</CardTitle>
-                <CardDescription>See who has paid for the current cycle and make payments on behalf of others.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {members.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No members yet.</p>
-                ) : (
-                  <div className="divide-y rounded">
-                    {members.map((m) => {
-                      const paid = Boolean(paidMemberIds[m.id]);
-                      return (
-                        <div key={m.id} className="flex items-center justify-between p-3">
-                          <div className="flex items-center gap-3">
-                            <Avatar>
-                              <AvatarFallback>{(m.profiles?.full_name || m.member_code || "U").slice(0,1)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium">{m.profiles?.full_name || m.member_code}</p>
-                              <p className="text-xs text-muted-foreground">{m.profiles?.email || m.profiles?.phone}</p>
-                            </div>
-                          </div>
+        <Tabs defaultValue="members" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="members">
+              <Users className="mr-2 h-4 w-4" /> Members
+            </TabsTrigger>
+            <TabsTrigger value="contributions">
+              <UserPlus className="mr-2 h-4 w-4" /> Contributions
+            </TabsTrigger>
+            <TabsTrigger value="activity">
+              <TrendingUp className="mr-2 h-4 w-4" /> Activity
+            </TabsTrigger>
+            <TabsTrigger value="calendar">
+              <Calendar className="mr-2 h-4 w-4" /> Calendar
+            </TabsTrigger>
+          </TabsList>
 
-                          <div className="flex items-center gap-3">
-                            {m.is_manager && <Badge variant="secondary">Manager</Badge>}
-                            {paid ? <Badge>Paid</Badge> : <Badge variant="destructive">Not paid</Badge>}
-                            <Button size="sm" onClick={() => setShowPaymentModalFor(m.id)}>
-                              <DollarSign className="h-4 w-4 mr-2" /> Pay
-                            </Button>
-                          </div>
+          <TabsContent value="members">
+            <div className="grid gap-4">
+              {chama.chama_members && chama.chama_members.length > 0 ? (
+                chama.chama_members.map((m) => (
+                  <Card key={m.id}>
+                    <CardContent className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          {m.avatar_url ? <img src={m.avatar_url} alt={m.name} /> : <AvatarFallback>{m.name?.[0] ?? "?"}</AvatarFallback>}
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{m.name}</div>
+                          <div className="text-sm text-muted-foreground">{m.email || m.phone || ""}</div>
                         </div>
-                      );
-                    })}
+                      </div>
+                      <div>{m.is_manager && <Badge variant="secondary">Manager</Badge>}</div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div>No members yet.</div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="contributions">
+            <Card>
+              <CardContent>
+                <h3 className="text-lg font-semibold mb-2">Contributions</h3>
+                {chama.transactions && chama.transactions.length > 0 ? (
+                  <div className="space-y-3">
+                    {chama.transactions.map((t) => (
+                      <div key={t.id} className="flex justify-between">
+                        <div>
+                          <div className="font-medium">{t.description || "Contribution"}</div>
+                          <div className="text-sm text-muted-foreground">{t.member_name}</div>
+                        </div>
+                        <div>
+                          <span className="font-semibold">
+                            {t.amount > 0 ? "+" : ""}KES {Math.abs(t.amount).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                ) : (
+                  <div>No contributions yet.</div>
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
 
+          <TabsContent value="activity">
             <Card>
-              <CardHeader>
-                <CardTitle>Cycle & Payment summary</CardTitle>
-                <CardDescription>{currentCycle ? `Cycle: ${new Date(currentCycle.start_date).toLocaleDateString()} — ${new Date(currentCycle.end_date).toLocaleDateString()}` : "No active cycle found"}</CardDescription>
-              </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Members paid</p>
-                    <p className="font-medium text-lg">{paidCount} / {memberCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Contribution amount</p>
-                    <p className="font-medium text-lg">KES {Number(chama.contribution_amount || 0).toLocaleString()}</p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-xs text-muted-foreground">Total this cycle</p>
-                  <p className="font-semibold">KES {Number(totalCollected || 0).toLocaleString()}</p>
-                </div>
+                <h3 className="text-lg font-semibold mb-2">Recent Activity</h3>
+                <div>{/* You can wire real activity here later */}No recent activity.</div>
               </CardContent>
             </Card>
-          </div>
+          </TabsContent>
 
-          {/* RIGHT SIDEBAR */}
-          <div className="space-y-4">
+          <TabsContent value="calendar">
             <Card>
-              <CardHeader>
-                <CardTitle>Invite & Quick Actions</CardTitle>
-                <CardDescription>Share invite link, view pending requests, manager actions</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Label className="text-muted-foreground">Invite link</Label>
-                <div className="mt-2 flex items-center gap-2">
-                  <Input readOnly value={`${window.location.origin}/chama/join/${chama.slug}`} />
-                  <Button size="sm" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/chama/join/${chama.slug}`)}>Copy</Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Anyone with the link can request to join — manager approval required.</p>
-
-                <div className="pt-2">
-                  <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
-                </div>
-
-                <div>
-                  <Label className="text-muted-foreground">Pending requests</Label>
-                  <div className="mt-2">
-                    <ChamaPendingRequests chamaId={chama.id} isManager={true} onUpdate={refresh} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Customer overview</CardTitle>
-                <CardDescription>Quick stats</CardDescription>
-              </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Members</p>
-                    <p className="font-medium">{memberCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Paid</p>
-                    <p className="font-medium">{paidCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total collected</p>
-                    <p className="font-medium">KES {Number(totalCollected || 0).toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Commission</p>
-                    <p className="font-medium">{chama.commission_rate ? `${chama.commission_rate}%` : "N/A"}</p>
-                  </div>
-                </div>
+                <h3 className="text-lg font-semibold">Calendar</h3>
+                <p className="text-sm text-muted-foreground">Upcoming meetings and events will show here.</p>
               </CardContent>
             </Card>
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {/* Payment modal */}
-      {showPaymentModalFor && (
-        <ChamaPaymentForm
-          chamaId={chama.id}
-          memberId={showPaymentModalFor}
-          onSuccess={onPaymentSuccess}
-          onCancel={() => setShowPaymentModalFor(null)}
-        />
-      )}
     </Layout>
   );
-        }
+};
+
+export default ChamaDetail;
