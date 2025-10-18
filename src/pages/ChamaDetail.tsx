@@ -493,4 +493,28 @@ export default function ChamaDetail() {
                     </p>
                   </div>
                   <div>
-                    <p class
+                    <p className="text-xs text-muted-foreground">Commission rate</p>
+                    <p className="font-medium">
+                      {chama.commission_rate ? `${chama.commission_rate}%` : "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* Payment modal */}
+      {showPaymentModalFor && (
+        <ChamaPaymentForm
+          chamaId={chama.id}
+          memberId={showPaymentModalFor}
+          onSuccess={onPaymentSuccess}
+          onCancel={() => setShowPaymentModalFor(null)}
+        />
+      )}
+    </Layout>
+  );
+      }
+                    
