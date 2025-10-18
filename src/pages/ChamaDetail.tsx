@@ -1,320 +1,165 @@
-import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Calendar, TrendingUp, UserPlus } from "lucide-react";
-import { Loader2 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
-type ChamaMember = {
-  id: string;
-  name: string;
-  phone?: string | null;
-  email?: string | null;
-  avatar_url?: string | null;
-  is_manager?: boolean;
-};
+const ChamaDetail = () => {
+  const { id } = useParams();
 
-type Transaction = {
-  id: string;
-  description?: string | null;
-  amount: number;
-  created_at?: string | null;
-  member_name?: string | null;
-};
+  // Mock chama data
+  const chama = {
+    id,
+    name: "Women Empowerment Group",
+    description: "Monthly savings for business growth and mutual support",
+    members: 24,
+    maxMembers: 30,
+    totalSavings: 120000,
+    monthlyContribution: 5000,
+    nextMeeting: "2025-10-08",
+    meetingDay: "First Tuesday",
+    category: "Business Investment",
+    createdBy: "Jane Wanjiku",
+    createdAt: "2025-06-15",
+  };
 
-type Chama = {
-  id: string;
-  name: string;
-  description?: string | null;
-  is_private?: boolean;
-  created_at?: string | null;
-  chama_members?: ChamaMember[];
-  transactions?: Transaction[];
-};
+  // Mock members
+  const members = [
+    { name: "Jane W.", contribution: 5000, status: "paid" },
+    { name: "Mary K.", contribution: 5000, status: "paid" },
+    { name: "Sarah M.", contribution: 5000, status: "pending" },
+    { name: "Grace N.", contribution: 5000, status: "paid" },
+  ];
 
-const ChamaDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const [chama, setChama] = useState<Chama | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Mock transactions
+  const transactions = [
+    { date: "2025-09-01", type: "Contribution", member: "Jane W.", amount: 5000 },
+    { date: "2025-09-01", type: "Contribution", member: "Mary K.", amount: 5000 },
+    { date: "2025-08-15", type: "Loan", member: "Sarah M.", amount: -15000 },
+  ];
 
-  useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
+  const handleJoinGroup = () => {
+    toast.success("Request to join group sent!");
+  };
 
-    const load = async () => {
-      setLoading(true);
-      try {
-        // Example fetch: adjust select and relationships to match your DB schema
-        // We expect a chama table with related chama_members and transactions
-        const { data, error } = await supabase
-          .from("chama")
-          .select(
-            `id, name, description, is_private, created_at,
-             chama_members ( id, name, phone, email, avatar_url, is_manager ),
-             transactions ( id, description, amount, created_at, member_name )`
-          )
-          .eq("id", id)
-          .single();
-
-        if (error && error.code !== "PGRST116") {
-          // PGRST116 sometimes occurs when .single() finds nothing - treat as not found
-          throw error;
-        }
-
-        if (!data) {
-          setChama(null);
-        } else {
-          setChama(data as Chama);
-        }
-      } catch (err: any) {
-        console.error("Fetch chama error:", err);
-        toast({
-          title: "Failed to load chama",
-          description: err?.message || String(err),
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="container px-4 py-6 max-w-4xl mx-auto">
-          <div className="flex items-center gap-2">
-            <Loader2 className="animate-spin" />
-            <span>Loading chama...</span>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!chama) {
-    return (
-      <Layout>
-        <div className="container px-4 py-6 max-w-4xl mx-auto">
-          <Card>
-            <CardContent>
-              <h3 className="text-lg font-semibold">Chama not found</h3>
-              <p>We couldn't find that chama. It may be private or removed.</p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Render the chama details (based on the older working UI)
   return (
-    <Layout>
-      <div className="container px-4 py-6 max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">{chama.name}</h1>
-          {chama.description && <p className="text-sm text-muted-foreground">{chama.description}</p>}
-        </div>
+    <Layout showBackButton>
+      <div className="container px-4 py-6 max-w-2xl mx-auto space-y-6">
+        {/* Group Header */}
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-start mb-2">
+              <Badge variant="secondary">{chama.category}</Badge>
+              <Badge>
+                {chama.members}/{chama.maxMembers} members
+              </Badge>
+            </div>
+            <CardTitle className="text-2xl">{chama.name}</CardTitle>
+            <CardDescription>Founded by {chama.createdBy}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-foreground leading-relaxed">{chama.description}</p>
 
-        <Tabs defaultValue="members" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="members">
-              <Users className="mr-2 h-4 w-4" /> Members
-            </TabsTrigger>
-            <TabsTrigger value="contributions">
-              <UserPlus className="mr-2 h-4 w-4" /> Contributions
-            </TabsTrigger>
-            <TabsTrigger value="activity">
-              <TrendingUp className="mr-2 h-4 w-4" /> Activity
-            </TabsTrigger>
-            <TabsTrigger value="calendar">
-              <Calendar className="mr-2 h-4 w-4" /> Calendar
-            </TabsTrigger>
+            <div className="grid grid-cols-2 gap-4 pt-4">
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Total Savings</p>
+                <p className="text-2xl font-bold text-foreground">
+                  KES {chama.totalSavings.toLocaleString()}
+                </p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Monthly Contribution</p>
+                <p className="text-2xl font-bold text-foreground">
+                  KES {chama.monthlyContribution.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-border">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                Next meeting: {new Date(chama.nextMeeting).toLocaleDateString()}
+              </div>
+            </div>
+
+            <Button variant="heroSecondary" className="w-full" onClick={handleJoinGroup}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Request to Join
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Tabs */}
+        <Tabs defaultValue="members" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="members">Members</TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
           </TabsList>
 
           <TabsContent value="members">
-            <div className="grid gap-4">
-              {chama.chama_members && chama.chama_members.length > 0 ? (
-                chama.chama_members.map((m) => (
-                  <Card key={m.id}>
-                    <CardContent className="flex items-center justify-between">
+            <Card>
+              <CardHeader>
+                <CardTitle>Group Members</CardTitle>
+                <CardDescription>Current contribution status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {members.map((member, index) => (
+                    <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Avatar>
-                          {m.avatar_url ? <img src={m.avatar_url} alt={m.name} /> : <AvatarFallback>{m.name?.[0] ?? "?"}</AvatarFallback>}
+                          <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className="font-medium">{m.name}</div>
-                          <div className="text-sm text-muted-foreground">{m.email || m.phone || ""}</div>
+                          <p className="font-medium text-foreground">{member.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            KES {member.contribution.toLocaleString()}/month
+                          </p>
                         </div>
                       </div>
-                      <div>{m.is_manager && <Badge variant="secondary">Manager</Badge>}</div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <div>No members yet.</div>
-              )}
-            </div>
+                      <Badge variant={member.status === "paid" ? "default" : "secondary"}>
+                        {member.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="contributions">
+          <TabsContent value="transactions">
             <Card>
+              <CardHeader>
+                <CardTitle>Transaction History</CardTitle>
+                <CardDescription>Recent group activity</CardDescription>
+              </CardHeader>
               <CardContent>
-                <h3 className="text-lg font-semibold mb-2">Contributions</h3>
-                {chama.transactions && chama.transactions.length > 0 ? (
-                  <div className="space-y-3">
-                    {chama.transactions.map((t) => (
-                      <div key={t.id} className="flex justify-between">
-                        <div>
-                          <div className="font-medium">{t.description || "Contribution"}</div>
-                          <div className="text-sm text-muted-foreground">{t.member_name}</div>
-                        </div>
-                        <div>
-                          <span className="font-semibold">
-                            {t.amount > 0 ? "+" : ""}KES {Math.abs(t.amount).toLocaleString()}
-                          </span>
-                        </div>
+                <div className="space-y-4">
+                  {transactions.map((transaction, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between pb-4 border-b border-border last:border-0"
+                    >
+                      <div>
+                        <p className="font-medium text-foreground">{transaction.type}</p>
+                        <p className="text-sm text-muted-foreground">{transaction.member}</p>
+                        <p className="text-xs text-muted-foreground">{transaction.date}</p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div>No contributions yet.</div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="activity">
-            <Card>
-              <CardContent>
-                <h3 className="text-lg font-semibold mb-2">Recent Activity</h3>
-                <div>{/* You can wire real activity here later */}No recent activity.</div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="calendar">
-            <Card>
-              <CardContent>
-                <h3 className="text-lg font-semibold">Calendar</h3>
-                <p className="text-sm text-muted-foreground">Upcoming meetings and events will show here.</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </Layout>
-  );
-};
-
-export default ChamaDetail;              <h3 className="text-lg font-semibold">Chama not found</h3>
-              <p>We couldn't find that chama. It may be private or removed.</p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Render the chama details (based on the older working UI)
-  return (
-    <Layout>
-      <div className="container px-4 py-6 max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">{chama.name}</h1>
-          {chama.description && <p className="text-sm text-muted-foreground">{chama.description}</p>}
-        </div>
-
-        <Tabs defaultValue="members" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="members">
-              <Users className="mr-2 h-4 w-4" /> Members
-            </TabsTrigger>
-            <TabsTrigger value="contributions">
-              <UserPlus className="mr-2 h-4 w-4" /> Contributions
-            </TabsTrigger>
-            <TabsTrigger value="activity">
-              <TrendingUp className="mr-2 h-4 w-4" /> Activity
-            </TabsTrigger>
-            <TabsTrigger value="calendar">
-              <Calendar className="mr-2 h-4 w-4" /> Calendar
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="members">
-            <div className="grid gap-4">
-              {chama.chama_members && chama.chama_members.length > 0 ? (
-                chama.chama_members.map((m) => (
-                  <Card key={m.id}>
-                    <CardContent className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          {m.avatar_url ? <img src={m.avatar_url} alt={m.name} /> : <AvatarFallback>{m.name?.[0] ?? "?"}</AvatarFallback>}
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{m.name}</div>
-                          <div className="text-sm text-muted-foreground">{m.email || m.phone || ""}</div>
-                        </div>
-                      </div>
-                      <div>{m.is_manager && <Badge variant="secondary">Manager</Badge>}</div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <div>No members yet.</div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="contributions">
-            <Card>
-              <CardContent>
-                <h3 className="text-lg font-semibold mb-2">Contributions</h3>
-                {chama.transactions && chama.transactions.length > 0 ? (
-                  <div className="space-y-3">
-                    {chama.transactions.map((t) => (
-                      <div key={t.id} className="flex justify-between">
-                        <div>
-                          <div className="font-medium">{t.description || "Contribution"}</div>
-                          <div className="text-sm text-muted-foreground">{t.member_name}</div>
-                        </div>
-                        <div>
-                          <span className="font-semibold">
-                            {t.amount > 0 ? "+" : ""}KES {Math.abs(t.amount).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div>No contributions yet.</div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="activity">
-            <Card>
-              <CardContent>
-                <h3 className="text-lg font-semibold mb-2">Recent Activity</h3>
-                <div>{/* You can wire real activity here later */}No recent activity.</div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="calendar">
-            <Card>
-              <CardContent>
-                <h3 className="text-lg font-semibold">Calendar</h3>
-                <p className="text-sm text-muted-foreground">Upcoming meetings and events will show here.</p>
+                      <span
+                        className={`font-semibold ${
+                          transaction.amount > 0 ? "text-primary" : "text-destructive"
+                        }`}
+                      >
+                        {transaction.amount > 0 ? "+" : ""}KES{" "}
+                        {Math.abs(transaction.amount).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
