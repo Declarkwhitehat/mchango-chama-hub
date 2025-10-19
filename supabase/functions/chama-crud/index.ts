@@ -159,29 +159,136 @@ return new Response(JSON.stringify({ data: result }), {
 
 async function handlePost(req: Request) {
   try {
-    // Accept id/slug in POST body and delegate to GET handler for unified logic
-    let id: string | null = null;
-    try {
-      const j = await req.json().catch(() => null);
-      if (j && (j.id || j.slug)) {
-        id = j.id ?? j.slug;
-      }
-    } catch (_) {
-      // ignore
-    }
-
-    if (id) {
+    const body = await req.json();
+    
+    // If body contains id or slug, treat as GET request
+    if (body?.id || body?.slug) {
       const url = new URL(req.url);
-      url.searchParams.set("id", String(id));
+      url.searchParams.set("id", String(body.id || body.slug));
       const getReq = new Request(url.toString(), { method: "GET", headers: req.headers });
       return await handleGet(getReq);
     }
 
-    // Fallback to GET logic (will try query params too)
-    return await handleGet(req);
+    // Otherwise, treat as CREATE request
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization required" }), 
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create authenticated client
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Get current user
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }), 
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check KYC status
+    const { data: profile, error: profileError } = await userClient
+      .from("profiles")
+      .select("kyc_status")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || profile?.kyc_status !== "approved") {
+      return new Response(
+        JSON.stringify({ error: "KYC approval required to create chama" }), 
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate required fields
+    const { name, contribution_amount, contribution_frequency, max_members } = body;
+    if (!name || !contribution_amount || !contribution_frequency || !max_members) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }), 
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate constraints
+    const minMembers = body.min_members || 2;
+    if (minMembers < 2) {
+      return new Response(
+        JSON.stringify({ error: "Minimum members must be at least 2" }), 
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (max_members > 200) {
+      return new Response(
+        JSON.stringify({ error: "Maximum members cannot exceed 200" }), 
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (max_members < minMembers) {
+      return new Response(
+        JSON.stringify({ error: "Maximum members must be greater than or equal to minimum members" }), 
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Generate slug from name
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50);
+
+    // Create chama
+    const chamaData = {
+      name,
+      description: body.description || null,
+      contribution_amount,
+      contribution_frequency,
+      every_n_days_count: body.every_n_days_count || null,
+      min_members: minMembers,
+      max_members,
+      is_public: body.is_public !== false,
+      payout_order: body.payout_order || "join_date",
+      whatsapp_link: body.whatsapp_link || null,
+      commission_rate: 0.05,
+      slug,
+      created_by: user.id,
+      status: "active"
+    };
+
+    const { data: newChama, error: createError } = await userClient
+      .from("chama")
+      .insert([chamaData])
+      .select()
+      .single();
+
+    if (createError) {
+      console.error("Error creating chama:", createError);
+      return new Response(
+        JSON.stringify({ error: createError.message || "Failed to create chama" }), 
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ data: newChama }), 
+      { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+
   } catch (err: any) {
     console.error("Unhandled error in chama-crud POST handler:", err);
-    return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500 });
+    return new Response(
+      JSON.stringify({ error: err.message || "Internal error" }), 
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 }
 
