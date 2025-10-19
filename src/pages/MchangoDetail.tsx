@@ -47,12 +47,11 @@ const MchangoDetail = () => {
     try {
       setLoading(true);
       
-      // Fetch by slug
+      // Fetch by slug (public campaigns are visible to everyone via RLS; creators/managers can see theirs)
       const { data, error } = await supabase
         .from('mchango')
         .select('*')
         .eq('slug', id)
-        .eq('is_public', true)
         .maybeSingle();
 
       if (error) throw error;

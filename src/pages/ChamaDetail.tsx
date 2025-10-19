@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { getChamaCommissionInfo } from "@/utils/commissionCalculator";
+import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 
 const ChamaDetail = () => {
   const { id } = useParams();
@@ -21,19 +22,22 @@ const ChamaDetail = () => {
   const { data: chama, isLoading, error } = useQuery({
     queryKey: ['chama', id],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const { data, error } = await supabase.functions.invoke('chama-crud', {
-        body: { id },
-        headers: session?.access_token ? {
-          Authorization: `Bearer ${session.access_token}`
-        } : {}
-      });
+      const { data, error } = await supabase
+        .from('chama')
+        .select(`
+          id, name, slug, description, created_at, is_public, min_members, max_members, contribution_amount, contribution_frequency, every_n_days_count, payout_order, status, commission_rate, whatsapp_link,
+          chama_members (
+            id, user_id, is_manager, member_code, order_index, status, approval_status, joined_at, last_payment_date, next_due_date,
+            profiles ( full_name )
+          )
+        `)
+        .eq('slug', id)
+        .maybeSingle();
 
       if (error) throw error;
-      if (!data?.data) throw new Error('Chama not found');
+      if (!data) throw new Error('Chama not found');
       
-      return data.data;
+      return data as any;
     },
     enabled: !!id,
   });
@@ -100,6 +104,24 @@ const ChamaDetail = () => {
   const frequencyText = chama.contribution_frequency === 'every_n_days' 
     ? `Every ${chama.every_n_days_count} days`
     : chama.contribution_frequency;
+
+  const currentMember = chama.chama_members?.find((m: any) => m.user_id === user?.id);
+
+  const queueLeader = (approvedMembers.length > 0)
+    ? [...approvedMembers].sort((a: any, b: any) => {
+        const aDate = a.next_due_date ? new Date(a.next_due_date).getTime() : Infinity;
+        const bDate = b.next_due_date ? new Date(b.next_due_date).getTime() : Infinity;
+        if (aDate !== bDate) return aDate - bDate;
+        return (a.order_index || 9999) - (b.order_index || 9999);
+      })[0]
+    : null;
+
+  const nextCycleDate: Date | undefined = (approvedMembers.length > 0)
+    ? approvedMembers
+        .map((m: any) => (m.next_due_date ? new Date(m.next_due_date) : null))
+        .filter((d: Date | null) => !!d)
+        .sort((a: any, b: any) => a.getTime() - b.getTime())[0] as Date | undefined
+    : undefined;
 
   return (
     <Layout showBackButton>
@@ -259,6 +281,18 @@ const ChamaDetail = () => {
                   <div className="flex justify-between items-center pb-3 border-b">
                     <span className="text-sm text-muted-foreground">Commission Rate</span>
                     <span className="font-medium">{commissionInfo.percentage}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-3 border-b">
+                    <span className="text-sm text-muted-foreground">Next Payout To</span>
+                    <span className="font-medium">
+                      {queueLeader?.profiles?.full_name || queueLeader?.member_code || 'TBD'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pb-3 border-b">
+                    <span className="text-sm text-muted-foreground">Next Cycle</span>
+                    <span className="font-medium">
+                      {nextCycleDate ? new Date(nextCycleDate).toLocaleDateString() : 'TBD'}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Net Payout Amount</span>
