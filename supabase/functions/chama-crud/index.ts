@@ -5,15 +5,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
-  try {
-    // Handle CORS preflight
-    if (req.method === "OPTIONS") {
-      return new Response("ok", { headers: corsHeaders });
-    }
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const userClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -24,102 +24,147 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await userClient.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
-    if (userError || !user) {
+    if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: "Invalid or expired token" }),
+        JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const body = await req.json().catch(() => ({}));
+    // Handle GET request
+    if (req.method === "GET") {
+      const url = new URL(req.url);
+      const id = url.searchParams.get("id");
+      const slug = url.searchParams.get("slug");
 
-    // 🧩 Check KYC status
-    const { data: profile, error: profileError } = await userClient
-      .from("profiles")
-      .select("kyc_status")
-      .eq("id", user.id)
-      .single();
+      if (!id && !slug) {
+        return new Response(
+          JSON.stringify({ error: "ID or slug required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    if (profileError || profile?.kyc_status !== "approved") {
+      let query = supabaseClient
+        .from("chama")
+        .select(`
+          *,
+          chama_members (
+            id,
+            user_id,
+            is_manager,
+            member_code,
+            order_index,
+            status,
+            approval_status,
+            joined_at,
+            profiles (full_name)
+          )
+        `);
+
+      if (id) {
+        query = query.eq("id", id);
+      } else if (slug) {
+        query = query.eq("slug", slug);
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (error) {
+        return new Response(
+          JSON.stringify({ error: error.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ error: "KYC approval required to create chama" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ data }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ✅ Validate required fields safely
-    const { name, contribution_amount, contribution_frequency, max_members } = body ?? {};
+    // Handle POST request (create chama)
+    if (req.method === "POST") {
+      const body = await req.json();
 
-    if (!name || !contribution_amount || !contribution_frequency || !max_members) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      // Check KYC status
+      const { data: profile } = await supabaseClient
+        .from("profiles")
+        .select("kyc_status")
+        .eq("id", user.id)
+        .single();
 
-    // ✅ Normalize the name safely
-    const normalizedName = (typeof name === "string" ? name.toLowerCase() : "");
+      if (profile?.kyc_status !== "approved") {
+        return new Response(
+          JSON.stringify({ error: "KYC approval required" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    // ✅ Validate constraints
-    const minMembers = body.min_members || 2;
+      const { name, description, contribution_amount, contribution_frequency, max_members, min_members, is_public, payout_order, whatsapp_link, every_n_days_count } = body;
 
-    if (minMembers < 2) {
-      return new Response(
-        JSON.stringify({ error: "Minimum members must be at least 2" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      if (!name || !contribution_amount || !contribution_frequency || !max_members) {
+        return new Response(
+          JSON.stringify({ error: "Missing required fields" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    if (max_members > 200) {
-      return new Response(
-        JSON.stringify({ error: "Maximum members cannot exceed 200" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      const minMembersValue = min_members || 2;
+      if (minMembersValue < 2 || max_members > 200 || max_members < minMembersValue) {
+        return new Response(
+          JSON.stringify({ error: "Invalid member limits" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    if (max_members < minMembers) {
-      return new Response(
-        JSON.stringify({ error: "Maximum members cannot be less than minimum members" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      // Generate slug from name
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    // ✅ Insert chama safely
-    const { data: chama, error: chamaError } = await userClient
-      .from("chamas")
-      .insert([
-        {
-          name: normalizedName,
+      const { data: chama, error: insertError } = await supabaseClient
+        .from("chama")
+        .insert({
+          name,
+          slug,
+          description,
           contribution_amount,
           contribution_frequency,
+          every_n_days_count,
           max_members,
-          min_members: minMembers,
+          min_members: minMembersValue,
+          is_public: is_public ?? true,
+          payout_order: payout_order || "join_date",
+          whatsapp_link,
           created_by: user.id,
-        },
-      ])
-      .select()
-      .single();
+          commission_rate: 0.05,
+          status: "active"
+        })
+        .select()
+        .single();
 
-    if (chamaError) {
-      console.error("Chama insert error:", chamaError);
+      if (insertError) {
+        return new Response(
+          JSON.stringify({ error: insertError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ error: "Failed to create chama", details: chamaError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ data: chama }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ✅ Success response
     return new Response(
-      JSON.stringify({ success: true, chama }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: "Method not allowed" }),
+      { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (err) {
-    console.error("Error in chama-crud:", err);
+  } catch (error: any) {
+    console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: err?.message || "Unknown error in chama-crud" }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

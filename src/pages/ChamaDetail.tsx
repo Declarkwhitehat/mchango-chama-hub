@@ -5,29 +5,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Calendar, TrendingUp, UserPlus, Loader2 } from "lucide-react";
+import { UserPlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { getChamaCommissionInfo } from "@/utils/commissionCalculator";
-import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 
 const ChamaDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Fetch chama details
-  const { data: chama, isLoading, error } = useQuery({
+  const { data: chama, isLoading, error, refetch } = useQuery({
     queryKey: ['chama', id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('chama')
         .select(`
-          id, name, slug, description, created_at, is_public, min_members, max_members, contribution_amount, contribution_frequency, every_n_days_count, payout_order, status, commission_rate, whatsapp_link,
-          chama_members (
-            id, user_id, is_manager, member_code, order_index, status, approval_status, joined_at, last_payment_date, next_due_date,
+          *,
+          chama_members!inner (
+            id, user_id, is_manager, member_code, order_index, status, approval_status, joined_at,
             profiles ( full_name )
           )
         `)
@@ -37,7 +35,7 @@ const ChamaDetail = () => {
       if (error) throw error;
       if (!data) throw new Error('Chama not found');
       
-      return data as any;
+      return data;
     },
     enabled: !!id,
   });
@@ -54,20 +52,26 @@ const ChamaDetail = () => {
     }
 
     try {
+      if (!chama?.id) {
+        toast.error("Invalid chama");
+        return;
+      }
+
       const { error } = await supabase
         .from('chama_members')
-        .insert([{
-          chama_id: id!,
+        .insert({
+          chama_id: chama.id,
           user_id: user.id,
           approval_status: 'pending',
           status: 'active',
           member_code: `TEMP-${Date.now()}`
-        }]);
+        });
 
       if (error) throw error;
-      toast.success("Request to join group sent!");
+      toast.success("Join request sent!");
+      refetch();
     } catch (error: any) {
-      toast.error(error.message || "Failed to send join request");
+      toast.error(error.message || "Failed to send request");
     }
   };
 
@@ -97,31 +101,18 @@ const ChamaDetail = () => {
     );
   }
 
-  const approvedMembers = chama.chama_members?.filter((m: any) => m.approval_status === 'approved') || [];
-  const isManager = chama.chama_members?.some((m: any) => m.user_id === user?.id && m.is_manager);
-  const isMember = chama.chama_members?.some((m: any) => m.user_id === user?.id);
+  const members = chama?.chama_members || [];
+  const approvedMembers = members.filter((m: any) => m.approval_status === 'approved');
+  const isManager = members.some((m: any) => m.user_id === user?.id && m.is_manager);
+  const isMember = members.some((m: any) => m.user_id === user?.id);
   
   const frequencyText = chama.contribution_frequency === 'every_n_days' 
     ? `Every ${chama.every_n_days_count} days`
     : chama.contribution_frequency;
 
-  const currentMember = chama.chama_members?.find((m: any) => m.user_id === user?.id);
-
-  const queueLeader = (approvedMembers.length > 0)
-    ? [...approvedMembers].sort((a: any, b: any) => {
-        const aDate = a.next_due_date ? new Date(a.next_due_date).getTime() : Infinity;
-        const bDate = b.next_due_date ? new Date(b.next_due_date).getTime() : Infinity;
-        if (aDate !== bDate) return aDate - bDate;
-        return (a.order_index || 9999) - (b.order_index || 9999);
-      })[0]
+  const nextInQueue = approvedMembers.length > 0 
+    ? approvedMembers.sort((a: any, b: any) => a.order_index - b.order_index)[0]
     : null;
-
-  const nextCycleDate: Date | undefined = (approvedMembers.length > 0)
-    ? approvedMembers
-        .map((m: any) => (m.next_due_date ? new Date(m.next_due_date) : null))
-        .filter((d: Date | null) => !!d)
-        .sort((a: any, b: any) => a.getTime() - b.getTime())[0] as Date | undefined
-    : undefined;
 
   return (
     <Layout showBackButton>
@@ -285,13 +276,7 @@ const ChamaDetail = () => {
                   <div className="flex justify-between items-center pb-3 border-b">
                     <span className="text-sm text-muted-foreground">Next Payout To</span>
                     <span className="font-medium">
-                      {queueLeader?.profiles?.full_name || queueLeader?.member_code || 'TBD'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b">
-                    <span className="text-sm text-muted-foreground">Next Cycle</span>
-                    <span className="font-medium">
-                      {nextCycleDate ? new Date(nextCycleDate).toLocaleDateString() : 'TBD'}
+                      {nextInQueue?.profiles?.full_name || nextInQueue?.member_code || 'Not set'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
