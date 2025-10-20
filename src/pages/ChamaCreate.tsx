@@ -75,24 +75,28 @@ const ChamaCreate = () => {
         contribution_amount: Number(formData.get("contribution_amount")),
         contribution_frequency: frequency,
         every_n_days_count: frequency === "every_n_days" ? Number(formData.get("every_n_days_count")) : null,
-        min_members: Number(formData.get("min_members")) || 2,
+        min_members: Number(formData.get("min_members")) || 5,
         max_members: Number(formData.get("max_members")),
         is_public: formData.get("is_public") === "true",
         payout_order: formData.get("payout_order") as string || "join_date",
         whatsapp_link: formData.get("whatsapp_link") as string || null,
       };
 
-      const { data, error } = await supabase.functions.invoke("chama-crud", {
+      // Supabase SDK automatically handles auth - don't pass Authorization header manually
+      const res = await supabase.functions.invoke("chama-crud", {
         body: chamaData,
       });
 
-      if (error) {
-        throw new Error(error.message);
+      if (res.error) {
+        console.error("Chama create invoke error:", res.error, res.data);
+        const apiError = (res.data as any)?.error || (res.data as any)?.message;
+        throw new Error(apiError || res.error.message || "Failed to create chama");
       }
 
-      const created = (data as any)?.data;
+      const created = (res.data as any)?.data;
       if (!created?.slug) {
-        throw new Error("Failed to create chama");
+        console.error("Unexpected response from chama-crud:", res.data);
+        throw new Error("Unexpected response from server");
       }
 
       toast({
@@ -243,12 +247,12 @@ const ChamaCreate = () => {
                     id="min_members"
                     name="min_members"
                     type="number"
-                    placeholder="2"
-                    defaultValue="2"
-                    min="2"
+                    placeholder="5"
+                    defaultValue="5"
+                    min="5"
                     disabled={kycStatus !== "approved"}
                   />
-                  <p className="text-xs text-muted-foreground">Minimum 2 members</p>
+                  <p className="text-xs text-muted-foreground">Minimum 5 members</p>
                 </div>
 
                 <div className="space-y-2">
@@ -257,13 +261,13 @@ const ChamaCreate = () => {
                     id="max_members"
                     name="max_members"
                     type="number"
-                    placeholder="50"
-                    min="2"
-                    max="200"
+                    placeholder="20"
+                    min="5"
+                    max="100"
                     required
                     disabled={kycStatus !== "approved"}
                   />
-                  <p className="text-xs text-muted-foreground">Maximum 200 members</p>
+                  <p className="text-xs text-muted-foreground">Maximum 100 members</p>
                 </div>
               </div>
 

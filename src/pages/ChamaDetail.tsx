@@ -1,99 +1,172 @@
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+
+// Layout is a named export in your project; import it as such
 import { Layout } from "@/components/Layout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { getChamaCommissionInfo } from "@/utils/commissionCalculator";
+import { Loader2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+
+type Profile = {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+};
+
+type ChamaMember = {
+  id: string;
+  user_id: string;
+  member_code?: string;
+  is_manager?: boolean;
+  joined_at?: string;
+  status?: string;
+  approval_status?: string;
+  order_index?: number;
+  profiles?: Profile;
+};
+
+type ChamaData = {
+  id: string;
+  slug?: string;
+  title?: string;
+  name?: string;
+  description?: string;
+  category?: string;
+  contribution_amount?: number;
+  contribution_frequency?: string;
+  created_at?: string;
+  created_by?: string | Profile;
+  chama_members?: ChamaMember[];
+  profiles?: Profile;
+  [key: string]: any;
+};
 
 const ChamaDetail = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const { user } = useAuth();
+  const { id } = useParams<{ id: string }>();
+  const [chama, setChama] = useState<ChamaData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentUserMembership, setCurrentUserMembership] = useState<ChamaMember | null>(null);
 
-  const { data: chama, isLoading, error, refetch } = useQuery({
-    queryKey: ['chama', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('chama')
+  useEffect(() => {
+    loadChama();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const loadChama = async () => {
+    setIsLoading(true);
+    try {
+      if (!id) {
+        throw new Error("Missing chama id/slug in route.");
+      }
+
+      // Try server function first (pass id in body)
+      try {
+        const res = await supabase.functions.invoke("chama-crud", {
+          body: { id },
+        });
+
+        console.log("chama-crud invoke response:", res);
+
+        if (res?.error) {
+          const apiError = (res.data as any)?.error || (res.data as any)?.message || res.error.message;
+          throw new Error(apiError || "Server function error");
+        }
+
+        const returned = (res.data as any)?.data ?? res.data;
+        if (returned) {
+          setChama(returned);
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user && returned.chama_members) {
+            const membership = returned.chama_members.find((m: any) => m.user_id === user.id);
+            setCurrentUserMembership(membership ?? null);
+          }
+          return;
+        }
+      } catch (fnErr) {
+        console.warn("chama-crud function failed, will fallback to direct queries. Error:", fnErr);
+      }
+
+      // Fallback: direct supabase query by id
+      const { data: byId, error: errById } = await supabase
+        .from("chama")
         .select(`
           *,
-          chama_members!inner (
-            id, user_id, is_manager, member_code, order_index, status, approval_status, joined_at,
-            profiles ( full_name )
-          )
+          profiles:created_by ( full_name, email, phone ),
+          chama_members ( id, user_id, member_code, is_manager, joined_at, status, approval_status, order_index, profiles ( full_name, email ) )
         `)
-        .eq('slug', id)
+        .eq("id", id)
         .maybeSingle();
 
-      if (error) throw error;
-      if (!data) throw new Error('Chama not found');
-      
-      return data;
-    },
-    enabled: !!id,
-  });
-
-  // Calculate total pool and commission
-  const totalPool = chama ? Number(chama.contribution_amount) * (chama.chama_members?.filter((m: any) => m.approval_status === 'approved').length || 0) : 0;
-  const commissionInfo = getChamaCommissionInfo(totalPool, chama?.commission_rate || 0.05);
-
-  const handleJoinGroup = async () => {
-    if (!user) {
-      toast.error("Please login to join this chama");
-      navigate('/auth');
-      return;
-    }
-
-    try {
-      if (!chama?.id) {
-        toast.error("Invalid chama");
+      if (errById) console.warn("Direct query by id error:", errById);
+      if (byId) {
+        setChama(byId);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && byId.chama_members) {
+          const membership = byId.chama_members.find((m: any) => m.user_id === user.id);
+          setCurrentUserMembership(membership ?? null);
+        }
         return;
       }
 
-      const { error } = await supabase
-        .from('chama_members')
-        .insert({
-          chama_id: chama.id,
-          user_id: user.id,
-          approval_status: 'pending',
-          status: 'active',
-          member_code: `TEMP-${Date.now()}`
-        });
+      // Fallback 2: direct query by slug
+      const { data: bySlug, error: errBySlug } = await supabase
+        .from("chama")
+        .select(`
+          *,
+          profiles:created_by ( full_name, email, phone ),
+          chama_members ( id, user_id, member_code, is_manager, joined_at, status, approval_status, order_index, profiles ( full_name, email ) )
+        `)
+        .eq("slug", id)
+        .maybeSingle();
 
-      if (error) throw error;
-      toast.success("Join request sent!");
-      refetch();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send request");
+      if (errBySlug) console.warn("Direct query by slug error:", errBySlug);
+      if (bySlug) {
+        setChama(bySlug);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && bySlug.chama_members) {
+          const membership = bySlug.chama_members.find((m: any) => m.user_id === user.id);
+          setCurrentUserMembership(membership ?? null);
+        }
+        return;
+      }
+
+      throw new Error("Chama not found");
+    } catch (err: any) {
+      console.error("Failed to load chama details:", err);
+      toast({
+        title: "Failed to load chama details",
+        description: err.message || "Please try again later.",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   if (isLoading) {
     return (
-      <Layout showBackButton>
-        <div className="container px-4 py-6 max-w-2xl mx-auto flex justify-center items-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <Layout>
+        <div className="container px-4 py-6 max-w-4xl mx-auto">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="animate-spin mr-2" />
+            Loading...
+          </div>
         </div>
       </Layout>
     );
   }
 
-  if (error || !chama) {
+  if (!chama) {
     return (
-      <Layout showBackButton>
-        <div className="container px-4 py-6 max-w-2xl mx-auto">
+      <Layout>
+        <div className="container px-4 py-6 max-w-4xl mx-auto">
           <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-muted-foreground">
-                {error ? 'Failed to load chama details' : 'Chama not found'}
-              </p>
+            <CardContent>
+              <h3 className="text-lg font-semibold">Chama not found</h3>
+              <p>We couldn't find the chama. It might be private or removed.</p>
             </CardContent>
           </Card>
         </div>
@@ -101,195 +174,53 @@ const ChamaDetail = () => {
     );
   }
 
-  const members = chama?.chama_members || [];
-  const approvedMembers = members.filter((m: any) => m.approval_status === 'approved');
-  const isManager = members.some((m: any) => m.user_id === user?.id && m.is_manager);
-  const isMember = members.some((m: any) => m.user_id === user?.id);
-  
-  const frequencyText = chama.contribution_frequency === 'every_n_days' 
-    ? `Every ${chama.every_n_days_count} days`
-    : chama.contribution_frequency;
-
-  const nextInQueue = approvedMembers.length > 0 
-    ? approvedMembers.sort((a: any, b: any) => a.order_index - b.order_index)[0]
-    : null;
-
   return (
-    <Layout showBackButton>
-      <div className="container px-4 py-6 max-w-2xl mx-auto space-y-6">
-        {/* Group Header */}
+    <Layout>
+      <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
         <Card>
-          <CardHeader>
-            <div className="flex justify-between items-start mb-2">
-              <Badge variant="secondary">{chama.is_public ? 'Public' : 'Private'}</Badge>
-              <Badge>
-                {approvedMembers.length}/{chama.max_members} members
-              </Badge>
-            </div>
-            <CardTitle className="text-2xl">{chama.name}</CardTitle>
-            <CardDescription>
-              Created {new Date(chama.created_at).toLocaleDateString()}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {chama.description && (
-              <p className="text-foreground leading-relaxed">{chama.description}</p>
-            )}
-
-            <div className="grid grid-cols-2 gap-4 pt-4">
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Contribution Amount</p>
-                <p className="text-2xl font-bold text-foreground">
-                  KES {Number(chama.contribution_amount).toLocaleString()}
-                </p>
-              </div>
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Frequency</p>
-                <p className="text-xl font-bold text-foreground capitalize">
-                  {frequencyText}
-                </p>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Avatar>
+                <AvatarFallback>
+                  {(typeof chama.created_by === 'object' && chama.created_by?.full_name 
+                    ? chama.created_by.full_name 
+                    : chama.profiles?.full_name || "C").slice(0, 1)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="font-semibold">{chama.title ?? chama.name}</div>
+                <div className="text-sm text-muted-foreground">{chama.created_at}</div>
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Total Pool</p>
-                <p className="text-xl font-bold text-foreground">
-                  KES {totalPool.toLocaleString()}
-                </p>
-              </div>
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Commission ({commissionInfo.percentage})</p>
-                <p className="text-xl font-bold text-foreground">
-                  KES {commissionInfo.commission.toLocaleString()}
-                </p>
-              </div>
+            <div className="mt-4">
+              <p className="text-sm text-muted-foreground">{chama.description}</p>
             </div>
-
-            {chama.whatsapp_link && (
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={() => window.open(chama.whatsapp_link, '_blank')}
-              >
-                Join WhatsApp Group
-              </Button>
-            )}
-
-            {!isMember && (
-              <Button variant="heroSecondary" className="w-full" onClick={handleJoinGroup}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Request to Join
-              </Button>
-            )}
-
-            {isManager && (
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={() => navigate(`/chama/${id}/manage`)}
-                >
-                  Manage Chama
-                </Button>
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Tabs */}
-        <Tabs defaultValue="members" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="members">Members</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          </TabsList>
+        <div>
+          <h3 className="text-lg font-semibold mb-3">Members</h3>
+          <div className="grid grid-cols-1 gap-3">
+            {chama.chama_members?.map((m: ChamaMember) => (
+              <Card key={m.id}>
+                <CardContent className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarFallback>{(m.profiles?.full_name || m.user_id).slice(0, 1)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="font-medium">{m.profiles?.full_name || m.user_id}</div>
+                      <div className="text-sm text-muted-foreground">{m.member_code}</div>
+                    </div>
+                  </div>
+                  <div>{m.is_manager && <Badge variant="secondary">Manager</Badge>}</div>
+                </CardContent>
+              </Card>
+            ))}
 
-          <TabsContent value="members">
-            <Card>
-              <CardHeader>
-                <CardTitle>Group Members ({approvedMembers.length})</CardTitle>
-                <CardDescription>Current members - Min: {chama.min_members}, Max: {chama.max_members}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {approvedMembers.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No members yet</p>
-                  ) : (
-                    approvedMembers.map((member: any) => (
-                      <div key={member.id} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarFallback>
-                              {member.profiles?.full_name?.charAt(0) || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium text-foreground">
-                              {member.profiles?.full_name || 'Unknown'}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {member.member_code}
-                              {member.is_manager && ' • Manager'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant={member.status === "active" ? "default" : "secondary"}>
-                            {member.status}
-                          </Badge>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Joined {new Date(member.joined_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="transactions">
-            <Card>
-              <CardHeader>
-                <CardTitle>Chama Details</CardTitle>
-                <CardDescription>Configuration and settings</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-3 border-b">
-                    <span className="text-sm text-muted-foreground">Status</span>
-                    <Badge>{chama.status}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b">
-                    <span className="text-sm text-muted-foreground">Payout Order</span>
-                    <span className="font-medium">{chama.payout_order}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b">
-                    <span className="text-sm text-muted-foreground">Visibility</span>
-                    <span className="font-medium">{chama.is_public ? 'Public' : 'Private'}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b">
-                    <span className="text-sm text-muted-foreground">Commission Rate</span>
-                    <span className="font-medium">{commissionInfo.percentage}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b">
-                    <span className="text-sm text-muted-foreground">Next Payout To</span>
-                    <span className="font-medium">
-                      {nextInQueue?.profiles?.full_name || nextInQueue?.member_code || 'Not set'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Net Payout Amount</span>
-                    <span className="font-bold text-primary">
-                      KES {commissionInfo.netBalance.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+            {!chama.chama_members?.length && <div>No members yet.</div>}
+          </div>
+        </div>
       </div>
     </Layout>
   );
