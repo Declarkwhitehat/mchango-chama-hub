@@ -125,9 +125,7 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await signUp({
-        email: data.email,
-        password: data.password,
+      const { error } = await signUp(data.email, data.password, {
         full_name: data.full_name,
         id_number: data.id_number,
         phone: data.phone,
