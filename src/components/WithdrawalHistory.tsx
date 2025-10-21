@@ -51,15 +51,17 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
         `withdrawals-crud?${params.toString()}`
       );
 
-      if (error) throw error;
-      setWithdrawals(data.data || []);
+      if (error) {
+        console.error("Error loading withdrawals:", error);
+        // Don't show error for empty data
+        setWithdrawals([]);
+      } else {
+        setWithdrawals(data.data || []);
+      }
     } catch (error: any) {
       console.error("Error loading withdrawals:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load withdrawal history",
-        variant: "destructive",
-      });
+      // Don't show toast, just set empty array
+      setWithdrawals([]);
     } finally {
       setIsLoading(false);
     }

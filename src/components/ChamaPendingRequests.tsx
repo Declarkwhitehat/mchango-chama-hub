@@ -55,16 +55,17 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         .eq('approval_status', 'pending')
         .order('joined_at', { ascending: true });
 
-      if (error) throw error;
-
-      setPendingMembers(data || []);
+      if (error) {
+        console.error('Error loading pending members:', error);
+        // Don't show toast for empty data or new chamas
+        setPendingMembers([]);
+      } else {
+        setPendingMembers(data || []);
+      }
     } catch (error: any) {
       console.error('Error loading pending members:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load pending join requests",
-        variant: "destructive",
-      });
+      // Don't show toast, just set empty array
+      setPendingMembers([]);
     } finally {
       setLoadingMembers(false);
     }

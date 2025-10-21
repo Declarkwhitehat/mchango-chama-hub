@@ -47,26 +47,24 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast({
-          title: "Error",
-          description: "Please log in to view your dashboard",
-          variant: "destructive",
-        });
+        console.log("No session found");
+        setIsLoading(false);
         return;
       }
 
       const { data, error } = await supabase.functions.invoke('member-dashboard');
 
-      if (error) throw error;
-
-      setDashboardData(data.data);
+      if (error) {
+        console.error("Dashboard error:", error);
+        // Don't show toast for new chamas with no data yet
+        setDashboardData(null);
+      } else {
+        setDashboardData(data.data);
+      }
     } catch (error: any) {
       console.error("Error loading dashboard:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load member dashboard",
-        variant: "destructive",
-      });
+      // Don't show toast, just set empty data
+      setDashboardData(null);
     } finally {
       setIsLoading(false);
     }
@@ -88,8 +86,11 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
     return (
       <div className="space-y-4">
         <Card>
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">No dashboard data available</p>
+          <CardContent className="pt-6 space-y-2">
+            <p className="text-center text-lg font-semibold">Welcome to Your Dashboard</p>
+            <p className="text-center text-muted-foreground">
+              Start making contributions to see your dashboard data and payment history.
+            </p>
           </CardContent>
         </Card>
       </div>
