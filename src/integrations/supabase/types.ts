@@ -839,6 +839,10 @@ export type Database = {
         Args: { _chama_id: string; _user_id: string }
         Returns: boolean
       }
+      is_chama_member: {
+        Args: { _chama_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"
