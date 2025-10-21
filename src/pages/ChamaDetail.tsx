@@ -53,6 +53,7 @@ const ChamaDetail = () => {
   const [currentUserMembership, setCurrentUserMembership] = useState<any>(null);
   const [currentTurnMemberId, setCurrentTurnMemberId] = useState<string | null>(null);
   const [nextTurnDates, setNextTurnDates] = useState<Record<string, Date>>({});
+  const [totalContributions, setTotalContributions] = useState<number>(0);
 
   useEffect(() => {
     loadChama();
@@ -73,6 +74,20 @@ const ChamaDetail = () => {
           (m: any) => m.user_id === user.id
         );
         setCurrentUserMembership(membership);
+      }
+
+      // Fetch actual contributions total
+      const { data: contributionsData, error: contribError } = await supabase
+        .from('contributions')
+        .select('amount')
+        .eq('chama_id', data.data.id)
+        .eq('status', 'completed');
+
+      if (!contribError && contributionsData) {
+        const total = contributionsData.reduce((sum, contrib) => sum + Number(contrib.amount), 0);
+        setTotalContributions(total);
+      } else {
+        setTotalContributions(0);
       }
 
       // Calculate whose turn it is and next turn dates
@@ -174,9 +189,6 @@ const ChamaDetail = () => {
   const isPending = currentUserMembership?.approval_status === 'pending';
   const isMyTurn = currentUserMembership?.id === currentTurnMemberId;
 
-  // Calculate total contributions (mock for now)
-  const totalSavings = approvedMembers.length * chama.contribution_amount;
-
   return (
     <Layout showBackButton>
       <div className="container px-4 py-6 max-w-2xl mx-auto space-y-6">
@@ -198,9 +210,9 @@ const ChamaDetail = () => {
 
             <div className="grid grid-cols-2 gap-4 pt-4">
               <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Total Pool</p>
+                <p className="text-sm text-muted-foreground mb-1">Total Collected</p>
                 <p className="text-2xl font-bold text-foreground">
-                  KES {totalSavings.toLocaleString()}
+                  KES {totalContributions.toLocaleString()}
                 </p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
@@ -221,7 +233,7 @@ const ChamaDetail = () => {
         {/* Commission Display - Visible to all approved members */}
         {isMember && (
           <CommissionDisplay 
-            totalCollected={totalSavings}
+            totalCollected={totalContributions}
             commissionRate={chama.commission_rate || 0.05}
             type="chama"
             showBreakdown={true}
@@ -246,7 +258,7 @@ const ChamaDetail = () => {
         {isMember && isMyTurn && (
           <WithdrawalButton
             chamaId={chama.id}
-            totalAvailable={totalSavings}
+            totalAvailable={totalContributions}
             commissionRate={chama.commission_rate || 0.05}
             onSuccess={loadChama}
           />
