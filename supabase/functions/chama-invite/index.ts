@@ -30,6 +30,72 @@ serve(async (req) => {
     const pathParts = url.pathname.split('/').filter(Boolean);
     const action = pathParts[pathParts.length - 1];
 
+    // Public endpoint - no auth required for validation
+    // GET /chama-invite/validate/:code - Validate invite code
+    if (req.method === 'GET' && pathParts.includes('validate')) {
+      const codeIndex = pathParts.indexOf('validate') + 1;
+      const code = pathParts[codeIndex];
+
+      if (!code) {
+        return new Response(JSON.stringify({ 
+          error: 'Code is required',
+          valid: false 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data, error } = await supabaseClient
+        .from('chama_invite_codes')
+        .select(`
+          *,
+          chama (
+            id,
+            name,
+            slug,
+            description,
+            contribution_amount,
+            contribution_frequency
+          )
+        `)
+        .eq('code', code.toUpperCase())
+        .eq('is_active', true)
+        .is('used_by', null)
+        .single();
+
+      if (error || !data) {
+        return new Response(JSON.stringify({ 
+          error: 'Invalid or expired invite code',
+          valid: false,
+          message: 'This invite code is not valid. Please check with the chama manager.'
+        }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Check expiration
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        return new Response(JSON.stringify({ 
+          error: 'Invite code has expired',
+          valid: false,
+          message: 'This invite code has expired. Please request a new one from the chama manager.'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ 
+        chama: data.chama, 
+        valid: true 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // All other endpoints require authentication
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -41,7 +107,7 @@ serve(async (req) => {
     // POST /chama-invite/generate - Generate invite codes
     if (req.method === 'POST' && action === 'generate') {
       const body = await req.json();
-      const { chama_id, count = 1, expires_in_days = null } = body;
+      const { chama_id, count = 1, expires_in_days = 1 } = body; // Default to 1 day (24 hours)
 
       if (!chama_id) {
         return new Response(JSON.stringify({ error: 'chama_id is required' }), {
@@ -150,61 +216,6 @@ serve(async (req) => {
       if (error) throw error;
 
       return new Response(JSON.stringify({ data }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // GET /chama-invite/validate/:code - Validate invite code
-    if (req.method === 'GET' && action === 'validate') {
-      const code = url.searchParams.get('code');
-
-      if (!code) {
-        return new Response(JSON.stringify({ error: 'Code is required' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      const { data, error } = await supabaseClient
-        .from('chama_invite_codes')
-        .select(`
-          *,
-          chama (
-            id,
-            name,
-            slug,
-            description,
-            contribution_amount,
-            contribution_frequency
-          )
-        `)
-        .eq('code', code.toUpperCase())
-        .eq('is_active', true)
-        .is('used_by', null)
-        .single();
-
-      if (error || !data) {
-        return new Response(JSON.stringify({ 
-          error: 'Invalid or expired invite code',
-          valid: false 
-        }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Check expiration
-      if (data.expires_at && new Date(data.expires_at) < new Date()) {
-        return new Response(JSON.stringify({ 
-          error: 'Invite code has expired',
-          valid: false 
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      return new Response(JSON.stringify({ data, valid: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

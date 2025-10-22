@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
-import { Users, Loader2, AlertCircle } from "lucide-react";
+import { Users, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 
 interface ChamaInfo {
   id: string;
@@ -21,64 +21,66 @@ interface ChamaInfo {
 const ChamaJoin = () => {
   const navigate = useNavigate();
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const inviteCode = searchParams.get("code");
 
   const [chamaInfo, setChamaInfo] = useState<ChamaInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isJoining, setIsJoining] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isCodeValid, setIsCodeValid] = useState(false);
 
   useEffect(() => {
-    // Load chama details without requiring authentication first
-    loadChama();
-  }, [slug]);
+    if (inviteCode) {
+      validateInviteCode();
+    } else {
+      setErrorMessage("No invite code provided. Please use a valid invite link.");
+      setIsLoading(false);
+    }
+  }, [inviteCode]);
 
-  const loadChama = async () => {
+  const validateInviteCode = async () => {
     setIsLoading(true);
     setErrorMessage("");
 
     try {
-      // Query database directly using RLS policies (public can view active chamas)
-      const { data, error } = await supabase
-        .from('chama')
-        .select(`
-          id,
-          name,
-          slug,
-          description,
-          contribution_amount,
-          contribution_frequency,
-          status,
-          is_public
-        `)
-        .eq('slug', slug)
-        .eq('status', 'active')
-        .eq('is_public', true)
-        .single();
+      const { data, error } = await supabase.functions.invoke(`chama-invite/validate/${inviteCode}`);
 
       if (error) throw error;
 
-      if (!data) {
-        setErrorMessage("Chama not found or is not public");
+      if (!data.valid) {
+        setErrorMessage(data.message || "Invalid invite code");
+        setIsLoading(false);
         return;
       }
 
-      setChamaInfo(data);
+      // Load chama details
+      const chamaData = data.chama;
+      setChamaInfo({
+        id: chamaData.id,
+        name: chamaData.name,
+        slug: chamaData.slug,
+        description: chamaData.description,
+        contribution_amount: chamaData.contribution_amount,
+        contribution_frequency: chamaData.contribution_frequency,
+      });
+      setIsCodeValid(true);
     } catch (error: any) {
-      console.error('Error loading chama:', error);
-      setErrorMessage(error.message || "Failed to load chama details");
+      console.error('Error validating invite code:', error);
+      setErrorMessage(error.message || "Failed to validate invite code");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleJoin = async () => {
-    if (!chamaInfo || isJoining) return;
+    if (!chamaInfo || isJoining || !isCodeValid) return;
 
     // Check if user is authenticated before joining
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       // Redirect to auth with return URL
-      navigate("/auth", { state: { returnTo: `/chama/join/${slug}` } });
+      navigate("/auth", { state: { returnTo: `/chama/join/${slug}?code=${inviteCode}` } });
       return;
     }
 
@@ -97,7 +99,10 @@ const ChamaJoin = () => {
       }
 
       const { data, error } = await supabase.functions.invoke("chama-join", {
-        body: { chama_id: chamaInfo.id },
+        body: { 
+          chama_id: chamaInfo.id,
+          invite_code: inviteCode 
+        },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
@@ -109,7 +114,7 @@ const ChamaJoin = () => {
       });
 
       // Navigate to chama detail page to see pending status
-      navigate(`/chama/${chamaInfo.slug}`);
+      navigate(`/chama/${chamaInfo.id}`);
     } catch (error: any) {
       const errorMessage = error.message || "Failed to submit join request";
       
@@ -162,8 +167,15 @@ const ChamaJoin = () => {
               </Alert>
             )}
 
-            {chamaInfo && (
+            {chamaInfo && isCodeValid && (
               <div className="space-y-4">
+                <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800 dark:text-green-200">
+                    Valid invite code! You can now request to join this chama.
+                  </AlertDescription>
+                </Alert>
+
                 <h3 className="font-semibold text-lg">Chama Details</h3>
                 
                 <div className="space-y-3">

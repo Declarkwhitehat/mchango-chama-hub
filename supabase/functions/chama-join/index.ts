@@ -34,13 +34,56 @@ serve(async (req) => {
       });
     }
 
-    // POST /chama-join - Join chama directly (no invite code needed)
+    // POST /chama-join - Join chama using invite code
     if (req.method === 'POST') {
       const body = await req.json();
-      const { chama_id } = body;
+      const { chama_id, invite_code } = body;
 
       if (!chama_id) {
         return new Response(JSON.stringify({ error: 'Chama ID is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!invite_code) {
+        return new Response(JSON.stringify({ error: 'Invite code is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Validate invite code
+      const { data: inviteCodeData, error: codeError } = await supabaseClient
+        .from('chama_invite_codes')
+        .select('id, chama_id, is_active, expires_at, used_by')
+        .eq('code', invite_code)
+        .eq('chama_id', chama_id)
+        .single();
+
+      if (codeError || !inviteCodeData) {
+        return new Response(JSON.stringify({ error: 'Invalid invite code' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!inviteCodeData.is_active) {
+        return new Response(JSON.stringify({ error: 'This invite code is no longer active' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (inviteCodeData.used_by) {
+        return new Response(JSON.stringify({ error: 'This invite code has already been used' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (inviteCodeData.expires_at && new Date(inviteCodeData.expires_at) < new Date()) {
+        return new Response(JSON.stringify({ error: 'This invite code has expired' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -139,7 +182,17 @@ serve(async (req) => {
         throw memberError;
       }
 
-      console.log(`User ${user.id} requested to join chama ${chama_id}`);
+      // Mark invite code as used
+      await supabaseClient
+        .from('chama_invite_codes')
+        .update({
+          is_active: false,
+          used_by: user.id,
+          used_at: new Date().toISOString(),
+        })
+        .eq('id', inviteCodeData.id);
+
+      console.log(`User ${user.id} requested to join chama ${chama_id} using code ${invite_code}`);
 
       return new Response(JSON.stringify({ 
         data: newMember,

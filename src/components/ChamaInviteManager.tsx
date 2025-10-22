@@ -5,8 +5,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Copy, Check, X, Link2, Users } from "lucide-react";
+import { Copy, Check, X, Link2, Users, Plus, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+
+interface InviteCode {
+  id: string;
+  code: string;
+  is_active: boolean;
+  expires_at: string | null;
+  used_by: string | null;
+  used_at: string | null;
+  created_at: string;
+}
 
 interface PendingMember {
   id: string;
@@ -28,11 +38,15 @@ interface ChamaInviteManagerProps {
 
 export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInviteManagerProps) => {
   const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingCodes, setIsLoadingCodes] = useState(false);
 
   useEffect(() => {
     if (isManager) {
       loadPendingMembers();
+      loadInviteCodes();
     }
   }, [chamaId, isManager]);
 
@@ -52,15 +66,96 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
     setPendingMembers(data.data || []);
   };
 
-  const copyInviteLink = async () => {
-    const inviteUrl = `${window.location.origin}/chama/join/${chamaSlug}`;
+  const loadInviteCodes = async () => {
+    setIsLoadingCodes(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    
+    const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    
+    if (error) {
+      console.error("Error loading invite codes:", error);
+    } else {
+      setInviteCodes(data.data || []);
+    }
+    setIsLoadingCodes(false);
+  };
+
+  const generateInviteCode = async () => {
+    setIsGenerating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({
+          title: "Error",
+          description: "Please log in to continue",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("chama-invite/generate", {
+        body: { chama_id: chamaId },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success!",
+        description: "Invite code generated successfully",
+      });
+
+      await loadInviteCodes();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate invite code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyInviteLink = async (code: string) => {
+    const inviteUrl = `${window.location.origin}/chama/join/${chamaSlug}?code=${code}`;
     await navigator.clipboard.writeText(inviteUrl);
-    setCopiedLink(true);
+    setCopiedCode(code);
     toast({
       title: "Copied!",
       description: "Invite link copied to clipboard",
     });
-    setTimeout(() => setCopiedLink(false), 2000);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const deactivateCode = async (codeId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const { error } = await supabase.functions.invoke(`chama-invite/${codeId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Invite code deactivated",
+      });
+
+      await loadInviteCodes();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to deactivate code",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleApproval = async (memberId: string, action: "approve" | "reject") => {
@@ -104,43 +199,119 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
 
   return (
     <div className="space-y-6">
-      {/* Invite Link */}
+      {/* Invite Codes */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
-            Invite Link
-          </CardTitle>
-          <CardDescription>
-            Share this link with people you want to invite to join the Chama
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
-              {`${window.location.origin}/chama/join/${chamaSlug}`}
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="h-5 w-5" />
+                Invite Codes
+              </CardTitle>
+              <CardDescription>
+                Generate and share invite codes with people you want to invite
+              </CardDescription>
             </div>
             <Button
-              onClick={copyInviteLink}
-              variant="outline"
+              onClick={generateInviteCode}
+              disabled={isGenerating}
+              size="sm"
             >
-              {copiedLink ? (
+              {isGenerating ? (
                 <>
-                  <Check className="h-4 w-4 mr-1" />
-                  Copied
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Generating...
                 </>
               ) : (
                 <>
-                  <Copy className="h-4 w-4 mr-1" />
-                  Copy
+                  <Plus className="h-4 w-4 mr-1" />
+                  Generate Code
                 </>
               )}
             </Button>
           </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoadingCodes ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : inviteCodes.length === 0 ? (
+            <Alert>
+              <AlertDescription>
+                No active invite codes. Generate one to start inviting members.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-3">
+              {inviteCodes.map((inviteCode) => (
+                <div
+                  key={inviteCode.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center gap-2">
+                      <code className="font-mono font-bold text-lg">{inviteCode.code}</code>
+                      {inviteCode.used_by && (
+                        <Badge variant="secondary">Used</Badge>
+                      )}
+                      {!inviteCode.is_active && (
+                        <Badge variant="outline">Inactive</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Created: {format(new Date(inviteCode.created_at), "PPp")}
+                    </p>
+                    {inviteCode.expires_at && (
+                      <p className="text-xs text-muted-foreground">
+                        Expires: {format(new Date(inviteCode.expires_at), "PPp")}
+                      </p>
+                    )}
+                    {inviteCode.used_at && (
+                      <p className="text-xs text-muted-foreground">
+                        Used: {format(new Date(inviteCode.used_at), "PPp")}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {inviteCode.is_active && !inviteCode.used_by && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => copyInviteLink(inviteCode.code)}
+                        >
+                          {copiedCode === inviteCode.code ? (
+                            <>
+                              <Check className="h-4 w-4 mr-1" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4 mr-1" />
+                              Copy Link
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => deactivateCode(inviteCode.id)}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Deactivate
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <Alert>
             <Users className="h-4 w-4" />
             <AlertDescription>
-              Anyone with this link can request to join. You'll need to approve their request before they become members.
+              Each code expires after 24 hours and can only be used once. You'll need to approve join requests before members are added.
             </AlertDescription>
           </Alert>
         </CardContent>
