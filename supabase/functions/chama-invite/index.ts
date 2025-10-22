@@ -24,11 +24,18 @@ serve(async (req) => {
       }
     );
     
-    console.log('chama-invite request', { method: req.method, path: req.url, hasAuth: !!authHeader });
-
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
     const action = pathParts[pathParts.length - 1];
+    
+    console.log('chama-invite request', { 
+      method: req.method, 
+      path: req.url,
+      pathname: url.pathname,
+      pathParts,
+      action,
+      hasAuth: !!authHeader 
+    });
 
     // Public endpoint - no auth required for validation
     // GET /chama-invite/validate/:code - Validate invite code
@@ -96,9 +103,11 @@ serve(async (req) => {
     }
 
     // All other endpoints require authentication
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    console.log('Auth check:', { hasUser: !!user, authError: authError?.message });
+    
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized', details: 'Authentication required' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
