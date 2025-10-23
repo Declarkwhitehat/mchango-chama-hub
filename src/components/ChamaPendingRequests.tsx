@@ -16,7 +16,7 @@ interface PendingMember {
     full_name: string;
     email: string;
     phone: string;
-  } | null; // ✅ allow null
+  } | null; // ✅ allow null to avoid runtime crash
 }
 
 interface ChamaPendingRequestsProps {
@@ -87,9 +87,10 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         throw new Error("Not authenticated");
       }
 
-      const { data, error } = await supabase.functions.invoke(chama-join/approve/${memberId}, {
+      // ✅ FIXED: added backticks for template string
+      const { data, error } = await supabase.functions.invoke(`chama-join/approve/${memberId}`, {
         body: { approved },
-        headers: { Authorization: Bearer ${session.access_token} },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (error) throw error;
