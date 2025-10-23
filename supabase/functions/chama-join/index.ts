@@ -26,9 +26,12 @@ serve(async (req) => {
     
     console.log('chama-join request', { method: req.method, hasAuth: !!authHeader });
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const token = authHeader?.replace('Bearer ', '').trim();
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    console.log('Auth check:', { hasUser: !!user, hasToken: !!token, authError: authError?.message });
+    
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized. Please login to join a chama.' }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized. Please login to join a chama.', details: authError?.message }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -179,7 +182,13 @@ serve(async (req) => {
 
       if (memberError) {
         console.error('Error creating member:', memberError);
-        throw memberError;
+        return new Response(JSON.stringify({ 
+          error: 'Failed to create membership', 
+          details: memberError.message 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       // Mark invite code as used
