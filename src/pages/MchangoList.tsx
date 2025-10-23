@@ -42,8 +42,7 @@ const MchangoList = () => {
       let query = supabase
         .from('mchango')
         .select('*')
-        .eq('status', 'active')
-        .eq('is_public', true);
+        .eq('status', 'active');
 
       // Apply sorting
       switch (sortBy) {

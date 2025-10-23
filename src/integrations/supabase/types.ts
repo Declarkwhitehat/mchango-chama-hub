@@ -592,10 +592,10 @@ export type Database = {
           kyc_status: Database["public"]["Enums"]["kyc_status"]
           kyc_submitted_at: string | null
           last_login_at: string | null
-          last_login_ip: unknown | null
+          last_login_ip: unknown
           phone: string
           phone_verified: boolean | null
-          signup_ip: unknown | null
+          signup_ip: unknown
           updated_at: string
         }
         Insert: {
@@ -613,10 +613,10 @@ export type Database = {
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_submitted_at?: string | null
           last_login_at?: string | null
-          last_login_ip?: unknown | null
+          last_login_ip?: unknown
           phone: string
           phone_verified?: boolean | null
-          signup_ip?: unknown | null
+          signup_ip?: unknown
           updated_at?: string
         }
         Update: {
@@ -634,10 +634,10 @@ export type Database = {
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_submitted_at?: string | null
           last_login_at?: string | null
-          last_login_ip?: unknown | null
+          last_login_ip?: unknown
           phone?: string
           phone_verified?: boolean | null
-          signup_ip?: unknown | null
+          signup_ip?: unknown
           updated_at?: string
         }
         Relationships: []
@@ -808,18 +808,12 @@ export type Database = {
         Args: { p_chama_id: string; p_last_payment_date: string }
         Returns: string
       }
-      generate_invite_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_invite_code: { Args: never; Returns: string }
       generate_member_code: {
         Args: { p_chama_id: string; p_order_index: number }
         Returns: string
       }
-      generate_slug: {
-        Args: { title: string }
-        Returns: string
-      }
+      generate_slug: { Args: { title: string }; Returns: string }
       get_member_payout_position: {
         Args: { p_member_id: string }
         Returns: {

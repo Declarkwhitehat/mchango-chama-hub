@@ -44,11 +44,20 @@ const ChamaJoin = () => {
     setErrorMessage("");
 
     try {
-      const { data, error } = await supabase.functions.invoke(`chama-invite/validate/${inviteCode}`);
+      // Call the validate endpoint directly without authentication
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-invite/validate/${inviteCode}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (error) throw error;
+      const data = await response.json();
 
-      if (!data.valid) {
+      if (!response.ok || !data.valid) {
         setErrorMessage(data.message || "Invalid invite code");
         setIsLoading(false);
         return;
