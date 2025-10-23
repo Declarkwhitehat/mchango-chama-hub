@@ -26,19 +26,32 @@ serve(async (req) => {
     
     console.log('chama-join request', { method: req.method, hasAuth: !!authHeader });
 
+    // Only require auth for actual join requests (POST), not for validation
     const token = authHeader?.replace('Bearer ', '').trim();
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    console.log('Auth check:', { hasUser: !!user, hasToken: !!token, authError: authError?.message });
+    let user = null;
     
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized. Please login to join a chama.', details: authError?.message }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (req.method === 'POST' || req.method === 'PUT') {
+      const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
+      console.log('Auth check:', { hasUser: !!authUser, hasToken: !!token, authError: authError?.message });
+      
+      if (!authUser) {
+        return new Response(JSON.stringify({ error: 'Unauthorized. Please login to join a chama.', details: authError?.message }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      user = authUser;
     }
 
     // POST /chama-join - Join chama using invite code
     if (req.method === 'POST') {
+      if (!user) {
+        return new Response(JSON.stringify({ error: 'Authentication required to join chama' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const body = await req.json();
       const { chama_id, invite_code } = body;
 
@@ -214,6 +227,13 @@ serve(async (req) => {
 
     // PUT /chama-join/approve/:member_id - Approve or reject join request
     if (req.method === 'PUT') {
+      if (!user) {
+        return new Response(JSON.stringify({ error: 'Authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const url = new URL(req.url);
       const pathParts = url.pathname.split('/').filter(Boolean);
       const memberId = pathParts[pathParts.length - 1];

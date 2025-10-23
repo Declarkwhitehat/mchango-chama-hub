@@ -102,20 +102,33 @@ serve(async (req) => {
       });
     }
 
-    // All other endpoints require authentication
+    // Endpoints that require authentication
     const token = authHeader?.replace('Bearer ', '').trim();
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    console.log('Auth check:', { hasUser: !!user, hasToken: !!token, authError: authError?.message });
+    let user = null;
     
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized', details: 'Authentication required' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Only check auth for protected endpoints
+    if (req.method !== 'GET' || !pathParts.includes('validate')) {
+      const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
+      console.log('Auth check:', { hasUser: !!authUser, hasToken: !!token, authError: authError?.message });
+      
+      if (!authUser) {
+        return new Response(JSON.stringify({ error: 'Unauthorized', details: 'Authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      user = authUser;
     }
 
     // POST /chama-invite/generate - Generate invite codes
     if (req.method === 'POST' && action === 'generate') {
+      if (!user) {
+        return new Response(JSON.stringify({ error: 'Authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const body = await req.json();
       const { chama_id, count = 1, expires_in_days = 1 } = body; // Default to 1 day (24 hours)
 
