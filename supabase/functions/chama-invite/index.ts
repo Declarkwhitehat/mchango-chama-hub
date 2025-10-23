@@ -103,8 +103,9 @@ serve(async (req) => {
     }
 
     // All other endpoints require authentication
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    console.log('Auth check:', { hasUser: !!user, authError: authError?.message });
+    const token = authHeader?.replace('Bearer ', '').trim();
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    console.log('Auth check:', { hasUser: !!user, hasToken: !!token, authError: authError?.message });
     
     if (!user) {
       return new Response(JSON.stringify({ error: 'Unauthorized', details: 'Authentication required' }), {
