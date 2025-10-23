@@ -16,7 +16,7 @@ interface PendingMember {
     full_name: string;
     email: string;
     phone: string;
-  };
+  } | null; // ✅ allow null
 }
 
 interface ChamaPendingRequestsProps {
@@ -39,7 +39,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
       setLoadingMembers(true);
 
       const { data, error } = await supabase
-        .from('chama_members')
+        .from("chama_members")
         .select(`
           id,
           user_id,
@@ -51,20 +51,18 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
             phone
           )
         `)
-        .eq('chama_id', chamaId)
-        .eq('approval_status', 'pending')
-        .order('joined_at', { ascending: true });
+        .eq("chama_id", chamaId)
+        .eq("approval_status", "pending")
+        .order("joined_at", { ascending: true });
 
       if (error) {
-        console.error('Error loading pending members:', error);
-        // Don't show toast for empty data or new chamas
+        console.error("Error loading pending members:", error);
         setPendingMembers([]);
       } else {
         setPendingMembers(data || []);
       }
     } catch (error: any) {
-      console.error('Error loading pending members:', error);
-      // Don't show toast, just set empty array
+      console.error("Error loading pending members:", error);
       setPendingMembers([]);
     } finally {
       setLoadingMembers(false);
@@ -89,29 +87,25 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         throw new Error("Not authenticated");
       }
 
-      const { data, error } = await supabase.functions.invoke(`chama-join/approve/${memberId}`, {
+      const { data, error } = await supabase.functions.invoke(chama-join/approve/${memberId}, {
         body: { approved },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: Bearer ${session.access_token} },
       });
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: approved 
+        description: approved
           ? "Join request approved! Member has been added to the chama."
           : "Join request rejected.",
       });
 
-      // Reload pending members
       await loadPendingMembers();
-      
-      // Trigger parent update if provided
-      if (onUpdate) {
-        onUpdate();
-      }
+
+      if (onUpdate) onUpdate();
     } catch (error: any) {
-      console.error('Error processing approval:', error);
+      console.error("Error processing approval:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to process request",
@@ -144,73 +138,82 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
           Pending Join Requests
         </CardTitle>
         <CardDescription>
-          {isManager 
-            ? "Review and approve or reject join requests" 
+          {isManager
+            ? "Review and approve or reject join requests"
             : "Join requests awaiting manager approval"}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {pendingMembers.map((member) => (
-            <div key={member.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback>
-                    {member.profiles.full_name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium text-foreground">{member.profiles.full_name}</p>
-                  <p className="text-sm text-muted-foreground">{member.profiles.email}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Requested: {new Date(member.joined_at).toLocaleDateString()}
-                  </p>
+          {pendingMembers.map((member) => {
+            const profile = member.profiles;
+            const fullName = profile?.full_name ?? "Unknown User";
+            const email = profile?.email ?? "No email available";
+
+            return (
+              <div
+                key={member.id}
+                className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar>
+                    <AvatarFallback>
+                      {fullName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium text-foreground">{fullName}</p>
+                    <p className="text-sm text-muted-foreground">{email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Requested: {new Date(member.joined_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {isManager ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => handleApproval(member.id, true)}
+                        disabled={processingId === member.id}
+                      >
+                        {processingId === member.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <UserCheck className="h-4 w-4 mr-1" />
+                            Approve
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleApproval(member.id, false)}
+                        disabled={processingId === member.id}
+                      >
+                        {processingId === member.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <UserX className="h-4 w-4 mr-1" />
+                            Reject
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <Badge variant="secondary">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Pending Approval
+                    </Badge>
+                  )}
                 </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                {isManager ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => handleApproval(member.id, true)}
-                      disabled={processingId === member.id}
-                    >
-                      {processingId === member.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <UserCheck className="h-4 w-4 mr-1" />
-                          Approve
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleApproval(member.id, false)}
-                      disabled={processingId === member.id}
-                    >
-                      {processingId === member.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <UserX className="h-4 w-4 mr-1" />
-                          Reject
-                        </>
-                      )}
-                    </Button>
-                  </>
-                ) : (
-                  <Badge variant="secondary">
-                    <Clock className="h-3 w-3 mr-1" />
-                    Pending Approval
-                  </Badge>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>
