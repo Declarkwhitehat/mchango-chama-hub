@@ -13,14 +13,21 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      authHeader ? {
+      {
         global: {
           headers: { Authorization: authHeader },
         },
-      } : {}
+      }
     );
 
     const { data: { user } } = await supabaseClient.auth.getUser();
@@ -48,7 +55,7 @@ serve(async (req) => {
       .from('chama_members')
       .select(`
         *,
-        profiles (
+        profiles!chama_members_user_id_fkey (
           full_name,
           email,
           phone

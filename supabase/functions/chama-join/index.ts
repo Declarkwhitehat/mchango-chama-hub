@@ -328,7 +328,7 @@ serve(async (req) => {
         .from('chama_members')
         .select(`
           *,
-          profiles (
+          profiles!chama_members_user_id_fkey (
             full_name,
             email,
             phone
