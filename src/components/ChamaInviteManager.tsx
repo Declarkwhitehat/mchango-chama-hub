@@ -122,7 +122,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
   };
 
   const copyInviteLink = async (code: string) => {
-    const inviteUrl = `${window.location.origin}/chama/join/${chamaSlug}?code=${code}`;
+    const inviteUrl = `${window.location.protocol}//${window.location.host}/chama/join/${chamaSlug}?code=${code}`;
     await navigator.clipboard.writeText(inviteUrl);
     setCopiedCode(code);
     toast({
