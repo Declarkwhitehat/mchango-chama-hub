@@ -236,7 +236,25 @@ serve(async (req) => {
 
       const url = new URL(req.url);
       const pathParts = url.pathname.split('/').filter(Boolean);
-      const memberId = pathParts[pathParts.length - 1];
+      
+      // Handle both /chama-join/approve/member_id and /chama-join/member_id patterns
+      let memberId: string;
+      if (pathParts.includes('approve')) {
+        // If 'approve' is in the path, get the part after it
+        const approveIndex = pathParts.indexOf('approve');
+        memberId = pathParts[approveIndex + 1];
+      } else {
+        // Otherwise get the last part
+        memberId = pathParts[pathParts.length - 1];
+      }
+      
+      if (!memberId) {
+        return new Response(JSON.stringify({ error: 'Member ID is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const body = await req.json();
       const { approved } = body; // boolean: true for approve, false for reject
 
