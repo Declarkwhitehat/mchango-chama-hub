@@ -87,8 +87,8 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         throw new Error("Not authenticated");
       }
 
-      // ✅ FIXED: added backticks for template string
       const { data, error } = await supabase.functions.invoke(`chama-join/approve/${memberId}`, {
+        method: 'PUT',
         body: { approved },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
