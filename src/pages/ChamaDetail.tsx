@@ -54,6 +54,7 @@ const ChamaDetail = () => {
   const [currentTurnMemberId, setCurrentTurnMemberId] = useState<string | null>(null);
   const [nextTurnDates, setNextTurnDates] = useState<Record<string, Date>>({});
   const [totalContributions, setTotalContributions] = useState<number>(0);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadChama();
@@ -69,11 +70,23 @@ const ChamaDetail = () => {
 
       // Check current user's membership
       const { data: { user } } = await supabase.auth.getUser();
-      if (user && data.data.chama_members) {
-        const membership = data.data.chama_members.find(
-          (m: any) => m.user_id === user.id
-        );
-        setCurrentUserMembership(membership);
+      if (user) {
+        // Check if user is admin
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        
+        setIsAdmin(!!roleData);
+
+        if (data.data.chama_members) {
+          const membership = data.data.chama_members.find(
+            (m: any) => m.user_id === user.id
+          );
+          setCurrentUserMembership(membership);
+        }
       }
 
       // Fetch actual contributions total
@@ -188,6 +201,7 @@ const ChamaDetail = () => {
   const isMember = currentUserMembership?.approval_status === 'approved';
   const isPending = currentUserMembership?.approval_status === 'pending';
   const isMyTurn = currentUserMembership?.id === currentTurnMemberId;
+  const hasViewAccess = isAdmin || isMember; // Admins can view without being members
 
   return (
     <Layout showBackButton>
@@ -230,8 +244,8 @@ const ChamaDetail = () => {
           </CardContent>
         </Card>
 
-        {/* Commission Display - Visible to all approved members */}
-        {isMember && (
+        {/* Commission Display - Visible to all approved members and admins */}
+        {hasViewAccess && (
           <CommissionDisplay 
             totalCollected={totalContributions}
             commissionRate={chama.commission_rate || 0.05}
@@ -245,8 +259,8 @@ const ChamaDetail = () => {
           <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
         )}
 
-        {/* Pending Join Requests - Visible to all members */}
-        {isMember && (
+        {/* Pending Join Requests - Visible to all members and admins */}
+        {hasViewAccess && (
           <ChamaPendingRequests 
             chamaId={chama.id} 
             isManager={isManager} 
@@ -296,13 +310,13 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Withdrawal History - Visible to all approved members */}
-        {isMember && (
+        {/* Withdrawal History - Visible to all approved members and admins */}
+        {hasViewAccess && (
           <WithdrawalHistory chamaId={chama.id} />
         )}
 
-        {/* Tabs - Only visible to approved members */}
-        {isMember && (
+        {/* Tabs - Only visible to approved members and admins */}
+        {hasViewAccess && (
           <Tabs defaultValue="dashboard" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
@@ -403,7 +417,7 @@ const ChamaDetail = () => {
         )}
 
         {/* Non-member view */}
-        {!isMember && !isPending && (
+        {!hasViewAccess && !isPending && (
           <Card>
             <CardContent className="pt-6">
               <p className="text-center text-muted-foreground">
