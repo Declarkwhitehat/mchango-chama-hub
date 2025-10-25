@@ -26,6 +26,7 @@ serve(async (req) => {
     
     console.log('chama-join request', { method: req.method, hasAuth: !!authHeader });
 
+    // Only require auth for actual join requests (POST), not for validation
     const token = authHeader?.replace('Bearer ', '').trim();
     let user = null;
     
@@ -42,7 +43,7 @@ serve(async (req) => {
       user = authUser;
     }
 
-    // ✅ FIX: Safe JSON parsing added below (POST)
+    // POST /chama-join - Join chama using invite code
     if (req.method === 'POST') {
       if (!user) {
         return new Response(JSON.stringify({ error: 'Authentication required to join chama' }), {
@@ -51,16 +52,7 @@ serve(async (req) => {
         });
       }
 
-      let body;
-      try {
-        body = await req.json();
-      } catch {
-        return new Response(JSON.stringify({ error: 'Invalid or missing JSON body' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
+      const body = await req.json();
       const { chama_id, invite_code } = body;
 
       if (!chama_id) {
@@ -77,7 +69,7 @@ serve(async (req) => {
         });
       }
 
-      // Your original logic (unchanged)
+      // Validate invite code
       const { data: inviteCodeData, error: codeError } = await supabaseClient
         .from('chama_invite_codes')
         .select('id, chama_id, is_active, expires_at, used_by')
@@ -113,6 +105,7 @@ serve(async (req) => {
         });
       }
 
+      // Verify chama exists and is public/active
       const { data: chama, error: chamaError } = await supabaseClient
         .from('chama')
         .select('id, name, is_public, status')
@@ -133,6 +126,7 @@ serve(async (req) => {
         });
       }
 
+      // Check if user is already a member
       const { data: existingMember } = await supabaseClient
         .from('chama_members')
         .select('id, status, approval_status')
@@ -142,19 +136,27 @@ serve(async (req) => {
 
       if (existingMember) {
         if (existingMember.approval_status === 'pending') {
-          return new Response(JSON.stringify({ error: 'You already have a pending join request for this chama' }), {
+          return new Response(JSON.stringify({ 
+            error: 'You already have a pending join request for this chama' 
+          }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         if (existingMember.approval_status === 'approved') {
-          return new Response(JSON.stringify({ error: 'You are already a member of this chama' }), {
+          return new Response(JSON.stringify({ 
+            error: 'You are already a member of this chama' 
+          }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
       }
 
+      // Get next order_index - STRICTLY based on join date order
+      // Order index determines payout position and is automatically assigned
+      // IMPORTANT: Once assigned, order_index CANNOT be modified by anyone (enforced by database trigger)
+      // This ensures fair, transparent payout order based solely on when members joined
       const { data: members } = await supabaseClient
         .from('chama_members')
         .select('order_index, joined_at')
@@ -163,16 +165,20 @@ serve(async (req) => {
         .order('order_index', { ascending: false })
         .limit(1);
 
+      // Calculate next sequential order index
+      // Creator has order_index = 1, subsequent members get 2, 3, 4, etc.
       const nextOrderIndex = members && members.length > 0 
         ? (members[0].order_index || 0) + 1 
-        : 2;
+        : 2; // Start at 2 (creator is always 1)
 
+      // Generate member code
       const { data: memberCodeData } = await supabaseClient
         .rpc('generate_member_code', { 
           p_chama_id: chama_id,
           p_order_index: nextOrderIndex 
         });
 
+      // Create pending membership
       const { data: newMember, error: memberError } = await supabaseClient
         .from('chama_members')
         .insert({
@@ -198,6 +204,7 @@ serve(async (req) => {
         });
       }
 
+      // Mark invite code as used
       await supabaseClient
         .from('chama_invite_codes')
         .update({
@@ -218,7 +225,7 @@ serve(async (req) => {
       });
     }
 
-    // ✅ FIX: Safe JSON parsing added below (PUT)
+    // PUT /chama-join/approve/:member_id - Approve or reject join request
     if (req.method === 'PUT') {
       if (!user) {
         return new Response(JSON.stringify({ error: 'Authentication required' }), {
@@ -229,14 +236,18 @@ serve(async (req) => {
 
       const url = new URL(req.url);
       const pathParts = url.pathname.split('/').filter(Boolean);
+      
+      // Handle both /chama-join/approve/member_id and /chama-join/member_id patterns
       let memberId: string;
       if (pathParts.includes('approve')) {
+        // If 'approve' is in the path, get the part after it
         const approveIndex = pathParts.indexOf('approve');
         memberId = pathParts[approveIndex + 1];
       } else {
+        // Otherwise get the last part
         memberId = pathParts[pathParts.length - 1];
       }
-
+      
       if (!memberId) {
         return new Response(JSON.stringify({ error: 'Member ID is required' }), {
           status: 400,
@@ -244,17 +255,8 @@ serve(async (req) => {
         });
       }
 
-      let body;
-      try {
-        body = await req.json();
-      } catch {
-        return new Response(JSON.stringify({ error: 'Invalid or missing JSON body' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      const { approved } = body;
+      const body = await req.json();
+      const { approved } = body; // boolean: true for approve, false for reject
 
       if (typeof approved !== 'boolean') {
         return new Response(JSON.stringify({ error: 'approved must be a boolean (true or false)' }), {
@@ -263,6 +265,7 @@ serve(async (req) => {
         });
       }
 
+      // Get member details
       const { data: member, error: memberFetchError } = await supabaseClient
         .from('chama_members')
         .select('chama_id, approval_status, user_id')
@@ -276,6 +279,7 @@ serve(async (req) => {
         });
       }
 
+      // Check if requester is manager
       const { data: requesterMembership } = await supabaseClient
         .from('chama_members')
         .select('is_manager')
@@ -291,6 +295,7 @@ serve(async (req) => {
         });
       }
 
+      // Update approval status
       const newStatus = approved ? 'approved' : 'rejected';
       const { data, error } = await supabaseClient
         .from('chama_members')
@@ -313,7 +318,7 @@ serve(async (req) => {
       });
     }
 
-    // GET /chama-join/pending/:chama_id
+    // GET /chama-join/pending/:chama_id - Get pending join requests
     if (req.method === 'GET') {
       const url = new URL(req.url);
       const pathParts = url.pathname.split('/').filter(Boolean);
