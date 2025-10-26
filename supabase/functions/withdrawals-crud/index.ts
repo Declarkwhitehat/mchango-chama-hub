@@ -216,8 +216,8 @@ serve(async (req) => {
         .from('withdrawals')
         .select(`
           *,
-          requester:requested_by(full_name, email),
-          reviewer:reviewed_by(full_name, email)
+          requester:profiles!withdrawals_requested_by_fkey(full_name, email),
+          reviewer:profiles!withdrawals_reviewed_by_fkey(full_name, email)
         `)
         .order('created_at', { ascending: false });
 

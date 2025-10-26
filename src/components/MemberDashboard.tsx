@@ -52,7 +52,9 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('member-dashboard');
+      const { data, error } = await supabase.functions.invoke(`member-dashboard?chama_id=${chamaId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
 
       if (error) {
         console.error("Dashboard error:", error);

@@ -43,12 +43,22 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
 
   const loadWithdrawals = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.log("No session found for withdrawals");
+        setIsLoading(false);
+        return;
+      }
+
       const params = new URLSearchParams();
       if (chamaId) params.append('chama_id', chamaId);
       if (mchangoId) params.append('mchango_id', mchangoId);
 
       const { data, error } = await supabase.functions.invoke(
-        `withdrawals-crud?${params.toString()}`
+        `withdrawals-crud?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        }
       );
 
       if (error) {

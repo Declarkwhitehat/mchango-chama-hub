@@ -114,9 +114,13 @@ serve(async (req) => {
     }
 
     // Calculate payout position
-    const { data: payoutPosition } = await supabaseClient
+    const { data: payoutPosition, error: payoutError } = await supabaseClient
       .rpc('get_member_payout_position', { p_member_id: member.id })
       .single();
+    
+    if (payoutError) {
+      console.error('Error fetching payout position:', payoutError);
+    }
 
     // Get all approved members count
     const { count: memberCount } = await supabaseClient

@@ -46,7 +46,15 @@ export const WithdrawalsManagement = () => {
 
   const loadWithdrawals = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('withdrawals-crud');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error("No session found");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('withdrawals-crud', {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
 
       if (error) throw error;
 
@@ -76,6 +84,16 @@ export const WithdrawalsManagement = () => {
     setIsProcessing(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in as admin",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error } = await supabase.functions.invoke(
         `withdrawals-crud/${selectedWithdrawal.id}`,
         {
@@ -84,6 +102,7 @@ export const WithdrawalsManagement = () => {
             payment_reference: paymentReference,
           },
           method: 'PATCH',
+          headers: { Authorization: `Bearer ${session.access_token}` }
         }
       );
 
@@ -121,6 +140,16 @@ export const WithdrawalsManagement = () => {
     setIsProcessing(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in as admin",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error } = await supabase.functions.invoke(
         `withdrawals-crud/${selectedWithdrawal.id}`,
         {
@@ -129,6 +158,7 @@ export const WithdrawalsManagement = () => {
             rejection_reason: rejectionReason,
           },
           method: 'PATCH',
+          headers: { Authorization: `Bearer ${session.access_token}` }
         }
       );
 
