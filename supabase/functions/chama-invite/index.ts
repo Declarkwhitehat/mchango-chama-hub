@@ -243,20 +243,18 @@ serve(async (req) => {
       });
     }
 
-    // DELETE /chama-invite/:id - Deactivate invite code
+    // DELETE /chama-invite/:id - Delete invite code
     if (req.method === 'DELETE') {
       const codeId = pathParts[pathParts.length - 1];
 
-      const { data, error } = await supabaseClient
+      const { error } = await supabaseClient
         .from('chama_invite_codes')
-        .update({ is_active: false })
-        .eq('id', codeId)
-        .select()
-        .single();
+        .delete()
+        .eq('id', codeId);
 
       if (error) throw error;
 
-      return new Response(JSON.stringify({ data }), {
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

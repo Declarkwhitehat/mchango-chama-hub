@@ -52,7 +52,17 @@ serve(async (req) => {
         });
       }
 
-      const body = await req.json();
+      let body;
+      try {
+        const text = await req.text();
+        body = text ? JSON.parse(text) : {};
+      } catch (e) {
+        return new Response(JSON.stringify({ error: 'Invalid request body' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       const { chama_id, invite_code } = body;
 
       if (!chama_id) {

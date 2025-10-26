@@ -132,7 +132,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const deactivateCode = async (codeId: string) => {
+  const deleteCode = async (codeId: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
@@ -146,14 +146,14 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
 
       toast({
         title: "Success",
-        description: "Invite code deactivated",
+        description: "Invite code deleted",
       });
 
       await loadInviteCodes();
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to deactivate code",
+        description: error.message || "Failed to delete code",
         variant: "destructive",
       });
     }
@@ -245,7 +245,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
             </Alert>
           ) : (
             <div className="space-y-3">
-              {inviteCodes.map((inviteCode) => (
+              {inviteCodes.filter(code => code.is_active && !code.used_by).map((inviteCode) => (
                 <div
                   key={inviteCode.id}
                   className="flex items-center justify-between p-4 border rounded-lg"
@@ -253,12 +253,6 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2">
                       <code className="font-mono font-bold text-lg">{inviteCode.code}</code>
-                      {inviteCode.used_by && (
-                        <Badge variant="secondary">Used</Badge>
-                      )}
-                      {!inviteCode.is_active && (
-                        <Badge variant="outline">Inactive</Badge>
-                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Created: {format(new Date(inviteCode.created_at), "PPp")}
@@ -268,42 +262,33 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
                         Expires: {format(new Date(inviteCode.expires_at), "PPp")}
                       </p>
                     )}
-                    {inviteCode.used_at && (
-                      <p className="text-xs text-muted-foreground">
-                        Used: {format(new Date(inviteCode.used_at), "PPp")}
-                      </p>
-                    )}
                   </div>
                   <div className="flex gap-2">
-                    {inviteCode.is_active && !inviteCode.used_by && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => copyInviteLink(inviteCode.code)}
-                        >
-                          {copiedCode === inviteCode.code ? (
-                            <>
-                              <Check className="h-4 w-4 mr-1" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4 mr-1" />
-                              Copy Link
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => deactivateCode(inviteCode.id)}
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          Deactivate
-                        </Button>
-                      </>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyInviteLink(inviteCode.code)}
+                    >
+                      {copiedCode === inviteCode.code ? (
+                        <>
+                          <Check className="h-4 w-4 mr-1" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy Link
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => deleteCode(inviteCode.id)}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
               ))}

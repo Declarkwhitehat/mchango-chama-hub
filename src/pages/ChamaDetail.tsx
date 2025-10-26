@@ -325,7 +325,16 @@ const ChamaDetail = () => {
             </TabsList>
 
             <TabsContent value="dashboard">
-              <MemberDashboard chamaId={chama.id} />
+              {isMember && <MemberDashboard chamaId={chama.id} />}
+              {isAdmin && !isMember && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-muted-foreground text-center">
+                      Admin view: Join as a member to see member dashboard
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="members">
