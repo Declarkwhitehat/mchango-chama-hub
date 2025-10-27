@@ -7,6 +7,12 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
 };
 
+// UUID validation helper
+const isValidUUID = (uuid: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -67,6 +73,14 @@ serve(async (req) => {
 
       if (!chama_id) {
         return new Response(JSON.stringify({ error: 'Chama ID is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Validate chama_id is a valid UUID
+      if (!isValidUUID(chama_id)) {
+        return new Response(JSON.stringify({ error: 'Invalid chama ID format. Must be a valid UUID.' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -248,18 +262,30 @@ serve(async (req) => {
       const pathParts = url.pathname.split('/').filter(Boolean);
       
       // Handle both /chama-join/approve/member_id and /chama-join/member_id patterns
-      let memberId: string;
+      let memberId: string | undefined;
       if (pathParts.includes('approve')) {
         // If 'approve' is in the path, get the part after it
         const approveIndex = pathParts.indexOf('approve');
         memberId = pathParts[approveIndex + 1];
-      } else {
-        // Otherwise get the last part
+      } else if (pathParts.length >= 2) {
+        // Only get last part if we have at least 2 parts (function-name + id)
         memberId = pathParts[pathParts.length - 1];
       }
       
       if (!memberId) {
-        return new Response(JSON.stringify({ error: 'Member ID is required' }), {
+        return new Response(JSON.stringify({ 
+          error: 'Member ID is required in the URL path. Use: /chama-join/approve/{member_id}' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Validate memberId is a valid UUID
+      if (!isValidUUID(memberId)) {
+        return new Response(JSON.stringify({ 
+          error: 'Invalid member ID format. Must be a valid UUID.' 
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -332,7 +358,28 @@ serve(async (req) => {
     if (req.method === 'GET') {
       const url = new URL(req.url);
       const pathParts = url.pathname.split('/').filter(Boolean);
+      
+      // Ensure we have enough path parts (function-name + pending + chama_id)
+      if (pathParts.length < 3) {
+        return new Response(JSON.stringify({ 
+          error: 'Chama ID is required in the URL path. Use: /chama-join/pending/{chama_id}' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       const chamaId = pathParts[pathParts.length - 1];
+
+      // Validate chamaId is a valid UUID
+      if (!isValidUUID(chamaId)) {
+        return new Response(JSON.stringify({ 
+          error: 'Invalid chama ID format. Must be a valid UUID.' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       const { data, error } = await supabaseClient
         .from('chama_members')
