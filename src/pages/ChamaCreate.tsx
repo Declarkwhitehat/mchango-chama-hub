@@ -68,7 +68,7 @@ const ChamaCreate = () => {
         throw new Error("Form not found");
       }
       const formData = new FormData(form);
-      
+
       const chamaData = {
         name: formData.get("name") as string,
         description: formData.get("description") as string,
@@ -82,9 +82,9 @@ const ChamaCreate = () => {
         whatsapp_link: formData.get("whatsapp_link") as string || null,
       };
 
-      // Supabase SDK automatically handles auth - don't pass Authorization header manually
       const res = await supabase.functions.invoke("chama-crud", {
         body: chamaData,
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (res.error) {

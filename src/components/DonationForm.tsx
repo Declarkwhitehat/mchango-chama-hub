@@ -75,6 +75,11 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
 
       if (donationError) throw donationError;
 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Not authenticated. Please log in.");
+      }
+
       // Initiate M-Pesa STK Push
       const { data: stkResponse, error: stkError } = await supabase.functions.invoke("mpesa-stk-push", {
         body: {
@@ -87,6 +92,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
             mchango_id: mchangoId,
           },
         },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (stkError) throw stkError;

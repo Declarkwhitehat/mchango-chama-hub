@@ -66,9 +66,9 @@ const MchangoCreate = () => {
         end_date: new Date(Date.now() + Number(formData.get("duration")) * 24 * 60 * 60 * 1000).toISOString(),
       };
 
-      // Supabase SDK automatically handles auth - don't pass Authorization header manually
       const res = await supabase.functions.invoke("mchango-crud", {
         body: mchangoData,
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (res.error) {

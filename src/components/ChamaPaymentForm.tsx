@@ -90,6 +90,11 @@ export const ChamaPaymentForm = ({
     setIsLoading(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Not authenticated. Please log in.");
+      }
+
       const paymentData = {
         chama_id: chamaId,
         member_id: targetMemberId,
@@ -102,6 +107,7 @@ export const ChamaPaymentForm = ({
 
       const { data, error } = await supabase.functions.invoke('contributions-crud', {
         body: paymentData,
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (error) throw error;
