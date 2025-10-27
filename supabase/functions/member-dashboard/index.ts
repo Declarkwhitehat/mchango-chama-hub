@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// UUID validation helper
+const isValidUUID = (uuid: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -39,10 +45,33 @@ serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const chamaId = url.searchParams.get('chama_id');
-
+    let chamaId = url.searchParams.get('chama_id');
+    
+    // Also allow passing chama_id in the request body
+    if (!chamaId) {
+      try {
+        const text = await req.text();
+        if (text) {
+          const body = JSON.parse(text);
+          if (body && typeof body.chama_id === 'string') {
+            chamaId = body.chama_id;
+          }
+        }
+      } catch (_e) {
+        // ignore parse errors
+      }
+    }
+    
     if (!chamaId) {
       return new Response(JSON.stringify({ error: 'chama_id is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate UUID format
+    if (!isValidUUID(chamaId)) {
+      return new Response(JSON.stringify({ error: 'Invalid chama_id format. Must be a valid UUID.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

@@ -175,6 +175,46 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+
+        // Reopen previously rejected or inactive request instead of inserting a duplicate
+        const { data: updatedMember, error: updateError } = await supabaseClient
+          .from('chama_members')
+          .update({ approval_status: 'pending' })
+          .eq('chama_id', chama_id)
+          .eq('user_id', user.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error('Error updating existing membership:', updateError);
+          return new Response(JSON.stringify({ 
+            error: 'Failed to update existing join request', 
+            details: updateError.message 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Mark invite code as used
+        await supabaseClient
+          .from('chama_invite_codes')
+          .update({
+            is_active: false,
+            used_by: user.id,
+            used_at: new Date().toISOString(),
+          })
+          .eq('id', inviteCodeData.id);
+
+        console.log(`User ${user.id} re-submitted join request for chama ${chama_id}`);
+
+        return new Response(JSON.stringify({ 
+          data: updatedMember,
+          message: 'Join request re-submitted. Awaiting manager approval.'
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       // Get next order_index - STRICTLY based on join date order
