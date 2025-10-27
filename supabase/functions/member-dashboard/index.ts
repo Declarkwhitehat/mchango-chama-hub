@@ -1,203 +1,161 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from '@supabase/supabase-js';
 
-const corsHeaders = {
+const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// UUID validation helper
-const isValidUUID = (uuid: string): boolean => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(uuid);
+// Simple UUID validator
+const isValidUUID = (s?: string | null) => {
+  if (!s) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 };
 
-serve(async (req) => {
+function jsonResponse(body: any, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+}
+
+export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: CORS_HEADERS });
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Validate environment variables
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || Deno.env.get('VITE_SUPABASE_URL');
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('VITE_SUPABASE_PUBLISHABLE_KEY');
+
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error('member-dashboard: missing SUPABASE_URL or SUPABASE_ANON_KEY');
+      return jsonResponse({
+        success: false,
+        error: 'Server configuration error: missing SUPABASE_URL or SUPABASE_ANON_KEY',
+      }, 500);
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
+    // Extract token (optional) — used for authenticated behavior if needed
+    const authHeader = req.headers.get('Authorization') || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : undefined;
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // Create supabase client — include token in headers if present
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      },
+    });
 
     const url = new URL(req.url);
-    let chamaId = url.searchParams.get('chama_id');
-    
-    // Also allow passing chama_id in the request body
+    // Accept either ?chama_id=... or last path segment as id
+    const queryChamaId = url.searchParams.get('chama_id');
+    const queryMemberId = url.searchParams.get('member_id');
+
+    // also support path like /functions/member-dashboard/<chama_id>
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const lastPart = pathParts.length ? pathParts[pathParts.length - 1] : null;
+
+    const chamaId = isValidUUID(queryChamaId) ? queryChamaId : (isValidUUID(lastPart) ? lastPart : null);
+    const memberId = isValidUUID(queryMemberId) ? queryMemberId : null;
+
     if (!chamaId) {
-      try {
-        const text = await req.text();
-        if (text) {
-          const body = JSON.parse(text);
-          if (body && typeof body.chama_id === 'string') {
-            chamaId = body.chama_id;
-          }
-        }
-      } catch (_e) {
-        // ignore parse errors
+      return jsonResponse({ success: false, error: 'Missing or invalid chama_id. Provide ?chama_id=<uuid> or use path /.../<chama_id>' }, 400);
+    }
+
+    // Fetch chama basic info
+    const { data: chama, error: chamaErr } = await supabase
+      .from('chamas')
+      .select('id, name, created_at, contribution_amount, description')
+      .eq('id', chamaId)
+      .maybeSingle();
+
+    if (chamaErr) {
+      console.error('member-dashboard: error fetching chama', { chamaId, error: chamaErr });
+      return jsonResponse({ success: false, error: 'Database error fetching chama' }, 500);
+    }
+    if (!chama) {
+      return jsonResponse({ success: false, error: 'Chama not found' }, 404);
+    }
+
+    // Members: count and brief info
+    const { data: members, error: membersErr } = await supabase
+      .from('chama_members')
+      .select('id, user_id, joined_at, role, user(full_name, email)')
+      .eq('chama_id', chamaId)
+      .limit(500); // reasonable cap
+
+    if (membersErr) {
+      console.error('member-dashboard: error fetching members', { chamaId, error: membersErr });
+      return jsonResponse({ success: false, error: 'Database error fetching members' }, 500);
+    }
+
+    const membersCount = Array.isArray(members) ? members.length : 0;
+
+    // Recent contributions (last 20)
+    const { data: contributions, error: contribErr } = await supabase
+      .from('contributions')
+      .select('id, member_id, amount, created_at, note, member:chama_member!inner(user_id)')
+      .eq('chama_id', chamaId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (contribErr) {
+      console.error('member-dashboard: error fetching contributions', { chamaId, error: contribErr });
+      return jsonResponse({ success: false, error: 'Database error fetching contributions' }, 500);
+    }
+
+    // Recent withdrawals (last 10)
+    const { data: withdrawals, error: withdrawErr } = await supabase
+      .from('withdrawals')
+      .select('id, member_id, amount, created_at, status, note')
+      .eq('chama_id', chamaId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (withdrawErr) {
+      console.error('member-dashboard: error fetching withdrawals', { chamaId, error: withdrawErr });
+      return jsonResponse({ success: false, error: 'Database error fetching withdrawals' }, 500);
+    }
+
+    // Compute basic totals (safely in-memory for limited rows)
+    // If you want accurate totals for very large tables consider an RPC or aggregate query.
+    let totalContributed = 0;
+    if (Array.isArray(contributions)) {
+      for (const c of contributions) {
+        const amt = typeof c.amount === 'number' ? c.amount : parseFloat(String(c.amount || 0));
+        totalContributed += isNaN(amt) ? 0 : amt;
       }
     }
-    
-    if (!chamaId) {
-      return new Response(JSON.stringify({ error: 'chama_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+
+    let totalWithdrawn = 0;
+    if (Array.isArray(withdrawals)) {
+      for (const w of withdrawals) {
+        const amt = typeof w.amount === 'number' ? w.amount : parseFloat(String(w.amount || 0));
+        totalWithdrawn += isNaN(amt) ? 0 : amt;
+      }
     }
 
-    // Validate UUID format
-    if (!isValidUUID(chamaId)) {
-      return new Response(JSON.stringify({ error: 'Invalid chama_id format. Must be a valid UUID.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log('member-dashboard request', { userId: user.id, chamaId });
-
-    // Get member info
-    const { data: member, error: memberError } = await supabaseClient
-      .from('chama_members')
-      .select(`
-        *,
-        profiles!chama_members_user_id_fkey (
-          full_name,
-          email,
-          phone
-        )
-      `)
-      .eq('chama_id', chamaId)
-      .eq('user_id', user.id)
-      .eq('approval_status', 'approved')
-      .single();
-
-    if (memberError || !member) {
-      return new Response(JSON.stringify({ error: 'Member not found or not approved' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Get chama details
-    const { data: chama, error: chamaError } = await supabaseClient
-      .from('chama')
-      .select('*')
-      .eq('id', chamaId)
-      .single();
-
-    if (chamaError) throw chamaError;
-
-    // Get payment history (contributions)
-    const { data: contributions, error: contribError } = await supabaseClient
-      .from('contributions')
-      .select('*')
-      .eq('chama_id', chamaId)
-      .eq('member_id', member.id)
-      .order('contribution_date', { ascending: false });
-
-    if (contribError) console.error('Error fetching contributions:', contribError);
-
-    // Get current cycle payment status
-    const { data: currentCycle } = await supabaseClient
-      .from('contribution_cycles')
-      .select('*')
-      .eq('chama_id', chamaId)
-      .lte('start_date', new Date().toISOString())
-      .gte('end_date', new Date().toISOString())
-      .single();
-
-    let currentCyclePayment = null;
-    if (currentCycle) {
-      const { data: payment } = await supabaseClient
-        .from('member_cycle_payments')
-        .select('*')
-        .eq('member_id', member.id)
-        .eq('cycle_id', currentCycle.id)
-        .single();
-
-      currentCyclePayment = payment;
-    }
-
-    // Calculate payout position
-    const { data: payoutPosition, error: payoutError } = await supabaseClient
-      .rpc('get_member_payout_position', { p_member_id: member.id })
-      .single();
-    
-    if (payoutError) {
-      console.error('Error fetching payout position:', payoutError);
-    }
-
-    // Get all approved members count
-    const { count: memberCount } = await supabaseClient
-      .from('chama_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('chama_id', chamaId)
-      .eq('approval_status', 'approved');
-
-    const dashboardData = {
-      member: {
-        id: member.id,
-        full_name: member.profiles.full_name,
-        email: member.profiles.email,
-        phone: member.profiles.phone,
-        member_code: member.member_code,
-        joined_at: member.joined_at,
-        order_index: member.order_index,
-        balance_credit: member.balance_credit || 0,
-        balance_deficit: member.balance_deficit || 0,
-        last_payment_date: member.last_payment_date,
-        next_due_date: member.next_due_date,
+    // Response payload
+    const payload = {
+      success: true,
+      data: {
+        chama,
+        membersCount,
+        members: members || [],
+        recentContributions: contributions || [],
+        recentWithdrawals: withdrawals || [],
+        totals: {
+          recentContributed: totalContributed,
+          recentWithdrawn: totalWithdrawn,
+        },
       },
-      chama: {
-        name: chama.name,
-        contribution_amount: chama.contribution_amount,
-        contribution_frequency: chama.contribution_frequency,
-        commission_rate: chama.commission_rate || 0.05,
-        member_count: memberCount || 0,
-      },
-      current_cycle: currentCyclePayment ? {
-        is_paid: currentCyclePayment.is_paid,
-        amount_paid: currentCyclePayment.amount_paid,
-        amount_due: currentCyclePayment.amount_due,
-        paid_at: currentCyclePayment.paid_at,
-      } : null,
-      payment_history: contributions || [],
-      payout_schedule: payoutPosition || null,
     };
 
-    return new Response(JSON.stringify({ data: dashboardData }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
-  } catch (error: any) {
-    console.error('Error in member-dashboard:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse(payload, 200);
+  } catch (err) {
+    console.error('member-dashboard: unexpected error', err);
+    return jsonResponse({ success: false, error: 'Internal server error' }, 500);
   }
-});
+}
