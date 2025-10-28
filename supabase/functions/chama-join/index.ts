@@ -4,7 +4,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
 };
 
 // UUID validation helper
@@ -19,177 +18,198 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') || undefined;
+    // Validate Authorization header upfront
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ 
+        error: 'Missing authorization header',
+        code: 'AUTH_REQUIRED' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: authHeader ? { Authorization: authHeader } : {},
+          headers: { Authorization: authHeader },
         },
       }
     );
-    
-    console.log('chama-join request', { method: req.method, hasAuth: !!authHeader });
 
-    // Only require auth for actual join requests (POST), not for validation
-    const token = authHeader?.replace('Bearer ', '').trim();
-    let user = null;
-    
-    if (req.method === 'POST' || req.method === 'PUT') {
-      const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
-      console.log('Auth check:', { hasUser: !!authUser, hasToken: !!token, authError: authError?.message });
-      
-      if (!authUser) {
-        return new Response(JSON.stringify({ error: 'Unauthorized. Please login to join a chama.', details: authError?.message }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      user = authUser;
+    // Verify authentication for all requests
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid or expired token',
+        code: 'AUTH_INVALID' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // POST /chama-join - Join chama using invite code
+    console.log('chama-join request', { 
+      method: req.method, 
+      userId: user.id,
+      timestamp: new Date().toISOString()
+    });
+
+    // POST /chama-join - Join a chama using invite code
     if (req.method === 'POST') {
-      if (!user) {
-        return new Response(JSON.stringify({ error: 'Authentication required to join chama' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      const body = await req.json();
+      const { invite_code, chama_id } = body;
 
-      let body;
-      try {
-        const text = await req.text();
-        body = text ? JSON.parse(text) : {};
-      } catch (e) {
-        return new Response(JSON.stringify({ error: 'Invalid request body' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      const { chama_id, invite_code } = body;
+      console.log('Join request received:', { invite_code, chama_id, user_id: user.id });
 
-      if (!chama_id) {
-        return new Response(JSON.stringify({ error: 'Chama ID is required' }), {
+      if (!invite_code || !chama_id) {
+        return new Response(JSON.stringify({ 
+          error: 'Missing required fields',
+          details: 'invite_code and chama_id are required' 
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Validate chama_id is a valid UUID
+      // Validate chama_id UUID format
       if (!isValidUUID(chama_id)) {
-        return new Response(JSON.stringify({ error: 'Invalid chama ID format. Must be a valid UUID.' }), {
+        return new Response(JSON.stringify({ 
+          error: 'Invalid chama ID format',
+          details: 'chama_id must be a valid UUID'
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      if (!invite_code) {
-        return new Response(JSON.stringify({ error: 'Invite code is required' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Validate invite code
-      const { data: inviteCodeData, error: codeError } = await supabaseClient
+      // Verify invite code exists and is valid
+      const { data: inviteCode, error: inviteError } = await supabaseClient
         .from('chama_invite_codes')
-        .select('id, chama_id, is_active, expires_at, used_by')
+        .select('*')
         .eq('code', invite_code)
         .eq('chama_id', chama_id)
-        .single();
+        .eq('is_active', true)
+        .maybeSingle();
 
-      if (codeError || !inviteCodeData) {
-        return new Response(JSON.stringify({ error: 'Invalid invite code' }), {
+      if (inviteError || !inviteCode) {
+        console.error('Invite code validation failed:', inviteError);
+        return new Response(JSON.stringify({ 
+          error: 'Invalid or expired invite code',
+          details: 'The invite code you entered is not valid or has expired'
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      if (!inviteCodeData.is_active) {
-        return new Response(JSON.stringify({ error: 'This invite code is no longer active' }), {
+      // Check if invite code was already used
+      if (inviteCode.used_by) {
+        return new Response(JSON.stringify({ 
+          error: 'Invite code already used',
+          details: 'This invite code has already been used by another member'
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      if (inviteCodeData.used_by) {
-        return new Response(JSON.stringify({ error: 'This invite code has already been used' }), {
+      // Check if expired
+      if (inviteCode.expires_at && new Date(inviteCode.expires_at) < new Date()) {
+        return new Response(JSON.stringify({ 
+          error: 'Invite code expired',
+          details: 'This invite code has expired'
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      if (inviteCodeData.expires_at && new Date(inviteCodeData.expires_at) < new Date()) {
-        return new Response(JSON.stringify({ error: 'This invite code has expired' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Verify chama exists and is public/active
+      // Get chama details
       const { data: chama, error: chamaError } = await supabaseClient
         .from('chama')
-        .select('id, name, is_public, status')
+        .select('*')
         .eq('id', chama_id)
-        .single();
+        .maybeSingle();
 
       if (chamaError || !chama) {
-        return new Response(JSON.stringify({ error: 'Chama not found' }), {
+        console.error('Chama lookup failed:', chamaError);
+        return new Response(JSON.stringify({ 
+          error: 'Chama not found',
+          details: 'The chama you are trying to join does not exist'
+        }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      if (!chama.is_public || chama.status !== 'active') {
-        return new Response(JSON.stringify({ error: 'This chama is not accepting new members' }), {
+      // Verify chama is accepting members
+      if (chama.status !== 'active') {
+        return new Response(JSON.stringify({ 
+          error: 'Chama not active',
+          details: 'This chama is not currently accepting new members'
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Check if user is already a member
-      const { data: existingMember } = await supabaseClient
+      // Check for existing membership (prevents duplicates)
+      const { data: existingMember, error: memberCheckError } = await supabaseClient
         .from('chama_members')
-        .select('id, status, approval_status')
+        .select('*')
         .eq('chama_id', chama_id)
         .eq('user_id', user.id)
         .maybeSingle();
 
+      if (memberCheckError) {
+        console.error('Error checking membership:', memberCheckError);
+        return new Response(JSON.stringify({ 
+          error: 'Database error',
+          details: 'Failed to check membership status'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Handle existing memberships
       if (existingMember) {
-        if (existingMember.approval_status === 'pending') {
-          return new Response(JSON.stringify({ 
-            error: 'You already have a pending join request for this chama' 
-          }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
         if (existingMember.approval_status === 'approved') {
           return new Response(JSON.stringify({ 
-            error: 'You are already a member of this chama' 
+            error: 'Already a member',
+            details: 'You are already an approved member of this chama'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } else if (existingMember.approval_status === 'pending') {
+          return new Response(JSON.stringify({ 
+            error: 'Request pending',
+            details: 'Your join request is awaiting manager approval'
           }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-
-        // Reopen previously rejected or inactive request instead of inserting a duplicate
+        
+        // Reopen rejected/inactive request
         const { data: updatedMember, error: updateError } = await supabaseClient
           .from('chama_members')
           .update({ approval_status: 'pending' })
           .eq('chama_id', chama_id)
           .eq('user_id', user.id)
           .select()
-          .single();
+          .maybeSingle();
 
         if (updateError) {
-          console.error('Error updating existing membership:', updateError);
+          console.error('Error updating member status:', updateError);
           return new Response(JSON.stringify({ 
-            error: 'Failed to update existing join request', 
-            details: updateError.message 
+            error: 'Update failed',
+            details: 'Failed to resubmit join request'
           }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -200,40 +220,34 @@ serve(async (req) => {
         await supabaseClient
           .from('chama_invite_codes')
           .update({
-            is_active: false,
             used_by: user.id,
             used_at: new Date().toISOString(),
+            is_active: false,
           })
-          .eq('id', inviteCodeData.id);
-
-        console.log(`User ${user.id} re-submitted join request for chama ${chama_id}`);
+          .eq('id', inviteCode.id);
 
         return new Response(JSON.stringify({ 
-          data: updatedMember,
-          message: 'Join request re-submitted. Awaiting manager approval.'
+          success: true,
+          message: 'Join request submitted successfully',
+          data: updatedMember
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Get next order_index - STRICTLY based on join date order
-      // Order index determines payout position and is automatically assigned
-      // IMPORTANT: Once assigned, order_index CANNOT be modified by anyone (enforced by database trigger)
-      // This ensures fair, transparent payout order based solely on when members joined
+      // Get next order_index
       const { data: members } = await supabaseClient
         .from('chama_members')
-        .select('order_index, joined_at')
+        .select('order_index')
         .eq('chama_id', chama_id)
         .not('order_index', 'is', null)
         .order('order_index', { ascending: false })
         .limit(1);
 
-      // Calculate next sequential order index
-      // Creator has order_index = 1, subsequent members get 2, 3, 4, etc.
       const nextOrderIndex = members && members.length > 0 
         ? (members[0].order_index || 0) + 1 
-        : 2; // Start at 2 (creator is always 1)
+        : 2;
 
       // Generate member code
       const { data: memberCodeData } = await supabaseClient
@@ -255,201 +269,217 @@ serve(async (req) => {
           approval_status: 'pending',
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (memberError) {
         console.error('Error creating member:', memberError);
-        return new Response(JSON.stringify({ 
-          error: 'Failed to create membership', 
-          details: memberError.message 
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        throw memberError;
       }
 
       // Mark invite code as used
       await supabaseClient
         .from('chama_invite_codes')
         .update({
-          is_active: false,
           used_by: user.id,
           used_at: new Date().toISOString(),
+          is_active: false,
         })
-        .eq('id', inviteCodeData.id);
+        .eq('id', inviteCode.id);
 
-      console.log(`User ${user.id} requested to join chama ${chama_id} using code ${invite_code}`);
+      console.log('New member created:', newMember);
 
       return new Response(JSON.stringify({ 
-        data: newMember,
-        message: 'Join request submitted. Awaiting manager approval.' 
+        success: true, 
+        message: 'Join request submitted successfully',
+        data: newMember 
       }), {
         status: 201,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // PUT /chama-join/approve/:member_id - Approve or reject join request
+    // PUT /chama-join - Approve or reject join requests
     if (req.method === 'PUT') {
-      if (!user) {
-        return new Response(JSON.stringify({ error: 'Authentication required' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      const body = await req.json();
+      const { member_id, approved, action } = body;
 
-      const url = new URL(req.url);
-      const pathParts = url.pathname.split('/').filter(Boolean);
-      
-      // Handle both /chama-join/approve/member_id and /chama-join/member_id patterns
-      let memberId: string | undefined;
-      if (pathParts.includes('approve')) {
-        // If 'approve' is in the path, get the part after it
-        const approveIndex = pathParts.indexOf('approve');
-        memberId = pathParts[approveIndex + 1];
-      } else if (pathParts.length >= 2) {
-        // Only get last part if we have at least 2 parts (function-name + id)
-        memberId = pathParts[pathParts.length - 1];
-      }
-      
+      // Support both member_id and action parameters
+      const memberId = member_id;
+      const isApproved = approved !== undefined ? approved : action === 'approve';
+
       if (!memberId) {
         return new Response(JSON.stringify({ 
-          error: 'Member ID is required in the URL path. Use: /chama-join/approve/{member_id}' 
+          error: 'Missing member_id',
+          details: 'member_id is required'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Validate memberId is a valid UUID
       if (!isValidUUID(memberId)) {
         return new Response(JSON.stringify({ 
-          error: 'Invalid member ID format. Must be a valid UUID.' 
+          error: 'Invalid member ID format',
+          details: 'member_id must be a valid UUID'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const body = await req.json();
-      const { approved } = body; // boolean: true for approve, false for reject
-
-      if (typeof approved !== 'boolean') {
-        return new Response(JSON.stringify({ error: 'approved must be a boolean (true or false)' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      console.log('Approval request:', { memberId, approved: isApproved });
 
       // Get member details
-      const { data: member, error: memberFetchError } = await supabaseClient
+      const { data: member, error: memberError } = await supabaseClient
         .from('chama_members')
-        .select('chama_id, approval_status, user_id')
+        .select('*, chama!inner(*)')
         .eq('id', memberId)
-        .single();
+        .maybeSingle();
 
-      if (memberFetchError || !member) {
-        return new Response(JSON.stringify({ error: 'Member not found' }), {
+      if (memberError || !member) {
+        console.error('Member lookup failed:', memberError);
+        return new Response(JSON.stringify({ 
+          error: 'Member not found',
+          details: 'The member you are trying to approve does not exist'
+        }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Check if requester is manager
-      const { data: requesterMembership } = await supabaseClient
+      // Verify requester has manager permissions
+      const { data: requesterMember, error: requesterError } = await supabaseClient
         .from('chama_members')
         .select('is_manager')
         .eq('chama_id', member.chama_id)
         .eq('user_id', user.id)
-        .eq('approval_status', 'approved')
-        .single();
+        .maybeSingle();
 
-      if (!requesterMembership || !requesterMembership.is_manager) {
-        return new Response(JSON.stringify({ error: 'Only managers can approve or reject join requests' }), {
+      if (requesterError || !requesterMember?.is_manager) {
+        console.error('Manager check failed:', requesterError);
+        return new Response(JSON.stringify({ 
+          error: 'Access denied',
+          details: 'Only chama managers can approve join requests'
+        }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Update approval status
-      const newStatus = approved ? 'approved' : 'rejected';
-      const { data, error } = await supabaseClient
+      // Update membership status
+      const { data: updatedMember, error: updateError } = await supabaseClient
         .from('chama_members')
-        .update({ approval_status: newStatus })
+        .update({
+          approval_status: isApproved ? 'approved' : 'rejected',
+          status: isApproved ? 'active' : 'inactive',
+        })
         .eq('id', memberId)
         .select()
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (updateError) {
+        console.error('Update failed:', updateError);
+        throw updateError;
+      }
 
-      console.log(`Member ${memberId} ${newStatus} by manager ${user.id}`);
+      console.log('Member status updated:', updatedMember);
 
       return new Response(JSON.stringify({ 
-        data,
-        message: approved 
-          ? 'Join request approved! Member has been added to the chama.' 
-          : 'Join request rejected.' 
+        success: true,
+        message: `Member ${isApproved ? 'approved' : 'rejected'} successfully`,
+        data: updatedMember 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // GET /chama-join/pending/:chama_id - Get pending join requests
+    // GET /chama-join - Get pending join requests
     if (req.method === 'GET') {
-      const url = new URL(req.url);
-      const pathParts = url.pathname.split('/').filter(Boolean);
-      
-      // Ensure we have enough path parts (function-name + pending + chama_id)
-      if (pathParts.length < 3) {
-        return new Response(JSON.stringify({ 
-          error: 'Chama ID is required in the URL path. Use: /chama-join/pending/{chama_id}' 
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      const chamaId = pathParts[pathParts.length - 1];
+      const body = await req.json().catch(() => ({}));
+      const { chama_id } = body;
 
-      // Validate chamaId is a valid UUID
-      if (!isValidUUID(chamaId)) {
+      if (!chama_id) {
         return new Response(JSON.stringify({ 
-          error: 'Invalid chama ID format. Must be a valid UUID.' 
+          error: 'Missing chama_id',
+          details: 'chama_id is required'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const { data, error } = await supabaseClient
+      if (!isValidUUID(chama_id)) {
+        return new Response(JSON.stringify({ 
+          error: 'Invalid chama ID format',
+          details: 'chama_id must be a valid UUID'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log('Fetching pending requests for chama:', chama_id);
+
+      // Verify requester has manager permissions
+      const { data: requesterMember, error: requesterError } = await supabaseClient
+        .from('chama_members')
+        .select('is_manager')
+        .eq('chama_id', chama_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (requesterError || !requesterMember?.is_manager) {
+        return new Response(JSON.stringify({ 
+          error: 'Access denied',
+          details: 'Only chama managers can view pending requests'
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Fetch pending join requests
+      const { data: pendingMembers, error: pendingError } = await supabaseClient
         .from('chama_members')
         .select(`
           *,
-          profiles!chama_members_user_id_fkey (
+          profiles:user_id (
             full_name,
             email,
             phone
           )
         `)
-        .eq('chama_id', chamaId)
+        .eq('chama_id', chama_id)
         .eq('approval_status', 'pending')
         .order('joined_at', { ascending: true });
 
-      if (error) throw error;
+      if (pendingError) {
+        console.error('Failed to fetch pending members:', pendingError);
+        throw pendingError;
+      }
 
-      return new Response(JSON.stringify({ data }), {
+      return new Response(JSON.stringify({ 
+        success: true,
+        data: pendingMembers 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+    return new Response(JSON.stringify({ 
+      error: 'Method not allowed',
+      details: 'Only GET, POST, and PUT methods are supported'
+    }), {
       status: 405,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
     console.error('Error in chama-join:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message || 'Internal server error',
+      code: 'CHAMA_JOIN_ERROR'
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

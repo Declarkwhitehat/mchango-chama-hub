@@ -53,6 +53,7 @@ export const WithdrawalsManagement = () => {
       }
 
       const { data, error } = await supabase.functions.invoke('withdrawals-crud', {
+        method: 'GET',
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
 
@@ -94,17 +95,15 @@ export const WithdrawalsManagement = () => {
         return;
       }
 
-      const { error } = await supabase.functions.invoke(
-        `withdrawals-crud/${selectedWithdrawal.id}`,
-        {
-          body: {
-            status: 'completed',
-            payment_reference: paymentReference,
-          },
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        }
-      );
+      const { error } = await supabase.functions.invoke('withdrawals-crud', {
+        method: 'PATCH',
+        body: {
+          withdrawal_id: selectedWithdrawal.id,
+          status: 'completed',
+          payment_reference: paymentReference,
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
 
       if (error) throw error;
 
@@ -150,17 +149,15 @@ export const WithdrawalsManagement = () => {
         return;
       }
 
-      const { error } = await supabase.functions.invoke(
-        `withdrawals-crud/${selectedWithdrawal.id}`,
-        {
-          body: {
-            status: 'rejected',
-            rejection_reason: rejectionReason,
-          },
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        }
-      );
+      const { error } = await supabase.functions.invoke('withdrawals-crud', {
+        method: 'PATCH',
+        body: {
+          withdrawal_id: selectedWithdrawal.id,
+          status: 'rejected',
+          rejection_reason: rejectionReason,
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
 
       if (error) throw error;
 

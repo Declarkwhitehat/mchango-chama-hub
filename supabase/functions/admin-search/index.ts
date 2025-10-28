@@ -47,7 +47,22 @@ serve(async (req) => {
     }
 
     const { query, type } = await req.json();
-    console.log('Admin search:', { query, type });
+    
+    // Sanitize and validate input
+    const sanitizedQuery = (query || '').trim().substring(0, 100);
+    const searchType = type || 'all';
+    
+    console.log('Admin search:', { query: sanitizedQuery, type: searchType });
+
+    if (!sanitizedQuery) {
+      return new Response(JSON.stringify({ 
+        error: 'Search query required',
+        details: 'Please provide a search term'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const results: any = {
       users: [],
@@ -57,26 +72,26 @@ serve(async (req) => {
       transactions: [],
     };
 
-    // Search users
-    if (type === 'all' || type === 'user' || type === 'email' || type === 'phone') {
+    // Search users (limit 50 results)
+    if (searchType === 'all' || searchType === 'user' || searchType === 'email' || searchType === 'phone') {
       const userQuery = supabaseClient
         .from('profiles')
         .select('*');
 
-      if (type === 'email') {
-        userQuery.ilike('email', `%${query}%`);
-      } else if (type === 'phone') {
-        userQuery.ilike('phone', `%${query}%`);
+      if (searchType === 'email') {
+        userQuery.ilike('email', `%${sanitizedQuery}%`);
+      } else if (searchType === 'phone') {
+        userQuery.ilike('phone', `%${sanitizedQuery}%`);
       } else {
-        userQuery.or(`full_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%,id_number.ilike.%${query}%`);
+        userQuery.or(`full_name.ilike.%${sanitizedQuery}%,email.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%,id_number.ilike.%${sanitizedQuery}%`);
       }
 
-      const { data: users } = await userQuery.limit(20);
+      const { data: users } = await userQuery.limit(50);
       results.users = users || [];
     }
 
-    // Search member codes
-    if (type === 'all' || type === 'member_code') {
+    // Search member codes (limit 50)
+    if (searchType === 'all' || searchType === 'member_code') {
       const { data: members } = await supabaseClient
         .from('chama_members')
         .select(`
@@ -84,55 +99,58 @@ serve(async (req) => {
           profiles (full_name, email),
           chama (name, slug)
         `)
-        .ilike('member_code', `%${query}%`)
-        .limit(20);
+        .ilike('member_code', `%${sanitizedQuery}%`)
+        .limit(50);
 
       results.members = members || [];
     }
 
-    // Search mchango slugs
-    if (type === 'all' || type === 'mchango_slug') {
+    // Search mchango slugs (limit 50)
+    if (searchType === 'all' || searchType === 'mchango_slug') {
       const { data: mchangos } = await supabaseClient
         .from('mchango')
         .select(`
           *,
           profiles:created_by (full_name, email)
         `)
-        .or(`slug.ilike.%${query}%,title.ilike.%${query}%`)
-        .limit(20);
+        .or(`slug.ilike.%${sanitizedQuery}%,title.ilike.%${sanitizedQuery}%`)
+        .limit(50);
 
       results.mchangos = mchangos || [];
     }
 
-    // Search chama slugs
-    if (type === 'all') {
+    // Search chama slugs (limit 50)
+    if (searchType === 'all') {
       const { data: chamas } = await supabaseClient
         .from('chama')
         .select(`
           *,
           profiles:created_by (full_name, email)
         `)
-        .or(`slug.ilike.%${query}%,name.ilike.%${query}%`)
-        .limit(20);
+        .or(`slug.ilike.%${sanitizedQuery}%,name.ilike.%${sanitizedQuery}%`)
+        .limit(50);
 
       results.chamas = chamas || [];
     }
 
-    // Search transactions by ID
-    if (type === 'all' || type === 'transaction_id') {
+    // Search transactions by ID (limit 50)
+    if (searchType === 'all' || searchType === 'transaction_id') {
       const { data: transactions } = await supabaseClient
         .from('transactions')
         .select(`
           *,
           profiles (full_name, email)
         `)
-        .or(`id.eq.${query},payment_reference.ilike.%${query}%`)
-        .limit(20);
+        .or(`id.eq.${sanitizedQuery},payment_reference.ilike.%${sanitizedQuery}%`)
+        .limit(50);
 
       results.transactions = transactions || [];
     }
 
-    return new Response(JSON.stringify({ data: results }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      data: results 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

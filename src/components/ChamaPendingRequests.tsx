@@ -87,9 +87,12 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         throw new Error("Not authenticated");
       }
 
-      const { data, error } = await supabase.functions.invoke(`chama-join/approve/${memberId}`, {
+      const { data, error } = await supabase.functions.invoke('chama-join', {
         method: 'PUT',
-        body: { approved },
+        body: { 
+          member_id: memberId,
+          approved: approved
+        },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 

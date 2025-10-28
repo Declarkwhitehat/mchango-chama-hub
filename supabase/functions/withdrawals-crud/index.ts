@@ -39,10 +39,9 @@ serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const withdrawalId = url.pathname.split('/').pop();
 
     // POST / - Create withdrawal request
-    if (req.method === 'POST' && !withdrawalId) {
+    if (req.method === 'POST') {
       const body = await req.json();
       const { chama_id, mchango_id, amount, notes } = body;
 
@@ -208,7 +207,7 @@ serve(async (req) => {
     }
 
     // GET / - List withdrawals
-    if (req.method === 'GET' && !withdrawalId) {
+    if (req.method === 'GET') {
       const chamaId = url.searchParams.get('chama_id');
       const mchangoId = url.searchParams.get('mchango_id');
 
@@ -236,12 +235,22 @@ serve(async (req) => {
       });
     }
 
-    // PATCH /:id - Admin approval/rejection
-    if (req.method === 'PATCH' && withdrawalId) {
+    // PATCH / - Admin approval/rejection
+    if (req.method === 'PATCH') {
       const body = await req.json();
-      const { status, rejection_reason, payment_reference } = body;
+      const { withdrawal_id, status, rejection_reason, payment_reference } = body;
 
-      console.log('Updating withdrawal status:', { withdrawalId, status });
+      if (!withdrawal_id) {
+        return new Response(JSON.stringify({ 
+          error: 'Missing withdrawal_id',
+          details: 'withdrawal_id is required'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log('Updating withdrawal status:', { withdrawal_id, status });
 
       // Verify admin role
       const { data: adminRole } = await supabaseClient
@@ -267,9 +276,9 @@ serve(async (req) => {
           rejection_reason: status === 'rejected' ? rejection_reason : null,
           payment_reference: status === 'completed' ? payment_reference : null,
         })
-        .eq('id', withdrawalId)
+        .eq('id', withdrawal_id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 

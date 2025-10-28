@@ -54,7 +54,9 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return;
     
-    const { data, error } = await supabase.functions.invoke(`chama-join/pending/${chamaId}`, {
+    const { data, error } = await supabase.functions.invoke('chama-join', {
+      method: 'GET',
+      body: { chama_id: chamaId },
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
     
@@ -171,9 +173,12 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
         return;
       }
 
-      const { error } = await supabase.functions.invoke(`chama-join/approve/${memberId}`, {
-        body: { action },
-        method: "PUT",
+      const { error } = await supabase.functions.invoke('chama-join', {
+        method: 'PUT',
+        body: { 
+          member_id: memberId,
+          action: action
+        },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 

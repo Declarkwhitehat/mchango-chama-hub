@@ -12,15 +12,46 @@ serve(async (req) => {
   }
 
   try {
+    // Validate Authorization header upfront
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ 
+        error: 'Missing authorization header',
+        code: 'AUTH_REQUIRED' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     );
+
+    // Verify authentication for all requests
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid or expired token',
+        code: 'AUTH_INVALID',
+        details: authError?.message 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('contributions-crud request', { 
+      method: req.method,
+      userId: user.id,
+      timestamp: new Date().toISOString()
+    });
 
     const url = new URL(req.url);
     const chamaId = url.searchParams.get('chama_id');
@@ -66,31 +97,23 @@ serve(async (req) => {
     // POST /contributions-crud - Create new contribution
     if (req.method === 'POST') {
       const body = await req.json();
-      const { data: { user } } = await supabaseClient.auth.getUser();
-
-      if (!user) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
 
       console.log('Creating contribution:', body);
 
-      // Get member info to verify membership (the member receiving the payment)
+      // Validate member exists
       const { data: member, error: memberError } = await supabaseClient
         .from('chama_members')
         .select('*, chama(contribution_amount)')
         .eq('id', body.member_id)
-        .single();
+        .maybeSingle();
 
-      // Verify the payer is also a member (if different from recipient)
+      // Validate payer (if different from recipient)
       if (body.paid_by_member_id && body.paid_by_member_id !== body.member_id) {
         const { data: payer, error: payerError } = await supabaseClient
           .from('chama_members')
           .select('id, chama_id')
           .eq('id', body.paid_by_member_id)
-          .single();
+          .maybeSingle();
 
         if (payerError || !payer || payer.chama_id !== member.chama_id) {
           return new Response(JSON.stringify({ error: 'Payer must be a member of the same chama' }), {
@@ -124,12 +147,12 @@ serve(async (req) => {
         console.log('Underpayment detected:', { paidAmount, expectedAmount, deficitDelta });
       }
 
-      // Insert contribution
+      // Create contribution record
       const { data, error } = await supabaseClient
         .from('contributions')
         .insert(body)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 

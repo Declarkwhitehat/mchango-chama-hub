@@ -46,25 +46,46 @@ serve(async (req) => {
       });
     }
 
-    const { type } = await req.json();
-    console.log('Admin export:', { type });
+    const { type, limit = 1000, offset = 0 } = await req.json();
+    console.log('Admin export:', { type, limit, offset });
+
+    if (!['transactions', 'members'].includes(type)) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid export type',
+        details: 'Type must be "transactions" or "members"'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     let csv = '';
+    let transactions: any[] = [];
+    let members: any[] = [];
 
     if (type === 'transactions') {
-      const { data: transactions } = await supabaseClient
+      // Paginate to prevent timeouts
+      const { data: txData, error: txError } = await supabaseClient
         .from('transactions')
         .select(`
           *,
           profiles (full_name, email)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (txError) {
+        console.error('Transaction export error:', txError);
+        throw txError;
+      }
+
+      transactions = txData || [];
 
       // CSV Header
       csv = 'ID,Date,User Name,Email,Amount,Type,Payment Method,Reference,Status\n';
 
       // CSV Rows
-      transactions?.forEach((tx: any) => {
+      transactions.forEach((tx: any) => {
         csv += `${tx.id},`;
         csv += `${new Date(tx.created_at).toISOString()},`;
         csv += `"${tx.profiles?.full_name || 'Unknown'}",`;
@@ -76,20 +97,29 @@ serve(async (req) => {
         csv += `${tx.status}\n`;
       });
     } else if (type === 'members') {
-      const { data: members } = await supabaseClient
+      // Paginate to prevent timeouts
+      const { data: memberData, error: memberError } = await supabaseClient
         .from('chama_members')
         .select(`
           *,
           profiles (full_name, email, phone),
           chama (name, slug, contribution_amount)
         `)
-        .order('joined_at', { ascending: false });
+        .order('joined_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (memberError) {
+        console.error('Member export error:', memberError);
+        throw memberError;
+      }
+
+      members = memberData || [];
 
       // CSV Header
       csv = 'Member Code,Name,Email,Phone,Chama,Joined Date,Order Index,Status,Is Manager\n';
 
       // CSV Rows
-      members?.forEach((member: any) => {
+      members.forEach((member: any) => {
         csv += `${member.member_code},`;
         csv += `"${member.profiles?.full_name || 'Unknown'}",`;
         csv += `${member.profiles?.email || 'N/A'},`;
@@ -100,14 +130,16 @@ serve(async (req) => {
         csv += `${member.approval_status},`;
         csv += `${member.is_manager}\n`;
       });
-    } else {
-      return new Response(JSON.stringify({ error: 'Invalid export type' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
     }
 
-    return new Response(JSON.stringify({ csv }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: 'Export complete',
+      csv,
+      total_records: type === 'transactions' ? transactions.length : members.length,
+      offset,
+      limit
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

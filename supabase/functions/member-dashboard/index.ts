@@ -79,7 +79,7 @@ serve(async (req) => {
 
     console.log('member-dashboard request', { userId: user.id, chamaId });
 
-    // Get member info
+    // Fetch member information
     const { data: member, error: memberError } = await supabaseClient
       .from('chama_members')
       .select(`
@@ -93,23 +93,30 @@ serve(async (req) => {
       .eq('chama_id', chamaId)
       .eq('user_id', user.id)
       .eq('approval_status', 'approved')
-      .single();
+      .maybeSingle();
 
     if (memberError || !member) {
-      return new Response(JSON.stringify({ error: 'Member not found or not approved' }), {
+      console.error('Member lookup failed:', memberError);
+      return new Response(JSON.stringify({ 
+        error: 'Member not found',
+        details: 'You are not an approved member of this chama or it does not exist'
+      }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Get chama details
+    // Fetch chama details
     const { data: chama, error: chamaError } = await supabaseClient
       .from('chama')
       .select('*')
       .eq('id', chamaId)
-      .single();
+      .maybeSingle();
 
-    if (chamaError) throw chamaError;
+    if (chamaError || !chama) {
+      console.error('Chama lookup failed:', chamaError);
+      throw new Error('Chama not found');
+    }
 
     // Get payment history (contributions)
     const { data: contributions, error: contribError } = await supabaseClient
@@ -128,7 +135,7 @@ serve(async (req) => {
       .eq('chama_id', chamaId)
       .lte('start_date', new Date().toISOString())
       .gte('end_date', new Date().toISOString())
-      .single();
+      .maybeSingle();
 
     let currentCyclePayment = null;
     if (currentCycle) {
@@ -137,7 +144,7 @@ serve(async (req) => {
         .select('*')
         .eq('member_id', member.id)
         .eq('cycle_id', currentCycle.id)
-        .single();
+        .maybeSingle();
 
       currentCyclePayment = payment;
     }
@@ -145,7 +152,7 @@ serve(async (req) => {
     // Calculate payout position
     const { data: payoutPosition, error: payoutError } = await supabaseClient
       .rpc('get_member_payout_position', { p_member_id: member.id })
-      .single();
+      .maybeSingle();
     
     if (payoutError) {
       console.error('Error fetching payout position:', payoutError);
@@ -189,13 +196,19 @@ serve(async (req) => {
       payout_schedule: payoutPosition || null,
     };
 
-    return new Response(JSON.stringify({ data: dashboardData }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      data: dashboardData 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
     console.error('Error in member-dashboard:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message || 'Internal server error',
+      code: 'DASHBOARD_ERROR'
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

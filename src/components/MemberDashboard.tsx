@@ -59,14 +59,30 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
 
       if (error) {
         console.error("Dashboard error:", error);
-        // Don't show toast for new chamas with no data yet
+        if (error.message?.includes('AUTH')) {
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to view your dashboard",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Error Loading Dashboard",
+            description: error.message || "Failed to load dashboard data",
+            variant: "destructive"
+          });
+        }
         setDashboardData(null);
       } else {
         setDashboardData(data.data);
       }
     } catch (error: any) {
       console.error("Error loading dashboard:", error);
-      // Don't show toast, just set empty data
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard",
+        variant: "destructive"
+      });
       setDashboardData(null);
     } finally {
       setIsLoading(false);
