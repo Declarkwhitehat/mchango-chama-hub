@@ -65,10 +65,23 @@ const ChamaDetail = () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       const { data, error } = await supabase.functions.invoke(`chama-crud/${id}`, {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        headers: session?.access_token ? { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        } : {
+          'Content-Type': 'application/json'
+        },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error loading chama:", error);
+        toast({
+          title: "Failed to Load Chama",
+          description: error.message || "Could not retrieve chama details",
+          variant: "destructive",
+        });
+        throw error;
+      }
 
       setChama(data.data);
 

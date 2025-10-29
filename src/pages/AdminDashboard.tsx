@@ -32,12 +32,21 @@ const AdminDashboard = () => {
     setIsSearching(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("No session");
+      if (!session?.access_token) {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again to perform searches",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
+      }
 
       const { data, error } = await supabase.functions.invoke('admin-search', {
         body: { query, type },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
         },
       });
 
@@ -46,8 +55,8 @@ const AdminDashboard = () => {
     } catch (error: any) {
       console.error('Search error:', error);
       toast({
-        title: "Error",
-        description: "Failed to perform search",
+        title: "Search Failed",
+        description: error.message || "Failed to perform search",
         variant: "destructive",
       });
     } finally {

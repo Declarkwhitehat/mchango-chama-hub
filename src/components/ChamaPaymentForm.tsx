@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ export const ChamaPaymentForm = ({
   commissionRate = CHAMA_DEFAULT_COMMISSION_RATE,
   onPaymentSuccess 
 }: ChamaPaymentFormProps) => {
+  const navigate = useNavigate();
   const [paymentType, setPaymentType] = useState<"self" | "other">("self");
   const [targetMemberId, setTargetMemberId] = useState(currentMemberId);
   const [amount, setAmount] = useState(contributionAmount.toString());
@@ -92,7 +94,13 @@ export const ChamaPaymentForm = ({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        throw new Error("Not authenticated. Please log in.");
+        toast({
+          title: "Session Expired",
+          description: "Please log in again to make a payment",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
       }
 
       const paymentData = {
@@ -107,7 +115,11 @@ export const ChamaPaymentForm = ({
 
       const { data, error } = await supabase.functions.invoke('contributions-crud', {
         body: paymentData,
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        method: 'POST',
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
       });
 
       if (error) throw error;

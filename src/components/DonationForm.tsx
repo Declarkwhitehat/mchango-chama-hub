@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ interface DonationFormProps {
 }
 
 export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFormProps) => {
+  const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -77,7 +79,13 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        throw new Error("Not authenticated. Please log in.");
+        toast({
+          title: "Session Expired",
+          description: "Please log in again to make a donation",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
       }
 
       // Initiate M-Pesa STK Push
@@ -92,7 +100,10 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
             mchango_id: mchangoId,
           },
         },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
       });
 
       if (stkError) throw stkError;

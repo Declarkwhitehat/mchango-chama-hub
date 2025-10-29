@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ export const WithdrawalButton = ({
   commissionRate,
   onSuccess 
 }: WithdrawalButtonProps) => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
@@ -110,10 +112,11 @@ export const WithdrawalButton = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         toast({
-          title: "Authentication required",
-          description: "Please log in to request a withdrawal",
+          title: "Session Expired",
+          description: "Please log in again to request a withdrawal",
           variant: "destructive",
         });
+        navigate("/auth");
         return;
       }
 
@@ -125,7 +128,10 @@ export const WithdrawalButton = ({
           notes: notes || null,
         },
         method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (error) throw error;

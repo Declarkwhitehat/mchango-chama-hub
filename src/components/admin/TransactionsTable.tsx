@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ interface Transaction {
 }
 
 export const TransactionsTable = () => {
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -65,12 +67,21 @@ export const TransactionsTable = () => {
     setExporting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("No session");
+      if (!session?.access_token) {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again to export data",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
+      }
 
       const { data, error } = await supabase.functions.invoke('admin-export', {
         body: { type: 'transactions' },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
         },
       });
 

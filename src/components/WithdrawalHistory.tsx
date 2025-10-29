@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +13,7 @@ interface WithdrawalHistoryProps {
 }
 
 export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps) => {
+  const navigate = useNavigate();
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -45,8 +47,12 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        console.log("No session found for withdrawals");
-        setIsLoading(false);
+        toast({
+          title: "Session Expired",
+          description: "Please log in again to view withdrawal history",
+          variant: "destructive",
+        });
+        navigate("/auth");
         return;
       }
 
@@ -57,20 +63,32 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
       const { data, error } = await supabase.functions.invoke(
         `withdrawals-crud?${params.toString()}`,
         {
-          headers: { Authorization: `Bearer ${session.access_token}` }
+          method: 'GET',
+          headers: { 
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
         }
       );
 
       if (error) {
         console.error("Error loading withdrawals:", error);
-        // Don't show error for empty data
+        toast({
+          title: "Failed to Load Withdrawals",
+          description: error.message || "Could not retrieve withdrawal history",
+          variant: "destructive",
+        });
         setWithdrawals([]);
       } else {
         setWithdrawals(data.data || []);
       }
     } catch (error: any) {
       console.error("Error loading withdrawals:", error);
-      // Don't show toast, just set empty array
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while loading withdrawals",
+        variant: "destructive",
+      });
       setWithdrawals([]);
     } finally {
       setIsLoading(false);
