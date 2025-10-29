@@ -54,7 +54,10 @@ export const WithdrawalsManagement = () => {
 
       const { data, error } = await supabase.functions.invoke('withdrawals-crud', {
         method: 'GET',
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (error) throw error;
@@ -102,7 +105,10 @@ export const WithdrawalsManagement = () => {
           status: 'completed',
           payment_reference: paymentReference,
         },
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (error) throw error;
@@ -156,7 +162,10 @@ export const WithdrawalsManagement = () => {
           status: 'rejected',
           rejection_reason: rejectionReason,
         },
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (error) throw error;

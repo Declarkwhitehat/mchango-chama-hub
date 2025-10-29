@@ -84,7 +84,10 @@ const ChamaCreate = () => {
 
       const res = await supabase.functions.invoke("chama-crud", {
         body: chamaData,
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
       });
 
       if (res.error) {

@@ -99,11 +99,11 @@ const ChamaJoin = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         toast({
-          title: "Error",
-          description: "Please log in to continue",
+          title: "Session Expired",
+          description: "Please log in again to join this chama",
           variant: "destructive",
         });
-        setIsJoining(false);
+        navigate("/auth");
         return;
       }
 
@@ -112,7 +112,10 @@ const ChamaJoin = () => {
           chama_id: chamaInfo.id,
           invite_code: inviteCode 
         },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
       });
 
       if (error) throw error;

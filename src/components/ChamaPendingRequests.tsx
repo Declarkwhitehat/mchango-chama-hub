@@ -93,7 +93,10 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
           member_id: memberId,
           approved: approved
         },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
       });
 
       if (error) throw error;

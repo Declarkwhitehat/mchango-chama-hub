@@ -57,7 +57,10 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
     const { data, error } = await supabase.functions.invoke('chama-join', {
       method: 'GET',
       body: { chama_id: chamaId },
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { 
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
     });
     
     if (error) {
@@ -75,7 +78,10 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
     
     const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`, {
       method: "GET",
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { 
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
     });
     
     if (error) {
@@ -101,7 +107,10 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
 
       const { data, error } = await supabase.functions.invoke("chama-invite/generate", {
         body: { chama_id: chamaId },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
       });
 
       if (error) throw error;
@@ -141,7 +150,10 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
 
       const { error } = await supabase.functions.invoke(`chama-invite/${codeId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
       });
 
       if (error) throw error;
@@ -179,7 +191,10 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
           member_id: memberId,
           action: action
         },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
       });
 
       if (error) throw error;
