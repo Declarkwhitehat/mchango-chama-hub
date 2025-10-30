@@ -161,22 +161,7 @@ serve(async (req) => {
 
     // POST /chama-crud - Handle both creation and fetching
     if (req.method === 'POST') {
-      let body;
-      try {
-        const text = await req.text();
-        console.log('Request body text:', text);
-        body = text ? JSON.parse(text) : {};
-      } catch (parseError: any) {
-        console.error('JSON parse error:', parseError);
-        return new Response(JSON.stringify({ 
-          error: 'Invalid JSON in request body',
-          details: parseError.message
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
+      const body = await req.json();
       const chamaId = body.chama_id || id;
       
       // If chama_id is provided, this is a fetch request
