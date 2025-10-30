@@ -64,11 +64,24 @@ const ChamaDetail = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
-      const { data, error } = await supabase.functions.invoke(`chama-crud/${id}`, {
-        headers: session?.access_token ? { 
+      if (!session) {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again",
+          variant: "destructive",
+        });
+        window.location.href = '/auth';
+        return;
+      }
+
+      console.log('Loading chama:', id);
+      
+      // Use POST method with ID in body for better compatibility
+      const { data, error } = await supabase.functions.invoke('chama-crud', {
+        method: 'POST',
+        body: { chama_id: id },
+        headers: { 
           Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        } : {
           'Content-Type': 'application/json'
         },
       });
@@ -80,7 +93,19 @@ const ChamaDetail = () => {
           description: error.message || "Could not retrieve chama details",
           variant: "destructive",
         });
-        throw error;
+        setIsLoading(false);
+        return;
+      }
+
+      if (!data || !data.data) {
+        console.error("No chama data returned");
+        toast({
+          title: "No Data",
+          description: "Chama details could not be loaded",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
       }
 
       setChama(data.data);

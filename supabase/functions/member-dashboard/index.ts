@@ -80,7 +80,8 @@ serve(async (req) => {
     console.log('member-dashboard request', { userId: user.id, chamaId });
 
     // Fetch member information
-    const { data: member, error: memberError } = await supabaseClient
+    // First check if user is a member at all (any status)
+    const { data: anyMember, error: anyMemberError } = await supabaseClient
       .from('chama_members')
       .select(`
         *,
@@ -92,19 +93,44 @@ serve(async (req) => {
       `)
       .eq('chama_id', chamaId)
       .eq('user_id', user.id)
-      .eq('approval_status', 'approved')
       .maybeSingle();
 
-    if (memberError || !member) {
-      console.error('Member lookup failed:', memberError);
+    if (anyMemberError) {
+      console.error('Member lookup error:', anyMemberError);
       return new Response(JSON.stringify({ 
-        error: 'Member not found',
-        details: 'You are not an approved member of this chama or it does not exist'
+        error: 'Database error',
+        details: anyMemberError.message
       }), {
-        status: 404,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    if (!anyMember) {
+      console.log('User is not a member of this chama');
+      return new Response(JSON.stringify({ 
+        error: 'Not a member',
+        details: 'You are not a member of this chama'
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (anyMember.approval_status !== 'approved') {
+      console.log('User membership not approved yet');
+      return new Response(JSON.stringify({ 
+        error: 'Pending approval',
+        details: 'Your membership request is still pending approval',
+        approval_status: anyMember.approval_status
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const member = anyMember;
+
 
     // Fetch chama details
     const { data: chama, error: chamaError } = await supabaseClient

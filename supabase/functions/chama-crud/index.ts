@@ -65,7 +65,10 @@ serve(async (req) => {
 
     // GET /chama-crud/:id - Get single chama by ID or slug
     if (req.method === 'GET' && id) {
-      let query = supabaseClient
+      console.log('Fetching chama by id or slug:', id);
+      
+      // Try by slug first
+      const { data: bySlug, error: slugError } = await supabaseClient
         .from('chama')
         .select(`
           *,
@@ -74,52 +77,195 @@ serve(async (req) => {
             email,
             phone
           ),
-          chama_members (
+          chama_members!chama_members_chama_id_fkey (
             id,
             user_id,
             member_code,
             is_manager,
             joined_at,
             status,
-            profiles (
+            approval_status,
+            order_index,
+            profiles!chama_members_user_id_fkey (
               full_name,
               email
             )
           )
-        `);
-
-      // Try by slug first, then by ID
-      const { data: bySlug } = await query.eq('slug', id).maybeSingle();
+        `)
+        .eq('slug', id)
+        .maybeSingle();
+      
+      if (slugError) {
+        console.error('Error fetching by slug:', slugError);
+      }
       
       if (bySlug) {
+        console.log('Found chama by slug:', bySlug.id);
         return new Response(JSON.stringify({ data: bySlug }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const { data, error } = await query.eq('id', id).maybeSingle();
+      // Try by ID
+      const { data, error } = await supabaseClient
+        .from('chama')
+        .select(`
+          *,
+          profiles:created_by (
+            full_name,
+            email,
+            phone
+          ),
+          chama_members!chama_members_chama_id_fkey (
+            id,
+            user_id,
+            member_code,
+            is_manager,
+            joined_at,
+            status,
+            approval_status,
+            order_index,
+            profiles!chama_members_user_id_fkey (
+              full_name,
+              email
+            )
+          )
+        `)
+        .eq('id', id)
+        .maybeSingle();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching by id:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Database error',
+          details: error.message
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       if (!data) {
+        console.log('Chama not found:', id);
         return new Response(JSON.stringify({ error: 'Chama not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
+      console.log('Found chama by id:', data.id);
       return new Response(JSON.stringify({ data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // POST /chama-crud - Create new chama (but also handle GET-style invocations with ID)
-    if (req.method === 'POST' && !id) {
+    // POST /chama-crud - Handle both creation and fetching
+    if (req.method === 'POST') {
       const body = await req.json();
+      const chamaId = body.chama_id || id;
+      
+      // If chama_id is provided, this is a fetch request
+      if (chamaId) {
+        console.log('Fetching chama via POST with id:', chamaId);
+        
+        // Try by slug first
+        const { data: bySlug, error: slugError } = await supabaseClient
+          .from('chama')
+          .select(`
+            *,
+            profiles:created_by (
+              full_name,
+              email,
+              phone
+            ),
+            chama_members!chama_members_chama_id_fkey (
+              id,
+              user_id,
+              member_code,
+              is_manager,
+              joined_at,
+              status,
+              approval_status,
+              order_index,
+              profiles!chama_members_user_id_fkey (
+                full_name,
+                email
+              )
+            )
+          `)
+          .eq('slug', chamaId)
+          .maybeSingle();
+        
+        if (slugError) {
+          console.error('Error fetching by slug:', slugError);
+        }
+        
+        if (bySlug) {
+          console.log('Found chama by slug:', bySlug.id);
+          return new Response(JSON.stringify({ data: bySlug }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Try by ID
+        const { data, error } = await supabaseClient
+          .from('chama')
+          .select(`
+            *,
+            profiles:created_by (
+              full_name,
+              email,
+              phone
+            ),
+            chama_members!chama_members_chama_id_fkey (
+              id,
+              user_id,
+              member_code,
+              is_manager,
+              joined_at,
+              status,
+              approval_status,
+              order_index,
+              profiles!chama_members_user_id_fkey (
+                full_name,
+                email
+              )
+            )
+          `)
+          .eq('id', chamaId)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error fetching by id:', error);
+          return new Response(JSON.stringify({ 
+            error: 'Database error',
+            details: error.message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        if (!data) {
+          console.log('Chama not found:', chamaId);
+          return new Response(JSON.stringify({ error: 'Chama not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        console.log('Found chama by id:', data.id);
+        return new Response(JSON.stringify({ data }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Otherwise, this is a create request
       const userRes = token
         ? await supabaseClient.auth.getUser(token)
         : await supabaseClient.auth.getUser();
       const user = userRes.data.user;
-      console.log('chama-crud POST user', { hasUser: !!user, userId: user?.id });
+      console.log('chama-crud POST create', { hasUser: !!user, userId: user?.id });
 
       if (!user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -222,57 +368,6 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({ data }), {
         status: 201,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // POST /chama-crud/:id - Handle as GET for viewing chama details
-    if (req.method === 'POST' && id) {
-      let query = supabaseClient
-        .from('chama')
-        .select(`
-          *,
-          profiles:created_by (
-            full_name,
-            email,
-            phone
-          ),
-          chama_members (
-            id,
-            user_id,
-            member_code,
-            is_manager,
-            joined_at,
-            status,
-            approval_status,
-            order_index,
-            profiles (
-              full_name,
-              email
-            )
-          )
-        `);
-
-      // Try by slug first, then by ID
-      const { data: bySlug } = await query.eq('slug', id).maybeSingle();
-      
-      if (bySlug) {
-        return new Response(JSON.stringify({ data: bySlug }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      const { data, error } = await query.eq('id', id).maybeSingle();
-      
-      if (error) throw error;
-      if (!data) {
-        return new Response(JSON.stringify({ error: 'Chama not found' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      return new Response(JSON.stringify({ data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
