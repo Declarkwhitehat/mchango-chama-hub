@@ -74,10 +74,14 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
   const loadInviteCodes = async () => {
     setIsLoadingCodes(true);
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return;
+    if (!session?.access_token) {
+      setIsLoadingCodes(false);
+      return;
+    }
     
-    const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`, {
-      method: "GET",
+    const { data, error } = await supabase.functions.invoke('chama-invite', {
+      method: "POST",
+      body: { action: 'list', chama_id: chamaId },
       headers: { 
         Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'
@@ -105,8 +109,9 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("chama-invite/generate", {
-        body: { chama_id: chamaId },
+      const { data, error } = await supabase.functions.invoke("chama-invite", {
+        method: 'POST',
+        body: { action: 'generate', chama_id: chamaId },
         headers: { 
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
@@ -148,8 +153,9 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
-      const { error } = await supabase.functions.invoke(`chama-invite/${codeId}`, {
-        method: "DELETE",
+      const { error } = await supabase.functions.invoke('chama-invite', {
+        method: "POST",
+        body: { action: 'delete', code_id: codeId },
         headers: { 
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
