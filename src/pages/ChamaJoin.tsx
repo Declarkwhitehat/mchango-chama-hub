@@ -111,11 +111,7 @@ const ChamaJoin = () => {
         body: { 
           chama_id: chamaInfo.id,
           invite_code: inviteCode 
-        },
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        }
       });
 
       if (error) throw error;
