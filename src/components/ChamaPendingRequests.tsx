@@ -45,7 +45,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
           user_id,
           approval_status,
           joined_at,
-          profiles:user_id (
+          profiles!chama_members_user_id_fkey (
             full_name,
             email,
             phone
@@ -92,11 +92,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         body: { 
           member_id: memberId,
           approved: approved
-        },
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        }
       });
 
       if (error) throw error;

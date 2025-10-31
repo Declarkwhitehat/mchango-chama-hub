@@ -393,15 +393,15 @@ serve(async (req) => {
       });
     }
 
-    // GET /chama-join - Get pending join requests
+    // GET /chama-join - Get pending join requests (manager only)
     if (req.method === 'GET') {
-      const body = await req.json().catch(() => ({}));
-      const { chama_id } = body;
+      const url = new URL(req.url);
+      const chama_id = url.searchParams.get('chama_id');
 
       if (!chama_id) {
         return new Response(JSON.stringify({ 
           error: 'Missing chama_id',
-          details: 'chama_id is required'
+          details: 'chama_id query parameter is required'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -443,7 +443,7 @@ serve(async (req) => {
         .from('chama_members')
         .select(`
           *,
-          profiles:user_id (
+          profiles!chama_members_user_id_fkey (
             full_name,
             email,
             phone

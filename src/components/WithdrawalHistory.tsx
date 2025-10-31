@@ -45,31 +45,28 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
 
   const loadWithdrawals = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast({
-          title: "Session Expired",
-          description: "Please log in again to view withdrawal history",
-          variant: "destructive",
-        });
-        navigate("/auth");
-        return;
+      setIsLoading(true);
+
+      // Use direct Supabase query instead of edge function
+      let query = supabase
+        .from('withdrawals')
+        .select(`
+          *,
+          profiles:requested_by (
+            full_name,
+            email
+          )
+        `)
+        .order('requested_at', { ascending: false });
+
+      if (chamaId) {
+        query = query.eq('chama_id', chamaId);
+      }
+      if (mchangoId) {
+        query = query.eq('mchango_id', mchangoId);
       }
 
-      const params = new URLSearchParams();
-      if (chamaId) params.append('chama_id', chamaId);
-      if (mchangoId) params.append('mchango_id', mchangoId);
-
-      const { data, error } = await supabase.functions.invoke(
-        `withdrawals-crud?${params.toString()}`,
-        {
-          method: 'GET',
-          headers: { 
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error loading withdrawals:", error);
@@ -80,7 +77,7 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
         });
         setWithdrawals([]);
       } else {
-        setWithdrawals(data.data || []);
+        setWithdrawals(data || []);
       }
     } catch (error: any) {
       console.error("Error loading withdrawals:", error);

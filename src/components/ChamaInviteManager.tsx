@@ -51,45 +51,45 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
   }, [chamaId, isManager]);
 
   const loadPendingMembers = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return;
-    
-    const { data, error } = await supabase.functions.invoke('chama-join', {
-      method: 'GET',
-      body: { chama_id: chamaId },
-      headers: { 
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      },
-    });
-    
-    if (error) {
-      console.error("Error loading pending members:", error);
-      return;
-    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      
+      const { data, error } = await supabase.functions.invoke(`chama-join?chama_id=${chamaId}`, {
+        method: 'GET'
+      });
+      
+      if (error) {
+        console.error("Error loading pending members:", error);
+        return;
+      }
 
-    setPendingMembers(data.data || []);
+      setPendingMembers(data?.data || []);
+    } catch (err) {
+      console.error("Failed to load pending members:", err);
+    }
   };
 
   const loadInviteCodes = async () => {
-    setIsLoadingCodes(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return;
+    try {
+      setIsLoadingCodes(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      
+      const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`, {
+        method: "GET"
+      });
     
-    const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`, {
-      method: "GET",
-      headers: { 
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      },
-    });
-    
-    if (error) {
-      console.error("Error loading invite codes:", error);
-    } else {
-      setInviteCodes(data.data || []);
+      if (error) {
+        console.error("Error loading invite codes:", error);
+      } else {
+        setInviteCodes(data.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load invite codes:", err);
+    } finally {
+      setIsLoadingCodes(false);
     }
-    setIsLoadingCodes(false);
   };
 
   const generateInviteCode = async () => {
@@ -106,11 +106,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       }
 
       const { data, error } = await supabase.functions.invoke("chama-invite/generate", {
-        body: { chama_id: chamaId },
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        body: { chama_id: chamaId }
       });
 
       if (error) throw error;
@@ -149,11 +145,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       if (!session?.access_token) return;
 
       const { error } = await supabase.functions.invoke(`chama-invite/${codeId}`, {
-        method: "DELETE",
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        method: "DELETE"
       });
 
       if (error) throw error;
@@ -190,11 +182,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
         body: { 
           member_id: memberId,
           action: action
-        },
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        }
       });
 
       if (error) throw error;

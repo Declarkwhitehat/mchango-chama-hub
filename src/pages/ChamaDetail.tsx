@@ -76,13 +76,8 @@ const ChamaDetail = () => {
 
       console.log('Loading chama:', id);
       
-      // Use GET via function subpath to avoid body parsing issues
       const { data, error } = await supabase.functions.invoke(`chama-crud/${id}`, {
-        method: 'GET',
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        method: 'GET'
       });
 
       if (error) {
