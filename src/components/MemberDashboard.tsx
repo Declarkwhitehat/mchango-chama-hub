@@ -45,20 +45,40 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
 
   const loadDashboard = async () => {
     try {
+      console.log('MemberDashboard: Starting to load dashboard for chama:', chamaId);
+      
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.log("No session found");
+        console.log("MemberDashboard: No session found");
         setIsLoading(false);
         return;
       }
+
+      console.log('MemberDashboard: Session found, invoking member-dashboard function');
 
       const { data, error } = await supabase.functions.invoke('member-dashboard', {
         body: { chama_id: chamaId }
       });
 
+      console.log('MemberDashboard: Function response:', { data, error });
+
       if (error) {
-        console.error("Dashboard error:", error);
-        if (error.message?.includes('AUTH')) {
+        console.error("MemberDashboard: Dashboard error:", error);
+        
+        // Handle specific error cases
+        if (error.message?.includes('Pending approval')) {
+          toast({
+            title: "Pending Approval",
+            description: "Your membership is awaiting manager approval. You'll be able to access the dashboard once approved.",
+            variant: "default"
+          });
+        } else if (error.message?.includes('Not a member')) {
+          toast({
+            title: "Not a Member",
+            description: "You need to join this chama to view the dashboard",
+            variant: "destructive"
+          });
+        } else if (error.message?.includes('AUTH') || error.message?.includes('Unauthorized')) {
           toast({
             title: "Authentication Required",
             description: "Please log in to view your dashboard",
@@ -73,13 +93,14 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
         }
         setDashboardData(null);
       } else {
-        setDashboardData(data.data);
+        console.log('MemberDashboard: Successfully loaded dashboard data');
+        setDashboardData(data?.data || data);
       }
     } catch (error: any) {
-      console.error("Error loading dashboard:", error);
+      console.error("MemberDashboard: Error loading dashboard:", error);
       toast({
         title: "Error",
-        description: "Failed to load dashboard",
+        description: error.message || "Failed to load dashboard",
         variant: "destructive"
       });
       setDashboardData(null);

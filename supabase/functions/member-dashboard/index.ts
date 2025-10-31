@@ -95,6 +95,12 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .maybeSingle();
 
+    console.log('Member lookup result:', { 
+      found: !!anyMember, 
+      approval_status: anyMember?.approval_status,
+      error: anyMemberError
+    });
+
     if (anyMemberError) {
       console.error('Member lookup error:', anyMemberError);
       return new Response(JSON.stringify({ 
@@ -118,7 +124,7 @@ serve(async (req) => {
     }
 
     if (anyMember.approval_status !== 'approved') {
-      console.log('User membership not approved yet');
+      console.log('User membership not approved yet, status:', anyMember.approval_status);
       return new Response(JSON.stringify({ 
         error: 'Pending approval',
         details: 'Your membership request is still pending approval',
@@ -138,6 +144,8 @@ serve(async (req) => {
       .select('*')
       .eq('id', chamaId)
       .maybeSingle();
+
+    console.log('Chama lookup result:', { found: !!chama, error: chamaError });
 
     if (chamaError || !chama) {
       console.error('Chama lookup failed:', chamaError);
@@ -221,6 +229,8 @@ serve(async (req) => {
       payment_history: contributions || [],
       payout_schedule: payoutPosition || null,
     };
+
+    console.log('Dashboard data assembled successfully, payment history count:', contributions?.length || 0);
 
     return new Response(JSON.stringify({ 
       success: true,
