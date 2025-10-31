@@ -56,7 +56,8 @@ export const ChamaManagement = () => {
 
       if (error) throw error;
 
-      setChamas(data || []);
+      const unique = Array.from(new Map((data || []).map((c: any) => [c.id, c])).values());
+      setChamas(unique);
     } catch (error: any) {
       console.error('Error fetching chamas:', error);
       toast({

@@ -67,7 +67,10 @@ serve(async (req) => {
     if (req.method === 'GET' && id) {
       console.log('Fetching chama by id or slug:', id);
       
-      // Try by slug first
+      // Try by slug first (with normalization that trims trailing hyphens)
+      const slugCandidate = id as string;
+      const normalizedSlug = slugCandidate.replace(/-+$/, '');
+
       const { data: bySlug, error: slugError } = await supabaseClient
         .from('chama')
         .select(`
@@ -92,7 +95,7 @@ serve(async (req) => {
             )
           )
         `)
-        .eq('slug', id)
+        .eq('slug', slugCandidate)
         .maybeSingle();
       
       if (slugError) {
@@ -104,6 +107,47 @@ serve(async (req) => {
         return new Response(JSON.stringify({ data: bySlug }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      }
+
+      // Try normalized slug (without trailing hyphens)
+      if (normalizedSlug !== slugCandidate) {
+        const { data: byNormalizedSlug, error: normalizedSlugError } = await supabaseClient
+          .from('chama')
+          .select(`
+            *,
+            profiles:created_by (
+              full_name,
+              email,
+              phone
+            ),
+            chama_members!chama_members_chama_id_fkey (
+              id,
+              user_id,
+              member_code,
+              is_manager,
+              joined_at,
+              status,
+              approval_status,
+              order_index,
+              profiles!chama_members_user_id_fkey (
+                full_name,
+                email
+              )
+            )
+          `)
+          .eq('slug', normalizedSlug)
+          .maybeSingle();
+
+        if (normalizedSlugError) {
+          console.error('Error fetching by normalized slug:', normalizedSlugError);
+        }
+
+        if (byNormalizedSlug) {
+          console.log('Found chama by normalized slug:', byNormalizedSlug.id);
+          return new Response(JSON.stringify({ data: byNormalizedSlug }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
 
       // Try by ID
@@ -183,7 +227,10 @@ serve(async (req) => {
       if (chamaId) {
         console.log('Fetching chama via POST with id:', chamaId);
         
-        // Try by slug first
+        // Try by slug first (with normalization)
+        const slugCandidate = String(chamaId);
+        const normalizedSlug = slugCandidate.replace(/-+$/, '');
+
         const { data: bySlug, error: slugError } = await supabaseClient
           .from('chama')
           .select(`
@@ -208,7 +255,7 @@ serve(async (req) => {
               )
             )
           `)
-          .eq('slug', chamaId)
+          .eq('slug', slugCandidate)
           .maybeSingle();
         
         if (slugError) {
@@ -220,6 +267,47 @@ serve(async (req) => {
           return new Response(JSON.stringify({ data: bySlug }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
+        }
+
+        // Try normalized slug
+        if (normalizedSlug !== slugCandidate) {
+          const { data: byNormalizedSlug, error: normalizedSlugError } = await supabaseClient
+            .from('chama')
+            .select(`
+              *,
+              profiles:created_by (
+                full_name,
+                email,
+                phone
+              ),
+              chama_members!chama_members_chama_id_fkey (
+                id,
+                user_id,
+                member_code,
+                is_manager,
+                joined_at,
+                status,
+                approval_status,
+                order_index,
+                profiles!chama_members_user_id_fkey (
+                  full_name,
+                  email
+                )
+              )
+            `)
+            .eq('slug', normalizedSlug)
+            .maybeSingle();
+
+          if (normalizedSlugError) {
+            console.error('Error fetching by normalized slug:', normalizedSlugError);
+          }
+
+          if (byNormalizedSlug) {
+            console.log('Found chama by normalized slug:', byNormalizedSlug.id);
+            return new Response(JSON.stringify({ data: byNormalizedSlug }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
         }
 
         // Try by ID
@@ -347,11 +435,19 @@ serve(async (req) => {
         });
       }
 
-      // Generate slug from name
-      const slug = body.name
+      // Validate required fields and generate a safe slug
+      if (!body?.name || typeof body.name !== 'string') {
+        return new Response(JSON.stringify({ error: 'name is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const base = (body.slug || body.name).toString().trim();
+      const slug = base
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-');
+        .replace(/\s+/g, '-')
+        .replace(/-+$/, '');
 
       const { data, error } = await supabaseClient
         .from('chama')

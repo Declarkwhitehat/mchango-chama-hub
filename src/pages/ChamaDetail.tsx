@@ -76,10 +76,9 @@ const ChamaDetail = () => {
 
       console.log('Loading chama:', id);
       
-      // Use POST method with ID in body for better compatibility
-      const { data, error } = await supabase.functions.invoke('chama-crud', {
-        method: 'POST',
-        body: { chama_id: id },
+      // Use GET via function subpath to avoid body parsing issues
+      const { data, error } = await supabase.functions.invoke(`chama-crud/${id}`, {
+        method: 'GET',
         headers: { 
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
