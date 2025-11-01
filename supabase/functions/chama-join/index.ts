@@ -18,24 +18,15 @@ serve(async (req) => {
   }
 
   try {
-    // Validate Authorization header upfront
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ 
-        error: 'Missing authorization header',
-        code: 'AUTH_REQUIRED' 
-      }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
+    
+    // With verify_jwt = true, Supabase ensures valid JWT before function runs
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: authHeader },
+          headers: { Authorization: authHeader! },
         },
       }
     );
@@ -43,6 +34,7 @@ serve(async (req) => {
     // Verify authentication for all requests
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
+      console.error('Failed to get user from JWT:', authError);
       return new Response(JSON.stringify({ 
         error: 'Invalid or expired token',
         code: 'AUTH_INVALID' 
