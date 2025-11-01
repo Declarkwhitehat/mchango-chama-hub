@@ -56,7 +56,8 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       if (!session?.access_token) return;
       
       const { data, error } = await supabase.functions.invoke(`chama-join?chama_id=${chamaId}`, {
-        method: 'GET'
+        method: 'GET',
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
       
       if (error) {

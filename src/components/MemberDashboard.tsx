@@ -57,7 +57,8 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
       console.log('MemberDashboard: Session found, invoking member-dashboard function');
 
       const { data, error } = await supabase.functions.invoke('member-dashboard', {
-        body: { chama_id: chamaId }
+        body: { chama_id: chamaId },
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
 
       console.log('MemberDashboard: Function response:', { data, error });
