@@ -115,11 +115,7 @@ export const ChamaPaymentForm = ({
 
       const { data, error } = await supabase.functions.invoke('contributions-crud', {
         body: paymentData,
-        method: 'POST',
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        method: 'POST'
       });
 
       if (error) throw error;

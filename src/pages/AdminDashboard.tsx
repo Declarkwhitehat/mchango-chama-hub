@@ -43,11 +43,7 @@ const AdminDashboard = () => {
       }
 
       const { data, error } = await supabase.functions.invoke('admin-search', {
-        body: { query, type },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        body: { query, type }
       });
 
       if (error) throw error;

@@ -78,11 +78,7 @@ export const TransactionsTable = () => {
       }
 
       const { data, error } = await supabase.functions.invoke('admin-export', {
-        body: { type: 'transactions' },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        body: { type: 'transactions' }
       });
 
       if (error) throw error;

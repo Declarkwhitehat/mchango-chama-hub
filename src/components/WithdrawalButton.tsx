@@ -127,11 +127,7 @@ export const WithdrawalButton = ({
           amount: parseFloat(amount),
           notes: notes || null,
         },
-        method: 'POST',
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
+        method: 'POST'
       });
 
       if (error) throw error;

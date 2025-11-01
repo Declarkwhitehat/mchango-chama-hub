@@ -99,11 +99,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
             donation_id: donation.id,
             mchango_id: mchangoId,
           },
-        },
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        }
       });
 
       if (stkError) throw stkError;
