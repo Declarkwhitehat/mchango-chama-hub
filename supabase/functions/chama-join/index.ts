@@ -396,12 +396,21 @@ serve(async (req) => {
     // GET /chama-join - Get pending join requests (manager only)
     if (req.method === 'GET') {
       const url = new URL(req.url);
-      const chama_id = url.searchParams.get('chama_id');
+      const pathname = url.pathname;
+      const parts = pathname.split('/').filter(Boolean); // [ 'chama-join', 'pending', ':id' ]
+
+      // Support both query param (?chama_id=...) and REST path (/chama-join/pending/:id)
+      let chama_id = url.searchParams.get('chama_id');
+      if (!chama_id && parts.length >= 3 && parts[1] === 'pending') {
+        chama_id = parts[2];
+      }
+
+      console.log('Fetching pending requests', { pathname, parts, chama_id_present: !!chama_id });
 
       if (!chama_id) {
         return new Response(JSON.stringify({ 
           error: 'Missing chama_id',
-          details: 'chama_id query parameter is required'
+          details: 'Provide ?chama_id=... or call /chama-join/pending/:id'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -417,8 +426,6 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-
-      console.log('Fetching pending requests for chama:', chama_id);
 
       // Verify requester has manager permissions
       const { data: requesterMember, error: requesterError } = await supabaseClient
