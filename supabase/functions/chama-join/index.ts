@@ -51,9 +51,103 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     });
 
-    // POST /chama-join - Join a chama using invite code
+    // POST /chama-join - Join a chama using invite code OR approve/reject join requests
     if (req.method === 'POST') {
       const body = await req.json();
+      
+      // Check if this is an approval request
+      if (body.member_id && (body.approved !== undefined || body.action)) {
+        const { member_id, approved, action } = body;
+        const memberId = member_id;
+        const isApproved = approved !== undefined ? approved : action === 'approve';
+
+        if (!memberId) {
+          return new Response(JSON.stringify({ 
+            error: 'Missing member_id',
+            details: 'member_id is required'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!isValidUUID(memberId)) {
+          return new Response(JSON.stringify({ 
+            error: 'Invalid member ID format',
+            details: 'member_id must be a valid UUID'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        console.log('Approval request:', { memberId, approved: isApproved });
+
+        // Get member details
+        const { data: member, error: memberError } = await supabaseClient
+          .from('chama_members')
+          .select('*, chama!inner(*)')
+          .eq('id', memberId)
+          .maybeSingle();
+
+        if (memberError || !member) {
+          console.error('Member lookup failed:', memberError);
+          return new Response(JSON.stringify({ 
+            error: 'Member not found',
+            details: 'The member you are trying to approve does not exist'
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Verify requester has manager permissions
+        const { data: requesterMember, error: requesterError } = await supabaseClient
+          .from('chama_members')
+          .select('is_manager')
+          .eq('chama_id', member.chama_id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (requesterError || !requesterMember?.is_manager) {
+          console.error('Manager check failed:', requesterError);
+          return new Response(JSON.stringify({ 
+            error: 'Access denied',
+            details: 'Only chama managers can approve join requests'
+          }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Update membership status
+        const { data: updatedMember, error: updateError } = await supabaseClient
+          .from('chama_members')
+          .update({
+            approval_status: isApproved ? 'approved' : 'rejected',
+            status: isApproved ? 'active' : 'inactive',
+          })
+          .eq('id', memberId)
+          .select()
+          .maybeSingle();
+
+        if (updateError) {
+          console.error('Update failed:', updateError);
+          throw updateError;
+        }
+
+        console.log('Member status updated:', updatedMember);
+
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: `Member ${isApproved ? 'approved' : 'rejected'} successfully`,
+          data: updatedMember 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Otherwise, handle as join request
       const { invite_code, chama_id } = body;
 
       console.log('Join request received:', { invite_code, chama_id, user_id: user.id });

@@ -88,7 +88,6 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
       }
 
       const { data, error } = await supabase.functions.invoke('chama-join', {
-        method: 'PUT',
         body: { 
           member_id: memberId,
           approved: approved
@@ -96,6 +95,10 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
       });
 
       if (error) throw error;
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Failed to process request");
+      }
 
       toast({
         title: "Success",
