@@ -58,6 +58,29 @@ const ChamaDetail = () => {
 
   useEffect(() => {
     loadChama();
+
+    // Subscribe to membership changes for real-time updates
+    const channel = supabase
+      .channel(`chama-members-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chama_members',
+          filter: `chama_id=eq.${id}`
+        },
+        (payload) => {
+          console.log('Member status changed:', payload);
+          // Reload chama data when any member's status changes
+          loadChama();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   const loadChama = async () => {
