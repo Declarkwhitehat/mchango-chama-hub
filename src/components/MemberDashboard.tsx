@@ -20,6 +20,13 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
   useEffect(() => {
     loadDashboard();
 
+    // Listen for auth state changes to avoid race conditions where the function is called before session is ready
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        loadDashboard();
+      }
+    });
+
     // Set up realtime subscription for contributions
     const channel: RealtimeChannel = supabase
       .channel('contributions-changes')
@@ -39,6 +46,7 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
       .subscribe();
 
     return () => {
+      subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, [chamaId]);
