@@ -18,20 +18,20 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    
+    const authHeaderRaw = req.headers.get('Authorization') ?? req.headers.get('authorization');
+    const token = authHeaderRaw?.split(' ')[1];
+
     // With verify_jwt = true, Supabase ensures valid JWT before function runs
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: authHeader! },
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         },
       }
     );
 
-    const token = authHeader?.replace('Bearer ', '');
     const { data: { user }, error: userErr } = await supabaseClient.auth.getUser(token);
     if (userErr || !user) {
       console.error('Failed to get user from JWT', userErr);
