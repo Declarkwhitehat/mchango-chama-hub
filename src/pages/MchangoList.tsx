@@ -29,15 +29,16 @@ interface Mchango {
 
 const MchangoList = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [mchangos, setMchangos] = useState<Mchango[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
 
   useEffect(() => {
+    if (authLoading) return;
     fetchMchangos();
-  }, [sortBy]);
+  }, [sortBy, authLoading, user?.id]);
 
   const fetchMchangos = async () => {
     try {
