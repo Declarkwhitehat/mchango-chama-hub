@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, TrendingUp, Calendar, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Mchango {
   id: string;
@@ -22,11 +23,13 @@ interface Mchango {
   category: string;
   end_date: string;
   created_at: string;
+  created_by: string;
   image_url?: string;
 }
 
 const MchangoList = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [mchangos, setMchangos] = useState<Mchango[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,6 +82,9 @@ const MchangoList = () => {
       m.description?.toLowerCase().includes(query)
     );
   });
+
+  const myCampaigns = filteredMchangos.filter(m => m.created_by === user?.id);
+  const otherCampaigns = filteredMchangos.filter(m => m.created_by !== user?.id);
 
   const calculateProgress = (current: number, target: number) => {
     return (current / target) * 100;
@@ -151,72 +157,153 @@ const MchangoList = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredMchangos.map((mchango) => {
-              const progress = calculateProgress(
-                Number(mchango.current_amount),
-                Number(mchango.target_amount)
-              );
-              const daysLeft = getDaysLeft(mchango.end_date);
+          <>
+            {/* My Campaigns Section */}
+            {myCampaigns.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-semibold">My Campaigns</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {myCampaigns.map((mchango) => {
+                    const progress = calculateProgress(
+                      Number(mchango.current_amount),
+                      Number(mchango.target_amount)
+                    );
+                    const daysLeft = getDaysLeft(mchango.end_date);
 
-              return (
-                <Card
-                  key={mchango.id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => navigate(`/mchango/${mchango.slug}`)}
-                >
-                  <CardHeader>
-                    <div className="flex justify-between items-start mb-2">
-                      {mchango.category && (
-                        <Badge variant="secondary">{mchango.category}</Badge>
-                      )}
-                      {daysLeft !== null && (
-                        <Badge variant={daysLeft < 7 ? "destructive" : "default"}>
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {daysLeft} days
-                        </Badge>
-                      )}
-                    </div>
-                    <CardTitle className="line-clamp-2">{mchango.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {mchango.description}
-                    </p>
+                    return (
+                      <Card
+                        key={mchango.id}
+                        className="cursor-pointer hover:shadow-lg transition-shadow"
+                        onClick={() => navigate(`/mchango/${mchango.slug}`)}
+                      >
+                        <CardHeader>
+                          <div className="flex justify-between items-start mb-2">
+                            {mchango.category && (
+                              <Badge variant="secondary">{mchango.category}</Badge>
+                            )}
+                            {daysLeft !== null && (
+                              <Badge variant={daysLeft < 7 ? "destructive" : "default"}>
+                                <Calendar className="h-3 w-3 mr-1" />
+                                {daysLeft} days
+                              </Badge>
+                            )}
+                          </div>
+                          <CardTitle className="line-clamp-2">{mchango.title}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {mchango.description}
+                          </p>
 
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          KES {Number(mchango.current_amount).toLocaleString()}
-                        </span>
-                        <span className="font-semibold">
-                          of {Number(mchango.target_amount).toLocaleString()}
-                        </span>
-                      </div>
-                      <Progress value={progress} className="h-2" />
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">
-                          {progress.toFixed(1)}% funded
-                        </span>
-                      </div>
-                    </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                KES {Number(mchango.current_amount).toLocaleString()}
+                              </span>
+                              <span className="font-semibold">
+                                of {Number(mchango.target_amount).toLocaleString()}
+                              </span>
+                            </div>
+                            <Progress value={progress} className="h-2" />
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground">
+                                {progress.toFixed(1)}% funded
+                              </span>
+                            </div>
+                          </div>
 
-                    <Button
-                      className="w-full"
-                      variant="default"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/mchango/${mchango.slug}`);
-                      }}
-                    >
-                      <Heart className="h-4 w-4 mr-2" />
-                      Donate Now
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                          <Button
+                            className="w-full"
+                            variant="default"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/mchango/${mchango.slug}`);
+                            }}
+                          >
+                            <Heart className="h-4 w-4 mr-2" />
+                            View Campaign
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Other Campaigns Section */}
+            {otherCampaigns.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-semibold">Other Campaigns</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {otherCampaigns.map((mchango) => {
+                    const progress = calculateProgress(
+                      Number(mchango.current_amount),
+                      Number(mchango.target_amount)
+                    );
+                    const daysLeft = getDaysLeft(mchango.end_date);
+
+                    return (
+                      <Card
+                        key={mchango.id}
+                        className="cursor-pointer hover:shadow-lg transition-shadow"
+                        onClick={() => navigate(`/mchango/${mchango.slug}`)}
+                      >
+                        <CardHeader>
+                          <div className="flex justify-between items-start mb-2">
+                            {mchango.category && (
+                              <Badge variant="secondary">{mchango.category}</Badge>
+                            )}
+                            {daysLeft !== null && (
+                              <Badge variant={daysLeft < 7 ? "destructive" : "default"}>
+                                <Calendar className="h-3 w-3 mr-1" />
+                                {daysLeft} days
+                              </Badge>
+                            )}
+                          </div>
+                          <CardTitle className="line-clamp-2">{mchango.title}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {mchango.description}
+                          </p>
+
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                KES {Number(mchango.current_amount).toLocaleString()}
+                              </span>
+                              <span className="font-semibold">
+                                of {Number(mchango.target_amount).toLocaleString()}
+                              </span>
+                            </div>
+                            <Progress value={progress} className="h-2" />
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground">
+                                {progress.toFixed(1)}% funded
+                              </span>
+                            </div>
+                          </div>
+
+                          <Button
+                            className="w-full"
+                            variant="default"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/mchango/${mchango.slug}`);
+                            }}
+                          >
+                            <Heart className="h-4 w-4 mr-2" />
+                            Donate Now
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </Layout>
