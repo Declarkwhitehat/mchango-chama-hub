@@ -144,9 +144,10 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
-      const { error } = await supabase.functions.invoke(`chama-invite/${codeId}`, {
-        method: "DELETE"
-      });
+      const { error } = await supabase
+        .from('chama_invite_codes')
+        .delete()
+        .eq('id', codeId);
 
       if (error) throw error;
 
