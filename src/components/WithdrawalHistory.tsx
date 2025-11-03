@@ -47,16 +47,10 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
     try {
       setIsLoading(true);
 
-      // Use direct Supabase query instead of edge function
+      // Use direct Supabase query - fetch withdrawals only
       let query = supabase
         .from('withdrawals')
-        .select(`
-          *,
-          profiles:requested_by (
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .order('requested_at', { ascending: false });
 
       if (chamaId) {
