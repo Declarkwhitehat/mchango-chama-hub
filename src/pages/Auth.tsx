@@ -12,6 +12,8 @@ import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { PhoneVerification } from "@/components/PhoneVerification";
+import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -21,7 +23,7 @@ const loginSchema = z.object({
 const signupSchema = z.object({
   full_name: z.string().min(2, "Full name is required").max(100),
   id_number: z.string().min(5, "Valid ID number is required").max(50),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone number format"),
+  phone: z.string().regex(/^\+\d{10,15}$/, "Phone must be in international format (e.g., +254712345678)"),
   email: z.string().email("Invalid email address").max(255),
   password: z
     .string()
@@ -46,6 +48,8 @@ const Auth = () => {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [signupStep, setSignupStep] = useState<'details' | 'phone'>('details');
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -122,6 +126,12 @@ const Auth = () => {
   };
 
   const handleSignup = async (data: SignupFormData) => {
+    // First step: collect details and verify phone
+    if (!phoneVerified) {
+      setSignupStep('phone');
+      return;
+    }
+
     setIsLoading(true);
     
     try {
@@ -139,6 +149,13 @@ const Auth = () => {
         }
         return;
       }
+
+      // Send welcome SMS
+      await sendTransactionalSMS(
+        data.phone,
+        SMS_TEMPLATES.accountCreated(data.full_name),
+        'registration'
+      );
       
       toast.success("Account created! Please upload your ID documents.");
       navigate("/kyc-upload");
@@ -254,11 +271,18 @@ const Auth = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>Create Account</CardTitle>
-                    <CardDescription>Get started with your financial journey</CardDescription>
+                    <CardDescription>
+                      {signupStep === 'details' 
+                        ? 'Get started with your financial journey'
+                        : 'Verify your phone number'
+                      }
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Form {...signupForm}>
                       <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
+                        {signupStep === 'details' && (
+                          <>
                         <FormField
                           control={signupForm.control}
                           name="full_name"
@@ -383,8 +407,32 @@ const Auth = () => {
                           className="w-full"
                           disabled={isLoading}
                         >
-                          {isLoading ? "Creating account..." : "Sign Up"}
+                          {isLoading ? "Creating account..." : phoneVerified ? "Complete Registration" : "Continue to Verification"}
                         </Button>
+                          </>
+                        )}
+
+                        {signupStep === 'phone' && (
+                          <div className="space-y-4">
+                            <PhoneVerification
+                              phone={signupForm.watch('phone')}
+                              onPhoneChange={(phone) => signupForm.setValue('phone', phone)}
+                              onVerified={() => {
+                                setPhoneVerified(true);
+                                setSignupStep('details');
+                                toast.success("Phone verified! Complete your registration.");
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => setSignupStep('details')}
+                            >
+                              Back to Details
+                            </Button>
+                          </div>
+                        )}
                       </form>
                     </Form>
                   </CardContent>

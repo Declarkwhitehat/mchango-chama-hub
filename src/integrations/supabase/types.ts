@@ -518,6 +518,39 @@ export type Database = {
           },
         ]
       }
+      otp_verifications: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          max_attempts: number | null
+          otp: string
+          phone: string
+          verified: boolean | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          max_attempts?: number | null
+          otp: string
+          phone: string
+          verified?: boolean | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          max_attempts?: number | null
+          otp?: string
+          phone?: string
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
       payouts: {
         Row: {
           amount: number
@@ -594,6 +627,7 @@ export type Database = {
           last_login_at: string | null
           last_login_ip: unknown
           phone: string
+          phone_otp_verified: boolean | null
           phone_verified: boolean | null
           signup_ip: unknown
           updated_at: string
@@ -615,6 +649,7 @@ export type Database = {
           last_login_at?: string | null
           last_login_ip?: unknown
           phone: string
+          phone_otp_verified?: boolean | null
           phone_verified?: boolean | null
           signup_ip?: unknown
           updated_at?: string
@@ -636,6 +671,7 @@ export type Database = {
           last_login_at?: string | null
           last_login_ip?: unknown
           phone?: string
+          phone_otp_verified?: boolean | null
           phone_verified?: boolean | null
           signup_ip?: unknown
           updated_at?: string
@@ -808,6 +844,7 @@ export type Database = {
         Args: { p_chama_id: string; p_last_payment_date: string }
         Returns: string
       }
+      cleanup_expired_otps: { Args: never; Returns: undefined }
       generate_invite_code: { Args: never; Returns: string }
       generate_member_code: {
         Args: { p_chama_id: string; p_order_index: number }

@@ -11,29 +11,13 @@ const AFRICASTALKING_USERNAME = Deno.env.get('AFRICASTALKING_USERNAME');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-interface SendOTPRequest {
+interface TransactionalSMSRequest {
   phone: string;
+  message: string;
+  eventType?: string; // e.g., 'registration', 'chama_created', 'payment_success'
 }
 
-// Rate limiting: max 3 OTP requests per phone per hour
-const checkRateLimit = async (supabase: any, phone: string): Promise<boolean> => {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  
-  const { data, error } = await supabase
-    .from('otp_verifications')
-    .select('id')
-    .eq('phone', phone)
-    .gte('created_at', oneHourAgo);
-
-  if (error) {
-    console.error('Rate limit check error:', error);
-    return false;
-  }
-
-  return data.length < 3;
-};
-
-const sendSMS = async (phone: string, message: string): Promise<boolean> => {
+const sendSMS = async (phone: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> => {
   try {
     const response = await fetch('https://api.africastalking.com/version1/messaging', {
       method: 'POST',
@@ -52,10 +36,15 @@ const sendSMS = async (phone: string, message: string): Promise<boolean> => {
     const result = await response.json();
     console.log('Africa\'s Talking SMS response:', result);
     
-    return result.SMSMessageData?.Recipients?.[0]?.status === 'Success';
-  } catch (error) {
+    const recipient = result.SMSMessageData?.Recipients?.[0];
+    if (recipient?.status === 'Success') {
+      return { success: true, messageId: recipient.messageId };
+    } else {
+      return { success: false, error: recipient?.status || 'Unknown error' };
+    }
+  } catch (error: any) {
     console.error('SMS sending error:', error);
-    return false;
+    return { success: false, error: error.message };
   }
 };
 
@@ -67,8 +56,9 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const { phone }: SendOTPRequest = await req.json();
+    const { phone, message, eventType }: TransactionalSMSRequest = await req.json();
 
+    // Validate inputs
     if (!phone || !/^\+\d{10,15}$/.test(phone)) {
       return new Response(
         JSON.stringify({ error: 'Invalid phone number format. Use international format (e.g., +254712345678)' }),
@@ -76,62 +66,42 @@ serve(async (req) => {
       );
     }
 
-    // Check rate limit
-    const canSend = await checkRateLimit(supabase, phone);
-    if (!canSend) {
+    if (!message || message.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Too many OTP requests. Please try again later.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+        JSON.stringify({ error: 'Message is required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
-    // Clean up expired OTPs
-    await supabase.rpc('cleanup_expired_otps');
+    if (message.length > 160) {
+      console.warn(`Message length exceeds 160 characters (${message.length}). This may be split into multiple SMS.`);
+    }
 
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+    // Send SMS
+    const result = await sendSMS(phone, message);
 
-    // Store OTP in database
-    const { error: insertError } = await supabase
-      .from('otp_verifications')
-      .insert({
-        phone,
-        otp,
-        expires_at: expiresAt,
-      });
-
-    if (insertError) {
-      console.error('Database error:', insertError);
+    if (!result.success) {
       return new Response(
-        JSON.stringify({ error: 'Failed to generate OTP' }),
+        JSON.stringify({ 
+          error: 'Failed to send SMS', 
+          details: result.error 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
 
-    // Send SMS via Africa's Talking
-    const message = `Your verification code is: ${otp}. Valid for 5 minutes. Do not share this code with anyone.`;
-    const smsSent = await sendSMS(phone, message);
-
-    if (!smsSent) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to send SMS. Please try again.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
-
-    console.log(`OTP sent successfully to ${phone}`);
+    console.log(`Transactional SMS sent successfully to ${phone}${eventType ? ` (Event: ${eventType})` : ''}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'OTP sent successfully',
-        expiresIn: 300 // 5 minutes in seconds
+        message: 'SMS sent successfully',
+        messageId: result.messageId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: any) {
-    console.error('Error in send-otp:', error);
+    console.error('Error in send-transactional-sms:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Internal server error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
