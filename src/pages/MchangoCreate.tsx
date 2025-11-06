@@ -10,7 +10,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle } from "lucide-react";
-import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 
 const MchangoCreate = () => {
   const navigate = useNavigate();
@@ -85,22 +84,6 @@ const MchangoCreate = () => {
       if (!created?.slug) {
         console.error("Unexpected response from mchango-crud:", res.data);
         throw new Error("Unexpected response from server");
-      }
-
-      // Get user's profile to send SMS
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('phone')
-        .eq('id', userCheck.user.id)
-        .single();
-
-      // Send SMS notification
-      if (profile?.phone) {
-        await sendTransactionalSMS(
-          profile.phone,
-          SMS_TEMPLATES.mchangoCreated(mchangoData.title),
-          'mchango_created'
-        );
       }
 
       // Notify dashboard to refresh lists
