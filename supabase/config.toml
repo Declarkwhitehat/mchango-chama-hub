@@ -1,5 +1,14 @@
 project_id = "ahhcbwbvueimezmtftte"
 
+[functions.send-otp]
+verify_jwt = false
+
+[functions.verify-otp]
+verify_jwt = false
+
+[functions.send-transactional-sms]
+verify_jwt = true
+
 [functions.mchango-crud]
 verify_jwt = false
 

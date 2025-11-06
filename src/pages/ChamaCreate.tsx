@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 
 const ChamaCreate = () => {
   const navigate = useNavigate();
@@ -100,6 +101,22 @@ const ChamaCreate = () => {
       if (!created?.slug) {
         console.error("Unexpected response from chama-crud:", res.data);
         throw new Error("Unexpected response from server");
+      }
+
+      // Get user's profile to send SMS
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', userCheck.user.id)
+        .single();
+
+      // Send SMS notification
+      if (profile?.phone) {
+        await sendTransactionalSMS(
+          profile.phone,
+          SMS_TEMPLATES.chamaCreated(chamaData.name),
+          'chama_created'
+        );
       }
 
       toast({
