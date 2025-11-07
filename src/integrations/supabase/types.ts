@@ -678,6 +678,227 @@ export type Database = {
         }
         Relationships: []
       }
+      saving_deposits: {
+        Row: {
+          balance_after: number
+          commission_amount: number
+          created_at: string
+          deposit_date: string
+          gross_amount: number
+          group_id: string
+          id: string
+          member_id: string
+          net_amount: number
+          notes: string | null
+          paid_by_user_id: string
+          payment_reference: string
+          user_id: string
+        }
+        Insert: {
+          balance_after: number
+          commission_amount: number
+          created_at?: string
+          deposit_date?: string
+          gross_amount: number
+          group_id: string
+          id?: string
+          member_id: string
+          net_amount: number
+          notes?: string | null
+          paid_by_user_id: string
+          payment_reference: string
+          user_id: string
+        }
+        Update: {
+          balance_after?: number
+          commission_amount?: number
+          created_at?: string
+          deposit_date?: string
+          gross_amount?: number
+          group_id?: string
+          id?: string
+          member_id?: string
+          net_amount?: number
+          notes?: string | null
+          paid_by_user_id?: string
+          payment_reference?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_deposits_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saving_deposits_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "saving_group_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saving_group_members: {
+        Row: {
+          current_savings: number
+          group_id: string
+          id: string
+          is_loan_eligible: boolean
+          joined_at: string
+          lifetime_deposits: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          current_savings?: number
+          group_id: string
+          id?: string
+          is_loan_eligible?: boolean
+          joined_at?: string
+          lifetime_deposits?: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          current_savings?: number
+          group_id?: string
+          id?: string
+          is_loan_eligible?: boolean
+          joined_at?: string
+          lifetime_deposits?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saving_groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          cycle_end_date: string
+          cycle_start_date: string
+          description: string | null
+          group_profit_pool: number
+          id: string
+          manager_id: string
+          monthly_target: number
+          name: string
+          slug: string
+          status: string
+          total_group_savings: number
+          updated_at: string
+          whatsapp_link: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          cycle_end_date: string
+          cycle_start_date: string
+          description?: string | null
+          group_profit_pool?: number
+          id?: string
+          manager_id: string
+          monthly_target?: number
+          name: string
+          slug: string
+          status?: string
+          total_group_savings?: number
+          updated_at?: string
+          whatsapp_link?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          cycle_end_date?: string
+          cycle_start_date?: string
+          description?: string | null
+          group_profit_pool?: number
+          id?: string
+          manager_id?: string
+          monthly_target?: number
+          name?: string
+          slug?: string
+          status?: string
+          total_group_savings?: number
+          updated_at?: string
+          whatsapp_link?: string | null
+        }
+        Relationships: []
+      }
+      saving_loans: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          borrower_id: string
+          created_at: string
+          due_date: string | null
+          group_id: string
+          id: string
+          interest_rate: number
+          notes: string | null
+          repaid_at: string | null
+          requested_at: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          borrower_id: string
+          created_at?: string
+          due_date?: string | null
+          group_id: string
+          id?: string
+          interest_rate?: number
+          notes?: string | null
+          repaid_at?: string | null
+          requested_at?: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          borrower_id?: string
+          created_at?: string
+          due_date?: string | null
+          group_id?: string
+          id?: string
+          interest_rate?: number
+          notes?: string | null
+          repaid_at?: string | null
+          requested_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_loans_borrower_id_fkey"
+            columns: ["borrower_id"]
+            isOneToOne: false
+            referencedRelation: "saving_group_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saving_loans_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
@@ -840,9 +1061,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_loan_pool_available: {
+        Args: { p_group_id: string }
+        Returns: number
+      }
       calculate_next_due_date: {
         Args: { p_chama_id: string; p_last_payment_date: string }
         Returns: string
+      }
+      check_loan_eligibility: {
+        Args: { p_member_id: string }
+        Returns: boolean
       }
       cleanup_expired_otps: { Args: never; Returns: undefined }
       generate_invite_code: { Args: never; Returns: string }
