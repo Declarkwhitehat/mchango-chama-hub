@@ -106,9 +106,19 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: any) {
-    console.error('Error in send-transactional-sms:', error);
+    console.error('Error in send-transactional-sms:', {
+      message: error.message,
+      code: error.code,
+      details: error.details
+    });
+    
+    let safeMessage = 'An error occurred processing your request';
+    if (error.code === '23505') safeMessage = 'Duplicate record';
+    else if (error.code === '23503') safeMessage = 'Referenced record not found';
+    else if (error.code === '42501') safeMessage = 'Permission denied';
+    
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({ error: safeMessage }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

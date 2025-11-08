@@ -5,11 +5,12 @@ import { formatDistanceToNow } from "date-fns";
 
 interface Donation {
   id: string;
-  display_name: string | null;
+  display_name: string;
   amount: number;
-  is_anonymous: boolean;
   created_at: string;
+  completed_at: string;
   payment_status: string;
+  mchango_id: string;
 }
 
 interface DonorsListProps {
@@ -51,10 +52,9 @@ export const DonorsList = ({ mchangoId, totalAmount }: DonorsListProps) => {
   const fetchDonations = async () => {
     try {
       const { data, error } = await supabase
-        .from("mchango_donations")
+        .from("public_donations")
         .select("*")
         .eq("mchango_id", mchangoId)
-        .eq("payment_status", "completed")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -97,7 +97,7 @@ export const DonorsList = ({ mchangoId, totalAmount }: DonorsListProps) => {
                     </div>
                     <div>
                       <p className="font-medium">
-                        {donation.is_anonymous ? "Anonymous" : (donation.display_name || "Anonymous")}
+                        {donation.display_name}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatDistanceToNow(new Date(donation.created_at), { addSuffix: true })}
