@@ -85,16 +85,19 @@ const ChamaCreate = () => {
 
       const res = await supabase.functions.invoke("chama-crud", {
         body: chamaData,
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
       });
 
       if (res.error) {
         console.error("Chama create invoke error:", res.error, res.data);
-        const apiError = (res.data as any)?.error || (res.data as any)?.message;
-        throw new Error(apiError || res.error.message || "Failed to create chama");
+        const apiError = res.error.message || "Failed to create chama";
+        throw new Error(apiError);
+      }
+
+      // Check for non-2xx status codes in the response data
+      if (!res.data || typeof res.data === 'object' && 'error' in res.data) {
+        console.error("Chama create API error:", res.data);
+        const apiError = (res.data as any)?.error || (res.data as any)?.message || "Failed to create chama";
+        throw new Error(apiError);
       }
 
       const created = (res.data as any)?.data;
