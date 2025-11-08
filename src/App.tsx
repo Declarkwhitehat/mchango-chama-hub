@@ -14,6 +14,9 @@ import ChamaCreate from "./pages/ChamaCreate";
 import ChamaDetail from "./pages/ChamaDetail";
 import ChamaJoin from "./pages/ChamaJoin";
 import ChamaList from "./pages/ChamaList";
+import SavingGroupCreate from "./pages/saving-groups/create";
+import SavingGroupDashboard from "./pages/saving-groups/dashboard";
+import SavingGroupAdmin from "./pages/saving-groups/admin";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import AdminKYC from "./pages/AdminKYC";
@@ -45,6 +48,9 @@ const App = () => (
           <Route path="/chama/create" element={<ProtectedRoute requireKYC><ChamaCreate /></ProtectedRoute>} />
           <Route path="/chama/join/:slug" element={<ChamaJoin />} />
           <Route path="/chama/:id" element={<ChamaDetail />} />
+          <Route path="/saving-groups" element={<ProtectedRoute><SavingGroupDashboard /></ProtectedRoute>} />
+          <Route path="/saving-groups/create" element={<ProtectedRoute><SavingGroupCreate /></ProtectedRoute>} />
+          <Route path="/saving-groups/:id" element={<ProtectedRoute><SavingGroupAdmin /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminProtectedRoute><Admin /></AdminProtectedRoute>} />
           <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />
