@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Home, User, Menu, ArrowLeft, Shield } from "lucide-react";
+import { Home, User, Menu, ArrowLeft, Shield, Users, Heart } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -81,6 +81,18 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                   <Button variant="ghost" className="w-full justify-start">
                     <Home className="mr-2 h-4 w-4" />
                     Home
+                  </Button>
+                </Link>
+                <Link to="/mchango">
+                  <Button variant="ghost" className="w-full justify-start">
+                    <Heart className="mr-2 h-4 w-4" />
+                    Browse Campaigns
+                  </Button>
+                </Link>
+                <Link to="/chama">
+                  <Button variant="ghost" className="w-full justify-start">
+                    <Users className="mr-2 h-4 w-4" />
+                    Browse Chamas
                   </Button>
                 </Link>
                 <Link to="/profile">
