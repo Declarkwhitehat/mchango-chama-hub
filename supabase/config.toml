@@ -10,13 +10,13 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.mchango-crud]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chama-crud]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chama-invite]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chama-join]
 verify_jwt = true

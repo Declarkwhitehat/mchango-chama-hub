@@ -37,8 +37,7 @@ serve(async (req) => {
       hasAuth: !!authHeader 
     });
 
-    // Public endpoint - no auth required for validation
-    // GET /chama-invite/validate/:code - Validate invite code
+    // Public endpoint - GET /chama-invite/validate/:code - Validate invite code
     if (req.method === 'GET' && pathParts.includes('validate')) {
       const codeIndex = pathParts.indexOf('validate') + 1;
       const code = pathParts[codeIndex];
@@ -102,35 +101,20 @@ serve(async (req) => {
       });
     }
 
-    // Endpoints that require authentication
-    const token = authHeader?.replace('Bearer ', '').trim();
-    let user = null;
-    
-    // Only check auth for protected endpoints
-    if (req.method !== 'GET' || !pathParts.includes('validate')) {
-      const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
-      console.log('Auth check:', { hasUser: !!authUser, hasToken: !!token, authError: authError?.message });
-      
-      if (!authUser) {
-        return new Response(JSON.stringify({ error: 'Unauthorized', details: 'Authentication required' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      user = authUser;
+    // All other endpoints require authentication
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // POST /chama-invite/generate - Generate invite codes
-    if (req.method === 'POST' && action === 'generate') {
-      if (!user) {
-        return new Response(JSON.stringify({ error: 'Authentication required' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
+    // POST /chama-invite/generate - Generate new invite code
+    if (req.method === 'POST' && (action === 'generate' || pathParts.includes('generate'))) {
       const body = await req.json();
-      const { chama_id, count = 1, expires_in_days = 1 } = body; // Default to 1 day (24 hours)
+      const { chama_id, expires_in_days } = body;
 
       if (!chama_id) {
         return new Response(JSON.stringify({ error: 'chama_id is required' }), {
@@ -139,122 +123,170 @@ serve(async (req) => {
         });
       }
 
-      // Check if user is manager
+      // Verify user is a manager
       const { data: membership } = await supabaseClient
         .from('chama_members')
         .select('is_manager')
         .eq('chama_id', chama_id)
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .eq('approval_status', 'approved')
         .single();
 
       if (!membership || !membership.is_manager) {
-        return new Response(JSON.stringify({ error: 'Only managers can generate invite codes' }), {
+        return new Response(JSON.stringify({ 
+          error: 'Only chama managers can generate invite codes' 
+        }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Check available spots
-      const { data: chama } = await supabaseClient
-        .from('chama')
-        .select('max_members')
-        .eq('id', chama_id)
-        .single();
+      // Generate code
+      const code = Array.from({ length: 8 }, () => 
+        'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]
+      ).join('');
 
-      const { count: currentMembers } = await supabaseClient
-        .from('chama_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('chama_id', chama_id)
-        .in('approval_status', ['approved', 'pending']);
-
-      const availableSpots = chama.max_members - (currentMembers || 0);
-
-      if (count > availableSpots) {
-        return new Response(JSON.stringify({ 
-          error: `Only ${availableSpots} spots available. Cannot generate ${count} codes.` 
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Generate codes
-      const codes = [];
       const expiresAt = expires_in_days 
         ? new Date(Date.now() + expires_in_days * 24 * 60 * 60 * 1000).toISOString()
         : null;
 
-      for (let i = 0; i < count; i++) {
-        const { data: codeData } = await supabaseClient.rpc('generate_invite_code');
-        
-        const { data: inviteCode, error } = await supabaseClient
-          .from('chama_invite_codes')
-          .insert({
-            chama_id,
-            code: codeData,
-            created_by: user.id,
-            expires_at: expiresAt,
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('Error creating invite code:', error);
-          continue;
-        }
-
-        codes.push(inviteCode);
-      }
-
-      console.log(`Generated ${codes.length} invite codes for chama ${chama_id}`);
-
-      return new Response(JSON.stringify({ data: codes }), {
-        status: 201,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // GET /chama-invite/list/:chama_id - List invite codes for chama
-    if (req.method === 'GET' && action !== 'validate') {
-      const chamaId = pathParts[pathParts.length - 1];
-
       const { data, error } = await supabaseClient
         .from('chama_invite_codes')
+        .insert({
+          chama_id,
+          created_by: user.id,
+          code,
+          expires_at: expiresAt,
+          is_active: true,
+        })
         .select(`
           *,
-          profiles!chama_invite_codes_created_by_fkey (
-            full_name,
-            email
-          ),
-          used_profile:profiles!chama_invite_codes_used_by_fkey (
-            full_name,
-            email
+          chama (
+            id,
+            name,
+            slug
           )
         `)
-        .eq('chama_id', chamaId)
-        .order('created_at', { ascending: false });
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to generate invite code:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate invite code' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       return new Response(JSON.stringify({ data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // DELETE /chama-invite/:id - Delete invite code
+    // GET /chama-invite/:chama_id - List invite codes for a chama
+    if (req.method === 'GET') {
+      const chamaId = pathParts[pathParts.length - 1];
+
+      if (!chamaId || chamaId === 'chama-invite') {
+        return new Response(JSON.stringify({ error: 'chama_id is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Verify user is a manager
+      const { data: membership } = await supabaseClient
+        .from('chama_members')
+        .select('is_manager')
+        .eq('chama_id', chamaId)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single();
+
+      if (!membership || !membership.is_manager) {
+        return new Response(JSON.stringify({ 
+          error: 'Only chama managers can view invite codes' 
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data, error } = await supabaseClient
+        .from('chama_invite_codes')
+        .select('*')
+        .eq('chama_id', chamaId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Failed to list invite codes:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to load invite codes' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(JSON.stringify({ data }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // DELETE /chama-invite/:code - Deactivate invite code
     if (req.method === 'DELETE') {
-      const codeId = pathParts[pathParts.length - 1];
+      const code = pathParts[pathParts.length - 1];
+
+      if (!code) {
+        return new Response(JSON.stringify({ error: 'Code is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Get the invite code with chama info
+      const { data: inviteCode } = await supabaseClient
+        .from('chama_invite_codes')
+        .select('chama_id')
+        .eq('code', code.toUpperCase())
+        .single();
+
+      if (!inviteCode) {
+        return new Response(JSON.stringify({ error: 'Invite code not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Verify user is a manager
+      const { data: membership } = await supabaseClient
+        .from('chama_members')
+        .select('is_manager')
+        .eq('chama_id', inviteCode.chama_id)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single();
+
+      if (!membership || !membership.is_manager) {
+        return new Response(JSON.stringify({ 
+          error: 'Only chama managers can deactivate invite codes' 
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       const { error } = await supabaseClient
         .from('chama_invite_codes')
-        .delete()
-        .eq('id', codeId);
+        .update({ is_active: false })
+        .eq('code', code.toUpperCase());
 
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to deactivate invite code:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to deactivate invite code' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-      return new Response(JSON.stringify({ success: true }), {
+      return new Response(JSON.stringify({ message: 'Invite code deactivated' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -264,11 +296,11 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: any) {
-    console.error('Error in chama-invite:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+  } catch (error) {
+    console.error('chama-invite error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });

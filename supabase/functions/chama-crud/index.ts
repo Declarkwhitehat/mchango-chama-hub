@@ -363,18 +363,15 @@ serve(async (req) => {
         });
       }
       
-      // Otherwise, this is a create request
-      const userRes = token
-        ? await supabaseClient.auth.getUser(token)
-        : await supabaseClient.auth.getUser();
-      const user = userRes.data.user;
+      // Otherwise, this is a create request - require authentication
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
       console.log('chama-crud POST create', { hasUser: !!user, userId: user?.id });
 
-      if (!user) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Authentication required' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       // Check KYC status

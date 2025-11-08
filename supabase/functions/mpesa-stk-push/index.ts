@@ -6,6 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Input validation schemas
+const validatePhone = (phone: string): boolean => {
+  // Kenyan phone format: +254XXXXXXXXX (total 13 chars)
+  return /^\+254[17]\d{8}$/.test(phone);
+};
+
+const validateAmount = (amount: number): boolean => {
+  return amount >= 1 && amount <= 1000000 && Number.isFinite(amount);
+};
+
 interface STKPushRequest {
   phone_number: string;
   amount: number;
@@ -28,7 +38,29 @@ serve(async (req) => {
     );
 
     const body: STKPushRequest = await req.json();
-    console.log('Incoming STK push request:', body);
+    console.log('Incoming STK push request:', { ...body, phone_number: body.phone_number?.substring(0, 7) + '****' });
+
+    // Validate inputs
+    if (!validatePhone(body.phone_number)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid phone number format. Use +254XXXXXXXXX' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!validateAmount(body.amount)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid amount. Must be between 1 and 1,000,000' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (body.account_reference && body.account_reference.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Account reference too long (max 100 characters)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY') ?? '';
     const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? '';
@@ -72,7 +104,7 @@ serve(async (req) => {
       TransactionDesc: body.transaction_desc || 'Donation Payment',
     };
 
-    console.log('STK Push payload:', payload);
+    console.log('STK Push payload:', { ...payload, Password: '****' });
 
     // --- Step 3: Send STK Push ---
     const stkResponse = await fetch(
@@ -90,34 +122,16 @@ serve(async (req) => {
     const result = await stkResponse.json();
     console.log('STK Push API Response:', result);
 
-    // --- Step 4: Save Transaction (Optional) ---
-    if (result.CheckoutRequestID) {
-      const { error } = await supabaseClient
-        .from('donations')
-        .insert([
-          {
-            phone_number: body.phone_number,
-            amount: body.amount,
-            chama_id: body.chama_id || null,
-            mchango_id: body.mchango_id || null,
-            status: 'PENDING',
-            checkout_request_id: result.CheckoutRequestID,
-            merchant_request_id: result.MerchantRequestID,
-          },
-        ]);
-
-      if (error) console.error('Supabase insert error:', error);
-    }
-
+    // --- Step 4: Return result ---
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+
   } catch (error) {
-    console.error('STK Push Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('STK Push error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });
