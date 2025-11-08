@@ -120,4 +120,4 @@ const CreateSavingGroupPage: React.FC = () => {
   );
 };
 
-export default CreateSavingGroupPage;
+export const SavingGroupCreate = CreateSavingGroupPage;
