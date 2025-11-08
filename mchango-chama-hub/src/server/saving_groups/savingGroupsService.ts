@@ -158,56 +158,6 @@ export async function requestLoan(group_id: string, borrower_user_id: string, pr
   return loan;
 }
 
-// NOTE: Loan Approval, Repayment, and Default logic will be implemented in Phase 6 as they are more complex.
-
-// --- Helper SQL Function (for atomicity) ---
-// This function should be created as a PostgreSQL function in a separate migration file
-// to ensure the deposit logic is atomic.
-
-/*
-CREATE OR REPLACE FUNCTION process_deposit_transaction(
-    p_group_id uuid,
-    p_member_user_id uuid,
-    p_payer_user_id uuid,
-    p_amount_kes NUMERIC,
-    p_commission_kes NUMERIC,
-    p_net_amount_kes NUMERIC
-)
-RETURNS void AS $$
-DECLARE
-    v_group_total_savings NUMERIC;
-    v_member_savings NUMERIC;
-BEGIN
-    -- 1. Insert the transaction record
-    INSERT INTO group_transactions (group_id, member_user_id, payer_user_id, amount_kes, commission_kes, net_amount_kes, type, status)
-    VALUES (p_group_id, p_member_user_id, p_payer_user_id, p_amount_kes, p_commission_kes, p_net_amount_kes, 'DEPOSIT', 'COMPLETED');
-
-    -- 2. Update group_members savings and loan eligibility
-    UPDATE group_members
-    SET
-        personal_savings_kes = personal_savings_kes + p_net_amount_kes,
-        is_eligible_for_loan = CASE WHEN personal_savings_kes + p_net_amount_kes >= 2000 THEN TRUE ELSE FALSE END
-    WHERE group_id = p_group_id AND user_id = p_member_user_id
-    RETURNING personal_savings_kes INTO v_member_savings;
-
-    -- 3. Update saving_groups totals
-    UPDATE saving_groups
-    SET
-        total_savings_kes = total_savings_kes + p_net_amount_kes,
-        loan_pool_limit_kes = (total_savings_kes + p_net_amount_kes) * 0.30
-    WHERE id = p_group_id
-    RETURNING total_savings_kes INTO v_group_total_savings;
-
-    -- 4. Record company commission (1% of deposit)
-    INSERT INTO company_commissions (group_id, source_type, source_id, amount_kes)
-    VALUES (p_group_id, 'DEPOSIT_COMMISSION', (SELECT id FROM group_transactions WHERE group_id = p_group_id AND member_user_id = p_member_user_id ORDER BY transaction_date DESC LIMIT 1), p_commission_kes);
-
-    -- 5. (Optional: Add notification logic here)
-
-END;
-$$ LANGUAGE plpgsql;
-*/
-
 /**
  * 4. Loan Approval Logic
  * Approves a loan request by a guarantor. Requires a minimum of 3 approvals.
