@@ -4,16 +4,22 @@ import { prisma } from "../db";
 export async function createSavingGroup(
   name: string,
   description: string,
-  adminId: string
+  managerId: string,
+  savingGoal: number,
+  maxMembers: number,
+  whatsAppGroupLink: string
 ): Promise<SavingGroup> {
   const savingGroup = await prisma.savingGroup.create({
     data: {
       name,
       description,
-      adminId,
+      managerId,
+      savingGoal,
+      maxMembers,
+      whatsAppGroupLink,
       members: {
         create: {
-          userId: adminId,
+          userId: managerId,
           role: "MANAGER",
         },
       },
@@ -28,6 +34,26 @@ export async function getSavingGroupById(
   const savingGroup = await prisma.savingGroup.findUnique({
     where: {
       id,
+    },
+  });
+  return savingGroup;
+}
+
+// Function to get comprehensive group data including financial fields
+export async function getComprehensiveSavingGroupData(
+  id: string
+): Promise<SavingGroup | null> {
+  const savingGroup = await prisma.savingGroup.findUnique({
+    where: {
+      id,
+    },
+    include: {
+      members: true,
+      loans: {
+        where: {
+          is_active: true,
+        },
+      },
     },
   });
   return savingGroup;
@@ -62,7 +88,10 @@ export async function getSavingGroupsByMemberId(
 export async function updateSavingGroup(
   id: string,
   name: string,
-  description: string
+  description: string,
+  savingGoal: number,
+  maxMembers: number,
+  whatsAppGroupLink: string
 ): Promise<SavingGroup> {
   const savingGroup = await prisma.savingGroup.update({
     where: {
@@ -71,6 +100,9 @@ export async function updateSavingGroup(
     data: {
       name,
       description,
+      savingGoal,
+      maxMembers,
+      whatsAppGroupLink,
     },
   });
   return savingGroup;

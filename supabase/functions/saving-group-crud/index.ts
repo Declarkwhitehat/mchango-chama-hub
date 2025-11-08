@@ -18,13 +18,21 @@ interface SavingGroup {
   name: string;
   description: string;
   managerId: string;
+  savingGoal: number;
+  maxMembers: number;
+  whatsAppGroupLink: string;
+  totalSavings: number;
+  totalProfits: number;
 }
 
 interface SavingGroupService {
   createSavingGroup: (
     name: string,
     description: string,
-    managerId: string
+    managerId: string,
+    savingGoal: number,
+    maxMembers: number,
+    whatsAppGroupLink: string
   ) => Promise<SavingGroup>;
   getSavingGroupById: (id: string) => Promise<SavingGroup | null>;
   getSavingGroupsByAdminId: (managerId: string) => Promise<SavingGroup[]>;
@@ -40,31 +48,65 @@ interface SavingGroupService {
 // Since we cannot import the actual service, we will mock it for the handler logic
 // In a real scenario, the service would be imported and used.
 const savingGroupsService: SavingGroupService = {
-  createSavingGroup: async (name, description, managerId) => ({
+  createSavingGroup: async (
+    name,
+    description,
+    managerId,
+    savingGoal,
+    maxMembers,
+    whatsAppGroupLink
+  ) => ({
     id: "mock-id",
     name,
     description,
     managerId,
+    savingGoal,
+    maxMembers,
+    whatsAppGroupLink,
+    totalSavings: 0,
+    totalProfits: 0,
   }),
   getSavingGroupById: async (id) => ({
     id,
     name: "Mock Group",
     description: "Mock Description",
     managerId: "mock-manager",
+    savingGoal: 100000,
+    maxMembers: 100,
+    whatsAppGroupLink: "https://wa.link/mock",
+    totalSavings: 50000,
+    totalProfits: 500,
   }),
   getSavingGroupsByAdminId: async (managerId) => [],
   getSavingGroupsByMemberId: async (memberId) => [],
-  updateSavingGroup: async (id, name, description) => ({
+  updateSavingGroup: async (
+    id,
+    name,
+    description,
+    savingGoal,
+    maxMembers,
+    whatsAppGroupLink
+  ) => ({
     id,
     name,
     description,
     managerId: "mock-manager",
+    savingGoal,
+    maxMembers,
+    whatsAppGroupLink,
+    totalSavings: 0,
+    totalProfits: 0,
   }),
   deleteSavingGroup: async (id) => ({
     id,
     name: "Deleted Mock Group",
     description: "Deleted Mock Description",
     managerId: "mock-manager",
+    savingGoal: 0,
+    maxMembers: 0,
+    whatsAppGroupLink: "",
+    totalSavings: 0,
+    totalProfits: 0,
   }),
 };
 
@@ -103,10 +145,10 @@ serve(async (req) => {
       case "POST": {
         // Create Saving Group
         if (path === "/create") {
-          const { name, description } = await req.json();
-          if (!name || !description) {
+          const { name, description, savingGoal, maxMembers, whatsAppGroupLink } = await req.json();
+          if (!name || !description || !savingGoal || !maxMembers || !whatsAppGroupLink) {
             return new Response(
-              JSON.stringify({ error: "Missing name or description" }),
+              JSON.stringify({ error: "Missing required fields for group creation" }),
               {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 400,
@@ -116,7 +158,10 @@ serve(async (req) => {
           const savingGroup = await savingGroupsService.createSavingGroup(
             name,
             description,
-            user.id
+            user.id,
+            savingGoal,
+            maxMembers,
+            whatsAppGroupLink
           );
           return new Response(JSON.stringify(savingGroup), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -127,11 +172,11 @@ serve(async (req) => {
       }
 
       case "GET": {
-        // Get Saving Group by ID
+        // Get Comprehensive Saving Group Data by ID        // Get Basic Saving Group Data by ID
         if (path.startsWith("/group/")) {
           const id = path.split("/group/")[1];
           const savingGroup = await savingGroupsService.getSavingGroupById(id);
-          if (!savingGroup) {
+          if (!savingGroup) {Group) {
             return new Response(
               JSON.stringify({ error: "Saving Group not found" }),
               {
@@ -146,7 +191,7 @@ serve(async (req) => {
           });
         }
 
-        // Get Saving Groups by Admin ID (User's groups)
+        // Get Saving Groups by Manager ID (User's groups)
         if (path === "/manager") {
           const savingGroups =
             await savingGroupsService.getSavingGroupsByAdminId(user.id);
@@ -172,10 +217,10 @@ serve(async (req) => {
         // Update Saving Group
         if (path.startsWith("/group/")) {
           const id = path.split("/group/")[1];
-          const { name, description } = await req.json();
-          if (!name || !description) {
+          const { name, description, savingGoal, maxMembers, whatsAppGroupLink } = await req.json();
+          if (!name || !description || !savingGoal || !maxMembers || !whatsAppGroupLink) {
             return new Response(
-              JSON.stringify({ error: "Missing name or description" }),
+              JSON.stringify({ error: "Missing required fields for group update" }),
               {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 400,
@@ -197,7 +242,10 @@ serve(async (req) => {
           const savingGroup = await savingGroupsService.updateSavingGroup(
             id,
             name,
-            description
+            description,
+            savingGoal,
+            maxMembers,
+            whatsAppGroupLink
           );
           return new Response(JSON.stringify(savingGroup), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
