@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,56 +43,9 @@ serve(async (req) => {
     // POST / - Create withdrawal request
     if (req.method === 'POST') {
       const body = await req.json();
-      
-      // Validate input with Zod
-      const withdrawalSchema = z.object({
-        chama_id: z.string().uuid().optional(),
-        mchango_id: z.string().uuid().optional(),
-        amount: z.number()
-          .positive('Amount must be positive')
-          .min(10, 'Minimum withdrawal is KES 10')
-          .max(10000000, 'Maximum withdrawal is KES 10M')
-          .multipleOf(0.01, 'Amount must have max 2 decimal places'),
-        notes: z.string()
-          .max(500, 'Notes must be under 500 characters')
-          .optional()
-      }).refine(
-        data => data.chama_id || data.mchango_id,
-        'Either chama_id or mchango_id required'
-      );
-      
-      try {
-        withdrawalSchema.parse(body);
-      } catch (validationError: any) {
-        return new Response(JSON.stringify({ 
-          error: 'Invalid request data',
-          details: validationError.errors
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
       const { chama_id, mchango_id, amount, notes } = body;
 
       console.log('Creating withdrawal request:', body);
-      
-      // Verify KYC status
-      const { data: profile } = await supabaseClient
-        .from('profiles')
-        .select('kyc_status')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile || profile.kyc_status !== 'approved') {
-        return new Response(JSON.stringify({ 
-          error: 'KYC verification required',
-          kyc_status: profile?.kyc_status || 'unknown'
-        }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
 
       // Verify creator ownership
       let isCreator = false;
@@ -343,19 +295,8 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Error in withdrawals-crud:', {
-      message: error.message,
-      code: error.code,
-      details: error.details
-    });
-    
-    // Return safe error messages
-    let safeMessage = 'An error occurred processing your request';
-    if (error.code === '23505') safeMessage = 'Duplicate record';
-    else if (error.code === '23503') safeMessage = 'Referenced record not found';
-    else if (error.code === '42501') safeMessage = 'Permission denied';
-    
-    return new Response(JSON.stringify({ error: safeMessage }), {
+    console.error('Error in withdrawals-crud:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

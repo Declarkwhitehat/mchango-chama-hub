@@ -99,23 +99,6 @@ serve(async (req) => {
       const body = await req.json();
 
       console.log('Creating contribution:', body);
-      
-      // Verify KYC status
-      const { data: profile } = await supabaseClient
-        .from('profiles')
-        .select('kyc_status')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile || profile.kyc_status !== 'approved') {
-        return new Response(JSON.stringify({ 
-          error: 'KYC verification required to make contributions',
-          kyc_status: profile?.kyc_status || 'unknown'
-        }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
 
       // Validate member exists
       const { data: member, error: memberError } = await supabaseClient
@@ -209,18 +192,8 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Error in contributions-crud:', {
-      message: error.message,
-      code: error.code,
-      details: error.details
-    });
-    
-    let safeMessage = 'An error occurred processing your request';
-    if (error.code === '23505') safeMessage = 'Duplicate record';
-    else if (error.code === '23503') safeMessage = 'Referenced record not found';
-    else if (error.code === '42501') safeMessage = 'Permission denied';
-    
-    return new Response(JSON.stringify({ error: safeMessage }), {
+    console.error('Error in contributions-crud:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
