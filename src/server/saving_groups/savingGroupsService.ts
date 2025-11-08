@@ -14,7 +14,7 @@ export async function createSavingGroup(
       members: {
         create: {
           userId: adminId,
-          role: "ADMIN",
+          role: "MANAGER",
         },
       },
     },

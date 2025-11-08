@@ -17,17 +17,17 @@ interface SavingGroup {
   id: string;
   name: string;
   description: string;
-  adminId: string;
+  managerId: string;
 }
 
 interface SavingGroupService {
   createSavingGroup: (
     name: string,
     description: string,
-    adminId: string
+    managerId: string
   ) => Promise<SavingGroup>;
   getSavingGroupById: (id: string) => Promise<SavingGroup | null>;
-  getSavingGroupsByAdminId: (adminId: string) => Promise<SavingGroup[]>;
+  getSavingGroupsByAdminId: (managerId: string) => Promise<SavingGroup[]>;
   getSavingGroupsByMemberId: (memberId: string) => Promise<SavingGroup[]>;
   updateSavingGroup: (
     id: string,
@@ -40,31 +40,31 @@ interface SavingGroupService {
 // Since we cannot import the actual service, we will mock it for the handler logic
 // In a real scenario, the service would be imported and used.
 const savingGroupsService: SavingGroupService = {
-  createSavingGroup: async (name, description, adminId) => ({
+  createSavingGroup: async (name, description, managerId) => ({
     id: "mock-id",
     name,
     description,
-    adminId,
+    managerId,
   }),
   getSavingGroupById: async (id) => ({
     id,
     name: "Mock Group",
     description: "Mock Description",
-    adminId: "mock-admin",
+    managerId: "mock-manager",
   }),
-  getSavingGroupsByAdminId: async (adminId) => [],
+  getSavingGroupsByAdminId: async (managerId) => [],
   getSavingGroupsByMemberId: async (memberId) => [],
   updateSavingGroup: async (id, name, description) => ({
     id,
     name,
     description,
-    adminId: "mock-admin",
+    managerId: "mock-manager",
   }),
   deleteSavingGroup: async (id) => ({
     id,
     name: "Deleted Mock Group",
     description: "Deleted Mock Description",
-    adminId: "mock-admin",
+    managerId: "mock-manager",
   }),
 };
 
@@ -147,7 +147,7 @@ serve(async (req) => {
         }
 
         // Get Saving Groups by Admin ID (User's groups)
-        if (path === "/admin") {
+        if (path === "/manager") {
           const savingGroups =
             await savingGroupsService.getSavingGroupsByAdminId(user.id);
           return new Response(JSON.stringify(savingGroups), {
@@ -182,9 +182,9 @@ serve(async (req) => {
               }
             );
           }
-          // Add authorization check: only admin can update
+          // Add authorization check: only manager can update
           const existingGroup = await savingGroupsService.getSavingGroupById(id);
-          if (!existingGroup || existingGroup.adminId !== user.id) {
+          if (!existingGroup || existingGroup.managerId !== user.id) {
             return new Response(
               JSON.stringify({ error: "Unauthorized to update this group" }),
               {
@@ -212,9 +212,9 @@ serve(async (req) => {
         if (path.startsWith("/group/")) {
           const id = path.split("/group/")[1];
 
-          // Add authorization check: only admin can delete
+          // Add authorization check: only manager can delete
           const existingGroup = await savingGroupsService.getSavingGroupById(id);
-          if (!existingGroup || existingGroup.adminId !== user.id) {
+          if (!existingGroup || existingGroup.managerId !== user.id) {
             return new Response(
               JSON.stringify({ error: "Unauthorized to delete this group" }),
               {

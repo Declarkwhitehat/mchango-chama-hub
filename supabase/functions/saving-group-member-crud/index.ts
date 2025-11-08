@@ -8,14 +8,14 @@ interface SavingGroupMember {
   id: string;
   savingGroupId: string;
   userId: string;
-  role: "ADMIN" | "MEMBER";
+  role: "MANAGER" | "MEMBER";
 }
 
 interface SavingGroup {
   id: string;
   name: string;
   description: string;
-  adminId: string;
+  managerId: string;
 }
 
 interface SavingGroupService {
@@ -26,7 +26,7 @@ interface SavingGroupMemberService {
   addMember: (
     savingGroupId: string,
     userId: string,
-    role: "ADMIN" | "MEMBER"
+    role: "MANAGER" | "MEMBER"
   ) => Promise<SavingGroupMember>;
   removeMember: (
     savingGroupId: string,
@@ -41,7 +41,7 @@ const savingGroupsService: SavingGroupService = {
     id,
     name: "Mock Group",
     description: "Mock Description",
-    adminId: "mock-admin",
+    managerId: "mock-manager",
   }),
 };
 
@@ -63,7 +63,7 @@ const savingGroupMemberService: SavingGroupMemberService = {
       id: "mock-member-id-1",
       savingGroupId,
       userId: "mock-user-1",
-      role: "ADMIN",
+      role: "MANAGER",
     },
     {
       id: "mock-member-id-2",
@@ -105,10 +105,10 @@ serve(async (req) => {
     const method = req.method;
     const path = url.pathname.replace("/saving-group-member-crud", "");
 
-    // Utility to check if the current user is the admin of the group
+    // Utility to check if the current user is the manager of the group
     const isAdmin = async (groupId: string): Promise<boolean> => {
       const group = await savingGroupsService.getSavingGroupById(groupId);
-      return group?.adminId === user.id;
+      return group?.managerId === user.id;
     };
 
     switch (method) {
@@ -126,11 +126,11 @@ serve(async (req) => {
             );
           }
 
-          // Authorization: Only admin can add members (for invitation)
+          // Authorization: Only manager can add members (for invitation)
           if (!(await isAdmin(savingGroupId))) {
             return new Response(
               JSON.stringify({
-                error: "Unauthorized: Only group admin can add members.",
+                error: "Unauthorized: Only group manager can add members.",
               }),
               {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -166,11 +166,11 @@ serve(async (req) => {
             );
           }
 
-          // Authorization: Only admin can remove members
+          // Authorization: Only manager can remove members
           if (!(await isAdmin(savingGroupId))) {
             return new Response(
               JSON.stringify({
-                error: "Unauthorized: Only group admin can remove members.",
+                error: "Unauthorized: Only group manager can remove members.",
               }),
               {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
