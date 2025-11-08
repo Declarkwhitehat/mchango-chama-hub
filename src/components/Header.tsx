@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogIn, UserPlus, Users, Heart, PiggyBank } from "lucide-react";
+import { Menu, X, LogIn, UserPlus, Users, Heart } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -38,14 +38,6 @@ export const Header = () => {
             >
               <Heart className="h-4 w-4" />
               Browse Campaigns
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={() => navigate('/saving-groups')}
-              className="gap-2"
-            >
-              <PiggyBank className="h-4 w-4" />
-              Saving Groups
             </Button>
             <Button 
               variant="ghost" 
@@ -103,17 +95,6 @@ export const Header = () => {
               >
                 <Heart className="h-4 w-4" />
                 Browse Campaigns
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => {
-                  navigate('/saving-groups');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full justify-start gap-2"
-              >
-                <PiggyBank className="h-4 w-4" />
-                Saving Groups
               </Button>
               <Button 
                 variant="ghost" 
