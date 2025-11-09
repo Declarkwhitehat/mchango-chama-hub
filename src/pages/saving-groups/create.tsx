@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { Layout } from '@/components/Layout';
 import { createSavingGroup } from '@/integrations/supabase/savingGroupsApi';
 
 const CreateSavingGroupPage: React.FC = () => {
@@ -45,7 +46,8 @@ const CreateSavingGroupPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-lg mx-auto">
+    <Layout>
+      <div className="p-6 max-w-lg mx-auto">
       <h1 className="text-2xl font-bold mb-4">Create New Saving Group</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -117,6 +119,7 @@ const CreateSavingGroupPage: React.FC = () => {
         </button>
       </form>
     </div>
+    </Layout>
   );
 };
 

@@ -149,7 +149,7 @@ serve(async (req) => {
         // Create Saving Group
         if (path === "/create") {
           const { name, description, savingGoal, maxMembers, whatsAppGroupLink } = await req.json();
-          if (!name || !description || !savingGoal || !maxMembers || !whatsAppGroupLink) {
+          if (!name || !description || !savingGoal || !maxMembers) {
             return new Response(
               JSON.stringify({ error: "Missing required fields for group creation" }),
               {
@@ -158,15 +158,59 @@ serve(async (req) => {
               }
             );
           }
-          const savingGroup = await savingGroupsService.createSavingGroup(
-            name,
-            description,
-            user.id,
-            savingGoal,
-            maxMembers,
-            whatsAppGroupLink
-          );
-          return new Response(JSON.stringify(savingGroup), {
+          
+          // Generate slug from name
+          const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+          
+          // Create the saving group
+          const { data: savingGroup, error: createError } = await supabaseClient
+            .from('saving_groups')
+            .insert({
+              name,
+              description: description || '',
+              slug: `${slug}-${Date.now()}`,
+              manager_id: user.id,
+              created_by: user.id,
+              cycle_start_date: new Date().toISOString(),
+              cycle_end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days from now
+              saving_goal: savingGoal,
+              max_members: maxMembers,
+              whatsapp_link: whatsAppGroupLink || null,
+            })
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error('Error creating saving group:', createError);
+            return new Response(
+              JSON.stringify({ error: 'Failed to create saving group' }),
+              {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 500,
+              }
+            );
+          }
+          
+          // Add creator as first member
+          await supabaseClient
+            .from('saving_group_members')
+            .insert({
+              group_id: savingGroup.id,
+              user_id: user.id,
+              status: 'active',
+            });
+          
+          return new Response(JSON.stringify({
+            id: savingGroup.id,
+            name: savingGroup.name,
+            description: savingGroup.description,
+            managerId: savingGroup.manager_id,
+            savingGoal: parseFloat(savingGroup.saving_goal || '0'),
+            maxMembers: savingGroup.max_members || 100,
+            whatsAppGroupLink: savingGroup.whatsapp_link || '',
+            totalSavings: parseFloat(savingGroup.total_group_savings || '0'),
+            totalProfits: parseFloat(savingGroup.group_profit_pool || '0'),
+          }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 201,
           });
@@ -175,11 +219,17 @@ serve(async (req) => {
       }
 
       case "GET": {
-        // Get Comprehensive Saving Group Data by ID        // Get Basic Saving Group Data by ID
+        // Get Basic Saving Group Data by ID
         if (path.startsWith("/group/")) {
           const id = path.split("/group/")[1];
-          const savingGroup = await savingGroupsService.getSavingGroupById(id);
-          if (!savingGroup) {
+          
+          const { data: savingGroup, error: fetchError } = await supabaseClient
+            .from('saving_groups')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+          if (fetchError || !savingGroup) {
             return new Response(
               JSON.stringify({ error: "Saving Group not found" }),
               {
@@ -188,7 +238,18 @@ serve(async (req) => {
               }
             );
           }
-          return new Response(JSON.stringify(savingGroup), {
+          
+          return new Response(JSON.stringify({
+            id: savingGroup.id,
+            name: savingGroup.name,
+            description: savingGroup.description,
+            managerId: savingGroup.manager_id,
+            savingGoal: parseFloat(savingGroup.saving_goal || '0'),
+            maxMembers: savingGroup.max_members || 100,
+            whatsAppGroupLink: savingGroup.whatsapp_link || '',
+            totalSavings: parseFloat(savingGroup.total_group_savings || '0'),
+            totalProfits: parseFloat(savingGroup.group_profit_pool || '0'),
+          }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,
           });
@@ -196,9 +257,34 @@ serve(async (req) => {
 
         // Get Saving Groups by Manager ID (User's groups)
         if (path === "/manager") {
-          const savingGroups =
-            await savingGroupsService.getSavingGroupsByAdminId(user.id);
-          return new Response(JSON.stringify(savingGroups), {
+          const { data: savingGroups, error: fetchError } = await supabaseClient
+            .from('saving_groups')
+            .select('*')
+            .eq('manager_id', user.id);
+            
+          if (fetchError) {
+            return new Response(
+              JSON.stringify({ error: 'Failed to fetch managed groups' }),
+              {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 500,
+              }
+            );
+          }
+          
+          const groups = (savingGroups || []).map(sg => ({
+            id: sg.id,
+            name: sg.name,
+            description: sg.description,
+            managerId: sg.manager_id,
+            savingGoal: parseFloat(sg.saving_goal || '0'),
+            maxMembers: sg.max_members || 100,
+            whatsAppGroupLink: sg.whatsapp_link || '',
+            totalSavings: parseFloat(sg.total_group_savings || '0'),
+            totalProfits: parseFloat(sg.group_profit_pool || '0'),
+          }));
+          
+          return new Response(JSON.stringify(groups), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,
           });
@@ -206,9 +292,38 @@ serve(async (req) => {
 
         // Get Saving Groups by Member ID (Groups user belongs to)
         if (path === "/member") {
-          const savingGroups =
-            await savingGroupsService.getSavingGroupsByMemberId(user.id);
-          return new Response(JSON.stringify(savingGroups), {
+          const { data: memberships, error: fetchError } = await supabaseClient
+            .from('saving_group_members')
+            .select('group_id, saving_groups(*)')
+            .eq('user_id', user.id)
+            .eq('status', 'active');
+            
+          if (fetchError) {
+            return new Response(
+              JSON.stringify({ error: 'Failed to fetch member groups' }),
+              {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 500,
+              }
+            );
+          }
+          
+          const groups = (memberships || []).map(m => {
+            const sg = m.saving_groups as any;
+            return {
+              id: sg.id,
+              name: sg.name,
+              description: sg.description,
+              managerId: sg.manager_id,
+              savingGoal: parseFloat(sg.saving_goal || '0'),
+              maxMembers: sg.max_members || 100,
+              whatsAppGroupLink: sg.whatsapp_link || '',
+              totalSavings: parseFloat(sg.total_group_savings || '0'),
+              totalProfits: parseFloat(sg.group_profit_pool || '0'),
+            };
+          });
+          
+          return new Response(JSON.stringify(groups), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,
           });

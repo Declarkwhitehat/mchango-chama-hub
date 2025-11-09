@@ -50,10 +50,14 @@ export interface Loan {
 
 const callEdgeFunction = async <T>(
   functionName: string,
-  method: "GET" | "POST" | "PUT" | "DELETE",
+  path: string = "",
+  method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
   body?: any
 ): Promise<T> => {
-  const { data, error } = await supabase.functions.invoke(functionName, {
+  // Construct the full function URL with path
+  const functionUrl = path ? `${functionName}${path}` : functionName;
+  
+  const { data, error } = await supabase.functions.invoke(functionUrl, {
     method,
     body,
   });
@@ -78,7 +82,7 @@ export const createSavingGroup = async (
   maxMembers: number,
   whatsAppGroupLink: string
 ): Promise<SavingGroup> => {
-  return callEdgeFunction<SavingGroup>("saving-group-crud", "POST", {
+  return callEdgeFunction<SavingGroup>("saving-group-crud", "/create", "POST", {
     name,
     description,
     savingGoal,
@@ -88,23 +92,17 @@ export const createSavingGroup = async (
 };
 
 export const getManagerSavingGroups = async (): Promise<SavingGroup[]> => {
-  return callEdgeFunction<SavingGroup[]>("saving-group-crud", "GET", {
-    path: "/manager",
-  });
+  return callEdgeFunction<SavingGroup[]>("saving-group-crud", "/manager", "GET");
 };
 
 export const getMemberSavingGroups = async (): Promise<SavingGroup[]> => {
-  return callEdgeFunction<SavingGroup[]>("saving-group-crud", "GET", {
-    path: "/member",
-  });
+  return callEdgeFunction<SavingGroup[]>("saving-group-crud", "/member", "GET");
 };
 
 export const getComprehensiveSavingGroupData = async (
   id: string
 ): Promise<SavingGroup> => {
-  return callEdgeFunction<SavingGroup>("saving-group-crud", "GET", {
-    path: `/group/comprehensive/${id}`,
-  });
+  return callEdgeFunction<SavingGroup>("saving-group-crud", `/group/${id}`, "GET");
 };
 
 export const updateSavingGroup = async (
@@ -115,8 +113,7 @@ export const updateSavingGroup = async (
   maxMembers: number,
   whatsAppGroupLink: string
 ): Promise<SavingGroup> => {
-  return callEdgeFunction<SavingGroup>("saving-group-crud", "PUT", {
-    path: `/group/${id}`,
+  return callEdgeFunction<SavingGroup>("saving-group-crud", `/group/${id}`, "PUT", {
     name,
     description,
     savingGoal,
@@ -131,8 +128,7 @@ export const addMemberToGroup = async (
   savingGroupId: string,
   userId: string
 ): Promise<SavingGroupMember> => {
-  return callEdgeFunction<SavingGroupMember>("saving-group-member-crud", "POST", {
-    path: "/add",
+  return callEdgeFunction<SavingGroupMember>("saving-group-member-crud", "/add", "POST", {
     savingGroupId,
     userId,
   });
@@ -141,9 +137,7 @@ export const addMemberToGroup = async (
 export const getGroupMembers = async (
   savingGroupId: string
 ): Promise<SavingGroupMember[]> => {
-  return callEdgeFunction<SavingGroupMember[]>("saving-group-member-crud", "GET", {
-    path: `/list/${savingGroupId}`,
-  });
+  return callEdgeFunction<SavingGroupMember[]>("saving-group-member-crud", `/list/${savingGroupId}`, "GET");
 };
 
 // --- Deposit Management ---
@@ -153,8 +147,7 @@ export const createDeposit = async (
   userId: string,
   amount: number
 ): Promise<Deposit> => {
-  return callEdgeFunction<Deposit>("deposit-crud", "POST", {
-    path: "/create",
+  return callEdgeFunction<Deposit>("deposit-crud", "/create", "POST", {
     savingGroupId,
     userId,
     amount,
@@ -165,17 +158,13 @@ export const getMemberTotalSavings = async (
   savingGroupId: string,
   userId: string
 ): Promise<{ totalSavings: number }> => {
-  return callEdgeFunction<{ totalSavings: number }>("deposit-crud", "GET", {
-    path: `/savings/${savingGroupId}/${userId}`,
-  });
+  return callEdgeFunction<{ totalSavings: number }>("deposit-crud", `/savings/${savingGroupId}/${userId}`, "GET");
 };
 
 export const getGroupDepositHistory = async (
   savingGroupId: string
 ): Promise<Deposit[]> => {
-  return callEdgeFunction<Deposit[]>("deposit-crud", "GET", {
-    path: `/history/${savingGroupId}`,
-  });
+  return callEdgeFunction<Deposit[]>("deposit-crud", `/history/${savingGroupId}`, "GET");
 };
 
 // --- Loan Management ---
@@ -184,8 +173,7 @@ export const createLoanRequest = async (
   savingGroupId: string,
   requestedAmount: number
 ): Promise<Loan> => {
-  return callEdgeFunction<Loan>("loan-crud", "POST", {
-    path: "/request",
+  return callEdgeFunction<Loan>("loan-crud", "/request", "POST", {
     savingGroupId,
     requestedAmount,
   });
@@ -194,17 +182,14 @@ export const createLoanRequest = async (
 export const getPendingLoans = async (
   savingGroupId: string
 ): Promise<Loan[]> => {
-  return callEdgeFunction<Loan[]>("loan-crud", "GET", {
-    path: `/pending/${savingGroupId}`,
-  });
+  return callEdgeFunction<Loan[]>("loan-crud", `/pending/${savingGroupId}`, "GET");
 };
 
 export const recordLoanApproval = async (
   loanId: string,
   savingGroupId: string
 ): Promise<any> => {
-  return callEdgeFunction<any>("loan-approval-crud", "POST", {
-    path: "/approve",
+  return callEdgeFunction<any>("loan-approval-crud", "/approve", "POST", {
     loanId,
     savingGroupId,
   });

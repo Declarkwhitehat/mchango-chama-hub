@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { Layout } from '@/components/Layout';
 import { getManagerSavingGroups, getMemberSavingGroups, SavingGroup } from '@/integrations/supabase/savingGroupsApi';
 
 const GroupCard: React.FC<{ group: SavingGroup, isManager: boolean }> = ({ group, isManager }) => (
@@ -41,7 +42,8 @@ const SavingGroupDashboardComponent: React.FC = () => {
   const uniqueGroups = Array.from(new Map(allGroups.map(group => [group.id, group])).values());
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <Layout>
+      <div className="p-6 max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">My Saving Groups</h1>
         <Link to="/saving-groups/create" className="py-2 px-4 bg-green-600 text-white rounded-md shadow-md hover:bg-green-700 transition-colors">
@@ -80,6 +82,7 @@ const SavingGroupDashboardComponent: React.FC = () => {
         </>
       )}
     </div>
+    </Layout>
   );
 };
 

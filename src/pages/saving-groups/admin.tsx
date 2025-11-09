@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Layout } from '@/components/Layout';
 import {
   getComprehensiveSavingGroupData,
   getGroupMembers,
@@ -152,7 +153,8 @@ const SavingGroupAdminComponent: React.FC = () => {
 
   // --- Render ---
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <Layout>
+      <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-2 text-indigo-700">{group.name}</h1>
       <p className="text-gray-600 mb-6">{group.description}</p>
 
@@ -246,6 +248,7 @@ const SavingGroupAdminComponent: React.FC = () => {
         </div>
       </div>
     </div>
+    </Layout>
   );
 };
 
