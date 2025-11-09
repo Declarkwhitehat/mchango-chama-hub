@@ -40,7 +40,10 @@ interface SavingGroupService {
   updateSavingGroup: (
     id: string,
     name: string,
-    description: string
+    description: string,
+    savingGoal: number,
+    maxMembers: number,
+    whatsAppGroupLink: string
   ) => Promise<SavingGroup>;
   deleteSavingGroup: (id: string) => Promise<SavingGroup>;
 }
@@ -80,12 +83,12 @@ const savingGroupsService: SavingGroupService = {
   getSavingGroupsByAdminId: async (managerId) => [],
   getSavingGroupsByMemberId: async (memberId) => [],
   updateSavingGroup: async (
-    id,
-    name,
-    description,
-    savingGoal,
-    maxMembers,
-    whatsAppGroupLink
+    id: string,
+    name: string,
+    description: string,
+    savingGoal: number,
+    maxMembers: number,
+    whatsAppGroupLink: string
   ) => ({
     id,
     name,
@@ -176,7 +179,7 @@ serve(async (req) => {
         if (path.startsWith("/group/")) {
           const id = path.split("/group/")[1];
           const savingGroup = await savingGroupsService.getSavingGroupById(id);
-          if (!savingGroup) {Group) {
+          if (!savingGroup) {
             return new Response(
               JSON.stringify({ error: "Saving Group not found" }),
               {
@@ -286,7 +289,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 404,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
