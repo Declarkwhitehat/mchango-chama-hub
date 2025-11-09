@@ -741,6 +741,188 @@ export type Database = {
           },
         ]
       }
+      saving_group_deposits: {
+        Row: {
+          amount: number
+          commission_amount: number
+          created_at: string
+          id: string
+          member_user_id: string
+          net_amount: number
+          payer_user_id: string
+          saving_group_id: string
+        }
+        Insert: {
+          amount: number
+          commission_amount: number
+          created_at?: string
+          id?: string
+          member_user_id: string
+          net_amount: number
+          payer_user_id: string
+          saving_group_id: string
+        }
+        Update: {
+          amount?: number
+          commission_amount?: number
+          created_at?: string
+          id?: string
+          member_user_id?: string
+          net_amount?: number
+          payer_user_id?: string
+          saving_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_deposits_saving_group_id_fkey"
+            columns: ["saving_group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saving_group_loan_guarantors: {
+        Row: {
+          approved_at: string
+          default_payment_amount: number | null
+          guarantor_user_id: string
+          id: string
+          is_default_payer: boolean
+          loan_id: string
+        }
+        Insert: {
+          approved_at?: string
+          default_payment_amount?: number | null
+          guarantor_user_id: string
+          id?: string
+          is_default_payer?: boolean
+          loan_id: string
+        }
+        Update: {
+          approved_at?: string
+          default_payment_amount?: number | null
+          guarantor_user_id?: string
+          id?: string
+          is_default_payer?: boolean
+          loan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_loan_guarantors_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "saving_group_loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saving_group_loan_repayments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          loan_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          loan_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          loan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_loan_repayments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "saving_group_loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saving_group_loans: {
+        Row: {
+          approved_at: string | null
+          balance_remaining: number
+          borrower_user_id: string
+          commission_deducted: number
+          defaulted_at: string | null
+          disbursed_amount: number
+          disbursed_at: string | null
+          due_date: string
+          id: string
+          insurance_fee_rate: number
+          interest_rate: number
+          is_active: boolean
+          principal_amount: number
+          profit_deducted: number
+          repaid_at: string | null
+          requested_amount: number
+          requested_at: string
+          saving_group_id: string
+          status: string
+          total_repayment_amount: number
+        }
+        Insert: {
+          approved_at?: string | null
+          balance_remaining: number
+          borrower_user_id: string
+          commission_deducted: number
+          defaulted_at?: string | null
+          disbursed_amount: number
+          disbursed_at?: string | null
+          due_date: string
+          id?: string
+          insurance_fee_rate?: number
+          interest_rate?: number
+          is_active?: boolean
+          principal_amount: number
+          profit_deducted: number
+          repaid_at?: string | null
+          requested_amount: number
+          requested_at?: string
+          saving_group_id: string
+          status?: string
+          total_repayment_amount: number
+        }
+        Update: {
+          approved_at?: string | null
+          balance_remaining?: number
+          borrower_user_id?: string
+          commission_deducted?: number
+          defaulted_at?: string | null
+          disbursed_amount?: number
+          disbursed_at?: string | null
+          due_date?: string
+          id?: string
+          insurance_fee_rate?: number
+          interest_rate?: number
+          is_active?: boolean
+          principal_amount?: number
+          profit_deducted?: number
+          repaid_at?: string | null
+          requested_amount?: number
+          requested_at?: string
+          saving_group_id?: string
+          status?: string
+          total_repayment_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_loans_saving_group_id_fkey"
+            columns: ["saving_group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saving_group_members: {
         Row: {
           current_savings: number
@@ -782,6 +964,41 @@ export type Database = {
           },
         ]
       }
+      saving_group_profit_distributions: {
+        Row: {
+          amount: number
+          created_at: string
+          cycle_end_date: string
+          id: string
+          saving_group_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          cycle_end_date: string
+          id?: string
+          saving_group_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          cycle_end_date?: string
+          id?: string
+          saving_group_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_profit_distributions_saving_group_id_fkey"
+            columns: ["saving_group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saving_groups: {
         Row: {
           created_at: string
@@ -792,12 +1009,17 @@ export type Database = {
           group_profit_pool: number
           id: string
           manager_id: string
+          max_members: number
           monthly_target: number
           name: string
+          saving_goal: number
           slug: string
           status: string
           total_group_savings: number
+          total_profits: number
+          total_savings: number
           updated_at: string
+          whatsapp_group_link: string | null
           whatsapp_link: string | null
         }
         Insert: {
@@ -809,12 +1031,17 @@ export type Database = {
           group_profit_pool?: number
           id?: string
           manager_id: string
+          max_members?: number
           monthly_target?: number
           name: string
+          saving_goal?: number
           slug: string
           status?: string
           total_group_savings?: number
+          total_profits?: number
+          total_savings?: number
           updated_at?: string
+          whatsapp_group_link?: string | null
           whatsapp_link?: string | null
         }
         Update: {
@@ -826,12 +1053,17 @@ export type Database = {
           group_profit_pool?: number
           id?: string
           manager_id?: string
+          max_members?: number
           monthly_target?: number
           name?: string
+          saving_goal?: number
           slug?: string
           status?: string
           total_group_savings?: number
+          total_profits?: number
+          total_savings?: number
           updated_at?: string
+          whatsapp_group_link?: string | null
           whatsapp_link?: string | null
         }
         Relationships: []
