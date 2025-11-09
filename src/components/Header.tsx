@@ -33,14 +33,6 @@ export const Header = () => {
             </Button>
             <Button 
               variant="ghost" 
-              onClick={() => navigate('/saving-groups')}
-              className="gap-2"
-            >
-              <Users className="h-4 w-4" />
-              Savings Groups
-            </Button>
-            <Button 
-              variant="ghost" 
               onClick={() => navigate('/mchango')}
               className="gap-2"
             >
@@ -92,17 +84,6 @@ export const Header = () => {
               >
                 <Users className="h-4 w-4" />
                 Browse Chamas
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => {
-                  navigate('/saving-groups');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full justify-start gap-2"
-              >
-                <Users className="h-4 w-4" />
-                Savings Groups
               </Button>
               <Button 
                 variant="ghost" 

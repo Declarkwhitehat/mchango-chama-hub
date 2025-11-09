@@ -248,8 +248,18 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Error in mchango-crud:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('Error in mchango-crud:', {
+      message: error.message,
+      code: error.code,
+      details: error.details
+    });
+    
+    let safeMessage = 'An error occurred processing your request';
+    if (error.code === '23505') safeMessage = 'Duplicate record';
+    else if (error.code === '23503') safeMessage = 'Referenced record not found';
+    else if (error.code === '42501') safeMessage = 'Permission denied';
+    
+    return new Response(JSON.stringify({ error: safeMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

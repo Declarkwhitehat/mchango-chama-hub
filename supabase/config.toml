@@ -41,27 +41,3 @@ verify_jwt = true
 
 [functions.mpesa-callback]
 verify_jwt = false
-
-[functions.saving-group-crud]
-verify_jwt = true
-
-[functions.saving-group-member-crud]
-verify_jwt = true
-
-[functions.deposit-crud]
-verify_jwt = true
-
-[functions.loan-crud]
-verify_jwt = true
-
-[functions.loan-approval-crud]
-verify_jwt = true
-
-[functions.loan-default-crud]
-verify_jwt = true
-
-[functions.profit-crud]
-verify_jwt = true
-
-[functions.withdrawals-crud]
-verify_jwt = true
