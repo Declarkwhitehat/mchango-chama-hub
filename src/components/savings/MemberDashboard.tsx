@@ -265,6 +265,15 @@ export default function SavingsGroupMemberDashboard({
         </Dialog>
 
         <Button
+          variant="outline"
+          size="lg"
+          onClick={() => navigate(`/savings-groups/${group.id}/activity`)}
+        >
+          <History className="mr-2 h-5 w-5" />
+          View Full Activity
+        </Button>
+
+        <Button
           variant="ghost"
           size="lg"
           onClick={onRefresh}

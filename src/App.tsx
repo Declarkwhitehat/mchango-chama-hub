@@ -19,6 +19,7 @@ import SavingsGroupList from "./pages/SavingsGroupList";
 import SavingsGroupCreate from "./pages/SavingsGroupCreate";
 import SavingsGroupJoin from "./pages/SavingsGroupJoin";
 import SavingsGroupDetail from "./pages/SavingsGroupDetail";
+import MemberActivity from "./pages/MemberActivity";
 import Admin from "./pages/Admin";
 import AdminKYC from "./pages/AdminKYC";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -56,6 +57,7 @@ const App = () => (
           <Route path="/savings-groups/create" element={<ProtectedRoute requireKYC><SavingsGroupCreate /></ProtectedRoute>} />
           <Route path="/savings-groups/join" element={<ProtectedRoute><SavingsGroupJoin /></ProtectedRoute>} />
           <Route path="/savings-groups/:id" element={<ProtectedRoute><SavingsGroupDetail /></ProtectedRoute>} />
+          <Route path="/savings-groups/:groupId/activity" element={<ProtectedRoute><MemberActivity /></ProtectedRoute>} />
           
           <Route path="/admin" element={<AdminProtectedRoute><Admin /></AdminProtectedRoute>} />
           <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />
