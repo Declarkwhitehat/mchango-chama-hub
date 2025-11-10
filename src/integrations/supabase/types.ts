@@ -247,6 +247,44 @@ export type Database = {
           },
         ]
       }
+      company_earnings: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          group_id: string | null
+          id: string
+          reference_id: string | null
+          source: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          group_id?: string | null
+          id?: string
+          reference_id?: string | null
+          source: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          group_id?: string | null
+          id?: string
+          reference_id?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_earnings_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contribution_cycles: {
         Row: {
           chama_id: string
@@ -750,6 +788,8 @@ export type Database = {
           member_user_id: string
           net_amount: number
           payer_user_id: string
+          profit_fee: number | null
+          saved_for_member_id: string | null
           saving_group_id: string
         }
         Insert: {
@@ -760,6 +800,8 @@ export type Database = {
           member_user_id: string
           net_amount: number
           payer_user_id: string
+          profit_fee?: number | null
+          saved_for_member_id?: string | null
           saving_group_id: string
         }
         Update: {
@@ -770,9 +812,18 @@ export type Database = {
           member_user_id?: string
           net_amount?: number
           payer_user_id?: string
+          profit_fee?: number | null
+          saved_for_member_id?: string | null
           saving_group_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "saving_group_deposits_saved_for_member_id_fkey"
+            columns: ["saved_for_member_id"]
+            isOneToOne: false
+            referencedRelation: "saving_group_members"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "saving_group_deposits_saving_group_id_fkey"
             columns: ["saving_group_id"]
@@ -863,11 +914,13 @@ export type Database = {
           principal_amount: number
           profit_deducted: number
           repaid_at: string | null
+          repayment_due_date: string | null
           requested_amount: number
           requested_at: string
           saving_group_id: string
           status: string
           total_repayment_amount: number
+          waitlist: boolean | null
         }
         Insert: {
           approved_at?: string | null
@@ -885,11 +938,13 @@ export type Database = {
           principal_amount: number
           profit_deducted: number
           repaid_at?: string | null
+          repayment_due_date?: string | null
           requested_amount: number
           requested_at?: string
           saving_group_id: string
           status?: string
           total_repayment_amount: number
+          waitlist?: boolean | null
         }
         Update: {
           approved_at?: string | null
@@ -907,11 +962,13 @@ export type Database = {
           principal_amount?: number
           profit_deducted?: number
           repaid_at?: string | null
+          repayment_due_date?: string | null
           requested_amount?: number
           requested_at?: string
           saving_group_id?: string
           status?: string
           total_repayment_amount?: number
+          waitlist?: boolean | null
         }
         Relationships: [
           {
@@ -928,30 +985,36 @@ export type Database = {
           current_savings: number
           group_id: string
           id: string
+          is_approved: boolean | null
           is_loan_eligible: boolean
           joined_at: string
           lifetime_deposits: number
           status: string
+          unique_member_id: string | null
           user_id: string
         }
         Insert: {
           current_savings?: number
           group_id: string
           id?: string
+          is_approved?: boolean | null
           is_loan_eligible?: boolean
           joined_at?: string
           lifetime_deposits?: number
           status?: string
+          unique_member_id?: string | null
           user_id: string
         }
         Update: {
           current_savings?: number
           group_id?: string
           id?: string
+          is_approved?: boolean | null
           is_loan_eligible?: boolean
           joined_at?: string
           lifetime_deposits?: number
           status?: string
+          unique_member_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -999,6 +1062,140 @@ export type Database = {
           },
         ]
       }
+      saving_group_profit_shares: {
+        Row: {
+          created_at: string
+          disbursed: boolean | null
+          disbursed_at: string | null
+          id: string
+          member_id: string
+          profit_id: string
+          savings_ratio: number
+          share_amount: number
+        }
+        Insert: {
+          created_at?: string
+          disbursed?: boolean | null
+          disbursed_at?: string | null
+          id?: string
+          member_id: string
+          profit_id: string
+          savings_ratio?: number
+          share_amount?: number
+        }
+        Update: {
+          created_at?: string
+          disbursed?: boolean | null
+          disbursed_at?: string | null
+          id?: string
+          member_id?: string
+          profit_id?: string
+          savings_ratio?: number
+          share_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_profit_shares_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "saving_group_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saving_group_profit_shares_profit_id_fkey"
+            columns: ["profit_id"]
+            isOneToOne: false
+            referencedRelation: "saving_group_profits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saving_group_profits: {
+        Row: {
+          created_at: string
+          cycle_period: string
+          distributed: boolean | null
+          distribution_date: string | null
+          group_id: string
+          id: string
+          total_profit: number
+        }
+        Insert: {
+          created_at?: string
+          cycle_period: string
+          distributed?: boolean | null
+          distribution_date?: string | null
+          group_id: string
+          id?: string
+          total_profit?: number
+        }
+        Update: {
+          created_at?: string
+          cycle_period?: string
+          distributed?: boolean | null
+          distribution_date?: string | null
+          group_id?: string
+          id?: string
+          total_profit?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_profits_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saving_group_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          group_id: string
+          id: string
+          member_id: string | null
+          notes: string | null
+          reference_id: string | null
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          group_id: string
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          reference_id?: string | null
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          group_id?: string
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          reference_id?: string | null
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_transactions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saving_group_transactions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "saving_group_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saving_groups: {
         Row: {
           created_at: string
@@ -1012,8 +1209,10 @@ export type Database = {
           max_members: number
           monthly_target: number
           name: string
+          profile_picture: string | null
           saving_goal: number
           slug: string
+          started_at: string | null
           status: string
           total_group_savings: number
           total_profits: number
@@ -1034,8 +1233,10 @@ export type Database = {
           max_members?: number
           monthly_target?: number
           name: string
+          profile_picture?: string | null
           saving_goal?: number
           slug: string
+          started_at?: string | null
           status?: string
           total_group_savings?: number
           total_profits?: number
@@ -1056,8 +1257,10 @@ export type Database = {
           max_members?: number
           monthly_target?: number
           name?: string
+          profile_picture?: string | null
           saving_goal?: number
           slug?: string
+          started_at?: string | null
           status?: string
           total_group_savings?: number
           total_profits?: number
@@ -1330,6 +1533,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_available_loan_pool: {
+        Args: { p_group_id: string }
+        Returns: number
+      }
       calculate_loan_pool_available: {
         Args: { p_group_id: string }
         Returns: number
@@ -1349,6 +1556,10 @@ export type Database = {
         Returns: string
       }
       generate_slug: { Args: { title: string }; Returns: string }
+      generate_unique_member_id: {
+        Args: { p_group_id: string; p_member_number: number }
+        Returns: string
+      }
       get_member_payout_position: {
         Args: { p_member_id: string }
         Returns: {
@@ -1371,6 +1582,16 @@ export type Database = {
       is_chama_member: {
         Args: { _chama_id: string; _user_id: string }
         Returns: boolean
+      }
+      record_company_earning: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_group_id?: string
+          p_reference_id?: string
+          p_source: string
+        }
+        Returns: string
       }
     }
     Enums: {
