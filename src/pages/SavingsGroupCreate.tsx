@@ -10,6 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -112,7 +119,10 @@ export default function SavingsGroupCreate() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const errorMessage = error?.message || response?.error?.message || response?.error?.error || "Failed to create savings group";
+        throw new Error(errorMessage);
+      }
 
       if (!response?.success || !response?.group) {
         throw new Error("Failed to create savings group");
@@ -266,17 +276,26 @@ export default function SavingsGroupCreate() {
                   <FormItem>
                     <FormLabel>Group Period (Months) *</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="6"
-                        min="6"
-                        max="24"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
+                      <Select
+                        value={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select period" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="6">6 months</SelectItem>
+                          <SelectItem value="9">9 months</SelectItem>
+                          <SelectItem value="12">12 months</SelectItem>
+                          <SelectItem value="15">15 months</SelectItem>
+                          <SelectItem value="18">18 months</SelectItem>
+                          <SelectItem value="21">21 months</SelectItem>
+                          <SelectItem value="24">24 months</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </FormControl>
                     <FormDescription>
-                      Choose between 6-24 months (recommended: 6, 9, or 12 months)
+                      Recommended: 6, 9, or 12 months
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

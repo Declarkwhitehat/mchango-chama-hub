@@ -76,7 +76,14 @@ serve(async (req) => {
     // POST /groups - Create group
     if (method === 'POST' && pathParts.length === 1) {
       const body = await req.json();
-      const { name, saving_goal, max_members, whatsapp_link, description, profile_picture, period_months } = body;
+      const { name, saving_goal, max_members, whatsapp_link, description, profile_picture } = body;
+
+      // Safely parse period_months with fallback
+      const rawPeriod = body?.period_months ?? body?.period ?? null;
+      const parsedPeriod = Number(rawPeriod);
+      const period_months = Number.isFinite(parsedPeriod) ? parsedPeriod : 6;
+
+      console.log('Create payload', { rawPeriod, parsedPeriod, period_months, type: typeof rawPeriod });
 
       // Validation
       if (!name || name.length > 100) {
@@ -88,7 +95,7 @@ serve(async (req) => {
       if (!max_members || max_members < 5 || max_members > 500) {
         throw new Error('Max members must be between 5 and 500');
       }
-      if (!period_months || period_months < 6 || period_months > 24) {
+      if (period_months < 6 || period_months > 24) {
         throw new Error('Period must be between 6 and 24 months');
       }
 
