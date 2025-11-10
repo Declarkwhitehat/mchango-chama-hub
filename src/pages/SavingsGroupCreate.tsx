@@ -1,15 +1,69 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/Layout";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// Validation schema
+const savingsGroupSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(3, "Name must be at least 3 characters")
+    .max(100, "Name must be less than 100 characters")
+    .regex(/^[a-zA-Z0-9\s-]+$/, "Name can only contain letters, numbers, spaces, and hyphens"),
+  description: z
+    .string()
+    .trim()
+    .max(500, "Description must be less than 500 characters")
+    .optional(),
+  saving_goal: z
+    .number()
+    .min(1000, "Saving goal must be at least KES 1,000")
+    .max(100000000, "Saving goal must be less than KES 100,000,000"),
+  max_members: z
+    .number()
+    .int("Max members must be a whole number")
+    .min(5, "Minimum 5 members required")
+    .max(500, "Maximum 500 members allowed"),
+  whatsapp_link: z
+    .string()
+    .trim()
+    .url("Must be a valid URL")
+    .regex(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//, "Must be a valid WhatsApp link")
+    .max(255, "URL too long")
+    .optional()
+    .or(z.literal("")),
+  profile_picture: z
+    .string()
+    .trim()
+    .url("Must be a valid URL")
+    .max(500, "URL too long")
+    .optional()
+    .or(z.literal("")),
+});
+
+type SavingsGroupFormData = z.infer<typeof savingsGroupSchema>;
 
 export default function SavingsGroupCreate() {
   const navigate = useNavigate();
@@ -17,63 +71,66 @@ export default function SavingsGroupCreate() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    saving_goal: "",
-    max_members: "100",
-    whatsapp_link: "",
-    whatsapp_group_link: "",
+  const form = useForm<SavingsGroupFormData>({
+    resolver: zodResolver(savingsGroupSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      saving_goal: 10000,
+      max_members: 100,
+      whatsapp_link: "",
+      profile_picture: "",
+    },
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
+  const onSubmit = async (data: SavingsGroupFormData) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to create a savings group",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
-      // Generate slug from name
-      const slug = formData.name
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-");
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Please log in to continue");
+      }
 
-      const { data, error } = await supabase.from("saving_groups").insert({
-        name: formData.name,
-        slug,
-        description: formData.description,
-        saving_goal: parseFloat(formData.saving_goal),
-        max_members: parseInt(formData.max_members),
-        whatsapp_link: formData.whatsapp_link || null,
-        whatsapp_group_link: formData.whatsapp_group_link || null,
-        created_by: user.id,
-        manager_id: user.id,
-        status: "active",
-        cycle_start_date: new Date().toISOString(),
-        cycle_end_date: new Date(
-          new Date().setMonth(new Date().getMonth() + 6)
-        ).toISOString(),
-      }).select().single();
+      // Call backend API
+      const { data: response, error } = await supabase.functions.invoke('savings-group-crud', {
+        method: 'POST',
+        body: {
+          name: data.name,
+          description: data.description || null,
+          saving_goal: data.saving_goal,
+          max_members: data.max_members,
+          whatsapp_link: data.whatsapp_link || null,
+          profile_picture: data.profile_picture || null,
+        },
+      });
 
       if (error) throw error;
 
-      // Add creator as first member
-      await supabase.from("saving_group_members").insert({
-        group_id: data.id,
-        user_id: user.id,
-        status: "active",
-      });
+      if (!response?.success || !response?.group) {
+        throw new Error("Failed to create savings group");
+      }
 
       toast({
         title: "Success!",
         description: "Savings group created successfully",
       });
 
-      navigate(`/savings-group/${data.id}`);
+      navigate(`/savings-group/${response.group.id}`);
     } catch (error: any) {
+      console.error("Error creating group:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to create savings group",
         variant: "destructive",
       });
     } finally {
@@ -94,124 +151,180 @@ export default function SavingsGroupCreate() {
         </Button>
 
         <Card className="p-6 sm:p-8">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-            Create Savings Group
-          </h1>
-          <p className="text-muted-foreground mb-6">
-            Set up your savings group and invite members to join
-          </p>
+          <div className="mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+              Create Savings Group
+            </h1>
+            <p className="text-muted-foreground">
+              Set up your savings group and invite members to join
+            </p>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <Label htmlFor="name">Group Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="e.g., Tech Savers 2025"
-                required
+          <Alert className="mb-6">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Important:</strong> The group cycle will be 6 months by default. 
+              You'll be automatically added as the first member and manager. 
+              Minimum 5 members required to start the group.
+            </AlertDescription>
+          </Alert>
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Group Name *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., Tech Savers 2025"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Choose a unique name for your savings group
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Describe the purpose of your savings group"
-                rows={4}
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe the purpose of your savings group..."
+                        rows={4}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Optional: Help members understand the group's goals
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="saving_goal">Saving Goal (KES) *</Label>
-                <Input
-                  id="saving_goal"
-                  type="number"
-                  value={formData.saving_goal}
-                  onChange={(e) =>
-                    setFormData({ ...formData, saving_goal: e.target.value })
-                  }
-                  placeholder="100000"
-                  min="1000"
-                  step="1000"
-                  required
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="saving_goal"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Saving Goal (KES) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="100000"
+                          min="1000"
+                          step="1000"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Minimum KES 1,000
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="max_members"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max Members *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="100"
+                          min="5"
+                          max="500"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Between 5 and 500
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
 
-              <div>
-                <Label htmlFor="max_members">Max Members *</Label>
-                <Input
-                  id="max_members"
-                  type="number"
-                  value={formData.max_members}
-                  onChange={(e) =>
-                    setFormData({ ...formData, max_members: e.target.value })
-                  }
-                  placeholder="100"
-                  min="5"
-                  max="500"
-                  required
-                />
+              <FormField
+                control={form.control}
+                name="whatsapp_link"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>WhatsApp Contact Link</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="url"
+                        placeholder="https://wa.me/254712345678"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Optional: Share your WhatsApp number for inquiries (e.g., https://wa.me/254712345678)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="profile_picture"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Profile Picture URL</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="url"
+                        placeholder="https://example.com/image.jpg"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Optional: Add a profile picture for your group
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/savings-group")}
+                  disabled={loading}
+                  className="w-full sm:w-auto"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full sm:flex-1"
+                >
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create Savings Group
+                </Button>
               </div>
-            </div>
-
-            <div>
-              <Label htmlFor="whatsapp_link">WhatsApp Contact (Optional)</Label>
-              <Input
-                id="whatsapp_link"
-                type="url"
-                value={formData.whatsapp_link}
-                onChange={(e) =>
-                  setFormData({ ...formData, whatsapp_link: e.target.value })
-                }
-                placeholder="https://wa.me/254..."
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="whatsapp_group_link">
-                WhatsApp Group Link (Optional)
-              </Label>
-              <Input
-                id="whatsapp_group_link"
-                type="url"
-                value={formData.whatsapp_group_link}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    whatsapp_group_link: e.target.value,
-                  })
-                }
-                placeholder="https://chat.whatsapp.com/..."
-              />
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate("/savings-group")}
-                className="w-full sm:w-auto"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full sm:flex-1"
-              >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Group
-              </Button>
-            </div>
-          </form>
+            </form>
+          </Form>
         </Card>
       </div>
     </Layout>
