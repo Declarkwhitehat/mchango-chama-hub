@@ -298,6 +298,102 @@ serve(async (req) => {
       );
     }
 
+    // GET /members/:memberId/dashboard - Member dashboard
+    if (method === 'GET' && pathParts[0] === 'members' && pathParts[2] === 'dashboard') {
+      const memberId = pathParts[1];
+
+      // Verify member exists and belongs to user
+      const { data: membership, error: memberError } = await supabase
+        .from('saving_group_members')
+        .select('*, saving_groups(*)')
+        .eq('id', memberId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (memberError || !membership) {
+        throw new Error('Membership not found or access denied');
+      }
+
+      const groupId = membership.group_id;
+
+      // Get personal statistics
+      const personalSavings = membership.current_savings || 0;
+      const lifetimeDeposits = membership.lifetime_deposits || 0;
+
+      // Get group statistics
+      const { data: group } = await supabase
+        .from('saving_groups')
+        .select('total_savings, total_profits, saving_goal')
+        .eq('id', groupId)
+        .single();
+
+      // Get member's loans
+      const { data: loans } = await supabase
+        .from('saving_group_loans')
+        .select('*')
+        .eq('borrower_user_id', user.id)
+        .eq('saving_group_id', groupId)
+        .order('requested_at', { ascending: false });
+
+      // Get member's transactions
+      const { data: transactions } = await supabase
+        .from('saving_group_transactions')
+        .select('*')
+        .eq('group_id', groupId)
+        .eq('member_id', memberId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      // Get profit shares
+      const { data: profitShares } = await supabase
+        .from('saving_group_profit_shares')
+        .select(`
+          *,
+          saving_group_profits(cycle_period)
+        `)
+        .eq('member_id', memberId)
+        .order('created_at', { ascending: false });
+
+      // Check loan eligibility
+      const hasActiveLoan = loans?.some(l => 
+        l.status === 'DISBURSED' || l.status === 'APPROVED' || l.status === 'PENDING_APPROVAL'
+      ) || false;
+
+      const isLoanEligible = membership.is_loan_eligible && !hasActiveLoan;
+      const maxLoanAmount = isLoanEligible 
+        ? Math.min(personalSavings * 3, (group?.total_savings || 0) * 0.30)
+        : 0;
+
+      const totalProfitEarned = profitShares?.reduce((sum, share) => 
+        sum + (share.disbursed ? parseFloat(share.share_amount) : 0), 0
+      ) || 0;
+
+      console.log(`Member dashboard accessed for member ${memberId}`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          membership,
+          statistics: {
+            personal_savings: personalSavings,
+            lifetime_deposits: lifetimeDeposits,
+            group_total_savings: group?.total_savings || 0,
+            group_total_profits: group?.total_profits || 0,
+            total_profit_earned: totalProfitEarned,
+          },
+          eligibility: {
+            is_loan_eligible: isLoanEligible,
+            has_active_loan: hasActiveLoan,
+            max_loan_amount: maxLoanAmount,
+          },
+          loans: loans || [],
+          transactions: transactions || [],
+          profit_shares: profitShares || [],
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     throw new Error('Invalid endpoint');
 
   } catch (error) {

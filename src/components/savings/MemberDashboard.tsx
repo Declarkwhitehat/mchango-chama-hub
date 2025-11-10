@@ -65,7 +65,7 @@ export default function SavingsGroupMemberDashboard({
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-members/${membership.id}/dashboard`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-crud/members/${membership.id}/dashboard`,
         {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
