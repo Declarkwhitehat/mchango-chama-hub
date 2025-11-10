@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import LoanRequestForm from "./LoanRequestForm";
+import LoanRepaymentForm from "./LoanRepaymentForm";
 import {
   TrendingUp,
   DollarSign,
@@ -46,6 +48,7 @@ export default function SavingsGroupMemberDashboard({
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loanDialogOpen, setLoanDialogOpen] = useState(false);
+  const [repaymentDialogOpen, setRepaymentDialogOpen] = useState(false);
 
   useEffect(() => {
     if (membership?.id) {
@@ -270,13 +273,39 @@ export default function SavingsGroupMemberDashboard({
         </Button>
       </div>
 
-      {/* Active Loan */}
+      {/* Active Loan with Repayment */}
       {activeLoan && (
         <Card className="p-6">
-          <h3 className="text-xl font-bold mb-4 flex items-center">
-            <CreditCard className="mr-2 h-5 w-5" />
-            Active Loan
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold flex items-center">
+              <CreditCard className="mr-2 h-5 w-5" />
+              Active Loan
+            </h3>
+            {activeLoan.balance_remaining > 0 && (
+              <Dialog open={repaymentDialogOpen} onOpenChange={setRepaymentDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="default">
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Make Repayment
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Loan Repayment</DialogTitle>
+                  </DialogHeader>
+                  <LoanRepaymentForm
+                    loan={activeLoan}
+                    onSuccess={() => {
+                      setRepaymentDialogOpen(false);
+                      fetchDashboardData();
+                      onRefresh();
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+          
           <div className="bg-muted p-4 rounded-lg">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
@@ -295,6 +324,18 @@ export default function SavingsGroupMemberDashboard({
                 <p className="text-sm text-muted-foreground mb-1">Due Date</p>
                 <p className="font-semibold">{new Date(activeLoan.due_date).toLocaleDateString()}</p>
               </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Repayment Progress</span>
+                <span className="font-medium">
+                  {(((activeLoan.requested_amount - activeLoan.balance_remaining) / activeLoan.requested_amount) * 100).toFixed(1)}%
+                </span>
+              </div>
+              <Progress 
+                value={((activeLoan.requested_amount - activeLoan.balance_remaining) / activeLoan.requested_amount) * 100} 
+                className="h-2"
+              />
             </div>
             <Badge variant={activeLoan.status === 'DISBURSED' ? 'default' : 'secondary'} className="mt-4">
               {activeLoan.status}
