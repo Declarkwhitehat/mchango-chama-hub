@@ -207,6 +207,18 @@ serve(async (req) => {
         })
         .eq('id', profit.id);
 
+      // Check if this is final distribution (cycle ended)
+      const cycleEndDate = new Date(group.cycle_end_date);
+      const isAfterCycleEnd = new Date() >= cycleEndDate;
+
+      if (isAfterCycleEnd) {
+        // Mark group as CLOSED
+        await supabase
+          .from('saving_groups')
+          .update({ status: 'closed' })
+          .eq('id', groupId);
+      }
+
       // Record transactions for each member
       const transactionPromises = profitShares.map(share =>
         supabase
