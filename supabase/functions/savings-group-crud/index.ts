@@ -39,13 +39,18 @@ serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const pathParts = url.pathname.split('/').filter(Boolean);
+    let pathParts = url.pathname.split('/').filter(Boolean);
     const method = req.method;
     
-    console.log('Request:', { method, path: url.pathname, pathParts });
+    // Normalize pathParts by removing function name prefix if present
+    if (pathParts[0] === 'savings-group-crud') {
+      pathParts = pathParts.slice(1);
+    }
+    
+    console.log('Request:', { method, path: url.pathname, normalizedPathParts: pathParts });
 
     // GET /groups - List all active groups
-    if (method === 'GET' && pathParts.length === 1) {
+    if (method === 'GET' && (pathParts.length === 0 || (pathParts.length === 1 && pathParts[0] === 'groups'))) {
       const { data: groups, error: groupsError } = await supabase
         .from('saving_groups')
         .select('*')
@@ -76,7 +81,7 @@ serve(async (req) => {
     }
 
     // POST /groups - Create group
-    if (method === 'POST' && pathParts.length === 1) {
+    if (method === 'POST' && (pathParts.length === 0 || (pathParts.length === 1 && pathParts[0] === 'groups'))) {
       const body = await req.json();
       const { name, saving_goal, max_members, whatsapp_link, description, profile_picture } = body;
 
@@ -150,7 +155,7 @@ serve(async (req) => {
     }
 
     // POST /groups/:groupId/start - Start group
-    if (method === 'POST' && pathParts[1] === 'start') {
+    if (method === 'POST' && pathParts.length === 2 && pathParts[1] === 'start') {
       const groupId = pathParts[0];
 
       // Verify user is manager
