@@ -17,6 +17,7 @@ import ChamaList from "./pages/ChamaList";
 import Profile from "./pages/Profile";
 import SavingsGroupList from "./pages/SavingsGroupList";
 import SavingsGroupCreate from "./pages/SavingsGroupCreate";
+import SavingsGroupJoin from "./pages/SavingsGroupJoin";
 import SavingsGroupDetail from "./pages/SavingsGroupDetail";
 import Admin from "./pages/Admin";
 import AdminKYC from "./pages/AdminKYC";
@@ -51,9 +52,10 @@ const App = () => (
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           
           {/* Savings Group Routes */}
-          <Route path="/savings-group" element={<ProtectedRoute><SavingsGroupList /></ProtectedRoute>} />
-          <Route path="/savings-group/create" element={<ProtectedRoute requireKYC><SavingsGroupCreate /></ProtectedRoute>} />
-          <Route path="/savings-group/:id" element={<ProtectedRoute><SavingsGroupDetail /></ProtectedRoute>} />
+          <Route path="/savings-groups" element={<ProtectedRoute><SavingsGroupList /></ProtectedRoute>} />
+          <Route path="/savings-groups/create" element={<ProtectedRoute requireKYC><SavingsGroupCreate /></ProtectedRoute>} />
+          <Route path="/savings-groups/join" element={<ProtectedRoute><SavingsGroupJoin /></ProtectedRoute>} />
+          <Route path="/savings-groups/:id" element={<ProtectedRoute><SavingsGroupDetail /></ProtectedRoute>} />
           
           <Route path="/admin" element={<AdminProtectedRoute><Admin /></AdminProtectedRoute>} />
           <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />

@@ -125,7 +125,7 @@ export default function SavingsGroupCreate() {
         description: "Savings group created successfully",
       });
 
-      navigate(`/savings-group/${response.group.id}`);
+      navigate(`/savings-groups/${response.group.id}`);
     } catch (error: any) {
       console.error("Error creating group:", error);
       toast({

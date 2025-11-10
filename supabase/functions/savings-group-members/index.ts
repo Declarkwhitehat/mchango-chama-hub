@@ -123,16 +123,39 @@ serve(async (req) => {
       }
 
       if (approved) {
-        // Approve member
+        // Get current approved member count to generate next member number
+        const { count } = await supabase
+          .from('saving_group_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('group_id', groupId)
+          .eq('is_approved', true);
+
+        const nextMemberNumber = (count || 0) + 1;
+
+        // Generate unique member ID using database function
+        const { data: uniqueId } = await supabase
+          .rpc('generate_unique_member_id', {
+            p_group_id: groupId,
+            p_member_number: nextMemberNumber
+          });
+
+        // Approve member with unique ID
         await supabase
           .from('saving_group_members')
-          .update({ is_approved: true })
+          .update({ 
+            is_approved: true,
+            unique_member_id: uniqueId
+          })
           .eq('id', memberId);
 
-        console.log(`Member ${memberId} approved for group ${groupId}`);
+        console.log(`Member ${memberId} approved for group ${groupId} with ID ${uniqueId}`);
 
         return new Response(
-          JSON.stringify({ success: true, message: 'Member approved' }),
+          JSON.stringify({ 
+            success: true, 
+            message: 'Member approved', 
+            unique_member_id: uniqueId 
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } else {

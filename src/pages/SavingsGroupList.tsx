@@ -90,14 +90,25 @@ export default function SavingsGroupList() {
               Join a savings group or create your own
             </p>
           </div>
-          <Button
-            size="lg"
-            onClick={() => navigate("/savings-group/create")}
-            className="w-full sm:w-auto"
-          >
-            <PlusCircle className="mr-2 h-5 w-5" />
-            Create Group
-          </Button>
+          <div className="flex gap-3 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => navigate("/savings-groups/join")}
+              className="flex-1 sm:flex-none"
+            >
+              <Users className="mr-2 h-5 w-5" />
+              Join Group
+            </Button>
+            <Button
+              size="lg"
+              onClick={() => navigate("/savings-groups/create")}
+              className="flex-1 sm:flex-none"
+            >
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Create Group
+            </Button>
+          </div>
         </div>
 
         {/* Search */}
@@ -135,7 +146,7 @@ export default function SavingsGroupList() {
                 : "Be the first to create a savings group"}
             </p>
             {!searchQuery && (
-              <Button onClick={() => navigate("/savings-group/create")}>
+              <Button onClick={() => navigate("/savings-groups/create")}>
                 <PlusCircle className="mr-2 h-5 w-5" />
                 Create Group
               </Button>
@@ -147,7 +158,7 @@ export default function SavingsGroupList() {
               <Card
                 key={group.id}
                 className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => navigate(`/savings-group/${group.id}`)}
+                onClick={() => navigate(`/savings-groups/${group.id}`)}
               >
                 <h3 className="text-xl font-bold mb-2 text-foreground">
                   {group.name}
