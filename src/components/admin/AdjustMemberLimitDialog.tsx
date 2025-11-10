@@ -8,16 +8,20 @@ import { toast } from "@/hooks/use-toast";
 import { Users, Loader2 } from "lucide-react";
 
 interface AdjustMemberLimitDialogProps {
-  chamaId: string;
-  chamaName: string;
+  entityId: string;
+  entityName: string;
+  entityType?: 'chama' | 'saving_groups';
   currentLimit: number;
+  maxLimit?: number;
   onSuccess: () => void;
 }
 
 export const AdjustMemberLimitDialog = ({ 
-  chamaId, 
-  chamaName, 
+  entityId, 
+  entityName, 
+  entityType = 'chama',
   currentLimit,
+  maxLimit = 1000,
   onSuccess 
 }: AdjustMemberLimitDialogProps) => {
   const [open, setOpen] = useState(false);
@@ -38,10 +42,10 @@ export const AdjustMemberLimitDialog = ({
       return;
     }
 
-    if (limitNumber > 1000) {
+    if (limitNumber > maxLimit) {
       toast({
         title: "Limit Too High",
-        description: "Member limit cannot exceed 1000",
+        description: `Member limit cannot exceed ${maxLimit}`,
         variant: "destructive",
       });
       return;
@@ -51,9 +55,9 @@ export const AdjustMemberLimitDialog = ({
 
     try {
       const { error } = await supabase
-        .from('chama')
+        .from(entityType)
         .update({ max_members: limitNumber })
-        .eq('id', chamaId);
+        .eq('id', entityId);
 
       if (error) throw error;
 
@@ -88,7 +92,7 @@ export const AdjustMemberLimitDialog = ({
         <DialogHeader>
           <DialogTitle>Adjust Member Limit</DialogTitle>
           <DialogDescription>
-            Update the maximum member capacity for "{chamaName}"
+            Update the maximum member capacity for "{entityName}"
           </DialogDescription>
         </DialogHeader>
 
@@ -111,14 +115,14 @@ export const AdjustMemberLimitDialog = ({
               id="newLimit"
               type="number"
               min={currentLimit}
-              max={1000}
+              max={maxLimit}
               value={newLimit}
               onChange={(e) => setNewLimit(e.target.value)}
               placeholder={`Minimum ${currentLimit}`}
               required
             />
             <p className="text-xs text-muted-foreground">
-              Must be at least {currentLimit} and not exceed 1000
+              Must be at least {currentLimit} and not exceed {maxLimit}
             </p>
           </div>
 

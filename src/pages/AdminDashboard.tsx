@@ -8,6 +8,9 @@ import { AuditLogsTable } from "@/components/admin/AuditLogsTable";
 import { AccountAdjustment } from "@/components/admin/AccountAdjustment";
 import { WithdrawalsManagement } from "@/components/admin/WithdrawalsManagement";
 import { PlatformStatistics } from "@/components/admin/PlatformStatistics";
+import { SavingsGroupManagement } from "@/components/admin/SavingsGroupManagement";
+import { CommissionOverview } from "@/components/admin/CommissionOverview";
+import { ChamaManagement } from "@/components/admin/ChamaManagement";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Users, TrendingUp, Activity, ExternalLink } from "lucide-react";
@@ -242,13 +245,28 @@ const AdminDashboard = () => {
         )}
 
         {/* Management Tabs */}
-        <Tabs defaultValue="withdrawals" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="commission" className="w-full">
+          <TabsList className="grid w-full grid-cols-7 lg:grid-cols-7">
+            <TabsTrigger value="commission">Commission</TabsTrigger>
+            <TabsTrigger value="chama">Chama</TabsTrigger>
+            <TabsTrigger value="savings">Savings</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="audit">Audit Logs</TabsTrigger>
             <TabsTrigger value="adjustment">Adjustment</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="commission">
+            <CommissionOverview />
+          </TabsContent>
+
+          <TabsContent value="chama">
+            <ChamaManagement />
+          </TabsContent>
+
+          <TabsContent value="savings">
+            <SavingsGroupManagement />
+          </TabsContent>
 
           <TabsContent value="withdrawals">
             <WithdrawalsManagement />
