@@ -5,7 +5,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import LoanRequestForm from "./LoanRequestForm";
 import {
   TrendingUp,
   DollarSign,
@@ -43,6 +45,7 @@ export default function SavingsGroupMemberDashboard({
   const { toast } = useToast();
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loanDialogOpen, setLoanDialogOpen] = useState(false);
 
   useEffect(() => {
     if (membership?.id) {
@@ -230,15 +233,34 @@ export default function SavingsGroupMemberDashboard({
           <PlusCircle className="mr-2 h-5 w-5" />
           Make Deposit
         </Button>
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={() => toast({ title: "Coming soon", description: "Loan request functionality will be available soon" })}
-          disabled={!eligibility.is_loan_eligible || eligibility.has_active_loan}
-        >
-          <CreditCard className="mr-2 h-5 w-5" />
-          Request Loan
-        </Button>
+        
+        <Dialog open={loanDialogOpen} onOpenChange={setLoanDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={!eligibility.is_loan_eligible || eligibility.has_active_loan}
+            >
+              <CreditCard className="mr-2 h-5 w-5" />
+              Request Loan
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Request Loan</DialogTitle>
+            </DialogHeader>
+            <LoanRequestForm 
+              groupId={group.id} 
+              memberId={membership.id}
+              onSuccess={() => {
+                setLoanDialogOpen(false);
+                fetchDashboardData();
+                onRefresh();
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+
         <Button
           variant="ghost"
           size="lg"
