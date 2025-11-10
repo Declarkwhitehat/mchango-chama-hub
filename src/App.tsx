@@ -15,6 +15,9 @@ import ChamaDetail from "./pages/ChamaDetail";
 import ChamaJoin from "./pages/ChamaJoin";
 import ChamaList from "./pages/ChamaList";
 import Profile from "./pages/Profile";
+import SavingsGroupList from "./pages/SavingsGroupList";
+import SavingsGroupCreate from "./pages/SavingsGroupCreate";
+import SavingsGroupDetail from "./pages/SavingsGroupDetail";
 import Admin from "./pages/Admin";
 import AdminKYC from "./pages/AdminKYC";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -46,6 +49,12 @@ const App = () => (
           <Route path="/chama/join/:slug" element={<ChamaJoin />} />
           <Route path="/chama/:id" element={<ChamaDetail />} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          
+          {/* Savings Group Routes */}
+          <Route path="/savings-group" element={<ProtectedRoute><SavingsGroupList /></ProtectedRoute>} />
+          <Route path="/savings-group/create" element={<ProtectedRoute requireKYC><SavingsGroupCreate /></ProtectedRoute>} />
+          <Route path="/savings-group/:id" element={<ProtectedRoute><SavingsGroupDetail /></ProtectedRoute>} />
+          
           <Route path="/admin" element={<AdminProtectedRoute><Admin /></AdminProtectedRoute>} />
           <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />
           <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
