@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   TrendingUp,
@@ -12,8 +13,20 @@ import {
   PlusCircle,
   Loader2,
   AlertCircle,
+  CheckCircle,
+  XCircle,
+  Gift,
+  History,
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface MemberDashboardProps {
   group: any;
@@ -28,89 +41,49 @@ export default function SavingsGroupMemberDashboard({
 }: MemberDashboardProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [stats, setStats] = useState({
-    personalSavings: 0,
-    groupSavings: 0,
-    groupProfits: 0,
-    activeLoans: [],
-    recentTransactions: [],
-  });
+  const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isEligibleForLoan, setIsEligibleForLoan] = useState(false);
 
   useEffect(() => {
-    if (membership) {
-      fetchMemberData();
+    if (membership?.id) {
+      fetchDashboardData();
     }
   }, [membership]);
 
-  const fetchMemberData = async () => {
+  const fetchDashboardData = async () => {
     try {
-      // Fetch personal savings
-      const personalSavings = membership?.current_savings || 0;
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Please log in to continue");
+      }
 
-      // Fetch active loans
-      const { data: loansData } = await supabase
-        .from("saving_group_loans")
-        .select("*")
-        .eq("saving_group_id", group.id)
-        .eq("borrower_user_id", membership.user_id)
-        .eq("is_active", true);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-members/${membership.id}/dashboard`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      // Fetch recent transactions
-      const { data: transactionsData } = await supabase
-        .from("saving_group_deposits")
-        .select("*")
-        .eq("saving_group_id", group.id)
-        .eq("member_user_id", membership.user_id)
-        .order("created_at", { ascending: false })
-        .limit(5);
+      const result = await response.json();
 
-      // Check loan eligibility
-      const eligible = personalSavings >= 2000 && (loansData?.length || 0) === 0;
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch dashboard data');
+      }
 
-      setStats({
-        personalSavings,
-        groupSavings: group.total_savings || 0,
-        groupProfits: group.total_profits || 0,
-        activeLoans: loansData || [],
-        recentTransactions: transactionsData || [],
-      });
-
-      setIsEligibleForLoan(eligible);
+      setDashboardData(result);
     } catch (error: any) {
+      console.error('Error fetching dashboard:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to load dashboard",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleJoinGroup = async () => {
-    try {
-      const { error } = await supabase.from("saving_group_members").insert({
-        group_id: group.id,
-        user_id: membership.user_id,
-        status: "pending",
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success!",
-        description: "Join request sent. Awaiting manager approval.",
-      });
-
-      onRefresh();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
     }
   };
 
@@ -122,34 +95,35 @@ export default function SavingsGroupMemberDashboard({
     );
   }
 
-  if (!membership) {
+  if (!dashboardData || !membership) {
     return (
-      <Card className="p-8 text-center">
-        <h2 className="text-2xl font-bold mb-2">{group.name}</h2>
-        <p className="text-muted-foreground mb-6">{group.description}</p>
-        <Button onClick={handleJoinGroup} size="lg">
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Request to Join
-        </Button>
-      </Card>
-    );
-  }
-
-  if (membership.status === "pending") {
-    return (
-      <Alert>
+      <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Your join request is pending approval by the group manager.
+          Failed to load dashboard data. Please refresh the page.
         </AlertDescription>
       </Alert>
     );
   }
 
-  const savingsProgress = Math.min(
-    100,
-    (stats.personalSavings / 2000) * 100
-  );
+  if (!membership.is_approved) {
+    return (
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Pending Approval</AlertTitle>
+        <AlertDescription>
+          Your join request is pending approval by the group manager. You'll be notified once approved.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  const { statistics, eligibility, loans, transactions, profit_shares } = dashboardData;
+  const activeLoan = loans?.find((l: any) => l.status === 'DISBURSED' || l.status === 'APPROVED');
+  
+  const monthlyTarget = 2000;
+  const savingsProgress = Math.min(100, (statistics.personal_savings / monthlyTarget) * 100);
+  const groupProgress = Math.min(100, (statistics.group_total_savings / group.saving_goal) * 100);
 
   return (
     <div className="space-y-6">
@@ -157,18 +131,41 @@ export default function SavingsGroupMemberDashboard({
       <div>
         <h1 className="text-3xl font-bold mb-1">{group.name}</h1>
         <p className="text-muted-foreground">Member Dashboard</p>
+        {membership.unique_member_id && (
+          <Badge variant="secondary" className="mt-2">
+            ID: {membership.unique_member_id}
+          </Badge>
+        )}
       </div>
 
+      {/* Loan Eligibility Alert */}
+      {eligibility.is_loan_eligible ? (
+        <Alert className="border-primary">
+          <CheckCircle className="h-4 w-4 text-primary" />
+          <AlertTitle>Loan Eligible</AlertTitle>
+          <AlertDescription>
+            You're eligible to request a loan up to KES {eligibility.max_loan_amount.toLocaleString()}
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Not Loan Eligible Yet</AlertTitle>
+          <AlertDescription>
+            Save at least KES 2,000 per month for 3 consecutive months to qualify for loans.
+            {eligibility.has_active_loan && " You also have an active loan that must be repaid first."}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">
-                Personal Savings
-              </p>
+              <p className="text-sm text-muted-foreground mb-1">Personal Savings</p>
               <p className="text-2xl font-bold">
-                KES {stats.personalSavings.toLocaleString()}
+                KES {statistics.personal_savings.toLocaleString()}
               </p>
             </div>
             <TrendingUp className="h-10 w-10 text-primary opacity-20" />
@@ -176,7 +173,7 @@ export default function SavingsGroupMemberDashboard({
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Monthly Target</span>
-              <span className="font-medium">KES 2,000</span>
+              <span className="font-medium">KES {monthlyTarget.toLocaleString()}</span>
             </div>
             <Progress value={savingsProgress} />
           </div>
@@ -185,9 +182,9 @@ export default function SavingsGroupMemberDashboard({
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Group Savings</p>
+              <p className="text-sm text-muted-foreground mb-1">Lifetime Deposits</p>
               <p className="text-2xl font-bold">
-                KES {stats.groupSavings.toLocaleString()}
+                KES {statistics.lifetime_deposits.toLocaleString()}
               </p>
             </div>
             <DollarSign className="h-10 w-10 text-primary opacity-20" />
@@ -197,12 +194,29 @@ export default function SavingsGroupMemberDashboard({
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Group Profits</p>
+              <p className="text-sm text-muted-foreground mb-1">Group Savings</p>
               <p className="text-2xl font-bold">
-                KES {stats.groupProfits.toLocaleString()}
+                KES {statistics.group_total_savings.toLocaleString()}
+              </p>
+              <div className="mt-2">
+                <Progress value={groupProgress} />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {groupProgress.toFixed(0)}% of goal
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Total Profits Earned</p>
+              <p className="text-2xl font-bold text-primary">
+                KES {statistics.total_profit_earned.toLocaleString()}
               </p>
             </div>
-            <CreditCard className="h-10 w-10 text-primary opacity-20" />
+            <Gift className="h-10 w-10 text-primary opacity-20" />
           </div>
         </Card>
       </div>
@@ -210,7 +224,7 @@ export default function SavingsGroupMemberDashboard({
       {/* Actions */}
       <div className="flex flex-wrap gap-3">
         <Button
-          onClick={() => navigate(`/savings-group/${group.id}/deposit`)}
+          onClick={() => toast({ title: "Coming soon", description: "Deposit functionality will be available soon" })}
           size="lg"
         >
           <PlusCircle className="mr-2 h-5 w-5" />
@@ -219,80 +233,134 @@ export default function SavingsGroupMemberDashboard({
         <Button
           variant="outline"
           size="lg"
-          onClick={() => navigate(`/savings-group/${group.id}/loan-request`)}
-          disabled={!isEligibleForLoan}
+          onClick={() => toast({ title: "Coming soon", description: "Loan request functionality will be available soon" })}
+          disabled={!eligibility.is_loan_eligible || eligibility.has_active_loan}
         >
           <CreditCard className="mr-2 h-5 w-5" />
           Request Loan
         </Button>
+        <Button
+          variant="ghost"
+          size="lg"
+          onClick={onRefresh}
+        >
+          Refresh Data
+        </Button>
       </div>
 
-      {!isEligibleForLoan && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Loan eligibility requires KES 2,000+ savings and no active loans.
-            Keep saving to qualify!
-          </AlertDescription>
-        </Alert>
+      {/* Active Loan */}
+      {activeLoan && (
+        <Card className="p-6">
+          <h3 className="text-xl font-bold mb-4 flex items-center">
+            <CreditCard className="mr-2 h-5 w-5" />
+            Active Loan
+          </h3>
+          <div className="bg-muted p-4 rounded-lg">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Loan Amount</p>
+                <p className="font-semibold">KES {activeLoan.requested_amount.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Disbursed</p>
+                <p className="font-semibold">KES {activeLoan.disbursed_amount.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Balance</p>
+                <p className="font-semibold text-primary">KES {activeLoan.balance_remaining.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Due Date</p>
+                <p className="font-semibold">{new Date(activeLoan.due_date).toLocaleDateString()}</p>
+              </div>
+            </div>
+            <Badge variant={activeLoan.status === 'DISBURSED' ? 'default' : 'secondary'} className="mt-4">
+              {activeLoan.status}
+            </Badge>
+          </div>
+        </Card>
       )}
 
-      {/* Active Loans */}
-      {stats.activeLoans.length > 0 && (
+      {/* Profit Shares */}
+      {profit_shares && profit_shares.length > 0 && (
         <Card className="p-6">
-          <h3 className="text-xl font-bold mb-4">Active Loans</h3>
-          <div className="space-y-4">
-            {stats.activeLoans.map((loan: any) => (
-              <div
-                key={loan.id}
-                className="flex justify-between items-center p-4 bg-muted rounded-lg"
-              >
-                <div>
-                  <p className="font-semibold">
-                    KES {loan.disbursed_amount.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Due: {new Date(loan.due_date).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold">
-                    KES {loan.balance_remaining.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Remaining</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h3 className="text-xl font-bold mb-4 flex items-center">
+            <Gift className="mr-2 h-5 w-5" />
+            Profit Shares
+          </h3>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cycle Period</TableHead>
+                <TableHead>Share Amount</TableHead>
+                <TableHead>Savings Ratio</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {profit_shares.map((share: any) => (
+                <TableRow key={share.id}>
+                  <TableCell>{share.saving_group_profits?.cycle_period || 'N/A'}</TableCell>
+                  <TableCell className="font-semibold text-primary">
+                    KES {share.share_amount.toLocaleString()}
+                  </TableCell>
+                  <TableCell>{(share.savings_ratio * 100).toFixed(2)}%</TableCell>
+                  <TableCell>
+                    {share.disbursed ? (
+                      <Badge variant="default">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Disbursed
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">Pending</Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       )}
 
       {/* Recent Transactions */}
       <Card className="p-6">
-        <h3 className="text-xl font-bold mb-4">Recent Transactions</h3>
-        {stats.recentTransactions.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">
-            No transactions yet
-          </p>
+        <h3 className="text-xl font-bold mb-4 flex items-center">
+          <History className="mr-2 h-5 w-5" />
+          Recent Transactions
+        </h3>
+        {!transactions || transactions.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">No transactions yet</p>
         ) : (
-          <div className="space-y-3">
-            {stats.recentTransactions.map((txn: any) => (
-              <div
-                key={txn.id}
-                className="flex justify-between items-center p-3 bg-muted rounded-lg"
-              >
-                <div>
-                  <p className="font-medium">Deposit</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(txn.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <p className="font-semibold text-primary">
-                  +KES {txn.net_amount.toLocaleString()}
-                </p>
-              </div>
-            ))}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Notes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions.slice(0, 10).map((txn: any) => (
+                <TableRow key={txn.id}>
+                  <TableCell>
+                    <Badge variant="outline">{txn.transaction_type}</Badge>
+                  </TableCell>
+                  <TableCell className={
+                    txn.transaction_type.includes('DEPOSIT') || txn.transaction_type.includes('PROFIT') 
+                      ? 'text-primary font-semibold' 
+                      : 'font-semibold'
+                  }>
+                    KES {txn.amount.toLocaleString()}
+                  </TableCell>
+                  <TableCell>{new Date(txn.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {txn.notes || '-'}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </Card>
     </div>
