@@ -115,19 +115,19 @@ const Profile = () => {
 
   return (
     <Layout>
-      <div className="container px-4 py-6 pb-24 max-w-2xl mx-auto space-y-6">
+      <div className="container px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 max-w-2xl mx-auto space-y-4 sm:space-y-6">
         {/* Profile Header */}
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <Avatar className="h-24 w-24">
-                <AvatarFallback className="text-2xl bg-gradient-to-br from-primary to-primary-glow text-primary-foreground">
+          <CardContent className="pt-4 sm:pt-6 px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="flex flex-col items-center text-center space-y-3 sm:space-y-4">
+              <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
+                <AvatarFallback className="text-xl sm:text-2xl bg-gradient-to-br from-primary to-primary-glow text-primary-foreground">
                   {profile.full_name.split(" ").map(n => n[0]).join("")}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">{profile.full_name}</h2>
-                <p className="text-muted-foreground">Member since {new Date(profile.created_at).toLocaleDateString()}</p>
+              <div className="space-y-1">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground break-words">{profile.full_name}</h2>
+                <p className="text-sm sm:text-base text-muted-foreground">Member since {new Date(profile.created_at).toLocaleDateString()}</p>
               </div>
             </div>
           </CardContent>
@@ -135,30 +135,30 @@ const Profile = () => {
 
         {/* KYC Status */}
         <Card>
-          <CardHeader>
-            <CardTitle>Verification Status</CardTitle>
+          <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
+            <CardTitle className="text-lg sm:text-xl">Verification Status</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">KYC Status</span>
+          <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
+              <span className="text-sm sm:text-base text-muted-foreground">KYC Status</span>
               {getKYCStatusBadge()}
             </div>
             {profile.kyc_status === 'rejected' && profile.kyc_rejection_reason && (
-              <div className="bg-destructive/10 p-4 rounded">
-                <p className="text-sm font-medium mb-1">Rejection Reason:</p>
-                <p className="text-sm">{profile.kyc_rejection_reason}</p>
+              <div className="bg-destructive/10 p-3 sm:p-4 rounded">
+                <p className="text-xs sm:text-sm font-medium mb-1">Rejection Reason:</p>
+                <p className="text-xs sm:text-sm break-words">{profile.kyc_rejection_reason}</p>
               </div>
             )}
             {!profile.kyc_submitted_at && (
               <Button
                 onClick={() => navigate("/kyc-upload")}
-                className="w-full"
+                className="w-full text-sm sm:text-base"
               >
                 Complete KYC Verification
               </Button>
             )}
             {profile.kyc_status === 'pending' && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Your documents are being reviewed by our team. This usually takes 1-2 business days.
               </p>
             )}
@@ -167,44 +167,44 @@ const Profile = () => {
 
         {/* Personal Information */}
         <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>Personal Information</CardTitle>
-              <Button variant="ghost" size="sm">
-                <Edit className="h-4 w-4" />
+          <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
+            <div className="flex justify-between items-center gap-2">
+              <CardTitle className="text-lg sm:text-xl">Personal Information</CardTitle>
+              <Button variant="ghost" size="sm" className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">Full Name</Label>
+          <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className="text-xs sm:text-sm text-muted-foreground">Full Name</Label>
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{profile.full_name}</span>
+                <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm sm:text-base text-foreground break-words">{profile.full_name}</span>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">Email</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className="text-xs sm:text-sm text-muted-foreground">Email</Label>
               <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{profile.email}</span>
+                <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm sm:text-base text-foreground break-all">{profile.email}</span>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">Phone</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className="text-xs sm:text-sm text-muted-foreground">Phone</Label>
               <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{profile.phone}</span>
+                <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm sm:text-base text-foreground">{profile.phone}</span>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">ID Number</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label className="text-xs sm:text-sm text-muted-foreground">ID Number</Label>
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{profile.id_number}</span>
+                <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm sm:text-base text-foreground">{profile.id_number}</span>
               </div>
             </div>
           </CardContent>
@@ -212,28 +212,28 @@ const Profile = () => {
 
         {/* Security */}
         <Card>
-          <CardHeader>
-            <CardTitle>Security</CardTitle>
-            <CardDescription>Manage your account security</CardDescription>
+          <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
+            <CardTitle className="text-lg sm:text-xl">Security</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Manage your account security</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 px-4 sm:px-6 pb-4 sm:pb-6">
             <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" className="w-full justify-start">
-                  <Key className="mr-2 h-4 w-4" />
+                <Button variant="outline" className="w-full justify-start text-sm sm:text-base">
+                  <Key className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   Change Password
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-[95vw] sm:max-w-md mx-auto">
                 <DialogHeader>
-                  <DialogTitle>Change Password</DialogTitle>
-                  <DialogDescription>
+                  <DialogTitle className="text-lg sm:text-xl">Change Password</DialogTitle>
+                  <DialogDescription className="text-xs sm:text-sm">
                     Enter your new password below. Make sure it's at least 8 characters long.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
+                <div className="space-y-3 sm:space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="new-password">New Password</Label>
+                    <Label htmlFor="new-password" className="text-xs sm:text-sm">New Password</Label>
                     <div className="relative">
                       <Input
                         id="new-password"
@@ -241,24 +241,25 @@ const Profile = () => {
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         placeholder="Enter new password"
+                        className="text-sm sm:text-base pr-10"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        className="absolute right-0 top-0 h-full px-2 sm:px-3 hover:bg-transparent"
                         onClick={() => setShowNewPassword(!showNewPassword)}
                       >
                         {showNewPassword ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                         ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
+                          <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                         )}
                       </Button>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Label htmlFor="confirm-password" className="text-xs sm:text-sm">Confirm New Password</Label>
                     <div className="relative">
                       <Input
                         id="confirm-password"
@@ -266,25 +267,26 @@ const Profile = () => {
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="Confirm new password"
+                        className="text-sm sm:text-base pr-10"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        className="absolute right-0 top-0 h-full px-2 sm:px-3 hover:bg-transparent"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       >
                         {showConfirmPassword ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                         ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
+                          <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                         )}
                       </Button>
                     </div>
                   </div>
                   <Button 
                     onClick={handlePasswordUpdate} 
-                    className="w-full"
+                    className="w-full text-sm sm:text-base"
                     disabled={isUpdatingPassword}
                   >
                     {isUpdatingPassword ? "Updating..." : "Update Password"}
@@ -297,13 +299,13 @@ const Profile = () => {
 
         {/* Actions */}
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6 px-4 sm:px-6 pb-4 sm:pb-6">
             <Button
               variant="destructive"
-              className="w-full"
+              className="w-full text-sm sm:text-base"
               onClick={handleLogout}
             >
-              <LogOut className="mr-2 h-4 w-4" />
+              <LogOut className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
               Logout
             </Button>
           </CardContent>
