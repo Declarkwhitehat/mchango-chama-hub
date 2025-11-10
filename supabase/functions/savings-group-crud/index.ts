@@ -381,6 +381,46 @@ serve(async (req) => {
         sum + (share.disbursed ? parseFloat(share.share_amount) : 0), 0
       ) || 0;
 
+      // Calculate monthly savings for last 6 months
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+      const { data: monthlyDeposits } = await supabase
+        .from('saving_group_deposits')
+        .select('net_amount, created_at')
+        .eq('member_user_id', user.id)
+        .eq('saving_group_id', groupId)
+        .gte('created_at', sixMonthsAgo.toISOString());
+
+      // Group by month and calculate totals
+      const monthlyData: any[] = [];
+      for (let i = 0; i < 6; i++) {
+        const monthDate = new Date();
+        monthDate.setMonth(monthDate.getMonth() - i);
+        const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+        const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+
+        const monthDeposits = monthlyDeposits?.filter((d: any) => {
+          const depositDate = new Date(d.created_at);
+          return depositDate >= monthStart && depositDate <= monthEnd;
+        }) || [];
+
+        const monthTotal = monthDeposits.reduce((sum: number, d: any) => 
+          sum + parseFloat(d.net_amount || 0), 0
+        );
+
+        const monthName = monthStart.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const targetMet = monthTotal >= 2000;
+
+        monthlyData.push({
+          month: monthName,
+          total: monthTotal,
+          target: 2000,
+          percentage: (monthTotal / 2000) * 100,
+          target_met: targetMet,
+        });
+      }
+
       console.log(`Member dashboard accessed for member ${memberId}`);
 
       return new Response(
@@ -402,6 +442,7 @@ serve(async (req) => {
           loans: loans || [],
           transactions: transactions || [],
           profit_shares: profitShares || [],
+          monthly_savings: monthlyData,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

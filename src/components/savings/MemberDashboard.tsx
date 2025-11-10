@@ -23,6 +23,7 @@ import {
   History,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MonthlySavingsTracker } from "./MonthlySavingsTracker";
 import {
   Table,
   TableBody,
@@ -281,6 +282,9 @@ export default function SavingsGroupMemberDashboard({
           Refresh Data
         </Button>
       </div>
+
+      {/* Monthly Savings Tracker */}
+      <MonthlySavingsTracker monthlyData={dashboardData?.monthly_savings} />
 
       {/* Active Loan with Repayment */}
       {activeLoan && (

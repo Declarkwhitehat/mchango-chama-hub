@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { SavingsGroupInviteManager } from "./InviteManager";
 
 interface ManagerDashboardProps {
   group: any;
@@ -454,7 +455,7 @@ export default function SavingsGroupManagerDashboard({
 
       {/* Tabs */}
       <Tabs defaultValue="members" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="members">
             Members
             {pendingMembers.length > 0 && (
@@ -467,6 +468,7 @@ export default function SavingsGroupManagerDashboard({
               <Badge variant="destructive" className="ml-2">{pendingLoans.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="invites">Invites</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="profits">Profits</TabsTrigger>
         </TabsList>
@@ -648,6 +650,10 @@ export default function SavingsGroupManagerDashboard({
               </>
             )}
           </Card>
+        </TabsContent>
+
+        <TabsContent value="invites" className="mt-6">
+          <SavingsGroupInviteManager groupId={group.id} />
         </TabsContent>
 
         <TabsContent value="transactions" className="mt-6">

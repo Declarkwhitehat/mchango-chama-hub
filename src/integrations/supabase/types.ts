@@ -833,6 +833,50 @@ export type Database = {
           },
         ]
       }
+      saving_group_invite_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          created_by: string
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          saving_group_id: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          saving_group_id: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          saving_group_id?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_group_invite_codes_saving_group_id_fkey"
+            columns: ["saving_group_id"]
+            isOneToOne: false
+            referencedRelation: "saving_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saving_group_loan_guarantors: {
         Row: {
           approved_at: string
@@ -1554,6 +1598,7 @@ export type Database = {
         Returns: boolean
       }
       cleanup_expired_otps: { Args: never; Returns: undefined }
+      generate_group_invite_code: { Args: never; Returns: string }
       generate_invite_code: { Args: never; Returns: string }
       generate_member_code: {
         Args: { p_chama_id: string; p_order_index: number }
