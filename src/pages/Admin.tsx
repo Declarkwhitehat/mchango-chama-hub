@@ -6,7 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UsersManagement } from "@/components/admin/UsersManagement";
 import { CampaignsManagement } from "@/components/admin/CampaignsManagement";
 import { ChamaManagement } from "@/components/admin/ChamaManagement";
-import { Users, TrendingUp, DollarSign, Activity, FileCheck } from "lucide-react";
+import { SavingsGroupManagement } from "@/components/admin/SavingsGroupManagement";
+import { Users, TrendingUp, DollarSign, Activity, FileCheck, PiggyBank } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +26,7 @@ const Admin = () => {
     totalUsers: 0,
     activeCampaigns: 0,
     activeGroups: 0,
+    activeSavingsGroups: 0,
     totalFundsRaised: 0,
     pendingKyc: 0,
   });
@@ -54,6 +56,14 @@ const Admin = () => {
 
       if (chamasError) throw chamasError;
 
+      // Fetch active savings groups
+      const { data: savingsGroups, error: savingsError } = await supabase
+        .from('saving_groups')
+        .select('*')
+        .eq('status', 'active');
+
+      if (savingsError) throw savingsError;
+
       // Calculate total funds raised
       const totalFunds = mchangos?.reduce((sum, m) => sum + Number(m.current_amount || 0), 0) || 0;
 
@@ -68,6 +78,7 @@ const Admin = () => {
         totalUsers: usersCount || 0,
         activeCampaigns: mchangos?.length || 0,
         activeGroups: chamas?.length || 0,
+        activeSavingsGroups: savingsGroups?.length || 0,
         totalFundsRaised: totalFunds,
         pendingKyc: pendingKycCount || 0,
       });
@@ -98,7 +109,7 @@ const Admin = () => {
     <Layout showBackButton title="Admin Dashboard">
       <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Total Users</CardDescription>
@@ -143,13 +154,27 @@ const Admin = () => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Active Groups</CardDescription>
+              <CardDescription>Chama Groups</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-muted-foreground" />
                 <span className="text-2xl font-bold text-foreground">
                   {stats.activeGroups}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Savings Groups</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <PiggyBank className="h-4 w-4 text-muted-foreground" />
+                <span className="text-2xl font-bold text-foreground">
+                  {stats.activeSavingsGroups}
                 </span>
               </div>
             </CardContent>
@@ -172,7 +197,7 @@ const Admin = () => {
 
         {/* Detailed Views */}
         <Tabs defaultValue="kyc" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="kyc">
               KYC Queue
               {stats.pendingKyc > 0 && (
@@ -183,7 +208,8 @@ const Admin = () => {
             </TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
-            <TabsTrigger value="groups">Groups</TabsTrigger>
+            <TabsTrigger value="groups">Chama Groups</TabsTrigger>
+            <TabsTrigger value="savings">Savings Groups</TabsTrigger>
           </TabsList>
 
           <TabsContent value="kyc">
@@ -224,6 +250,10 @@ const Admin = () => {
 
           <TabsContent value="groups">
             <ChamaManagement />
+          </TabsContent>
+
+          <TabsContent value="savings">
+            <SavingsGroupManagement />
           </TabsContent>
         </Tabs>
       </div>
