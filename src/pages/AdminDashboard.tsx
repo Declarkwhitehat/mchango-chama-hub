@@ -69,20 +69,34 @@ const AdminDashboard = () => {
 
   return (
     <Layout showBackButton title="Admin Dashboard">
-      <div className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Search, manage, and audit all platform data</p>
+      <div className="container px-4 py-8 max-w-[1600px] mx-auto space-y-8">
+        {/* Header Section */}
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            Admin Dashboard
+          </h1>
+          <p className="text-lg text-muted-foreground">
+            Complete platform management and analytics
+          </p>
         </div>
 
         {/* Platform Statistics */}
         <PlatformStatistics />
 
+        {/* Commission Overview - Prominent Position */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-6 w-6 text-primary" />
+            <h2 className="text-2xl font-bold">Platform Revenue</h2>
+          </div>
+          <CommissionOverview />
+        </div>
+
         {/* Global Search */}
-        <Card>
+        <Card className="border-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Search className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Search className="h-5 w-5 text-primary" />
               Universal Search
             </CardTitle>
             <CardDescription>
@@ -244,46 +258,60 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Management Tabs */}
-        <Tabs defaultValue="commission" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 lg:grid-cols-7">
-            <TabsTrigger value="commission">Commission</TabsTrigger>
-            <TabsTrigger value="chama">Chama</TabsTrigger>
-            <TabsTrigger value="savings">Savings</TabsTrigger>
-            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            <TabsTrigger value="audit">Audit Logs</TabsTrigger>
-            <TabsTrigger value="adjustment">Adjustment</TabsTrigger>
-          </TabsList>
+        {/* Management Sections */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Activity className="h-6 w-6 text-primary" />
+            <h2 className="text-2xl font-bold">Platform Management</h2>
+          </div>
+          
+          <Tabs defaultValue="savings" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 h-auto gap-2 bg-muted/50 p-2">
+              <TabsTrigger value="savings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Savings Groups
+              </TabsTrigger>
+              <TabsTrigger value="chama" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Chama Groups
+              </TabsTrigger>
+              <TabsTrigger value="withdrawals" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Withdrawals
+              </TabsTrigger>
+              <TabsTrigger value="transactions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Transactions
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Audit Logs
+              </TabsTrigger>
+              <TabsTrigger value="adjustment" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Adjustments
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="commission">
-            <CommissionOverview />
-          </TabsContent>
+            <TabsContent value="savings" className="mt-6">
+              <SavingsGroupManagement />
+            </TabsContent>
 
-          <TabsContent value="chama">
-            <ChamaManagement />
-          </TabsContent>
+            <TabsContent value="chama" className="mt-6">
+              <ChamaManagement />
+            </TabsContent>
 
-          <TabsContent value="savings">
-            <SavingsGroupManagement />
-          </TabsContent>
+            <TabsContent value="withdrawals" className="mt-6">
+              <WithdrawalsManagement />
+            </TabsContent>
 
-          <TabsContent value="withdrawals">
-            <WithdrawalsManagement />
-          </TabsContent>
+            <TabsContent value="transactions" className="mt-6">
+              <TransactionsTable />
+            </TabsContent>
 
-          <TabsContent value="transactions">
-            <TransactionsTable />
-          </TabsContent>
+            <TabsContent value="audit" className="mt-6">
+              <AuditLogsTable />
+            </TabsContent>
 
-          <TabsContent value="audit">
-            <AuditLogsTable />
-          </TabsContent>
-
-          <TabsContent value="adjustment">
-            <AccountAdjustment />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="adjustment" className="mt-6">
+              <AccountAdjustment />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </Layout>
   );
