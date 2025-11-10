@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
-import { Users, TrendingUp, Heart, Shield } from "lucide-react";
+import { Users, TrendingUp, Heart, Shield, PiggyBank } from "lucide-react";
 import heroImage from "@/assets/hero-image.jpg";
 import profilePhoto from "@/assets/profile-photo.png";
 
@@ -47,6 +47,15 @@ const Index = () => {
                 >
                   <Users className="mr-2 h-5 w-5" />
                   Browse Chamas
+                </Button>
+                <Button 
+                  variant="heroSecondary" 
+                  size="xl"
+                  className="w-full sm:w-auto"
+                  onClick={() => window.location.href = '/savings-group'}
+                >
+                  <PiggyBank className="mr-2 h-5 w-5" />
+                  Savings Group
                 </Button>
               </div>
             </div>
@@ -200,6 +209,10 @@ const Index = () => {
             </Button>
             <Button variant="heroSecondary" size="xl" onClick={() => window.location.href = '/auth'}>
               Join a Chama
+            </Button>
+            <Button variant="heroSecondary" size="xl" onClick={() => window.location.href = '/auth'}>
+              <PiggyBank className="mr-2 h-5 w-5" />
+              Join Savings Group
             </Button>
           </div>
         </div>
