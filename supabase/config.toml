@@ -21,6 +21,9 @@ verify_jwt = true
 [functions.chama-join]
 verify_jwt = true
 
+[functions.chama-start]
+verify_jwt = true
+
 [functions.contributions-crud]
 verify_jwt = true
 

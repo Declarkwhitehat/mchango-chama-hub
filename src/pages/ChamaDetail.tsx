@@ -26,6 +26,7 @@ interface ChamaData {
   contribution_frequency: string;
   max_members: number;
   commission_rate: number;
+  status: string;
   created_at: string;
   every_n_days_count?: number;
   profiles: {
@@ -55,6 +56,7 @@ const ChamaDetail = () => {
   const [nextTurnDates, setNextTurnDates] = useState<Record<string, Date>>({});
   const [totalContributions, setTotalContributions] = useState<number>(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
     loadChama();
@@ -231,6 +233,36 @@ const ChamaDetail = () => {
     }
   };
 
+  const handleStartChama = async () => {
+    if (!chama) return;
+
+    setIsStarting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('chama-start', {
+        body: { chamaId: chama.id },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Chama Started!",
+        description: `${data.notificationsSent} members have been notified via SMS.`,
+      });
+
+      // Reload chama data to reflect new status
+      await loadChama();
+    } catch (error: any) {
+      console.error("Error starting chama:", error);
+      toast({
+        title: "Failed to Start Chama",
+        description: error.message || "Could not start the chama",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout showBackButton>
@@ -261,6 +293,8 @@ const ChamaDetail = () => {
   const isPending = currentUserMembership?.approval_status === 'pending';
   const isMyTurn = currentUserMembership?.id === currentTurnMemberId;
   const hasViewAccess = isAdmin || isMember; // Admins can view without being members
+  const isPendingStatus = chama.status === 'pending';
+  const isActive = chama.status === 'active';
 
   return (
     <Layout showBackButton>
@@ -269,11 +303,17 @@ const ChamaDetail = () => {
         <Card>
           <CardHeader>
             <div className="flex justify-between items-start mb-2">
-              <Badge>
-                {approvedMembers.length}/{chama.max_members} members
-              </Badge>
-              {isManager && <Badge variant="default">Manager</Badge>}
-              {isPending && <Badge variant="secondary">Pending Approval</Badge>}
+              <div className="flex gap-2">
+                <Badge>
+                  {approvedMembers.length}/{chama.max_members} members
+                </Badge>
+                {isPendingStatus && <Badge variant="secondary">Pending Start</Badge>}
+                {isActive && <Badge variant="default">Active</Badge>}
+              </div>
+              <div className="flex gap-2">
+                {isManager && <Badge variant="default">Manager</Badge>}
+                {isPending && <Badge variant="secondary">Pending Approval</Badge>}
+              </div>
             </div>
             <CardTitle className="text-2xl">{chama.name}</CardTitle>
             <CardDescription>Founded by {chama.profiles.full_name}</CardDescription>
@@ -303,8 +343,57 @@ const ChamaDetail = () => {
           </CardContent>
         </Card>
 
-        {/* Commission Display - Visible to all approved members and admins */}
-        {hasViewAccess && (
+        {/* Start Chama Button - Only visible to manager when status is pending */}
+        {isManager && isPendingStatus && (
+          <Card className="border-primary">
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-semibold">Ready to Start Your Chama?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Once started, all {approvedMembers.length} approved members will be notified via SMS with their contribution details and payout schedule.
+                  </p>
+                </div>
+                <Button 
+                  onClick={handleStartChama} 
+                  disabled={isStarting || approvedMembers.length === 0}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isStarting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Starting Chama...
+                    </>
+                  ) : (
+                    'Start Chama'
+                  )}
+                </Button>
+                {approvedMembers.length === 0 && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    You need at least one approved member to start the chama
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Pending Status Message - Visible to all members */}
+        {isMember && isPendingStatus && !isManager && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center space-y-2">
+                <p className="text-muted-foreground">
+                  This Chama hasn't started yet. The manager will notify all members when it begins.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Commission Display - Visible to all approved members and admins (only when active) */}
+        {hasViewAccess && isActive && (
           <CommissionDisplay 
             totalCollected={totalContributions}
             commissionRate={chama.commission_rate || 0.05}
@@ -327,8 +416,8 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Withdrawal Button - Only for member whose turn it is */}
-        {isMember && isMyTurn && (
+        {/* Withdrawal Button - Only for member whose turn it is and chama is active */}
+        {isMember && isMyTurn && isActive && (
           <WithdrawalButton
             chamaId={chama.id}
             totalAvailable={totalContributions}
@@ -337,8 +426,8 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Show turn information to all members */}
-        {isMember && !isMyTurn && currentTurnMemberId && (
+        {/* Show turn information to all members (only when active) */}
+        {isMember && !isMyTurn && currentTurnMemberId && isActive && (
           <Card>
             <CardContent className="pt-6">
               <div className="text-center space-y-2">
@@ -359,8 +448,8 @@ const ChamaDetail = () => {
           </Card>
         )}
 
-        {/* Payment Form - Only visible to approved members */}
-        {isMember && (
+        {/* Payment Form - Only visible to approved members when chama is active */}
+        {isMember && isActive && (
           <ChamaPaymentForm
             chamaId={chama.id}
             currentMemberId={currentUserMembership.id}
@@ -369,8 +458,8 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Withdrawal History - Visible to all approved members and admins */}
-        {hasViewAccess && (
+        {/* Withdrawal History - Visible to all approved members and admins when active */}
+        {hasViewAccess && isActive && (
           <WithdrawalHistory chamaId={chama.id} />
         )}
 

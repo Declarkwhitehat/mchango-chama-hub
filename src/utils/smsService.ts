@@ -110,4 +110,7 @@ export const SMS_TEMPLATES = {
   
   withdrawalApproved: (amount: number) =>
     `Your withdrawal request of KES ${amount} has been approved and will be processed shortly.`,
+  
+  chamaStarted: (chamaName: string, amount: number, frequency: string, memberNumber: number, payoutDate: string, startDate: string) =>
+    `Your Chama "${chamaName}" has officially started! You will contribute KES ${amount.toLocaleString()} ${frequency}, starting ${startDate}. You are member #${memberNumber}, and your payout date will be ${payoutDate}.`,
 };

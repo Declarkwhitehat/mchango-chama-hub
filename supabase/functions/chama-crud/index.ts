@@ -462,6 +462,7 @@ serve(async (req) => {
           commission_rate: body.commission_rate || 0.05,
           whatsapp_link: body.whatsapp_link,
           created_by: user.id,
+          status: 'pending', // New chamas start in pending state
         })
         .select()
         .single();
