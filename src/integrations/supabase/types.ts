@@ -1548,6 +1548,7 @@ export type Database = {
         Args: { p_chama_id: string; p_last_payment_date: string }
         Returns: string
       }
+      check_kyc_approved: { Args: { _user_id: string }; Returns: boolean }
       check_loan_eligibility: {
         Args: { p_member_id: string }
         Returns: boolean
