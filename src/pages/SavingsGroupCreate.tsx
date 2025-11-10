@@ -50,15 +50,8 @@ const savingsGroupSchema = z.object({
     .string()
     .trim()
     .url("Must be a valid URL")
-    .regex(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//, "Must be a valid WhatsApp link")
+    .regex(/^https:\/\/(wa\.me|api\.whatsapp\.com|chat\.whatsapp\.com)\//, "Must be a valid WhatsApp link")
     .max(255, "URL too long")
-    .optional()
-    .or(z.literal("")),
-  profile_picture: z
-    .string()
-    .trim()
-    .url("Must be a valid URL")
-    .max(500, "URL too long")
     .optional()
     .or(z.literal("")),
 });
@@ -79,7 +72,6 @@ export default function SavingsGroupCreate() {
       saving_goal: 10000,
       max_members: 100,
       whatsapp_link: "",
-      profile_picture: "",
     },
   });
 
@@ -110,7 +102,6 @@ export default function SavingsGroupCreate() {
           saving_goal: data.saving_goal,
           max_members: data.max_members,
           whatsapp_link: data.whatsapp_link || null,
-          profile_picture: data.profile_picture || null,
         },
       });
 
@@ -267,37 +258,16 @@ export default function SavingsGroupCreate() {
                 name="whatsapp_link"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>WhatsApp Contact Link</FormLabel>
+                    <FormLabel>WhatsApp Group Link</FormLabel>
                     <FormControl>
                       <Input
                         type="url"
-                        placeholder="https://wa.me/254712345678"
+                        placeholder="https://chat.whatsapp.com/..."
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      Optional: Share your WhatsApp number for inquiries (e.g., https://wa.me/254712345678)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="profile_picture"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Profile Picture URL</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="url"
-                        placeholder="https://example.com/image.jpg"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Optional: Add a profile picture for your group
+                      Optional: Share your WhatsApp group link for member communication
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
