@@ -226,6 +226,18 @@ const Home = () => {
     return diffDays > 0 ? diffDays : 0;
   };
 
+  // Calculate dashboard statistics
+  const dashboardStats = {
+    totalSavings: savingsGroupList.reduce((sum, g) => sum + Number(g.total_savings), 0) +
+                  memberSavingsGroupList.reduce((sum, g) => sum + Number(g.total_savings), 0),
+    totalContributions: chamaList.reduce((sum, c) => sum + Number(c.contribution_amount), 0) +
+                        memberChamaList.reduce((sum, c) => sum + Number(c.contribution_amount), 0),
+    totalMchangoRaised: mchangoList.reduce((sum, m) => sum + Number(m.current_amount), 0),
+    activeMemberships: memberChamaList.length + memberSavingsGroupList.length,
+    groupsCreated: chamaList.length + savingsGroupList.length,
+    activeCampaigns: mchangoList.length,
+  };
+
   return (
     <Layout>
       <div className="container px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 sm:pb-24 max-w-7xl mx-auto">
@@ -313,6 +325,57 @@ const Home = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Dashboard Statistics Summary */}
+          <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Financial Overview
+              </CardTitle>
+              <CardDescription>Your complete financial snapshot</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="p-4 bg-background rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">Total Savings</p>
+                  <p className="text-lg sm:text-xl font-bold text-primary">
+                    KES {dashboardStats.totalSavings.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-4 bg-background rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">Chama Contributions</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">
+                    KES {dashboardStats.totalContributions.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-4 bg-background rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">Mchango Raised</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">
+                    KES {dashboardStats.totalMchangoRaised.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-4 bg-background rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">Active Memberships</p>
+                  <p className="text-lg sm:text-xl font-bold text-primary">
+                    {dashboardStats.activeMemberships}
+                  </p>
+                </div>
+                <div className="p-4 bg-background rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">Groups Created</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">
+                    {dashboardStats.groupsCreated}
+                  </p>
+                </div>
+                <div className="p-4 bg-background rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">Active Campaigns</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">
+                    {dashboardStats.activeCampaigns}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
