@@ -1,11 +1,32 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogIn, UserPlus, Users, Heart, PiggyBank } from "lucide-react";
+import { Menu, X, LogIn, UserPlus, Users, Heart, PiggyBank, User, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, signOut, profile } = useAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      navigate("/");
+      toast({
+        title: "Success",
+        description: "Signed out successfully",
+      });
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
@@ -39,29 +60,54 @@ export const Header = () => {
               <Heart className="h-4 w-4" />
               Browse Campaigns
             </Button>
-            <Button 
-              variant="ghost" 
-              onClick={() => navigate('/savings-group')}
-              className="gap-2"
-            >
-              <PiggyBank className="h-4 w-4" />
-              Savings Group
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={() => navigate('/auth')}
-              className="gap-2"
-            >
-              <LogIn className="h-4 w-4" />
-              Login
-            </Button>
-            <Button 
-              onClick={() => navigate('/auth')}
-              className="gap-2"
-            >
-              <UserPlus className="h-4 w-4" />
-              Sign Up
-            </Button>
+            {user && profile?.kyc_status === 'approved' && (
+              <Button 
+                variant="ghost" 
+                onClick={() => navigate('/savings-group')}
+                className="gap-2"
+              >
+                <PiggyBank className="h-4 w-4" />
+                Savings Groups
+              </Button>
+            )}
+            {user ? (
+              <>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => navigate('/profile')}
+                  className="gap-2"
+                >
+                  <User className="h-4 w-4" />
+                  Profile
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleSignOut}
+                  className="gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => navigate('/auth')}
+                  className="gap-2"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Login
+                </Button>
+                <Button 
+                  onClick={() => navigate('/auth')}
+                  className="gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Sign Up
+                </Button>
+              </>
+            )}
           </nav>
 
           {/* Mobile Menu Button */}
@@ -104,38 +150,69 @@ export const Header = () => {
                 <Heart className="h-4 w-4" />
                 Browse Campaigns
               </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => {
-                  navigate('/savings-group');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full justify-start gap-2"
-              >
-                <PiggyBank className="h-4 w-4" />
-                Savings Group
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => {
-                  navigate('/auth');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full justify-start gap-2"
-              >
-                <LogIn className="h-4 w-4" />
-                Login
-              </Button>
-              <Button 
-                onClick={() => {
-                  navigate('/auth');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full justify-start gap-2"
-              >
-                <UserPlus className="h-4 w-4" />
-                Sign Up
-              </Button>
+              {user && profile?.kyc_status === 'approved' && (
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    navigate('/savings-group');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full justify-start gap-2"
+                >
+                  <PiggyBank className="h-4 w-4" />
+                  Savings Groups
+                </Button>
+              )}
+              {user ? (
+                <>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      navigate('/profile');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <User className="h-4 w-4" />
+                    Profile
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      handleSignOut();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      navigate('/auth');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <LogIn className="h-4 w-4" />
+                    Login
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      navigate('/auth');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Sign Up
+                  </Button>
+                </>
+              )}
             </nav>
           </div>
         )}
