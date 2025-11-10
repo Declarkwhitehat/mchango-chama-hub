@@ -108,7 +108,7 @@ const Index = () => {
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 sm:gap-10 md:gap-12 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 sm:gap-10 md:gap-12 max-w-6xl mx-auto">
             {/* Mchango */}
             <div className="space-y-4 sm:space-y-6">
               <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-secondary to-secondary-glow rounded-full">
@@ -178,6 +178,43 @@ const Index = () => {
                   <div>
                     <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Grow Wealth</h4>
                     <p className="text-muted-foreground text-sm">Watch your savings multiply over time</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Savings Group */}
+            <div className="space-y-4 sm:space-y-6">
+              <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-accent to-accent/80 rounded-full">
+                <span className="text-accent-foreground font-semibold text-sm sm:text-base">Savings Group</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Build Together</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">
+                    1
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Start Saving</h4>
+                    <p className="text-muted-foreground text-sm">Create or join a structured savings group</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">
+                    2
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Access Loans</h4>
+                    <p className="text-muted-foreground text-sm">Get loans based on your savings balance</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">
+                    3
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Share Profits</h4>
+                    <p className="text-muted-foreground text-sm">Earn returns from group investment activities</p>
                   </div>
                 </div>
               </div>
