@@ -41,6 +41,8 @@ serve(async (req) => {
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
     const method = req.method;
+    
+    console.log('Request:', { method, path: url.pathname, pathParts });
 
     // GET /groups - List all active groups
     if (method === 'GET' && pathParts.length === 1) {
@@ -225,9 +227,11 @@ serve(async (req) => {
       );
     }
 
-    // GET /groups/:groupId/dashboard - Manager dashboard
-    if (method === 'GET' && pathParts[1] === 'dashboard') {
+    // GET /:groupId/dashboard - Manager dashboard
+    if (method === 'GET' && pathParts.length === 2 && pathParts[1] === 'dashboard') {
       const groupId = pathParts[0];
+      
+      console.log('Manager dashboard request for group:', groupId);
 
       // Verify user is manager
       const { data: group } = await supabase
@@ -237,6 +241,7 @@ serve(async (req) => {
         .single();
 
       if (!group || group.manager_id !== user.id) {
+        console.error('Not manager or group not found');
         throw new Error('Only the group manager can access this dashboard');
       }
 
@@ -299,8 +304,10 @@ serve(async (req) => {
     }
 
     // GET /members/:memberId/dashboard - Member dashboard
-    if (method === 'GET' && pathParts[0] === 'members' && pathParts[2] === 'dashboard') {
+    if (method === 'GET' && pathParts.length === 3 && pathParts[0] === 'members' && pathParts[2] === 'dashboard') {
       const memberId = pathParts[1];
+      
+      console.log('Member dashboard request for:', memberId);
 
       // Verify member exists and belongs to user
       const { data: membership, error: memberError } = await supabase
@@ -311,6 +318,7 @@ serve(async (req) => {
         .single();
 
       if (memberError || !membership) {
+        console.error('Membership not found:', memberError);
         throw new Error('Membership not found or access denied');
       }
 
@@ -394,6 +402,7 @@ serve(async (req) => {
       );
     }
 
+    console.log('No matching endpoint for:', { method, pathParts });
     throw new Error('Invalid endpoint');
 
   } catch (error) {
