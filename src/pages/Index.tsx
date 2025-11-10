@@ -12,28 +12,29 @@ const Index = () => {
       <Header />
       
       {/* Hero Section */}
-      <section className="relative overflow-hidden pt-16 md:pt-20">
-        <div className="absolute inset-0 bg-[var(--gradient-hero)] z-0" />
-        <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 md:py-20 relative z-10">
-          <div className="grid md:grid-cols-2 gap-6 md:gap-8 lg:gap-12 items-center">
+      <section className="relative overflow-hidden pt-20 md:pt-24 lg:pt-32">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-background z-0" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent z-0" />
+        <div className="container mx-auto px-4 sm:px-6 py-16 sm:py-20 md:py-28 lg:py-36 relative z-10">
+          <div className="max-w-4xl mx-auto">
             {/* Content */}
-            <div className="space-y-4 sm:space-y-6 text-center md:text-left">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
+            <div className="space-y-6 sm:space-y-8 text-center">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight">
                 Build Your Financial Future{" "}
                 <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                   Together
                 </span>
               </h1>
-              <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-xl mx-auto md:mx-0">
+              <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto px-4">
                 Join thousands building wealth through community savings groups and crowdfunding campaigns
               </p>
               
               {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center md:justify-start pt-2 sm:pt-4">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4 sm:pt-6 max-w-3xl mx-auto">
                 <Button 
                   variant="hero" 
                   size="xl"
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto min-w-[200px]"
                   onClick={() => window.location.href = '/mchango'}
                 >
                   <Heart className="mr-2 h-5 w-5" />
@@ -42,7 +43,7 @@ const Index = () => {
                 <Button 
                   variant="heroSecondary" 
                   size="xl"
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto min-w-[200px]"
                   onClick={() => window.location.href = '/chama'}
                 >
                   <Users className="mr-2 h-5 w-5" />
@@ -51,22 +52,13 @@ const Index = () => {
                 <Button 
                   variant="heroSecondary" 
                   size="xl"
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto min-w-[200px]"
                   onClick={() => window.location.href = '/savings-group'}
                 >
                   <PiggyBank className="mr-2 h-5 w-5" />
                   Savings Group
                 </Button>
               </div>
-            </div>
-
-            {/* Hero Image */}
-            <div className="hidden md:block">
-              <img 
-                src={heroImage} 
-                alt="Community savings and crowdfunding platform" 
-                className="rounded-xl md:rounded-2xl shadow-2xl w-full h-auto object-cover"
-              />
             </div>
           </div>
         </div>
