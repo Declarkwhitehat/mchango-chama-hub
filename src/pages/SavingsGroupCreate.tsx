@@ -54,6 +54,11 @@ const savingsGroupSchema = z.object({
     .max(255, "URL too long")
     .optional()
     .or(z.literal("")),
+  period_months: z
+    .number()
+    .int("Period must be a whole number")
+    .min(6, "Minimum period is 6 months")
+    .max(24, "Maximum period is 24 months"),
 });
 
 type SavingsGroupFormData = z.infer<typeof savingsGroupSchema>;
@@ -72,6 +77,7 @@ export default function SavingsGroupCreate() {
       saving_goal: 10000,
       max_members: 100,
       whatsapp_link: "",
+      period_months: 6,
     },
   });
 
@@ -102,6 +108,7 @@ export default function SavingsGroupCreate() {
           saving_goal: data.saving_goal,
           max_members: data.max_members,
           whatsapp_link: data.whatsapp_link || null,
+          period_months: data.period_months,
         },
       });
 
@@ -154,8 +161,7 @@ export default function SavingsGroupCreate() {
           <Alert className="mb-6">
             <Info className="h-4 w-4" />
             <AlertDescription>
-              <strong>Important:</strong> The group cycle will be 6 months by default. 
-              You'll be automatically added as the first member and manager. 
+              <strong>Important:</strong> You'll be automatically added as the first member and manager. 
               Minimum 5 members required to start the group.
             </AlertDescription>
           </Alert>
@@ -252,6 +258,30 @@ export default function SavingsGroupCreate() {
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="period_months"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Group Period (Months) *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="6"
+                        min="6"
+                        max="24"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Choose between 6-24 months (recommended: 6, 9, or 12 months)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}

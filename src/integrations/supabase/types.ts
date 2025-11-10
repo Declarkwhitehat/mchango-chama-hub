@@ -1209,6 +1209,7 @@ export type Database = {
           max_members: number
           monthly_target: number
           name: string
+          period_months: number
           profile_picture: string | null
           saving_goal: number
           slug: string
@@ -1233,6 +1234,7 @@ export type Database = {
           max_members?: number
           monthly_target?: number
           name: string
+          period_months?: number
           profile_picture?: string | null
           saving_goal?: number
           slug: string
@@ -1257,6 +1259,7 @@ export type Database = {
           max_members?: number
           monthly_target?: number
           name?: string
+          period_months?: number
           profile_picture?: string | null
           saving_goal?: number
           slug?: string

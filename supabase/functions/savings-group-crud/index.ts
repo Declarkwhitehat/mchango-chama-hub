@@ -76,7 +76,7 @@ serve(async (req) => {
     // POST /groups - Create group
     if (method === 'POST' && pathParts.length === 1) {
       const body = await req.json();
-      const { name, saving_goal, max_members, whatsapp_link, description, profile_picture } = body;
+      const { name, saving_goal, max_members, whatsapp_link, description, profile_picture, period_months } = body;
 
       // Validation
       if (!name || name.length > 100) {
@@ -88,12 +88,19 @@ serve(async (req) => {
       if (!max_members || max_members < 5 || max_members > 500) {
         throw new Error('Max members must be between 5 and 500');
       }
+      if (!period_months || period_months < 6 || period_months > 24) {
+        throw new Error('Period must be between 6 and 24 months');
+      }
 
       const slug = name
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
         .substring(0, 50);
+
+      const cycleStartDate = new Date();
+      const cycleEndDate = new Date(cycleStartDate);
+      cycleEndDate.setMonth(cycleEndDate.getMonth() + period_months);
 
       const { data: group, error } = await supabase
         .from('saving_groups')
@@ -105,11 +112,12 @@ serve(async (req) => {
           max_members,
           whatsapp_link: whatsapp_link || null,
           profile_picture: profile_picture || null,
+          period_months,
           created_by: user.id,
           manager_id: user.id,
           status: 'active',
-          cycle_start_date: new Date().toISOString(),
-          cycle_end_date: new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString(),
+          cycle_start_date: cycleStartDate.toISOString(),
+          cycle_end_date: cycleEndDate.toISOString(),
         })
         .select()
         .single();
