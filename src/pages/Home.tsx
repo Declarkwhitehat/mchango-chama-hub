@@ -177,127 +177,128 @@ const Home = () => {
 
   return (
     <Layout>
-      <div className="container px-4 py-6 pb-24">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">Manage your financial journey</p>
+      <div className="container px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 sm:pb-24 max-w-7xl mx-auto">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1 sm:mb-2">Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage your financial journey</p>
         </div>
 
-        {/* Profile Summary Card */}
-        {profile && (
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-16 w-16">
-                    <AvatarFallback className="text-xl bg-gradient-to-br from-primary to-primary-glow text-primary-foreground">
-                      {profile.full_name.split(" ").map(n => n[0]).join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">{profile.full_name}</h2>
-                    <div className="flex flex-col gap-1 mt-1">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="h-3 w-3" />
-                        {profile.email}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Phone className="h-3 w-3" />
-                        {profile.phone}
+        <div className="space-y-4 sm:space-y-6">
+          {/* Profile Summary Card */}
+          {profile && (
+            <Card>
+              <CardContent className="pt-4 sm:pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <Avatar className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0">
+                      <AvatarFallback className="text-base sm:text-xl bg-gradient-to-br from-primary to-primary-glow text-primary-foreground">
+                        {profile.full_name.split(" ").map(n => n[0]).join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">{profile.full_name}</h2>
+                      <div className="flex flex-col gap-0.5 sm:gap-1 mt-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+                          <Mail className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{profile.email}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+                          <Phone className="h-3 w-3 flex-shrink-0" />
+                          <span>{profile.phone}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Link to="/profile">
-                    <Button variant="outline" size="sm">
-                      <UserIcon className="h-4 w-4 mr-2" />
-                      View Profile
+                  <div className="flex flex-row sm:flex-col gap-2 justify-end">
+                    <Link to="/profile" className="flex-1 sm:flex-none">
+                      <Button variant="outline" size="sm" className="w-full">
+                        <UserIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                        <span className="text-xs sm:text-sm">View Profile</span>
+                      </Button>
+                    </Link>
+                    <Button variant="ghost" size="sm" onClick={handleLogout} className="flex-1 sm:flex-none">
+                      <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                      <span className="text-xs sm:text-sm">Logout</span>
                     </Button>
-                  </Link>
-                  <Button variant="ghost" size="sm" onClick={handleLogout}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* KYC Status Card */}
+          {profile && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Verification Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className="text-sm sm:text-base text-muted-foreground">KYC Status</span>
+                    {getKYCStatusBadge()}
+                  </div>
+                  {!profile.kyc_submitted_at && (
+                    <Link to="/kyc-upload" className="w-full sm:w-auto">
+                      <Button size="sm" className="w-full sm:w-auto text-xs sm:text-sm">
+                        Complete Verification
+                      </Button>
+                    </Link>
+                  )}
+                  {profile.kyc_status === 'rejected' && (
+                    <Link to="/kyc-upload" className="w-full sm:w-auto">
+                      <Button size="sm" variant="destructive" className="w-full sm:w-auto text-xs sm:text-sm">
+                        Resubmit KYC
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+                {profile.kyc_status === 'rejected' && profile.kyc_rejection_reason && (
+                  <div className="mt-3 bg-destructive/10 p-3 rounded text-xs sm:text-sm">
+                    <p className="font-medium mb-1">Rejection Reason:</p>
+                    <p className="break-words">{profile.kyc_rejection_reason}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+              <TabsTrigger value="mchango" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Mchango
+              </TabsTrigger>
+              <TabsTrigger value="chama" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Chama
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="mchango" className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground">My Campaigns</h2>
+                <Link to="/mchango/create" className="w-full sm:w-auto">
+                  <Button variant="hero" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">
+                    <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                    Create Campaign
                   </Button>
-                </div>
+                </Link>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* KYC Status Card */}
-        {profile && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">Verification Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground">KYC Status</span>
-                  {getKYCStatusBadge()}
-                </div>
-                {!profile.kyc_submitted_at && (
-                  <Link to="/kyc-upload">
-                    <Button size="sm">
-                      Complete Verification
-                    </Button>
-                  </Link>
-                )}
-                {profile.kyc_status === 'rejected' && (
-                  <Link to="/kyc-upload">
-                    <Button size="sm" variant="destructive">
-                      Resubmit KYC
-                    </Button>
-                  </Link>
-                )}
-              </div>
-              {profile.kyc_status === 'rejected' && profile.kyc_rejection_reason && (
-                <div className="mt-3 bg-destructive/10 p-3 rounded text-sm">
-                  <p className="font-medium mb-1">Rejection Reason:</p>
-                  <p>{profile.kyc_rejection_reason}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="mchango" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Mchango
-            </TabsTrigger>
-            <TabsTrigger value="chama" className="gap-2">
-              <Users className="h-4 w-4" />
-              Chama
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="mchango" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-foreground">My Campaigns</h2>
-              <Link to="/mchango/create">
-                <Button variant="hero" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Campaign
-                </Button>
-              </Link>
-            </div>
 
             {loading ? (
               <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">Loading campaigns...</p>
+                <CardContent className="py-6 sm:py-8 text-center">
+                  <p className="text-sm sm:text-base text-muted-foreground">Loading campaigns...</p>
                 </CardContent>
               </Card>
             ) : mchangoList.length === 0 ? (
               <Card>
-                <CardContent className="py-8 text-center space-y-4">
-                  <p className="text-muted-foreground">You haven't created any campaigns yet</p>
-                  <Link to="/mchango/create">
-                    <Button variant="hero">
-                      <Plus className="h-4 w-4 mr-2" />
+                <CardContent className="py-6 sm:py-8 text-center space-y-3 sm:space-y-4">
+                  <p className="text-sm sm:text-base text-muted-foreground">You haven't created any campaigns yet</p>
+                  <Link to="/mchango/create" className="inline-block">
+                    <Button variant="hero" className="text-xs sm:text-sm">
+                      <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                       Create Your First Campaign
                     </Button>
                   </Link>
@@ -313,18 +314,18 @@ const Home = () => {
                     <Link key={campaign.id} to={`/mchango/${campaign.slug}`}>
                       <Card className="hover:shadow-md transition-shadow">
                         <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle className="text-lg">{campaign.title}</CardTitle>
-                              <CardDescription>{campaign.description}</CardDescription>
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-base sm:text-lg break-words">{campaign.title}</CardTitle>
+                              <CardDescription className="text-xs sm:text-sm break-words">{campaign.description}</CardDescription>
                             </div>
                             {daysLeft !== null && (
-                              <Badge variant="secondary">{daysLeft} days</Badge>
+                              <Badge variant="secondary" className="text-xs self-start sm:self-auto flex-shrink-0">{daysLeft} days</Badge>
                             )}
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                          <div className="flex justify-between text-sm">
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2 text-xs sm:text-sm">
                             <span className="text-muted-foreground">
                               KES {Number(campaign.current_amount).toLocaleString()} raised
                             </span>
@@ -333,7 +334,7 @@ const Home = () => {
                             </span>
                           </div>
                           <Progress value={progress} />
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-xs sm:text-sm text-muted-foreground">
                             {progress.toFixed(1)}% funded
                           </div>
                         </CardContent>
@@ -346,11 +347,11 @@ const Home = () => {
           </TabsContent>
 
           <TabsContent value="chama" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-foreground">My Groups</h2>
-              <Link to="/chama/create">
-                <Button variant="heroSecondary" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground">My Groups</h2>
+              <Link to="/chama/create" className="w-full sm:w-auto">
+                <Button variant="heroSecondary" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">
+                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                   Create Group
                 </Button>
               </Link>
@@ -358,23 +359,23 @@ const Home = () => {
 
             {loading ? (
               <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">Loading groups...</p>
+                <CardContent className="py-6 sm:py-8 text-center">
+                  <p className="text-sm sm:text-base text-muted-foreground">Loading groups...</p>
                 </CardContent>
               </Card>
             ) : chamaList.length === 0 && memberChamaList.length === 0 ? (
               <Card>
-                <CardContent className="py-8 text-center space-y-4">
-                  <p className="text-muted-foreground">You haven't joined any chama groups yet</p>
+                <CardContent className="py-6 sm:py-8 text-center space-y-3 sm:space-y-4">
+                  <p className="text-sm sm:text-base text-muted-foreground">You haven't joined any chama groups yet</p>
                   <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Link to="/chama/create">
-                      <Button variant="heroSecondary">
-                        <Plus className="h-4 w-4 mr-2" />
+                    <Link to="/chama/create" className="w-full sm:w-auto">
+                      <Button variant="heroSecondary" className="w-full sm:w-auto text-xs sm:text-sm">
+                        <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                         Create Your First Group
                       </Button>
                     </Link>
-                    <Link to="/chama/join">
-                      <Button variant="outline">
+                    <Link to="/chama/join" className="w-full sm:w-auto">
+                      <Button variant="outline" className="w-full sm:w-auto text-xs sm:text-sm">
                         Join Existing Group
                       </Button>
                     </Link>
@@ -385,8 +386,8 @@ const Home = () => {
               <div className="space-y-6">
                 {/* Created Chamas */}
                 {chamaList.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  <div className="space-y-3 sm:space-y-4">
+                    <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                       Created by You
                     </h3>
                     <div className="space-y-4">
@@ -394,31 +395,31 @@ const Home = () => {
                         <Link key={group.id} to={`/chama/${group.slug}`}>
                           <Card className="hover:shadow-md transition-shadow">
                             <CardHeader>
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <CardTitle className="text-lg">{group.name}</CardTitle>
-                                  <CardDescription>{group.description}</CardDescription>
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <CardTitle className="text-base sm:text-lg break-words">{group.name}</CardTitle>
+                                  <CardDescription className="text-xs sm:text-sm break-words">{group.description}</CardDescription>
                                 </div>
-                                <Badge variant="default">Manager</Badge>
+                                <Badge variant="default" className="text-xs self-start sm:self-auto flex-shrink-0">Manager</Badge>
                               </div>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                              <div className="flex justify-between">
+                              <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Contribution</p>
-                                  <p className="text-xl font-bold text-foreground">
+                                  <p className="text-xs sm:text-sm text-muted-foreground">Contribution</p>
+                                  <p className="text-lg sm:text-xl font-bold text-foreground">
                                     KES {Number(group.contribution_amount).toLocaleString()}
                                   </p>
                                 </div>
-                                <div className="text-right">
-                                  <p className="text-sm text-muted-foreground">Frequency</p>
-                                  <p className="text-lg font-semibold text-foreground capitalize">
+                                <div className="sm:text-right">
+                                  <p className="text-xs sm:text-sm text-muted-foreground">Frequency</p>
+                                  <p className="text-base sm:text-lg font-semibold text-foreground capitalize">
                                     {group.contribution_frequency.replace('_', ' ')}
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-border">
-                                <Calendar className="h-4 w-4" />
+                              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground pt-2 border-t border-border">
+                                <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                 Created: {new Date(group.created_at).toLocaleDateString()}
                               </div>
                             </CardContent>
@@ -431,8 +432,8 @@ const Home = () => {
 
                 {/* Member Chamas */}
                 {memberChamaList.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  <div className="space-y-3 sm:space-y-4">
+                    <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                       Member Groups
                     </h3>
                     <div className="space-y-4">
@@ -474,6 +475,7 @@ const Home = () => {
             )}
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </Layout>
   );
