@@ -20,6 +20,7 @@ import SavingsGroupCreate from "./pages/SavingsGroupCreate";
 import SavingsGroupJoin from "./pages/SavingsGroupJoin";
 import SavingsGroupDetail from "./pages/SavingsGroupDetail";
 import MemberActivity from "./pages/MemberActivity";
+import Activity from "./pages/Activity";
 import Admin from "./pages/Admin";
 import AdminKYC from "./pages/AdminKYC";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -51,6 +52,7 @@ const App = () => (
           <Route path="/chama/join/:slug" element={<ChamaJoin />} />
           <Route path="/chama/:id" element={<ChamaDetail />} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
           
           {/* Savings Group Routes */}
           <Route path="/savings-groups" element={<ProtectedRoute><SavingsGroupList /></ProtectedRoute>} />
