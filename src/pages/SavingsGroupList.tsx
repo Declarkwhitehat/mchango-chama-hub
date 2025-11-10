@@ -36,32 +36,34 @@ export default function SavingsGroupList() {
 
   const fetchGroups = async () => {
     try {
-      const { data: groupsData, error } = await supabase
-        .from("saving_groups")
-        .select("*")
-        .eq("status", "active")
-        .order("created_at", { ascending: false });
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to view savings groups",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('savings-group-crud', {
+        method: 'GET',
+      });
 
       if (error) throw error;
 
-      // Get member counts
-      const groupsWithCounts = await Promise.all(
-        (groupsData || []).map(async (group) => {
-          const { count } = await supabase
-            .from("saving_group_members")
-            .select("*", { count: "exact", head: true })
-            .eq("group_id", group.id)
-            .eq("status", "active");
-
-          return { ...group, member_count: count || 0 };
-        })
-      );
-
-      setGroups(groupsWithCounts);
+      if (data?.success && data?.groups) {
+        setGroups(data.groups);
+      } else {
+        throw new Error('Failed to fetch groups');
+      }
     } catch (error: any) {
+      console.error('Error fetching groups:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to load savings groups",
         variant: "destructive",
       });
     } finally {

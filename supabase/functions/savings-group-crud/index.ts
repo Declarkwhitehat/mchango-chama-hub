@@ -42,6 +42,37 @@ serve(async (req) => {
     const pathParts = url.pathname.split('/').filter(Boolean);
     const method = req.method;
 
+    // GET /groups - List all active groups
+    if (method === 'GET' && pathParts.length === 1) {
+      const { data: groups, error: groupsError } = await supabase
+        .from('saving_groups')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (groupsError) throw groupsError;
+
+      // Get member counts for each group
+      const groupsWithCounts = await Promise.all(
+        (groups || []).map(async (group) => {
+          const { count } = await supabase
+            .from('saving_group_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('group_id', group.id)
+            .eq('status', 'active');
+
+          return { ...group, member_count: count || 0 };
+        })
+      );
+
+      console.log(`Listed ${groupsWithCounts.length} active groups for user ${user.id}`);
+
+      return new Response(
+        JSON.stringify({ success: true, groups: groupsWithCounts }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // POST /groups - Create group
     if (method === 'POST' && pathParts.length === 1) {
       const body = await req.json();
