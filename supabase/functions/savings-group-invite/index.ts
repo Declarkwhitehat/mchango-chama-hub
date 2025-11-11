@@ -139,9 +139,14 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Handle both array and object responses from Supabase
+      const group = Array.isArray(inviteCode.saving_groups) 
+        ? inviteCode.saving_groups[0] 
+        : inviteCode.saving_groups;
+
       return new Response(JSON.stringify({ 
         valid: true,
-        group: inviteCode.saving_groups 
+        group 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -181,6 +186,11 @@ Deno.serve(async (req) => {
       }
 
       const groupId = inviteCode.saving_group_id;
+      
+      // Handle both array and object responses
+      const group = Array.isArray(inviteCode.saving_groups) 
+        ? inviteCode.saving_groups[0] 
+        : inviteCode.saving_groups;
 
       // Check if user already member
       const { data: existingMember } = await supabase
@@ -204,7 +214,7 @@ Deno.serve(async (req) => {
         .eq('group_id', groupId)
         .eq('status', 'active');
 
-      if (memberCount && inviteCode.saving_groups.max_members && memberCount >= inviteCode.saving_groups.max_members) {
+      if (memberCount && group?.max_members && memberCount >= group.max_members) {
         return new Response(JSON.stringify({ error: 'Group is full' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

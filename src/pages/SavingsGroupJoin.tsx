@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,10 +25,13 @@ type JoinFormData = z.infer<typeof joinSchema>;
 export default function SavingsGroupJoin() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [validatingCode, setValidatingCode] = useState(false);
   const [groupPreview, setGroupPreview] = useState<any>(null);
   const [joinStatus, setJoinStatus] = useState<'idle' | 'pending' | 'approved' | 'already_member'>('idle');
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   const form = useForm<JoinFormData>({
     resolver: zodResolver(joinSchema),
@@ -36,6 +39,86 @@ export default function SavingsGroupJoin() {
       groupIdentifier: "",
     },
   });
+
+  // Auto-validate invite code from URL
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code) {
+      setInviteCode(code);
+      validateInviteCode(code);
+    }
+  }, [searchParams]);
+
+  const validateInviteCode = async (code: string) => {
+    setValidatingCode(true);
+    setGroupPreview(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("Please log in to continue");
+      }
+
+      const { data, error } = await supabase.functions.invoke(
+        'savings-group-invite',
+        {
+          body: { path: `/validate/${code}` },
+        }
+      );
+
+      if (error || !data?.valid) {
+        throw new Error(data?.error || 'Invalid invite code');
+      }
+
+      const group = data.group;
+
+      // Check if user is already a member
+      const { data: existingMembership } = await supabase
+        .from("saving_group_members")
+        .select("id, status, is_approved")
+        .eq("group_id", group.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existingMembership) {
+        if (existingMembership.is_approved) {
+          setJoinStatus('already_member');
+        } else {
+          setJoinStatus('pending');
+        }
+      }
+
+      // Get member count
+      const { count } = await supabase
+        .from("saving_group_members")
+        .select("*", { count: "exact", head: true })
+        .eq("group_id", group.id)
+        .eq("status", "active")
+        .eq("is_approved", true);
+
+      setGroupPreview({
+        ...group,
+        memberCount: count || 0,
+        existingMembership,
+      });
+
+      toast({
+        title: "Valid Invite Code",
+        description: "You've been invited to join this group!",
+      });
+    } catch (error: any) {
+      console.error("Error validating invite code:", error);
+      toast({
+        title: "Invalid Invite Code",
+        description: error.message || "The invite code is invalid or expired",
+        variant: "destructive",
+      });
+      setInviteCode(null);
+    } finally {
+      setValidatingCode(false);
+    }
+  };
 
   const searchGroup = async () => {
     const identifier = form.getValues("groupIdentifier").trim().toLowerCase();
@@ -150,21 +233,40 @@ export default function SavingsGroupJoin() {
         throw new Error("Please log in to continue");
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-members/groups/${groupPreview.id}/join`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
+      let result;
+
+      if (inviteCode) {
+        // Join via invite code
+        const { data, error } = await supabase.functions.invoke(
+          'savings-group-invite',
+          {
+            body: { path: `/join/${inviteCode}` },
+          }
+        );
+
+        if (error || !data?.success) {
+          throw new Error(data?.error || error?.message || "Failed to join group");
         }
-      );
 
-      const result = await response.json();
+        result = data;
+      } else {
+        // Regular join (existing logic)
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-members/groups/${groupPreview.id}/join`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to join group");
+        result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to join group");
+        }
       }
 
       setJoinStatus('pending');
@@ -195,13 +297,30 @@ export default function SavingsGroupJoin() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold mb-2">Join Savings Group</h1>
+          <h1 className="text-3xl font-bold mb-2">
+            {inviteCode ? "You've Been Invited!" : "Join Savings Group"}
+          </h1>
           <p className="text-muted-foreground">
-            Search for a savings group by name or slug and request to join
+            {inviteCode 
+              ? "Review the group details below and join with one click"
+              : "Search for a savings group by name or slug and request to join"
+            }
           </p>
         </div>
 
-        {/* Search Form */}
+        {/* Validating Code Indicator */}
+        {validatingCode && (
+          <Alert>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <AlertTitle>Validating Invite Code</AlertTitle>
+            <AlertDescription>
+              Please wait while we validate your invite link...
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Search Form - Hide if invite code present */}
+        {!inviteCode && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -245,6 +364,7 @@ export default function SavingsGroupJoin() {
             </Form>
           </CardContent>
         </Card>
+        )}
 
         {/* Group Preview */}
         {groupPreview && (
@@ -255,7 +375,12 @@ export default function SavingsGroupJoin() {
                   <Users className="h-5 w-5" />
                   {groupPreview.name}
                 </span>
-                <Badge variant="default">{groupPreview.status}</Badge>
+                <div className="flex gap-2">
+                  {inviteCode && (
+                    <Badge variant="secondary">Via Invite Link</Badge>
+                  )}
+                  <Badge variant="default">{groupPreview.status}</Badge>
+                </div>
               </CardTitle>
               <CardDescription>
                 Slug: {groupPreview.slug}
@@ -351,7 +476,7 @@ export default function SavingsGroupJoin() {
                   >
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     <UserPlus className="mr-2 h-4 w-4" />
-                    Request to Join
+                    {inviteCode ? "Join via Invite" : "Request to Join"}
                   </Button>
                 )}
 
