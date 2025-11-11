@@ -589,6 +589,48 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_methods: {
+        Row: {
+          account_name: string | null
+          account_number: string | null
+          bank_name: string | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          is_verified: boolean | null
+          method_type: Database["public"]["Enums"]["payment_method_type"]
+          phone_number: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_verified?: boolean | null
+          method_type: Database["public"]["Enums"]["payment_method_type"]
+          phone_number?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_verified?: boolean | null
+          method_type?: Database["public"]["Enums"]["payment_method_type"]
+          phone_number?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       payouts: {
         Row: {
           amount: number
@@ -664,6 +706,7 @@ export type Database = {
           kyc_submitted_at: string | null
           last_login_at: string | null
           last_login_ip: unknown
+          payment_details_completed: boolean | null
           phone: string
           phone_otp_verified: boolean | null
           phone_verified: boolean | null
@@ -686,6 +729,7 @@ export type Database = {
           kyc_submitted_at?: string | null
           last_login_at?: string | null
           last_login_ip?: unknown
+          payment_details_completed?: boolean | null
           phone: string
           phone_otp_verified?: boolean | null
           phone_verified?: boolean | null
@@ -708,6 +752,7 @@ export type Database = {
           kyc_submitted_at?: string | null
           last_login_at?: string | null
           last_login_ip?: unknown
+          payment_details_completed?: boolean | null
           phone?: string
           phone_otp_verified?: boolean | null
           phone_verified?: boolean | null
@@ -1650,6 +1695,7 @@ export type Database = {
       kyc_status: "pending" | "approved" | "rejected"
       mchango_status: "active" | "completed" | "cancelled"
       member_status: "active" | "inactive" | "left"
+      payment_method_type: "mpesa" | "airtel_money" | "bank_account"
       payout_status: "pending" | "processing" | "completed" | "failed"
       transaction_status: "pending" | "completed" | "failed" | "refunded"
       transaction_type: "donation" | "contribution" | "payout"
@@ -1786,6 +1832,7 @@ export const Constants = {
       kyc_status: ["pending", "approved", "rejected"],
       mchango_status: ["active", "completed", "cancelled"],
       member_status: ["active", "inactive", "left"],
+      payment_method_type: ["mpesa", "airtel_money", "bank_account"],
       payout_status: ["pending", "processing", "completed", "failed"],
       transaction_status: ["pending", "completed", "failed", "refunded"],
       transaction_type: ["donation", "contribution", "payout"],

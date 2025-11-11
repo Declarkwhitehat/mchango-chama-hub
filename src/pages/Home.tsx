@@ -11,6 +11,7 @@ import { TrendingUp, Users, Plus, Calendar, CheckCircle, AlertCircle, Clock, Use
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { PaymentDetailsSetup } from "@/components/PaymentDetailsSetup";
 
 interface Mchango {
   id: string;
@@ -52,8 +53,21 @@ const Home = () => {
   const [savingsGroupList, setSavingsGroupList] = useState<SavingsGroup[]>([]);
   const [memberSavingsGroupList, setMemberSavingsGroupList] = useState<SavingsGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, profile, signOut } = useAuth();
+  const [showPaymentSetup, setShowPaymentSetup] = useState(false);
+  const { user, profile, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Show payment setup modal if KYC approved but payment details not completed
+    if (profile && profile.kyc_status === 'approved' && !profile.payment_details_completed) {
+      setShowPaymentSetup(true);
+    }
+  }, [profile]);
+
+  const handlePaymentSetupComplete = async () => {
+    setShowPaymentSetup(false);
+    await refreshProfile();
+  };
 
   const handleLogout = async () => {
     const { error } = await signOut();
@@ -240,6 +254,7 @@ const Home = () => {
 
   return (
     <Layout>
+      <PaymentDetailsSetup open={showPaymentSetup} onComplete={handlePaymentSetupComplete} />
       <div className="container px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 sm:pb-24 max-w-7xl mx-auto">
         <div className="mb-4 sm:mb-6">
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1 sm:mb-2">Dashboard</h1>

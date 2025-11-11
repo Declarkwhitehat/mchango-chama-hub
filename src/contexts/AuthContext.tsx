@@ -12,6 +12,7 @@ interface Profile {
   kyc_submitted_at: string | null;
   kyc_rejection_reason: string | null;
   created_at: string | null;
+  payment_details_completed: boolean | null;
 }
 
 interface AuthContextType {
