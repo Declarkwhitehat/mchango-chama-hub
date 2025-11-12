@@ -1519,6 +1519,10 @@ export type Database = {
           mchango_id: string | null
           net_amount: number
           notes: string | null
+          payment_method_id: string | null
+          payment_method_type:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
           payment_reference: string | null
           rejection_reason: string | null
           requested_at: string
@@ -1538,6 +1542,10 @@ export type Database = {
           mchango_id?: string | null
           net_amount: number
           notes?: string | null
+          payment_method_id?: string | null
+          payment_method_type?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
           payment_reference?: string | null
           rejection_reason?: string | null
           requested_at?: string
@@ -1557,6 +1565,10 @@ export type Database = {
           mchango_id?: string | null
           net_amount?: number
           notes?: string | null
+          payment_method_id?: string | null
+          payment_method_type?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
           payment_reference?: string | null
           rejection_reason?: string | null
           requested_at?: string
@@ -1581,10 +1593,34 @@ export type Database = {
             referencedRelation: "mchango"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "withdrawals_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
+      daily_withdrawal_totals: {
+        Row: {
+          daily_total: number | null
+          payment_method_id: string | null
+          transaction_count: number | null
+          withdrawal_date: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawals_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       public_donations: {
         Row: {
           amount: number | null

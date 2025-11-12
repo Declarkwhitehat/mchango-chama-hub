@@ -95,11 +95,93 @@ serve(async (req) => {
         });
       }
 
+      // Fetch user's default payment method
+      const { data: defaultPaymentMethod, error: pmError } = await supabaseClient
+        .from('payment_methods')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_default', true)
+        .maybeSingle();
+
+      if (!defaultPaymentMethod) {
+        return new Response(JSON.stringify({ 
+          error: 'No payment method configured',
+          message: 'Please add a default payment method in your profile settings'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Payment method transaction limits
+      const TRANSACTION_LIMITS: Record<string, number> = {
+        'mpesa': 150000,
+        'airtel_money': 150000,
+        'bank_account': 500000
+      };
+
+      const dailyLimit = TRANSACTION_LIMITS[defaultPaymentMethod.method_type];
+
+      // Calculate net amount before validation
+      let commissionRate = 0.05;
+      if (chama_id) {
+        const { data: chama } = await supabaseClient
+          .from('chama')
+          .select('commission_rate')
+          .eq('id', chama_id)
+          .single();
+        commissionRate = chama?.commission_rate || 0.05;
+      }
+      
+      const commissionAmount = amount * commissionRate;
+      const netAmount = amount - commissionAmount;
+
+      // Check if net withdrawal amount exceeds single transaction limit
+      if (netAmount > dailyLimit) {
+        return new Response(JSON.stringify({ 
+          error: 'Transaction limit exceeded',
+          message: `${defaultPaymentMethod.method_type.replace('_', ' ').toUpperCase()} has a maximum transaction limit of KES ${dailyLimit.toLocaleString()}. Your withdrawal of KES ${netAmount.toLocaleString()} (after commission) exceeds this limit.`,
+          limit: dailyLimit,
+          requested: netAmount,
+          payment_method_type: defaultPaymentMethod.method_type
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Check daily cumulative limit (including pending + completed today)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { data: dailyTotals } = await supabaseClient
+        .from('withdrawals')
+        .select('net_amount')
+        .eq('payment_method_id', defaultPaymentMethod.id)
+        .in('status', ['pending', 'completed'])
+        .gte('requested_at', todayStart.toISOString());
+
+      const todayTotal = dailyTotals?.reduce((sum, w) => sum + Number(w.net_amount), 0) || 0;
+      const projectedTotal = todayTotal + netAmount;
+
+      if (projectedTotal > dailyLimit) {
+        return new Response(JSON.stringify({ 
+          error: 'Daily limit exceeded',
+          message: `You have already withdrawn KES ${todayTotal.toLocaleString()} today. Adding KES ${netAmount.toLocaleString()} would exceed your daily limit of KES ${dailyLimit.toLocaleString()} for ${defaultPaymentMethod.method_type.replace('_', ' ').toUpperCase()}.`,
+          daily_limit: dailyLimit,
+          used_today: todayTotal,
+          available: dailyLimit - todayTotal,
+          payment_method_type: defaultPaymentMethod.method_type
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       // Verify creator ownership
       let isCreator = false;
       let isManager = false;
       let totalAvailable = 0;
-      let commissionRate = 0.05;
 
       if (chama_id) {
         const { data: chama, error: chamaError } = await supabaseClient
@@ -116,7 +198,6 @@ serve(async (req) => {
         }
 
         isCreator = chama.created_by === user.id;
-        commissionRate = chama.commission_rate || 0.05;
 
         // Check if user is a manager
         const { data: membership } = await supabaseClient
@@ -188,7 +269,6 @@ serve(async (req) => {
         }
 
         isCreator = mchango.created_by === user.id;
-        commissionRate = 0.05;
         totalAvailable = Number(mchango.current_amount);
       }
 
@@ -224,11 +304,7 @@ serve(async (req) => {
         });
       }
 
-      // Calculate commission and net amount
-      const commissionAmount = amount * commissionRate;
-      const netAmount = amount - commissionAmount;
-
-      // Create withdrawal request
+      // Create withdrawal request with payment method details
       const { data: withdrawal, error } = await supabaseClient
         .from('withdrawals')
         .insert({
@@ -238,6 +314,8 @@ serve(async (req) => {
           amount,
           commission_amount: commissionAmount,
           net_amount: netAmount,
+          payment_method_id: defaultPaymentMethod.id,
+          payment_method_type: defaultPaymentMethod.method_type,
           status: 'pending',
           notes,
         })
@@ -264,7 +342,14 @@ serve(async (req) => {
         .select(`
           *,
           requester:profiles!withdrawals_requested_by_fkey(full_name, email),
-          reviewer:profiles!withdrawals_reviewed_by_fkey(full_name, email)
+          reviewer:profiles!withdrawals_reviewed_by_fkey(full_name, email),
+          payment_method:payment_methods(
+            method_type,
+            phone_number,
+            bank_name,
+            account_number,
+            account_name
+          )
         `)
         .order('created_at', { ascending: false });
 

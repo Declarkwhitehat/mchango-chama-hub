@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Wallet, Loader2, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Wallet, Loader2, Clock, AlertCircle, Smartphone, Building2 } from "lucide-react";
+import { PAYMENT_METHOD_LIMITS, type PaymentMethodType } from "@/utils/paymentLimits";
 
 interface WithdrawalButtonProps {
   chamaId?: string;
@@ -32,10 +34,15 @@ export const WithdrawalButton = ({
   const [notes, setNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [pendingWithdrawal, setPendingWithdrawal] = useState<any>(null);
+  const [defaultPaymentMethod, setDefaultPaymentMethod] = useState<any>(null);
+  const [dailyUsed, setDailyUsed] = useState(0);
+  const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       loadPendingWithdrawal();
+      loadPaymentMethod();
+      loadDailyUsage();
     }
   }, [isOpen, chamaId, mchangoId]);
 
@@ -82,6 +89,59 @@ export const WithdrawalButton = ({
       setPendingWithdrawal(data);
     } catch (error: any) {
       console.error("Error loading pending withdrawal:", error);
+    }
+  };
+
+  const loadPaymentMethod = async () => {
+    try {
+      setLoadingPaymentMethod(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_default', true)
+        .maybeSingle();
+
+      if (error) throw error;
+      setDefaultPaymentMethod(data);
+    } catch (error: any) {
+      console.error("Error loading payment method:", error);
+    } finally {
+      setLoadingPaymentMethod(false);
+    }
+  };
+
+  const loadDailyUsage = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: paymentMethod } = await supabase
+        .from('payment_methods')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_default', true)
+        .maybeSingle();
+
+      if (!paymentMethod) return;
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { data } = await supabase
+        .from('withdrawals')
+        .select('net_amount')
+        .eq('payment_method_id', paymentMethod.id)
+        .in('status', ['pending', 'completed'])
+        .gte('requested_at', todayStart.toISOString());
+
+      const total = data?.reduce((sum, w) => sum + Number(w.net_amount), 0) || 0;
+      setDailyUsed(total);
+    } catch (error: any) {
+      console.error("Error loading daily usage:", error);
     }
   };
 
@@ -149,9 +209,13 @@ export const WithdrawalButton = ({
       }
     } catch (error: any) {
       console.error("Withdrawal error:", error);
+      
+      // Parse error message for limit exceeded cases
+      let errorMessage = error.message || "Failed to create withdrawal request";
+      
       toast({
         title: "Withdrawal Failed",
-        description: error.message || "Failed to create withdrawal request",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -161,6 +225,19 @@ export const WithdrawalButton = ({
 
   const commissionAmount = parseFloat(amount || "0") * commissionRate;
   const netAmount = parseFloat(amount || "0") - commissionAmount;
+
+  const dailyLimit = defaultPaymentMethod 
+    ? PAYMENT_METHOD_LIMITS[defaultPaymentMethod.method_type as PaymentMethodType]?.daily_limit || 0
+    : 0;
+  
+  const remainingLimit = Math.max(0, dailyLimit - dailyUsed);
+
+  const getPaymentIcon = (type: string) => {
+    if (type === 'mpesa' || type === 'airtel_money') {
+      return <Smartphone className="h-4 w-4" />;
+    }
+    return <Building2 className="h-4 w-4" />;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -178,7 +255,22 @@ export const WithdrawalButton = ({
           </DialogDescription>
         </DialogHeader>
 
-        {pendingWithdrawal ? (
+        {!defaultPaymentMethod && !loadingPaymentMethod ? (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Payment Method Required</AlertTitle>
+            <AlertDescription>
+              Please add a default payment method in your profile to request withdrawals.
+              <Button 
+                variant="link" 
+                className="p-0 h-auto ml-1"
+                onClick={() => navigate('/profile')}
+              >
+                Configure Now
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : pendingWithdrawal ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -211,6 +303,42 @@ export const WithdrawalButton = ({
           </Card>
         ) : (
           <form onSubmit={handleWithdraw} className="space-y-4">
+            {defaultPaymentMethod && (
+              <Card className="bg-muted/30">
+                <CardContent className="pt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {getPaymentIcon(defaultPaymentMethod.method_type)}
+                      <div>
+                        <p className="text-sm font-medium">
+                          {PAYMENT_METHOD_LIMITS[defaultPaymentMethod.method_type as PaymentMethodType]?.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {defaultPaymentMethod.phone_number || 
+                           `${defaultPaymentMethod.bank_name} - ***${defaultPaymentMethod.account_number?.slice(-4)}`}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary">Default</Badge>
+                  </div>
+                  <div className="pt-2 border-t space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Daily Limit</span>
+                      <span className="font-medium">KES {dailyLimit.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Used Today</span>
+                      <span className="font-medium">KES {dailyUsed.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span>Available Today</span>
+                      <span className="text-green-600">KES {remainingLimit.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="space-y-2">
               <Label>Available Balance</Label>
               <p className="text-2xl font-bold text-foreground">
@@ -263,7 +391,20 @@ export const WithdrawalButton = ({
               />
             </div>
 
-            <Button type="submit" disabled={isLoading} className="w-full">
+            {netAmount > remainingLimit && remainingLimit > 0 && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  This withdrawal exceeds your remaining daily limit. You can withdraw up to KES {remainingLimit.toLocaleString()} more today.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Button 
+              type="submit" 
+              disabled={isLoading || !defaultPaymentMethod || netAmount > remainingLimit} 
+              className="w-full"
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Wallet, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Wallet, Clock, CheckCircle, XCircle, Loader2, Smartphone, Building2 } from "lucide-react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { formatPaymentMethodLabel } from "@/utils/paymentLimits";
 
 interface WithdrawalHistoryProps {
   chamaId?: string;
@@ -180,6 +181,22 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
                 <div className="pt-2 border-t">
                   <p className="text-sm text-muted-foreground">Rejection Reason</p>
                   <p className="text-sm text-destructive">{withdrawal.rejection_reason}</p>
+                </div>
+              )}
+
+              {withdrawal.payment_method_type && (
+                <div className="pt-2 border-t">
+                  <p className="text-sm text-muted-foreground">Payment Method</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {withdrawal.payment_method_type === 'bank_account' ? (
+                      <Building2 className="h-3 w-3" />
+                    ) : (
+                      <Smartphone className="h-3 w-3" />
+                    )}
+                    <p className="text-sm font-medium">
+                      {formatPaymentMethodLabel(withdrawal.payment_method_type)}
+                    </p>
+                  </div>
                 </div>
               )}
 
