@@ -12,8 +12,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
-import { PaymentMethodCard } from "@/components/PaymentMethodCard";
-import { PaymentDetailsSetup } from "@/components/PaymentDetailsSetup";
+import { PaymentMethodsManager } from "@/components/PaymentMethodsManager";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -26,58 +25,6 @@ const Profile = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-  const [showPaymentSetup, setShowPaymentSetup] = useState(false);
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
-  const [loadingMethods, setLoadingMethods] = useState(true);
-
-  useEffect(() => {
-    fetchPaymentMethods();
-  }, []);
-
-  const fetchPaymentMethods = async () => {
-    try {
-      setLoadingMethods(true);
-      const { data, error } = await supabase.functions.invoke('payment-methods/list');
-      if (error) throw error;
-      setPaymentMethods(data.methods || []);
-    } catch (error: any) {
-      console.error('Error fetching payment methods:', error);
-    } finally {
-      setLoadingMethods(false);
-    }
-  };
-
-  const handleSetDefault = async (id: string) => {
-    try {
-      const { error } = await supabase.functions.invoke(`payment-methods/set-default/${id}`, {
-        method: 'POST',
-      });
-      if (error) throw error;
-      toast.success("Default payment method updated");
-      await fetchPaymentMethods();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to set default");
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      const { error } = await supabase.functions.invoke(`payment-methods/delete/${id}`, {
-        method: 'DELETE',
-      });
-      if (error) throw error;
-      toast.success("Payment method deleted");
-      await fetchPaymentMethods();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete payment method");
-    }
-  };
-
-  const handlePaymentSetupComplete = async () => {
-    setShowPaymentSetup(false);
-    await fetchPaymentMethods();
-    await refreshProfile();
-  };
 
   const handleLogout = async () => {
     const { error } = await signOut();
@@ -169,7 +116,6 @@ const Profile = () => {
 
   return (
     <Layout>
-      <PaymentDetailsSetup open={showPaymentSetup} onComplete={handlePaymentSetupComplete} />
       <div className="container px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 max-w-2xl mx-auto space-y-4 sm:space-y-6">
         {/* Profile Header */}
         <Card>
@@ -265,53 +211,24 @@ const Profile = () => {
           </CardContent>
         </Card>
 
-        {/* Payment Methods */}
+        {/* Payment Methods Dashboard */}
         <Card>
           <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
-            <div className="flex justify-between items-center gap-2">
-              <div>
-                <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                  <Wallet className="h-5 w-5" />
-                  Payment Methods
-                </CardTitle>
-                <CardDescription className="text-xs sm:text-sm mt-1">
-                  Manage your payout methods (up to 3)
-                </CardDescription>
-              </div>
-              {paymentMethods.length < 3 && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setShowPaymentSetup(true)}
-                  className="text-xs sm:text-sm"
-                >
-                  Add Method
-                </Button>
-              )}
+            <div>
+              <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Payment Methods Dashboard
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm mt-1">
+                Manage your payout methods with transaction limits (up to 3)
+              </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3 px-4 sm:px-6 pb-4 sm:pb-6">
-            {loadingMethods ? (
-              <p className="text-sm text-muted-foreground">Loading payment methods...</p>
-            ) : paymentMethods.length === 0 ? (
-              <div className="text-center py-6 space-y-3">
-                <p className="text-sm text-muted-foreground">No payment methods added yet</p>
-                <Button onClick={() => setShowPaymentSetup(true)} size="sm">
-                  Add Payment Method
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {paymentMethods.map((method) => (
-                  <PaymentMethodCard
-                    key={method.id}
-                    method={method}
-                    onSetDefault={handleSetDefault}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
-            )}
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <PaymentMethodsManager 
+              userName={profile.full_name}
+              onUpdate={refreshProfile}
+            />
           </CardContent>
         </Card>
 
