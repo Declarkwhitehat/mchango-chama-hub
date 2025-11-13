@@ -13,6 +13,7 @@ interface PaymentMethod {
   account_number?: string;
   account_name?: string;
   is_default?: boolean;
+  is_verified?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -92,6 +93,9 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Set is_verified: true for bank accounts, use body value for others
+      const isVerified = body.method_type === 'bank_account' ? true : (body.is_verified || false);
+
       const { data: method, error } = await supabase
         .from('payment_methods')
         .insert({
@@ -102,6 +106,7 @@ Deno.serve(async (req) => {
           account_number: body.account_number,
           account_name: body.account_name,
           is_default: body.is_default || false,
+          is_verified: isVerified,
         })
         .select()
         .single();

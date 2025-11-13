@@ -113,7 +113,8 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ 
-        success: true, 
+        success: true,
+        verified: true,
         message: 'Phone number verified successfully'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }

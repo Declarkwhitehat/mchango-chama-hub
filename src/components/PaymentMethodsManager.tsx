@@ -98,7 +98,7 @@ export const PaymentMethodsManager = ({
         body: { phone, otp },
       });
       if (error) throw error;
-      return data.verified === true;
+      return data.success === true || data.verified === true;
     } catch (error: any) {
       return false;
     }
@@ -142,6 +142,7 @@ export const PaymentMethodsManager = ({
         methodData.bank_name = bankName;
         methodData.account_number = accountNumber;
         methodData.account_name = accountName;
+        methodData.is_verified = true; // Bank accounts are auto-verified
       }
 
       const { error } = await supabase.functions.invoke('payment-methods/create', {
@@ -150,7 +151,7 @@ export const PaymentMethodsManager = ({
 
       if (error) throw error;
 
-      toast.success("Payment method added successfully");
+      toast.success("Bank account verified and saved successfully!");
       setShowAddDialog(false);
       resetForm();
       await fetchMethods();
@@ -215,11 +216,12 @@ export const PaymentMethodsManager = ({
           body: {
             ...selectedMethod,
             phone_number: phone,
+            is_verified: true, // Mark as verified after OTP success
           },
         });
 
         if (error) throw error;
-        toast.success("Payment method verified and added");
+        toast.success("Payment method verified and saved successfully!");
         await fetchMethods();
         onUpdate?.();
       }
