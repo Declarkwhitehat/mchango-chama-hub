@@ -62,7 +62,9 @@ export const PaymentMethodsManager = ({
   const fetchMethods = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('payment-methods/list');
+      const { data, error } = await supabase.functions.invoke('payment-methods/list', {
+        method: 'GET',
+      });
       if (error) throw error;
       setMethods(data.methods || []);
     } catch (error: any) {
