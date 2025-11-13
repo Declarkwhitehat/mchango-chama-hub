@@ -5,11 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import LoanRequestForm from "./LoanRequestForm";
 import LoanRepaymentForm from "./LoanRepaymentForm";
+import { SavingsDepositForm } from "./SavingsDepositForm";
 import {
   TrendingUp,
   DollarSign,
@@ -50,6 +51,7 @@ export default function SavingsGroupMemberDashboard({
   const [loading, setLoading] = useState(true);
   const [loanDialogOpen, setLoanDialogOpen] = useState(false);
   const [repaymentDialogOpen, setRepaymentDialogOpen] = useState(false);
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
 
   useEffect(() => {
     if (membership?.id) {
@@ -230,13 +232,32 @@ export default function SavingsGroupMemberDashboard({
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3">
-        <Button
-          onClick={() => toast({ title: "Coming soon", description: "Deposit functionality will be available soon" })}
-          size="lg"
-        >
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Make Deposit
-        </Button>
+        <Dialog open={depositDialogOpen} onOpenChange={setDepositDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="lg">
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Make Deposit
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Make a Deposit</DialogTitle>
+              <DialogDescription>
+                1% commission will be deducted from your deposit
+              </DialogDescription>
+            </DialogHeader>
+            <SavingsDepositForm
+              groupId={group.id}
+              memberId={membership.id}
+              groupName={group.name}
+              onSuccess={() => {
+                setDepositDialogOpen(false);
+                fetchDashboardData();
+                onRefresh();
+              }}
+            />
+          </DialogContent>
+        </Dialog>
         
         <Dialog open={loanDialogOpen} onOpenChange={setLoanDialogOpen}>
           <DialogTrigger asChild>
