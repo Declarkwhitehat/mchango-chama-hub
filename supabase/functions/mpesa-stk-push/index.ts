@@ -122,8 +122,45 @@ serve(async (req) => {
     const result = await stkResponse.json();
     console.log('STK Push API Response:', result);
 
-    // --- Step 4: Return result ---
-    return new Response(JSON.stringify(result), {
+    // --- Step 4: Create pending deposit record if this is a savings deposit ---
+    let depositId = null;
+    if (body.callback_metadata?.type === 'savings_deposit' && result.CheckoutRequestID) {
+      const checkoutRequestId = result.CheckoutRequestID;
+      const commissionAmount = body.amount * 0.01;
+      const netAmount = body.amount - commissionAmount;
+
+      console.log('Creating pending deposit record for:', {
+        groupId: body.callback_metadata.group_id,
+        amount: body.amount,
+        checkoutRequestId
+      });
+
+      const { data: depositRecord, error: depositError } = await supabaseClient
+        .from('saving_group_deposits')
+        .insert({
+          saving_group_id: body.callback_metadata.group_id,
+          member_user_id: body.callback_metadata.beneficiary_user_id,
+          payer_user_id: body.callback_metadata.payer_user_id,
+          amount: body.amount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
+          payment_reference: checkoutRequestId,
+          status: 'pending',
+          saved_for_member_id: body.callback_metadata.saved_for_member_id || null,
+        })
+        .select()
+        .single();
+
+      if (depositError) {
+        console.error('Error creating deposit record:', depositError);
+      } else {
+        depositId = depositRecord.id;
+        console.log('Deposit record created:', depositId);
+      }
+    }
+
+    // --- Step 5: Return result with deposit_id ---
+    return new Response(JSON.stringify({ ...result, deposit_id: depositId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

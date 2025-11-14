@@ -33,8 +33,9 @@ serve(async (req) => {
     const pathParts = url.pathname.split('/').filter(Boolean);
     const method = req.method;
 
-    // POST /groups/:groupId/members/:memberId/savings - Add saving
-    if (method === 'POST' && pathParts.length === 4 && pathParts[2] === 'savings') {
+    // POST endpoint removed - deposits are now created via mpesa-stk-push function
+    // Deposits are created when STK Push is initiated, then updated by callback
+    if (false) { // Disabled
       const groupId = pathParts[0];
       const body = await req.json();
       const { amount, saved_for_member_id, payment_reference } = body;

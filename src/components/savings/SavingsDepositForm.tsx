@@ -68,7 +68,7 @@ export function SavingsDepositForm({ groupId, memberId, groupName, onSuccess }: 
   useEffect(() => {
     const fetchPaymentMethods = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('payment-methods/list', {
+        const { data, error } = await supabase.functions.invoke('payment-methods', {
           method: 'GET',
         });
         if (error) throw error;
