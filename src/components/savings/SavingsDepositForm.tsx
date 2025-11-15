@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getPaymentMethodLimit } from '@/utils/paymentLimits';
+import { calculateBackoffDelay, canRetry, getRetryMessage, DEFAULT_RETRY_CONFIG } from '@/utils/retryHelpers';
 
 interface PaymentMethod {
   id: string;
@@ -176,7 +177,7 @@ export function SavingsDepositForm({ groupId, memberId, groupName, onSuccess }: 
     return null;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (isRetry: boolean = false, existingDepositId?: string) => {
     const validationError = validateAmount();
     if (validationError) {
       toast({
@@ -190,88 +191,157 @@ export function SavingsDepositForm({ groupId, memberId, groupName, onSuccess }: 
     try {
       setProcessing(true);
       const amountNum = parseFloat(amount);
-      const paymentReference = `DEP-${groupId.substring(0, 8)}-${Date.now()}`;
-
-      // Step 1: Initiate M-Pesa STK Push
-      if (selectedPaymentMethod?.method_type === 'mpesa' || selectedPaymentMethod?.method_type === 'airtel_money') {
-        toast({
-          title: 'Payment Initiated',
-          description: `Please check your phone for the payment prompt`,
-        });
-
-        const { data: stkData, error: stkError } = await supabase.functions.invoke('mpesa-stk-push', {
-          body: {
-            phone_number: selectedPaymentMethod.phone_number,
-            amount: amountNum,
-            account_reference: `SAV-${groupId.substring(0, 8)}`,
-            transaction_desc: `Savings deposit to ${groupName}`,
-            callback_metadata: {
-              type: 'savings_deposit',
-              group_id: groupId,
-              member_id: saveFor === 'self' ? memberId : selectedMemberId,
-              payer_member_id: memberId,
-              payment_reference: paymentReference,
-            }
-          }
-        });
-
-        if (stkError) throw stkError;
-
-        // For now, we'll proceed with recording the deposit
-        // In production, this should wait for M-Pesa callback confirmation
-        toast({
-          title: 'Processing Payment',
-          description: 'Recording your deposit...',
-        });
-      }
-
-      // Step 2: Record deposit via edge function
+      
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) throw new Error('Not authenticated');
 
-      const depositPayload = {
-        saving_group_id: groupId,
-        member_user_id: saveFor === 'self' ? session.session.user.id : 
-          groupMembers.find(m => m.id === selectedMemberId)?.user_id,
-        payer_user_id: session.session.user.id,
-        amount: amountNum,
-        payment_reference: paymentReference,
-        saved_for_member_id: saveFor === 'other' ? selectedMemberId : null,
-      };
+      // Get beneficiary user_id
+      const beneficiaryUserId = saveFor === 'self' 
+        ? session.session.user.id 
+        : groupMembers.find(m => m.id === selectedMemberId)?.user_id;
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-deposits`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(depositPayload),
+      let depositId = existingDepositId;
+      let checkoutRequestId: string;
+      let currentRetryCount = 0;
+
+      // If this is a retry, get the current retry count
+      if (isRetry && existingDepositId) {
+        const { data: existingDeposit } = await supabase
+          .from('saving_group_deposits')
+          .select('retry_count, max_retries')
+          .eq('id', existingDepositId)
+          .single();
+
+        if (existingDeposit) {
+          currentRetryCount = existingDeposit.retry_count || 0;
+          
+          // Check if max retries exceeded
+          if (!canRetry(currentRetryCount, existingDeposit.max_retries)) {
+            toast({
+              title: 'Maximum Retries Exceeded',
+              description: `This payment has already been retried ${currentRetryCount} times. Please contact support if you need assistance.`,
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          // Show retry notification with backoff message
+          const delay = calculateBackoffDelay(currentRetryCount);
+          toast({
+            title: 'Retrying Payment',
+            description: getRetryMessage(currentRetryCount, existingDeposit.max_retries),
+          });
+
+          // Wait for exponential backoff
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to record deposit');
       }
 
+      // Step 1: Trigger M-Pesa STK Push (this now creates the pending deposit record)
       toast({
-        title: 'Deposit Successful!',
-        description: (
-          <div className="space-y-1">
-            <p>Paid: KES {amountNum.toLocaleString()}</p>
-            <p>Commission: KES {commission.toFixed(2)} (1%)</p>
-            <p>Credited: KES {netAmount.toFixed(2)}</p>
-          </div>
-        ),
+        title: isRetry ? 'Retrying Payment' : 'Payment Initiated',
+        description: 'Please check your phone and enter your M-Pesa PIN',
       });
 
-      onSuccess();
+      const { data: stkData, error: stkError } = await supabase.functions.invoke('mpesa-stk-push', {
+        body: {
+          phone_number: selectedPaymentMethod?.phone_number,
+          amount: amountNum,
+          account_reference: `SAV-${groupId.substring(0, 8)}`,
+          transaction_desc: `Savings deposit to ${groupName}`,
+          callback_metadata: {
+            type: 'savings_deposit',
+            group_id: groupId,
+            beneficiary_user_id: beneficiaryUserId,
+            payer_user_id: session.session.user.id,
+            saved_for_member_id: saveFor === 'other' ? selectedMemberId : null,
+            is_retry: isRetry,
+            existing_deposit_id: existingDepositId,
+            retry_count: currentRetryCount + (isRetry ? 1 : 0),
+          }
+        }
+      });
+
+      if (stkError) throw stkError;
+
+      depositId = stkData.deposit_id;
+      checkoutRequestId = stkData.CheckoutRequestID;
+
+      // Step 2: Show processing message
+      toast({
+        title: 'Processing Payment',
+        description: 'Waiting for M-Pesa confirmation...',
+        duration: 5000,
+      });
+
+      // Step 3: Poll for payment status (check every 3 seconds for up to 60 seconds)
+      let attempts = 0;
+      const maxAttempts = 20;
+      
+      const checkStatus = async (): Promise<boolean> => {
+        const { data: depositStatus } = await supabase
+          .from('saving_group_deposits')
+          .select('status, mpesa_receipt_number, retry_count, max_retries')
+          .eq('id', depositId!)
+          .single();
+
+        if (depositStatus?.status === 'completed') {
+          toast({
+            title: 'Deposit Successful!',
+            description: (
+              <div className="space-y-1">
+                <p>Paid: KES {amountNum.toFixed(2)}</p>
+                <p>Commission: KES {commission.toFixed(2)} (1%)</p>
+                <p>Credited: KES {netAmount.toFixed(2)}</p>
+                {isRetry && <p className="text-green-600">✓ Retry successful!</p>}
+              </div>
+            ),
+          });
+          setAmount('');
+          setSaveFor('self');
+          setSelectedMemberId('');
+          onSuccess();
+          return true;
+        }
+
+        if (depositStatus?.status === 'failed') {
+          const canRetryAgain = canRetry(
+            depositStatus.retry_count || 0,
+            depositStatus.max_retries || DEFAULT_RETRY_CONFIG.maxRetries
+          );
+
+          toast({
+            title: 'Payment Failed',
+            description: canRetryAgain
+              ? `M-Pesa payment was not completed. You can retry this payment (${depositStatus.retry_count || 0}/${depositStatus.max_retries} attempts used).`
+              : 'Maximum retry attempts reached. Please contact support.',
+            variant: 'destructive',
+          });
+          return true;
+        }
+
+        // Still pending
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          return checkStatus();
+        } else {
+          // Timeout
+          toast({
+            title: 'Payment Timeout',
+            description: 'Payment is taking longer than expected. Check your transaction history or retry the payment.',
+            variant: 'destructive',
+          });
+          return true;
+        }
+      };
+
+      await checkStatus();
+
     } catch (error: any) {
       console.error('Deposit error:', error);
       toast({
-        title: 'Deposit Failed',
+        title: isRetry ? 'Retry Failed' : 'Deposit Failed',
         description: error.message || 'Failed to process deposit',
         variant: 'destructive',
       });
@@ -423,7 +493,7 @@ export function SavingsDepositForm({ groupId, memberId, groupName, onSuccess }: 
 
       {/* Submit Button */}
       <Button
-        onClick={handleSubmit}
+        onClick={() => handleSubmit(false)}
         disabled={processing || !amount || parseFloat(amount) < MIN_AMOUNT}
         className="w-full"
         size="lg"

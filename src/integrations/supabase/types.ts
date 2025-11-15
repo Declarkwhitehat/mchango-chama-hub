@@ -832,12 +832,15 @@ export type Database = {
           created_at: string
           failed_reason: string | null
           id: string
+          last_retry_at: string | null
+          max_retries: number | null
           member_user_id: string
           mpesa_receipt_number: string | null
           net_amount: number
           payer_user_id: string
           payment_reference: string | null
           profit_fee: number | null
+          retry_count: number | null
           saved_for_member_id: string | null
           saving_group_id: string
           status: string | null
@@ -849,12 +852,15 @@ export type Database = {
           created_at?: string
           failed_reason?: string | null
           id?: string
+          last_retry_at?: string | null
+          max_retries?: number | null
           member_user_id: string
           mpesa_receipt_number?: string | null
           net_amount: number
           payer_user_id: string
           payment_reference?: string | null
           profit_fee?: number | null
+          retry_count?: number | null
           saved_for_member_id?: string | null
           saving_group_id: string
           status?: string | null
@@ -866,12 +872,15 @@ export type Database = {
           created_at?: string
           failed_reason?: string | null
           id?: string
+          last_retry_at?: string | null
+          max_retries?: number | null
           member_user_id?: string
           mpesa_receipt_number?: string | null
           net_amount?: number
           payer_user_id?: string
           payment_reference?: string | null
           profit_fee?: number | null
+          retry_count?: number | null
           saved_for_member_id?: string | null
           saving_group_id?: string
           status?: string | null
