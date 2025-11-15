@@ -828,38 +828,53 @@ export type Database = {
         Row: {
           amount: number
           commission_amount: number
+          completed_at: string | null
           created_at: string
+          failed_reason: string | null
           id: string
           member_user_id: string
+          mpesa_receipt_number: string | null
           net_amount: number
           payer_user_id: string
+          payment_reference: string | null
           profit_fee: number | null
           saved_for_member_id: string | null
           saving_group_id: string
+          status: string | null
         }
         Insert: {
           amount: number
           commission_amount: number
+          completed_at?: string | null
           created_at?: string
+          failed_reason?: string | null
           id?: string
           member_user_id: string
+          mpesa_receipt_number?: string | null
           net_amount: number
           payer_user_id: string
+          payment_reference?: string | null
           profit_fee?: number | null
           saved_for_member_id?: string | null
           saving_group_id: string
+          status?: string | null
         }
         Update: {
           amount?: number
           commission_amount?: number
+          completed_at?: string | null
           created_at?: string
+          failed_reason?: string | null
           id?: string
           member_user_id?: string
+          mpesa_receipt_number?: string | null
           net_amount?: number
           payer_user_id?: string
+          payment_reference?: string | null
           profit_fee?: number | null
           saved_for_member_id?: string | null
           saving_group_id?: string
+          status?: string | null
         }
         Relationships: [
           {
