@@ -122,40 +122,75 @@ serve(async (req) => {
     const result = await stkResponse.json();
     console.log('STK Push API Response:', result);
 
-    // --- Step 4: Create pending deposit record if this is a savings deposit ---
+    // --- Step 4: Create or update deposit record if this is a savings deposit ---
     let depositId = null;
     if (body.callback_metadata?.type === 'savings_deposit' && result.CheckoutRequestID) {
       const checkoutRequestId = result.CheckoutRequestID;
       const commissionAmount = body.amount * 0.01;
       const netAmount = body.amount - commissionAmount;
+      const isRetry = body.callback_metadata.is_retry || false;
+      const existingDepositId = body.callback_metadata.existing_deposit_id;
+      const retryCount = body.callback_metadata.retry_count || 0;
 
-      console.log('Creating pending deposit record for:', {
-        groupId: body.callback_metadata.group_id,
-        amount: body.amount,
-        checkoutRequestId
-      });
+      if (isRetry && existingDepositId) {
+        // Update existing deposit for retry
+        console.log('Updating existing deposit for retry:', {
+          depositId: existingDepositId,
+          checkoutRequestId,
+          retryCount
+        });
 
-      const { data: depositRecord, error: depositError } = await supabaseClient
-        .from('saving_group_deposits')
-        .insert({
-          saving_group_id: body.callback_metadata.group_id,
-          member_user_id: body.callback_metadata.beneficiary_user_id,
-          payer_user_id: body.callback_metadata.payer_user_id,
-          amount: body.amount,
-          commission_amount: commissionAmount,
-          net_amount: netAmount,
-          payment_reference: checkoutRequestId,
-          status: 'pending',
-          saved_for_member_id: body.callback_metadata.saved_for_member_id || null,
-        })
-        .select()
-        .single();
+        const { data: updateResult, error: updateError } = await supabaseClient
+          .from('saving_group_deposits')
+          .update({
+            payment_reference: checkoutRequestId,
+            status: 'pending',
+            retry_count: retryCount,
+            last_retry_at: new Date().toISOString(),
+            failed_reason: null, // Clear previous failure reason
+          })
+          .eq('id', existingDepositId)
+          .select()
+          .single();
 
-      if (depositError) {
-        console.error('Error creating deposit record:', depositError);
+        if (updateError) {
+          console.error('Error updating deposit record:', updateError);
+        } else {
+          depositId = existingDepositId;
+          console.log('Deposit record updated for retry:', depositId);
+        }
       } else {
-        depositId = depositRecord.id;
-        console.log('Deposit record created:', depositId);
+        // Create new deposit record
+        console.log('Creating new pending deposit record:', {
+          groupId: body.callback_metadata.group_id,
+          amount: body.amount,
+          checkoutRequestId
+        });
+
+        const { data: depositRecord, error: depositError } = await supabaseClient
+          .from('saving_group_deposits')
+          .insert({
+            saving_group_id: body.callback_metadata.group_id,
+            member_user_id: body.callback_metadata.beneficiary_user_id,
+            payer_user_id: body.callback_metadata.payer_user_id,
+            amount: body.amount,
+            commission_amount: commissionAmount,
+            net_amount: netAmount,
+            payment_reference: checkoutRequestId,
+            status: 'pending',
+            saved_for_member_id: body.callback_metadata.saved_for_member_id || null,
+            retry_count: 0,
+            max_retries: 3,
+          })
+          .select()
+          .single();
+
+        if (depositError) {
+          console.error('Error creating deposit record:', depositError);
+        } else {
+          depositId = depositRecord.id;
+          console.log('Deposit record created:', depositId);
+        }
       }
     }
 

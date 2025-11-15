@@ -22,9 +22,11 @@ import {
   XCircle,
   Gift,
   History,
+  RefreshCw,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MonthlySavingsTracker } from "./MonthlySavingsTracker";
+import { RetryPaymentButton } from "./RetryPaymentButton";
 import {
   Table,
   TableBody,
@@ -83,7 +85,16 @@ export default function SavingsGroupMemberDashboard({
         throw new Error(result.error || 'Failed to fetch dashboard data');
       }
 
-      setDashboardData(result);
+      // Fetch deposits with status
+      const { data: deposits } = await supabase
+        .from('saving_group_deposits')
+        .select('*, profiles!saving_group_deposits_payer_user_id_fkey(phone)')
+        .eq('saving_group_id', group.id)
+        .eq('payer_user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      setDashboardData({ ...result, deposits: deposits || [] });
     } catch (error: any) {
       console.error('Error fetching dashboard:', error);
       toast({
@@ -418,6 +429,79 @@ export default function SavingsGroupMemberDashboard({
           </Table>
         </Card>
       )}
+
+      {/* Recent Transactions */}
+      <Card className="p-6">
+        <h3 className="text-xl font-bold mb-4 flex items-center">
+          <History className="mr-2 h-5 w-5" />
+          Recent Deposits
+        </h3>
+        {!dashboardData?.deposits || dashboardData.deposits.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">No deposits yet</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Amount</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Receipt</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dashboardData.deposits.slice(0, 10).map((deposit: any) => (
+                <TableRow key={deposit.id}>
+                  <TableCell className="font-semibold">
+                    KES {deposit.amount.toLocaleString()}
+                  </TableCell>
+                  <TableCell>{new Date(deposit.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {deposit.status === 'completed' && (
+                      <Badge className="bg-green-600">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Completed
+                      </Badge>
+                    )}
+                    {deposit.status === 'pending' && (
+                      <Badge variant="secondary">
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Pending
+                      </Badge>
+                    )}
+                    {deposit.status === 'failed' && (
+                      <Badge variant="destructive">
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Failed
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {deposit.mpesa_receipt_number || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {deposit.status === 'failed' && (
+                      <RetryPaymentButton
+                        depositId={deposit.id}
+                        amount={deposit.amount}
+                        retryCount={deposit.retry_count || 0}
+                        maxRetries={deposit.max_retries || 3}
+                        phoneNumber={deposit.phone_number || ''}
+                        groupId={group.id}
+                        groupName={group.name}
+                        onSuccess={() => {
+                          fetchDashboardData();
+                          onRefresh();
+                        }}
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
 
       {/* Recent Transactions */}
       <Card className="p-6">
