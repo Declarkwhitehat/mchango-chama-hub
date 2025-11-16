@@ -54,38 +54,46 @@ export default function SavingsGroupJoin() {
     setGroupPreview(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error("Please log in to continue");
-      }
-
-      const { data, error } = await supabase.functions.invoke(
-        `savings-group-invite/validate/${code}`,
+      // Call the validate endpoint directly without authentication
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-invite/validate/${code}`,
         {
           method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
         }
       );
 
-      if (error || !data?.valid) {
-        throw new Error(data?.error || 'Invalid invite code');
+      const data = await response.json();
+
+      if (!response.ok || !data?.valid) {
+        throw new Error(data?.message || 'Invalid invite code');
       }
 
       const group = data.group;
 
-      // Check if user is already a member
-      const { data: existingMembership } = await supabase
-        .from("saving_group_members")
-        .select("id, status, is_approved")
-        .eq("group_id", group.id)
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Check if user is authenticated and already a member
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      let existingMembership = null;
+      if (user) {
+        // Check if user is already a member (only if authenticated)
+        const { data: membership } = await supabase
+          .from("saving_group_members")
+          .select("id, status, is_approved")
+          .eq("group_id", group.id)
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-      if (existingMembership) {
-        if (existingMembership.is_approved) {
-          setJoinStatus('already_member');
-        } else {
-          setJoinStatus('pending');
+        existingMembership = membership;
+
+        if (existingMembership) {
+          if (existingMembership.is_approved) {
+            setJoinStatus('already_member');
+          } else {
+            setJoinStatus('pending');
+          }
         }
       }
 
@@ -223,6 +231,14 @@ export default function SavingsGroupJoin() {
 
   const joinGroup = async () => {
     if (!groupPreview) return;
+
+    // Check if user is authenticated before joining
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      // Redirect to auth with return URL
+      navigate("/auth", { state: { returnTo: `/savings-groups/join?code=${inviteCode}` } });
+      return;
+    }
 
     setLoading(true);
 
