@@ -19,14 +19,6 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const url = new URL(req.url);
     let pathParts = url.pathname.split('/').filter(Boolean);
     
@@ -37,6 +29,57 @@ Deno.serve(async (req) => {
     
     const method = req.method;
     console.log('Invite Request:', { method, path: url.pathname, normalizedPathParts: pathParts });
+
+    // GET /validate/:code - Public endpoint (no auth required)
+    if (method === 'GET' && pathParts[0] === 'validate' && pathParts[1]) {
+      const code = pathParts[1];
+
+      const { data: inviteCode, error: codeError } = await supabase
+        .from('saving_group_invite_codes')
+        .select('*, saving_groups(*)')
+        .eq('code', code)
+        .eq('is_active', true)
+        .is('used_at', null)
+        .single();
+
+      if (codeError || !inviteCode) {
+        return new Response(JSON.stringify({ 
+          valid: false, 
+          message: 'Invalid or inactive invite code' 
+        }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Check if expired
+      if (inviteCode.expires_at && new Date(inviteCode.expires_at) < new Date()) {
+        return new Response(JSON.stringify({ 
+          valid: false, 
+          message: 'This invite code has expired' 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ 
+        valid: true,
+        group: inviteCode.saving_groups,
+        code: inviteCode.code
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // All other operations require authentication
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // POST /generate - Generate invite code
     if (method === 'POST' && pathParts[0] === 'generate') {
@@ -105,52 +148,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // GET /validate/:code - Validate invite code
-    if (method === 'GET' && pathParts[0] === 'validate' && pathParts[1]) {
-      const code = pathParts[1];
-
-      const { data: inviteCode, error: codeError } = await supabase
-        .from('saving_group_invite_codes')
-        .select('*, saving_groups(*)')
-        .eq('code', code)
-        .eq('is_active', true)
-        .single();
-
-      if (codeError || !inviteCode) {
-        return new Response(JSON.stringify({ error: 'Invalid or expired invite code' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Check if expired
-      if (inviteCode.expires_at && new Date(inviteCode.expires_at) < new Date()) {
-        return new Response(JSON.stringify({ error: 'Invite code has expired' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Check if already used
-      if (inviteCode.used_by) {
-        return new Response(JSON.stringify({ error: 'Invite code already used' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Handle both array and object responses from Supabase
-      const group = Array.isArray(inviteCode.saving_groups) 
-        ? inviteCode.saving_groups[0] 
-        : inviteCode.saving_groups;
-
-      return new Response(JSON.stringify({ 
-        valid: true,
-        group 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
 
     // POST /join/:code - Join group via invite code
     if (method === 'POST' && pathParts[0] === 'join' && pathParts[1]) {
