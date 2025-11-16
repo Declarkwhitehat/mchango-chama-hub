@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
+import Footer from "@/components/Footer";
 import { Users, TrendingUp, Heart, Shield, PiggyBank } from "lucide-react";
 import heroImage from "@/assets/hero-image.jpg";
 import profilePhoto from "@/assets/profile-photo.png";
@@ -267,6 +268,7 @@ const Index = () => {
           </div>
         </div>
       </footer>
+      <Footer />
     </div>
   );
 };

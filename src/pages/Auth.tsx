@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Eye, EyeOff, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PhoneVerification } from "@/components/PhoneVerification";
@@ -33,6 +35,9 @@ const signupSchema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
   confirmPassword: z.string(),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "You must accept the Terms and Conditions"
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -50,6 +55,34 @@ const Auth = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [signupStep, setSignupStep] = useState<'details' | 'phone'>('details');
+  const [passwordStrength, setPasswordStrength] = useState({
+    score: 0,
+    hasUpperCase: false,
+    hasLowerCase: false,
+    hasNumber: false,
+    hasSpecialChar: false,
+    hasMinLength: false,
+  });
+
+  // Calculate password strength
+  const calculatePasswordStrength = (password: string) => {
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+    const hasMinLength = password.length >= 8;
+
+    const score = [hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar, hasMinLength].filter(Boolean).length;
+
+    setPasswordStrength({
+      score,
+      hasUpperCase,
+      hasLowerCase,
+      hasNumber,
+      hasSpecialChar,
+      hasMinLength,
+    });
+  };
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -92,8 +125,12 @@ const Auth = () => {
       const { error } = await signIn(data.email, data.password);
       
       if (error) {
-        if (error.message.includes("Invalid")) {
-          toast.error("Invalid email or password");
+        if (error.message.includes("Invalid login credentials")) {
+          toast.error("Invalid email or password. Please check your credentials and try again.");
+        } else if (error.message.includes("Email not confirmed")) {
+          toast.error("Please verify your email address before logging in. Check your inbox.");
+        } else if (error.message.includes("Too many requests")) {
+          toast.error("Too many login attempts. Please wait a few minutes and try again.");
         } else {
           toast.error(error.message);
         }
@@ -135,27 +172,50 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await signUp(data.email, data.password, {
+      const { error: signUpError } = await signUp(data.email, data.password, {
         full_name: data.full_name,
         id_number: data.id_number,
         phone: data.phone,
       });
       
-      if (error) {
-        if (error.message.includes("already registered")) {
-          toast.error("Email already registered");
+      if (signUpError) {
+        if (signUpError.message.includes("already registered") || signUpError.message.includes("User already")) {
+          toast.error("This email is already registered. Please log in or use a different email.");
+        } else if (signUpError.message.includes("Password")) {
+          toast.error("Password is too weak. Please use a stronger password.");
+        } else if (signUpError.message.includes("rate limit")) {
+          toast.error("Too many requests. Please wait a moment and try again.");
         } else {
-          toast.error(error.message);
+          toast.error(signUpError.message);
         }
         return;
       }
 
+      // Record T&C acceptance
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('user_consents').insert({
+            user_id: user.id,
+            terms_version: 'v1.0',
+            privacy_version: 'v1.0',
+            ip_address: null,
+          });
+        }
+      } catch (consentError) {
+        console.error('Failed to record consent:', consentError);
+      }
+
       // Send welcome SMS
-      await sendTransactionalSMS(
-        data.phone,
-        SMS_TEMPLATES.accountCreated(data.full_name),
-        'registration'
-      );
+      try {
+        await sendTransactionalSMS(
+          data.phone,
+          SMS_TEMPLATES.accountCreated(data.full_name),
+          'registration'
+        );
+      } catch (smsError) {
+        console.error('Failed to send welcome SMS:', smsError);
+      }
       
       toast.success("Account created! Please upload your ID documents.");
       navigate("/kyc-upload");
@@ -261,6 +321,11 @@ const Auth = () => {
                         >
                           {isLoading ? "Logging in..." : "Login"}
                         </Button>
+                        <div className="text-center">
+                          <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                            Forgot password?
+                          </Link>
+                        </div>
                       </form>
                     </Form>
                   </CardContent>
@@ -349,7 +414,11 @@ const Auth = () => {
                                 <div className="relative">
                                   <Input 
                                     type={showSignupPassword ? "text" : "password"} 
-                                    {...field} 
+                                    {...field}
+                                    onChange={(e) => {
+                                      field.onChange(e);
+                                      calculatePasswordStrength(e.target.value);
+                                    }}
                                   />
                                   <Button
                                     type="button"
@@ -366,6 +435,46 @@ const Auth = () => {
                                   </Button>
                                 </div>
                               </FormControl>
+                              {field.value && (
+                                <div className="space-y-2 mt-2">
+                                  <div className="flex gap-1">
+                                    {[1, 2, 3, 4, 5].map((level) => (
+                                      <div
+                                        key={level}
+                                        className={`h-1 flex-1 rounded-full transition-colors ${
+                                          level <= passwordStrength.score
+                                            ? passwordStrength.score <= 2
+                                              ? "bg-red-500"
+                                              : passwordStrength.score <= 3
+                                              ? "bg-yellow-500"
+                                              : "bg-green-500"
+                                            : "bg-muted"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <div className="text-xs space-y-1">
+                                    {[
+                                      { check: passwordStrength.hasMinLength, label: "At least 8 characters" },
+                                      { check: passwordStrength.hasUpperCase, label: "One uppercase letter" },
+                                      { check: passwordStrength.hasLowerCase, label: "One lowercase letter" },
+                                      { check: passwordStrength.hasNumber, label: "One number" },
+                                      { check: passwordStrength.hasSpecialChar, label: "One special character" },
+                                    ].map((requirement, index) => (
+                                      <div key={index} className="flex items-center gap-1 text-muted-foreground">
+                                        {requirement.check ? (
+                                          <Check className="h-3 w-3 text-green-500" />
+                                        ) : (
+                                          <X className="h-3 w-3 text-red-500" />
+                                        )}
+                                        <span className={requirement.check ? "text-green-500" : ""}>
+                                          {requirement.label}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -398,6 +507,33 @@ const Auth = () => {
                                 </div>
                               </FormControl>
                               <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="acceptTerms"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel className="text-sm font-normal">
+                                  I agree to the{" "}
+                                  <Link to="/terms" target="_blank" className="text-primary hover:underline">
+                                    Terms and Conditions
+                                  </Link>
+                                  {" "}and{" "}
+                                  <Link to="/privacy" target="_blank" className="text-primary hover:underline">
+                                    Privacy Policy
+                                  </Link>
+                                </FormLabel>
+                                <FormMessage />
+                              </div>
                             </FormItem>
                           )}
                         />
