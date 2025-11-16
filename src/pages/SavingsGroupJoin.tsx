@@ -61,9 +61,9 @@ export default function SavingsGroupJoin() {
       }
 
       const { data, error } = await supabase.functions.invoke(
-        'savings-group-invite',
+        `savings-group-invite/validate/${code}`,
         {
-          body: { path: `/validate/${code}` },
+          method: 'GET',
         }
       );
 
@@ -238,9 +238,9 @@ export default function SavingsGroupJoin() {
       if (inviteCode) {
         // Join via invite code
         const { data, error } = await supabase.functions.invoke(
-          'savings-group-invite',
+          `savings-group-invite/join/${inviteCode}`,
           {
-            body: { path: `/join/${inviteCode}` },
+            method: 'POST',
           }
         );
 
