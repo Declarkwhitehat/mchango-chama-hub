@@ -1,0 +1,59 @@
+import { Link } from "react-router-dom";
+
+const Footer = () => {
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container py-6 px-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Company Info */}
+          <div>
+            <h3 className="font-semibold text-lg mb-2">Chama Platform</h3>
+            <p className="text-sm text-muted-foreground">
+              Empowering communities through collective savings, fundraising, and financial growth.
+            </p>
+          </div>
+
+          {/* Quick Links */}
+          <div>
+            <h3 className="font-semibold text-lg mb-2">Quick Links</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link to="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Terms and Conditions
+                </Link>
+              </li>
+              <li>
+                <Link to="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <a href="mailto:support@platform.com" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Contact Support
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Contact Info */}
+          <div>
+            <h3 className="font-semibold text-lg mb-2">Contact</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>Email: support@platform.com</li>
+              <li>Phone: +254 XXX XXX XXX</li>
+              <li>Nairobi, Kenya</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-6 pt-6 border-t text-center text-sm text-muted-foreground">
+          <p>&copy; {currentYear} Chama Platform. All rights reserved. | Version 1.0</p>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
+export default Footer;
