@@ -22,9 +22,10 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     let pathParts = url.pathname.split('/').filter(Boolean);
     
-    // Normalize pathParts by removing function name prefix
-    if (pathParts[0] === 'savings-group-invite') {
-      pathParts = pathParts.slice(1);
+    // Find and normalize pathParts by removing everything before and including 'savings-group-invite'
+    const functionIndex = pathParts.findIndex(part => part === 'savings-group-invite');
+    if (functionIndex !== -1) {
+      pathParts = pathParts.slice(functionIndex + 1);
     }
     
     const method = req.method;
