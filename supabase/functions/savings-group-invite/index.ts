@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
 
     // GET /validate/:code - Public endpoint (no auth required)
     if (method === 'GET' && pathParts[0] === 'validate' && pathParts[1]) {
-      const code = pathParts[1];
+      const code = pathParts[1].toUpperCase();
 
       const { data: inviteCode, error: codeError } = await supabase
         .from('saving_group_invite_codes')
@@ -73,8 +73,17 @@ Deno.serve(async (req) => {
     }
 
     // All other operations require authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const jwt = authHeader.replace(/^Bearer\s+/i, '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
     if (userError || !user) {
+      console.error('Auth error:', userError);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -151,7 +160,7 @@ Deno.serve(async (req) => {
 
     // POST /join/:code - Join group via invite code
     if (method === 'POST' && pathParts[0] === 'join' && pathParts[1]) {
-      const code = pathParts[1];
+      const code = pathParts[1].toUpperCase();
 
       // Validate code
       const { data: inviteCode, error: codeError } = await supabase
@@ -256,6 +265,13 @@ Deno.serve(async (req) => {
     // DELETE /:codeId - Delete invite code
     if (method === 'DELETE' && pathParts[0]) {
       const codeId = pathParts[0];
+      
+      if (!codeId) {
+        return new Response(JSON.stringify({ error: 'No code ID provided' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       // Verify user is manager
       const { data: inviteCode, error: codeError } = await supabase

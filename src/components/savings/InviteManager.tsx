@@ -35,14 +35,23 @@ export function SavingsGroupInviteManager({ groupId }: InviteManagerProps) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data, error } = await supabase.functions.invoke(`savings-group-invite/list/${groupId}`, {
-        method: 'GET',
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-invite/list/${groupId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch invite codes');
       }
-      
+
+      const data = await response.json();
       if (data?.invite_codes) {
         setInviteCodes(data.invite_codes);
       }
@@ -87,17 +96,33 @@ export function SavingsGroupInviteManager({ groupId }: InviteManagerProps) {
 
   const deleteInviteCode = async (codeId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke(`savings-group-invite/${codeId}`, {
-        method: 'DELETE',
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Please log in to delete invite codes');
+        return;
+      }
 
-      if (error) throw error;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-invite/${codeId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete invite code');
+      }
 
       toast.success('Invite code deleted');
       await fetchInviteCodes();
     } catch (error) {
       console.error('Error deleting invite code:', error);
-      toast.error('Failed to delete invite code');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete invite code');
     }
   };
 
