@@ -57,7 +57,7 @@ const App = () => (
           {/* Savings Group Routes */}
           <Route path="/savings-groups" element={<ProtectedRoute><SavingsGroupList /></ProtectedRoute>} />
           <Route path="/savings-groups/create" element={<ProtectedRoute requireKYC><SavingsGroupCreate /></ProtectedRoute>} />
-          <Route path="/savings-groups/join" element={<ProtectedRoute><SavingsGroupJoin /></ProtectedRoute>} />
+          <Route path="/savings-groups/join" element={<SavingsGroupJoin />} />
           <Route path="/savings-groups/:id" element={<ProtectedRoute><SavingsGroupDetail /></ProtectedRoute>} />
           <Route path="/savings-groups/:groupId/activity" element={<ProtectedRoute><MemberActivity /></ProtectedRoute>} />
           
