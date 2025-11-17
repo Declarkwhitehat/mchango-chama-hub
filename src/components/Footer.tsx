@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Instagram, Facebook } from "lucide-react";
+import { Instagram, Facebook, Twitter } from "lucide-react";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -64,6 +64,15 @@ const Footer = () => {
                 aria-label="Facebook"
               >
                 <Facebook className="h-5 w-5" />
+              </a>
+              <a
+                href="https://twitter.com/yourhandle"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Twitter"
+              >
+                <Twitter className="h-5 w-5" />
               </a>
             </div>
           </div>
