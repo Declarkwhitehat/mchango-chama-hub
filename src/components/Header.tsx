@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -80,47 +81,51 @@ export const Header = () => {
               </Button>
             )}
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-2">
-                    <Avatar className="h-7 w-7">
-                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                        {profile?.full_name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="hidden lg:inline">{profile?.full_name || 'Account'}</span>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{profile?.full_name || 'User'}</p>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/activity')} className="cursor-pointer">
-                    <Activity className="mr-2 h-4 w-4" />
-                    Activity & Payments
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="gap-2">
+                      <Avatar className="h-7 w-7">
+                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                          {profile?.full_name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="hidden lg:inline">{profile?.full_name || 'Account'}</span>
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium">{profile?.full_name || 'User'}</p>
+                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/activity')} className="cursor-pointer">
+                      <Activity className="mr-2 h-4 w-4" />
+                      Activity & Payments
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <ThemeToggle />
+              </>
             ) : (
               <>
+                <ThemeToggle />
                 <Button 
                   variant="ghost" 
                   onClick={() => navigate('/auth')}
@@ -141,17 +146,20 @@ export const Header = () => {
           </nav>
 
           {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? (
-              <X className="h-5 w-5 sm:h-6 sm:w-6" />
-            ) : (
-              <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
-            )}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              className="p-2 rounded-lg hover:bg-accent transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
+              ) : (
+                <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
