@@ -11,6 +11,7 @@ import { PlatformStatistics } from "@/components/admin/PlatformStatistics";
 import { SavingsGroupManagement } from "@/components/admin/SavingsGroupManagement";
 import { CommissionOverview } from "@/components/admin/CommissionOverview";
 import { ChamaManagement } from "@/components/admin/ChamaManagement";
+import { CustomerCallbacks } from "@/components/admin/CustomerCallbacks";
 import { DataExport } from "@/components/admin/DataExport";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -270,7 +271,7 @@ const AdminDashboard = () => {
           </div>
           
           <Tabs defaultValue="savings" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 h-auto gap-2 bg-muted/50 p-2">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-7 h-auto gap-2 bg-muted/50 p-2">
               <TabsTrigger value="savings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Savings Groups
               </TabsTrigger>
@@ -288,6 +289,9 @@ const AdminDashboard = () => {
               </TabsTrigger>
               <TabsTrigger value="adjustment" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Adjustments
+              </TabsTrigger>
+              <TabsTrigger value="callbacks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Callbacks
               </TabsTrigger>
             </TabsList>
 
@@ -313,6 +317,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="adjustment" className="mt-6">
               <AccountAdjustment />
+            </TabsContent>
+
+            <TabsContent value="callbacks" className="mt-6">
+              <CustomerCallbacks />
             </TabsContent>
           </Tabs>
         </div>
