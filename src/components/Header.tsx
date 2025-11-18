@@ -192,7 +192,7 @@ export const Header = () => {
                 <Button 
                   variant="ghost" 
                   onClick={() => {
-                    navigate('/savings-group');
+                    navigate('/savings-groups');
                     setMobileMenuOpen(false);
                   }}
                   className="w-full justify-start gap-2"

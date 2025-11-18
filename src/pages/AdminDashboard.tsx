@@ -11,6 +11,7 @@ import { PlatformStatistics } from "@/components/admin/PlatformStatistics";
 import { SavingsGroupManagement } from "@/components/admin/SavingsGroupManagement";
 import { CommissionOverview } from "@/components/admin/CommissionOverview";
 import { ChamaManagement } from "@/components/admin/ChamaManagement";
+import { DataExport } from "@/components/admin/DataExport";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Users, TrendingUp, Activity, ExternalLink } from "lucide-react";
@@ -91,6 +92,9 @@ const AdminDashboard = () => {
           </div>
           <CommissionOverview />
         </div>
+
+        {/* Data Export Section */}
+        <DataExport />
 
         {/* Global Search */}
         <Card className="border-2">

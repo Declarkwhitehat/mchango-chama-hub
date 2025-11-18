@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Send,
   Gift,
+  Ban,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -367,6 +368,47 @@ export default function SavingsGroupManagerDashboard({
                 <PlayCircle className="mr-2 h-4 w-4" />
               )}
               Start Group
+            </Button>
+          )}
+          {group.started_at && group.status === 'active' && cycleEnded && (
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) throw new Error("Please log in to continue");
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-closure`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ group_id: group.id })
+                    }
+                  );
+
+                  const result = await response.json();
+                  if (!response.ok) throw new Error(result.error || 'Failed to close group');
+
+                  toast({
+                    title: "Success!",
+                    description: "Group closed successfully. Final distributions processed.",
+                  });
+                  onRefresh();
+                } catch (error: any) {
+                  toast({
+                    title: "Error",
+                    description: error.message,
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              <Ban className="mr-2 h-4 w-4" />
+              Close Group
             </Button>
           )}
           <Button variant="outline" onClick={() => toast({ title: "Coming soon", description: "Export functionality will be available soon" })}>
