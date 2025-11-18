@@ -54,10 +54,10 @@ const Index = () => {
                   variant="heroSecondary" 
                   size="xl"
                   className="w-full sm:w-auto min-w-[200px]"
-                  onClick={() => window.location.href = '/savings-group'}
+                  onClick={() => window.location.href = '/savings-groups'}
                 >
                   <PiggyBank className="mr-2 h-5 w-5" />
-                  Savings Group
+                  Savings Groups
                 </Button>
               </div>
             </div>
