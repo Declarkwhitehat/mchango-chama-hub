@@ -13,9 +13,9 @@ interface Message {
 }
 
 const LANGUAGE_GREETINGS = {
-  english: 'Hello! I\'m Declark Chacha 👋 How can I help you today? I can answer questions about Chama Groups, Mchango Campaigns, and Savings Groups.',
-  swahili: 'Habari! Mimi ni Declark Chacha 👋 Naweza kukusaidia vipi leo? Ninaweza kujibu maswali kuhusu Vikundi vya Chama, Kampeni za Mchango, na Vikundi vya Akiba.',
-  sheng: 'Vipi! Nai-call Declark Chacha 👋 Naweza ku-help aje leo? Nina-answer maswali za Chama Groups, Mchango Campaigns, na Savings Groups.',
+  english: 'Hello! I\'m Declark Chacha, your AI assistant 👋 I\'m here to help you with any questions about Chama Groups, Mchango Campaigns, and Savings Groups. How can I assist you today?',
+  swahili: 'Habari! Mimi ni Declark Chacha, msaidizi wako wa AI 👋 Niko hapa kukusaidia na maswali yoyote kuhusu Vikundi vya Chama, Kampeni za Mchango, na Vikundi vya Akiba. Naweza kukusaidia vipi leo?',
+  sheng: 'Vipi! Nai-call Declark Chacha, AI assistant wako 👋 Niko hapa ku-help na maswali zote za Chama Groups, Mchango Campaigns, na Savings Groups. Naweza ku-help aje leo?',
 };
 
 export function ChatSupport() {
