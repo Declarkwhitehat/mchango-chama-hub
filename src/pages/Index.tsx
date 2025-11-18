@@ -2,17 +2,25 @@ import { Button } from "@/components/ui/button";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Users, TrendingUp, Heart, Shield, PiggyBank } from "lucide-react";
+import { Users, TrendingUp, Heart, Shield, PiggyBank, ChevronDown } from "lucide-react";
+import { useState } from "react";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import heroImage from "@/assets/hero-image.jpg";
 import profilePhoto from "@/assets/profile-photo.png";
 
 const Index = () => {
+  const [isFaqOpen, setIsFaqOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Header */}
@@ -262,92 +270,104 @@ const Index = () => {
         </div>
       </section>
 
-      {/* FAQ Section - Compact */}
-      <section className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Quick answers about our platform
-            </p>
+      {/* FAQ Section - Collapsible */}
+      <section className="container mx-auto px-4 sm:px-6 py-6">
+        <Collapsible open={isFaqOpen} onOpenChange={setIsFaqOpen} className="max-w-3xl mx-auto">
+          <div className="flex justify-center">
+            <CollapsibleTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="lg"
+                className="gap-2 hover:bg-accent/50 transition-all"
+              >
+                <span className="font-semibold">Frequently Asked Questions</span>
+                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isFaqOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
           </div>
+          
+          <CollapsibleContent className="pt-6">
+            <div className="text-center mb-6">
+              <p className="text-sm text-muted-foreground">
+                Quick answers about our platform
+              </p>
+            </div>
 
-          <Accordion type="single" collapsible className="w-full space-y-2">
-            <AccordionItem value="item-1" className="border rounded-lg px-4 py-1 bg-card">
-              <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                What is Mchango?
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground pb-3">
-                Mchango is our crowdfunding feature that allows you to create fundraising campaigns for any cause - medical bills, education, weddings, or community projects.
-              </AccordionContent>
-            </AccordionItem>
+            <Accordion type="single" collapsible className="w-full space-y-2">
+              <AccordionItem value="item-1" className="border rounded-lg px-4 py-1 bg-card">
+                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
+                  What is Mchango?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground pb-3">
+                  Mchango is our crowdfunding feature that allows you to create fundraising campaigns for any cause - medical bills, education, weddings, or community projects.
+                </AccordionContent>
+              </AccordionItem>
 
-            <AccordionItem value="item-2" className="border rounded-lg px-4 py-1 bg-card">
-              <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                What are Chamas?
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground pb-3">
-                Chamas are rotating savings and credit associations (ROSCAs) where members contribute a fixed amount regularly. Each cycle, one member receives the total pot.
-              </AccordionContent>
-            </AccordionItem>
+              <AccordionItem value="item-2" className="border rounded-lg px-4 py-1 bg-card">
+                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
+                  What are Chamas?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground pb-3">
+                  Chamas are rotating savings and credit associations (ROSCAs) where members contribute a fixed amount regularly. Each cycle, one member receives the total pot.
+                </AccordionContent>
+              </AccordionItem>
 
-            <AccordionItem value="item-3" className="border rounded-lg px-4 py-1 bg-card">
-              <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                What are Savings Groups?
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground pb-3">
-                Savings Groups are long-term (6-24 months) collective savings with profit-sharing. Members save monthly, can take loans from the group pool, and share profits at the end.
-              </AccordionContent>
-            </AccordionItem>
+              <AccordionItem value="item-3" className="border rounded-lg px-4 py-1 bg-card">
+                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
+                  What are Savings Groups?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground pb-3">
+                  Savings Groups are long-term (6-24 months) collective savings with profit-sharing. Members save monthly, can take loans from the group pool, and share profits at the end.
+                </AccordionContent>
+              </AccordionItem>
 
-            <AccordionItem value="item-4" className="border rounded-lg px-4 py-1 bg-card">
-              <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                How do payments work?
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground pb-3">
-                We accept M-Pesa, Airtel Money, and bank account payments. After KYC verification, you'll set up payment methods with daily limits.
-              </AccordionContent>
-            </AccordionItem>
+              <AccordionItem value="item-4" className="border rounded-lg px-4 py-1 bg-card">
+                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
+                  How do payments work?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground pb-3">
+                  We accept M-Pesa, Airtel Money, and bank account payments. After KYC verification, you'll set up payment methods with daily limits.
+                </AccordionContent>
+              </AccordionItem>
 
-            <AccordionItem value="item-5" className="border rounded-lg px-4 py-1 bg-card">
-              <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                What is KYC verification?
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground pb-3">
-                KYC is our identity verification process. Upload your ID photos which our team reviews to approve access to all platform features.
-              </AccordionContent>
-            </AccordionItem>
+              <AccordionItem value="item-5" className="border rounded-lg px-4 py-1 bg-card">
+                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
+                  What is KYC verification?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground pb-3">
+                  KYC is our identity verification process. Upload your ID photos which our team reviews to approve access to all platform features.
+                </AccordionContent>
+              </AccordionItem>
 
-            <AccordionItem value="item-6" className="border rounded-lg px-4 py-1 bg-card">
-              <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                How are withdrawals processed?
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground pb-3">
-                Withdrawals are sent to your default payment method after admin approval. A small commission is deducted to cover platform costs.
-              </AccordionContent>
-            </AccordionItem>
+              <AccordionItem value="item-6" className="border rounded-lg px-4 py-1 bg-card">
+                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
+                  How are withdrawals processed?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground pb-3">
+                  Withdrawals are sent to your default payment method after admin approval. A small commission is deducted to cover platform costs.
+                </AccordionContent>
+              </AccordionItem>
 
-            <AccordionItem value="item-7" className="border rounded-lg px-4 py-1 bg-card">
-              <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                What are the fees?
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground pb-3">
-                We charge a small commission on transactions to maintain the platform. Rates are displayed before you complete any transaction.
-              </AccordionContent>
-            </AccordionItem>
+              <AccordionItem value="item-7" className="border rounded-lg px-4 py-1 bg-card">
+                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
+                  What are the fees?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground pb-3">
+                  We charge a small commission on transactions to maintain the platform. Rates are displayed before you complete any transaction.
+                </AccordionContent>
+              </AccordionItem>
 
-            <AccordionItem value="item-8" className="border rounded-lg px-4 py-1 bg-card">
-              <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                Is my money safe?
-              </AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground pb-3">
-                Yes! We use bank-grade security, encrypted connections, and secure payment gateways. All transactions are tracked and auditable.
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
+              <AccordionItem value="item-8" className="border rounded-lg px-4 py-1 bg-card">
+                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
+                  Is my money safe?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground pb-3">
+                  Yes! We use bank-grade security, encrypted connections, and secure payment gateways. All transactions are tracked and auditable.
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </CollapsibleContent>
+        </Collapsible>
       </section>
 
       {/* Footer */}
