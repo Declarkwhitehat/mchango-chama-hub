@@ -1727,10 +1727,6 @@ export type Database = {
         Args: { p_group_id: string }
         Returns: number
       }
-      calculate_loan_pool_available: {
-        Args: { p_group_id: string }
-        Returns: number
-      }
       calculate_next_due_date: {
         Args: { p_chama_id: string; p_last_payment_date: string }
         Returns: string
