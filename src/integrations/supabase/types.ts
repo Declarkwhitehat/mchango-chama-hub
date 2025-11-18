@@ -384,6 +384,42 @@ export type Database = {
           },
         ]
       }
+      customer_callbacks: {
+        Row: {
+          conversation_history: Json | null
+          created_at: string
+          customer_name: string | null
+          id: string
+          notes: string | null
+          phone_number: string
+          question: string
+          resolved_at: string | null
+          status: string
+        }
+        Insert: {
+          conversation_history?: Json | null
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          notes?: string | null
+          phone_number: string
+          question: string
+          resolved_at?: string | null
+          status?: string
+        }
+        Update: {
+          conversation_history?: Json | null
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          notes?: string | null
+          phone_number?: string
+          question?: string
+          resolved_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       mchango: {
         Row: {
           beneficiary_url: string | null

@@ -34,6 +34,7 @@ import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+import { ChatSupport } from "./components/ChatSupport";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <PWAInstallPrompt />
+        <ChatSupport />
         <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />

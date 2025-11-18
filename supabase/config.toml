@@ -53,3 +53,6 @@ verify_jwt = true
 
 [functions.savings-group-members]
 verify_jwt = true
+
+[functions.chat-support]
+verify_jwt = false
