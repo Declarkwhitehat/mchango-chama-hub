@@ -73,7 +73,7 @@ export const Header = () => {
             {user && profile?.kyc_status === 'approved' && (
               <Button 
                 variant="ghost" 
-                onClick={() => navigate('/savings-group')}
+                onClick={() => navigate('/savings-groups')}
                 className="gap-2"
               >
                 <PiggyBank className="h-4 w-4" />
