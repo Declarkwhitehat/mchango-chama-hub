@@ -3,6 +3,12 @@ import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Users, TrendingUp, Heart, Shield, PiggyBank } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import heroImage from "@/assets/hero-image.jpg";
 import profilePhoto from "@/assets/profile-photo.png";
 
@@ -314,6 +320,94 @@ const Index = () => {
               Join Savings Group
             </Button>
           </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-24">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-muted-foreground text-base sm:text-lg">
+              Everything you need to know about our platform
+            </p>
+          </div>
+
+          <Accordion type="single" collapsible className="w-full space-y-4">
+            <AccordionItem value="item-1" className="border rounded-lg px-6 bg-card">
+              <AccordionTrigger className="text-left font-semibold hover:no-underline">
+                What is Mchango?
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                Mchango is our crowdfunding feature that allows you to create fundraising campaigns for any cause - medical bills, education, weddings, or community projects. Anyone can contribute to help you reach your goal.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-2" className="border rounded-lg px-6 bg-card">
+              <AccordionTrigger className="text-left font-semibold hover:no-underline">
+                What are Chamas?
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                Chamas are rotating savings and credit associations (ROSCAs) where members contribute a fixed amount regularly. Each cycle, one member receives the total pot. It's a traditional Kenyan way of saving and accessing lump sums.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-3" className="border rounded-lg px-6 bg-card">
+              <AccordionTrigger className="text-left font-semibold hover:no-underline">
+                What are Savings Groups?
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                Savings Groups are long-term (6-24 months) collective savings with profit-sharing. Members save monthly, can take loans from the group pool, and share profits at the end of the cycle. It's ideal for building financial discipline and earning returns.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-4" className="border rounded-lg px-6 bg-card">
+              <AccordionTrigger className="text-left font-semibold hover:no-underline">
+                How do payments work?
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                We accept M-Pesa, Airtel Money, and bank account payments. After KYC verification, you'll set up your payment methods with daily transaction limits (KES 150,000 for mobile money, KES 500,000 for banks). Your default method is used for automatic payouts.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-5" className="border rounded-lg px-6 bg-card">
+              <AccordionTrigger className="text-left font-semibold hover:no-underline">
+                What is KYC verification?
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                KYC (Know Your Customer) is our identity verification process. You'll upload photos of your ID (front and back) which our team reviews. Once approved, you can access all platform features including withdrawals and creating groups.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-6" className="border rounded-lg px-6 bg-card">
+              <AccordionTrigger className="text-left font-semibold hover:no-underline">
+                How are withdrawals processed?
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                Withdrawals are sent to your default payment method. Admins review and approve requests, which are then processed to your M-Pesa, Airtel Money, or bank account. A small commission is deducted to cover platform costs.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-7" className="border rounded-lg px-6 bg-card">
+              <AccordionTrigger className="text-left font-semibold hover:no-underline">
+                What are the fees?
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                We charge a small commission on transactions to maintain and improve the platform. Commission rates vary by feature and are transparently displayed before you complete any transaction.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-8" className="border rounded-lg px-6 bg-card">
+              <AccordionTrigger className="text-left font-semibold hover:no-underline">
+                Is my money safe?
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                Yes! We use bank-grade security, encrypted connections, and secure payment gateways. All transactions are tracked and auditable. Your personal and financial information is protected with industry-standard security measures.
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </section>
 
