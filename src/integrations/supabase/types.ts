@@ -247,6 +247,33 @@ export type Database = {
           },
         ]
       }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          session_id: string
+          user_id: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          session_id: string
+          user_id?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       company_earnings: {
         Row: {
           amount: number
@@ -1773,6 +1800,7 @@ export type Database = {
         Returns: boolean
       }
       cleanup_expired_otps: { Args: never; Returns: undefined }
+      cleanup_old_chat_messages: { Args: never; Returns: undefined }
       generate_group_invite_code: { Args: never; Returns: string }
       generate_invite_code: { Args: never; Returns: string }
       generate_member_code: {
