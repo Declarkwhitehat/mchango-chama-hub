@@ -24,15 +24,26 @@ export default function PWAInstallPrompt() {
       }
     };
 
+    // Handle manual install trigger
+    const manualInstallHandler = () => {
+      if (deferredPrompt) {
+        setShowPrompt(true);
+      }
+    };
+
     window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("triggerPWAInstall", manualInstallHandler);
 
     // Check if already installed
     if (window.matchMedia("(display-mode: standalone)").matches) {
       setShowPrompt(false);
     }
 
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("triggerPWAInstall", manualInstallHandler);
+    };
+  }, [deferredPrompt]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
