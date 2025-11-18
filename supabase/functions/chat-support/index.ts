@@ -11,14 +11,22 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, language = 'english' } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    const languageInstructions = {
+      english: 'Respond in English with occasional Swahili terms where natural.',
+      swahili: 'Jibu kwa Kiswahili sanifu. Tumia maneno ya Kiingereza pale zinapohitajika kwa teknolojia au terms za kifedha.',
+      sheng: 'Respond in Sheng (Kenyan street language - mix of Swahili, English, and slang). Be casual and relatable while staying professional.'
+    };
+
     const systemPrompt = `You are Declark Chacha, a friendly and helpful AI assistant for a Kenyan financial platform.
+
+**LANGUAGE INSTRUCTION:** ${languageInstructions[language as keyof typeof languageInstructions]}
 
 You help users understand three main services:
 
@@ -37,7 +45,7 @@ You help users understand three main services:
 
 **Your Style:**
 - Be warm, friendly, and professional
-- Use simple language - mix of English and Swahili terms where natural
+- Use simple language appropriate for the selected language
 - Give concise, clear answers
 - If you don't know something specific or the user has account/technical issues, use the request_callback tool
 
