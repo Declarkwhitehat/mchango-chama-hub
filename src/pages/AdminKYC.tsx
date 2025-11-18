@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CheckCircle, XCircle, Clock, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { AdvancedFilters, FilterConfig } from "@/components/admin/AdvancedFilters";
+import { BulkActions, BulkAction, useBulkSelection } from "@/components/admin/BulkActions";
 
 interface KYCSubmission {
   id: string;
@@ -28,16 +31,24 @@ const AdminKYC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [submissions, setSubmissions] = useState<KYCSubmission[]>([]);
+  const [filteredSubmissions, setFilteredSubmissions] = useState<KYCSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<KYCSubmission | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [processing, setProcessing] = useState(false);
   const [idFrontUrl, setIdFrontUrl] = useState<string | null>(null);
   const [idBackUrl, setIdBackUrl] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterConfig>({});
+
+  const { selectedIds, toggleSelection, selectAll, clearSelection, isSelected } = useBulkSelection(filteredSubmissions);
 
   useEffect(() => {
     fetchSubmissions();
   }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [submissions, filters]);
 
   const fetchSubmissions = async () => {
     try {
@@ -66,6 +77,55 @@ const AdminKYC = () => {
       setLoading(false);
     }
   };
+
+  const applyFilters = () => {
+    let filtered = [...submissions];
+
+    // Filter by KYC status
+    if (filters.kycStatus && filters.kycStatus.length > 0) {
+      filtered = filtered.filter(sub => filters.kycStatus?.includes(sub.kyc_status));
+    }
+
+    // Filter by date range
+    if (filters.dateFrom) {
+      filtered = filtered.filter(sub => 
+        new Date(sub.kyc_submitted_at || '') >= filters.dateFrom!
+      );
+    }
+    if (filters.dateTo) {
+      filtered = filtered.filter(sub => 
+        new Date(sub.kyc_submitted_at || '') <= filters.dateTo!
+      );
+    }
+
+    setFilteredSubmissions(filtered);
+  };
+
+  const handleBulkAction = async (actionId: string, ids: string[]) => {
+    if (actionId === 'approve') {
+      for (const id of ids) {
+        await handleApprove(id);
+      }
+    } else if (actionId === 'reject') {
+      toast({
+        title: "Rejection Reason Required",
+        description: "Please select individual submissions to reject with reasons",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const bulkActions: BulkAction[] = [
+    {
+      id: 'approve',
+      label: 'Approve Selected',
+      icon: <CheckCircle className="h-4 w-4" />,
+      variant: 'default',
+      confirmRequired: true,
+      confirmTitle: 'Approve Selected KYC Submissions',
+      confirmDescription: 'Are you sure you want to approve the selected KYC submissions?',
+    },
+  ];
 
   const loadDocumentImages = async (submission: KYCSubmission) => {
     try {
