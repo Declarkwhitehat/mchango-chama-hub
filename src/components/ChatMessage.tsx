@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
-import { MessageCircle, User } from 'lucide-react';
+import { User } from 'lucide-react';
+import declarkAvatar from '@/assets/declark-chacha-avatar.png';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -17,10 +18,18 @@ export function ChatMessage({ message }: ChatMessageProps) {
   return (
     <div className={cn('flex gap-3', isUser && 'flex-row-reverse')}>
       <div className={cn(
-        'flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center',
+        'flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center overflow-hidden',
         isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
       )}>
-        {isUser ? <User className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
+        {isUser ? (
+          <User className="h-4 w-4" />
+        ) : (
+          <img 
+            src={declarkAvatar} 
+            alt="Declark Chacha" 
+            className="h-full w-full object-cover"
+          />
+        )}
       </div>
       <div className={cn(
         'flex flex-col gap-1 max-w-[75%]',
