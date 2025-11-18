@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Minimize2 } from 'lucide-react';
+import { MessageCircle, X, Minimize2, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChatMessage } from './ChatMessage';
 import { CallbackForm } from './CallbackForm';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -11,12 +12,22 @@ interface Message {
   timestamp: Date;
 }
 
+const LANGUAGE_GREETINGS = {
+  english: 'Hello! I\'m Declark Chacha 👋 How can I help you today? I can answer questions about Chama Groups, Mchango Campaigns, and Savings Groups.',
+  swahili: 'Habari! Mimi ni Declark Chacha 👋 Naweza kukusaidia vipi leo? Ninaweza kujibu maswali kuhusu Vikundi vya Chama, Kampeni za Mchango, na Vikundi vya Akiba.',
+  sheng: 'Vipi! Nai-call Declark Chacha 👋 Naweza ku-help aje leo? Nina-answer maswali za Chama Groups, Mchango Campaigns, na Savings Groups.',
+};
+
 export function ChatSupport() {
   const [isOpen, setIsOpen] = useState(false);
+  const [language, setLanguage] = useState<'english' | 'swahili' | 'sheng'>(() => {
+    const saved = localStorage.getItem('chat-language');
+    return (saved as 'english' | 'swahili' | 'sheng') || 'english';
+  });
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Habari! I\'m Declark Chacha 👋 How can I help you today? I can answer questions about Chama Groups, Mchango Campaigns, and Savings Groups.',
+      content: LANGUAGE_GREETINGS[language],
       timestamp: new Date()
     }
   ]);
@@ -26,6 +37,16 @@ export function ChatSupport() {
   const [currentQuestion, setCurrentQuestion] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleLanguageChange = (newLanguage: 'english' | 'swahili' | 'sheng') => {
+    setLanguage(newLanguage);
+    localStorage.setItem('chat-language', newLanguage);
+    setMessages([{
+      role: 'assistant',
+      content: LANGUAGE_GREETINGS[newLanguage],
+      timestamp: new Date()
+    }]);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,7 +87,8 @@ export function ChatSupport() {
           messages: messages.concat(userMessage).map(m => ({
             role: m.role,
             content: m.content
-          }))
+          })),
+          language: language
         })
       });
 
@@ -183,32 +205,53 @@ export function ChatSupport() {
       {isOpen && (
         <Card className="fixed bottom-6 right-6 w-[400px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-[calc(100vw-2rem)] max-md:h-[calc(100vh-2rem)] max-md:max-h-[600px]">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground rounded-t-lg">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
-              <h3 className="font-semibold">Declark Chacha</h3>
+          <div className="p-4 border-b bg-primary text-primary-foreground rounded-t-lg space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5" />
+                <h3 className="font-semibold">Declark Chacha</h3>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOpen(false)}
+                  className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setMessages([{
+                      role: 'assistant',
+                      content: LANGUAGE_GREETINGS[language],
+                      timestamp: new Date()
+                    }]);
+                    setShowCallbackForm(false);
+                  }}
+                  className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsOpen(false)}
-                className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
-              >
-                <Minimize2 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setIsOpen(false);
-                  setMessages([messages[0]]);
-                  setShowCallbackForm(false);
-                }}
-                className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+            
+            {/* Language Selector */}
+            <div className="flex items-center gap-2">
+              <Languages className="h-4 w-4" />
+              <Select value={language} onValueChange={handleLanguageChange}>
+                <SelectTrigger className="h-8 w-[140px] bg-primary-foreground text-primary border-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="english">English</SelectItem>
+                  <SelectItem value="swahili">Kiswahili</SelectItem>
+                  <SelectItem value="sheng">Sheng</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
