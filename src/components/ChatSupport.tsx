@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { ChatMessage } from './ChatMessage';
 import { CallbackForm } from './CallbackForm';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -24,6 +25,13 @@ export function ChatSupport() {
     const saved = localStorage.getItem('chat-language');
     return (saved as 'english' | 'swahili' | 'sheng') || 'english';
   });
+  const [sessionId] = useState<string>(() => {
+    const saved = localStorage.getItem('chat-session-id');
+    if (saved) return saved;
+    const newId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('chat-session-id', newId);
+    return newId;
+  });
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -31,6 +39,7 @@ export function ChatSupport() {
       timestamp: new Date()
     }
   ]);
+  const [isLoading, setIsLoading] = useState(true);
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [showCallbackForm, setShowCallbackForm] = useState(false);
@@ -38,14 +47,69 @@ export function ChatSupport() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Load chat history from database
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      try {
+        const { data: user } = await supabase.auth.getUser();
+        
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('session_id', sessionId)
+          .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error('Error loading chat history:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          const loadedMessages = data.map(msg => ({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+            timestamp: new Date(msg.created_at)
+          }));
+          setMessages(loadedMessages);
+        }
+      } catch (error) {
+        console.error('Error loading chat history:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadChatHistory();
+  }, [sessionId]);
+
+  // Save message to database
+  const saveMessage = async (message: Message) => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      
+      await supabase.from('chat_messages').insert({
+        session_id: sessionId,
+        user_id: user.user?.id || null,
+        role: message.role,
+        content: message.content,
+        created_at: message.timestamp.toISOString()
+      });
+    } catch (error) {
+      console.error('Error saving message:', error);
+    }
+  };
+
   const handleLanguageChange = (newLanguage: 'english' | 'swahili' | 'sheng') => {
     setLanguage(newLanguage);
     localStorage.setItem('chat-language', newLanguage);
-    setMessages([{
-      role: 'assistant',
+    const newGreeting = {
+      role: 'assistant' as const,
       content: LANGUAGE_GREETINGS[newLanguage],
       timestamp: new Date()
-    }]);
+    };
+    setMessages([newGreeting]);
+    saveMessage(newGreeting);
   };
 
   const scrollToBottom = () => {
@@ -72,6 +136,7 @@ export function ChatSupport() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    saveMessage(userMessage);
     setCurrentQuestion(inputValue);
     setInputValue('');
     setIsStreaming(true);
@@ -106,10 +171,11 @@ export function ChatSupport() {
       let needsCallback = false;
 
       // Add empty assistant message to start streaming into
+      const assistantMessageTimestamp = new Date();
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: '',
-        timestamp: new Date()
+        timestamp: assistantMessageTimestamp
       }]);
 
       let buffer = '';
@@ -159,20 +225,31 @@ export function ChatSupport() {
 
       if (needsCallback) {
         setShowCallbackForm(true);
-        setMessages(prev => [...prev.slice(0, -1), {
-          role: 'assistant',
+        const callbackMessage = {
+          role: 'assistant' as const,
           content: 'I apologize, but I need to connect you with our support team for this. Would you like them to call you back? Please share your contact details below.',
           timestamp: new Date()
-        }]);
+        };
+        setMessages(prev => [...prev.slice(0, -1), callbackMessage]);
+        saveMessage(callbackMessage);
+      } else if (assistantMessage) {
+        // Save the completed assistant message
+        saveMessage({
+          role: 'assistant',
+          content: assistantMessage,
+          timestamp: assistantMessageTimestamp
+        });
       }
 
     } catch (error) {
       console.error('Chat error:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
+      const errorMessage = {
+        role: 'assistant' as const,
         content: 'Sorry, I\'m having trouble right now. Would you like our team to call you back?',
         timestamp: new Date()
-      }]);
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      saveMessage(errorMessage);
       setShowCallbackForm(true);
     } finally {
       setIsStreaming(false);
@@ -181,11 +258,13 @@ export function ChatSupport() {
 
   const handleCallbackSuccess = () => {
     setShowCallbackForm(false);
-    setMessages(prev => [...prev, {
-      role: 'assistant',
+    const successMessage = {
+      role: 'assistant' as const,
       content: 'Thank you! Our team will call you within 24 hours. Is there anything else I can help you with?',
       timestamp: new Date()
-    }]);
+    };
+    setMessages(prev => [...prev, successMessage]);
+    saveMessage(successMessage);
   };
 
   return (
@@ -257,9 +336,19 @@ export function ChatSupport() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((message, index) => (
-              <ChatMessage key={index} message={message} />
-            ))}
+            {isLoading ? (
+              <div className="flex justify-center items-center h-full">
+                <div className="flex gap-2">
+                  <span className="animate-bounce">●</span>
+                  <span className="animate-bounce delay-100">●</span>
+                  <span className="animate-bounce delay-200">●</span>
+                </div>
+              </div>
+            ) : (
+              messages.map((message, index) => (
+                <ChatMessage key={index} message={message} />
+              ))
+            )}
             {isStreaming && messages[messages.length - 1]?.role === 'user' && (
               <div className="flex gap-2">
                 <div className="bg-muted rounded-lg px-4 py-2">
