@@ -110,42 +110,22 @@ serve(async (req) => {
     // POST /mchango-crud - Create new mchango (KYC-approved users only)
     if (req.method === 'POST') {
       let body;
-      
       try {
-        body = await req.json();
-        console.log('Received mchango data:', JSON.stringify(body).substring(0, 200));
-      } catch (err) {
-        console.error('Failed to parse JSON body:', err);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Invalid request body',
-            details: 'Request body must be valid JSON'
-          }), 
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        const text = await req.text();
+        console.log('Request body text:', text);
+        body = text ? JSON.parse(text) : {};
+      } catch (parseError: any) {
+        console.error('JSON parse error:', parseError);
+        return new Response(JSON.stringify({ 
+          error: 'Invalid JSON in request body',
+          details: parseError.message
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
-
-      // Validate body has required fields
-      if (!body || typeof body !== 'object') {
-        console.error('Invalid body type:', typeof body);
-        return new Response(
-          JSON.stringify({ error: 'Request body must be a JSON object' }), 
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-
-      console.log('Validated mchango data:', { 
-        title: body.title, 
-        hasDescription: !!body.description,
-        target_amount: body.target_amount,
-        hasImageUrl: !!body.image_url
-      });
+      
+      console.log('Parsed body:', body);
       
       // Require authentication
       const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
