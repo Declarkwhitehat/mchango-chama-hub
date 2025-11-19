@@ -109,7 +109,43 @@ serve(async (req) => {
 
     // POST /mchango-crud - Create new mchango (KYC-approved users only)
     if (req.method === 'POST') {
-      const body = await req.json();
+      let body;
+      try {
+        const text = await req.text();
+        console.log('Request body text:', text.substring(0, 200)); // Log first 200 chars
+        body = text ? JSON.parse(text) : {};
+      } catch (err) {
+        console.error('JSON parse error:', err);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid JSON in request body',
+            details: err instanceof Error ? err.message : 'Unknown error'
+          }), 
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Validate body has required fields
+      if (!body || Object.keys(body).length === 0) {
+        console.error('Empty request body');
+        return new Response(
+          JSON.stringify({ error: 'Request body is required' }), 
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      console.log('Parsed mchango data:', { 
+        title: body.title, 
+        hasDescription: !!body.description,
+        target_amount: body.target_amount,
+        hasImageUrl: !!body.image_url
+      });
       
       // Require authentication
       const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
