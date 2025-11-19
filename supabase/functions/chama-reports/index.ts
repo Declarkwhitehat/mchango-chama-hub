@@ -348,16 +348,25 @@ async function getMemberPosition(supabase: any, chamaId: string, userId: string 
     .limit(1)
     .single();
 
+  // Handle case where user has no upcoming receiving cycle
+  const positionData: any = {
+    memberName: userMember.profiles?.full_name || 'Unknown',
+    memberCode: userMember.member_code,
+    position: userMember.order_index,
+    totalMembers: allMembers?.length || 0,
+    allMembersOrder: allMembers?.map((m: any) => m.profiles?.full_name || 'Unknown') || []
+  };
+
+  if (!nextCycle) {
+    positionData.noData = true;
+    positionData.message = "No upcoming receiving date found. This could mean you've already received your payout or the chama cycle hasn't been scheduled yet.";
+  } else {
+    positionData.nextReceivingDate = nextCycle.end_date;
+    positionData.cycleNumber = nextCycle.cycle_number;
+  }
+
   return new Response(
-    JSON.stringify({
-      memberName: userMember.profiles?.full_name || 'Unknown',
-      memberCode: userMember.member_code,
-      position: userMember.order_index,
-      totalMembers: allMembers?.length || 0,
-      allMembersOrder: allMembers?.map((m: any) => m.profiles?.full_name || 'Unknown') || [],
-      nextReceivingDate: nextCycle?.end_date || null,
-      cycleNumber: nextCycle?.cycle_number || null
-    }),
+    JSON.stringify(positionData),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }
@@ -396,6 +405,19 @@ async function getContributionHistory(supabase: any, chamaId: string, userId: st
     .eq('chama_id', chamaId)
     .gte('start_date', startDate.toISOString())
     .order('start_date', { ascending: false });
+
+  // Check if there are no cycles in the period
+  if (!cycles || cycles.length === 0) {
+    return new Response(
+      JSON.stringify({
+        noData: true,
+        message: `No contribution records found for the last ${period} days. The chama may not have started yet or there's no activity in this period.`,
+        memberName: member.profiles?.full_name || 'Unknown',
+        periodDays: period
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   // Get payments for these cycles
   const cycleIds = cycles?.map((c: any) => c.id) || [];
@@ -439,6 +461,18 @@ async function getChamaSummary(supabase: any, chamaId: string, period: number) {
     .select('id, due_amount')
     .eq('chama_id', chamaId)
     .gte('start_date', startDate.toISOString());
+
+  // Check if there are no cycles
+  if (!cycles || cycles.length === 0) {
+    return new Response(
+      JSON.stringify({
+        noData: true,
+        message: `No contribution cycles found for the last ${period} days. The chama may not have started yet or there's no activity in this period.`,
+        periodDays: period
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   const cycleIds = cycles?.map((c: any) => c.id) || [];
 
@@ -547,6 +581,30 @@ async function generatePDF(supabase: any, body: any) {
     .eq('chama_id', chamaId)
     .gte('start_date', startDate.toISOString())
     .order('start_date');
+
+  // Check if there's no data to generate report
+  if (!cycles || cycles.length === 0) {
+    return new Response(
+      JSON.stringify({
+        noData: true,
+        error: `No contribution cycles found for the last ${days} day(s). Cannot generate report. The chama may not have started yet or there's no activity in this period.`,
+        periodDays: days,
+        reportType
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  if (!members || members.length === 0) {
+    return new Response(
+      JSON.stringify({
+        noData: true,
+        error: 'No active members found in this chama. Cannot generate report.',
+        reportType
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   const cycleIds = cycles?.map((c: any) => c.id) || [];
 
