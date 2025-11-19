@@ -4,116 +4,120 @@
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 
 export async function handleGetChamaInfo(toolArgs: any, authHeader: string) {
-  // Step 1: Lookup user by ID number and phone
+  // Step 1: Lookup user and chama by member code
   const lookupResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?idNumber=${toolArgs.idNumber}&phone=${toolArgs.phone}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
     { headers: { Authorization: authHeader } }
   );
   
   const lookupResult = await lookupResponse.json();
   
-  if (!lookupResponse.ok || !lookupResult.userId) {
+  if (!lookupResponse.ok || !lookupResult.userId || !lookupResult.chamaId) {
     return {
       error: true,
-      message: lookupResult.error || 'Could not find user with provided details',
+      message: lookupResult.error || 'Could not find member with provided code',
       suggestions: lookupResult.suggestions || []
     };
   }
   
-  // Step 2: Use the userId to fetch chama info
+  // Step 2: Use the userId and chamaId to fetch chama info
   const infoResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/info/${toolArgs.chamaId}?userId=${lookupResult.userId}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/info/${lookupResult.chamaId}?userId=${lookupResult.userId}`,
     { headers: { Authorization: authHeader } }
   );
   
   const result = await infoResponse.json();
   result.userName = lookupResult.fullName;
+  result.memberCode = lookupResult.memberCode;
   return result;
 }
 
 export async function handleGetMemberPosition(toolArgs: any, authHeader: string) {
   const lookupResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?idNumber=${toolArgs.idNumber}&phone=${toolArgs.phone}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
     { headers: { Authorization: authHeader } }
   );
   
   const lookupResult = await lookupResponse.json();
-  if (!lookupResponse.ok || !lookupResult.userId) {
+  if (!lookupResponse.ok || !lookupResult.userId || !lookupResult.chamaId) {
     return { error: true, message: lookupResult.error, suggestions: lookupResult.suggestions || [] };
   }
   
   const positionResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/position/${toolArgs.chamaId}?userId=${lookupResult.userId}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/position/${lookupResult.chamaId}?userId=${lookupResult.userId}`,
     { headers: { Authorization: authHeader } }
   );
   
   const result = await positionResponse.json();
   result.userName = lookupResult.fullName;
+  result.memberCode = lookupResult.memberCode;
   return result;
 }
 
 export async function handleGenerateReport(toolArgs: any, authHeader: string) {
   const lookupResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?idNumber=${toolArgs.idNumber}&phone=${toolArgs.phone}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
     { headers: { Authorization: authHeader } }
   );
   
   const lookupResult = await lookupResponse.json();
-  if (!lookupResponse.ok || !lookupResult.userId) {
+  if (!lookupResponse.ok || !lookupResult.userId || !lookupResult.chamaId) {
     return { error: true, message: lookupResult.error, suggestions: lookupResult.suggestions || [] };
   }
   
   const period = toolArgs.reportType === 'daily' ? 'daily' : toolArgs.reportType === 'weekly' ? '7day' : '30day';
   const reportResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/generate-pdf/${toolArgs.chamaId}?userId=${lookupResult.userId}&period=${period}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/generate-pdf/${lookupResult.chamaId}?userId=${lookupResult.userId}&period=${period}`,
     { headers: { Authorization: authHeader } }
   );
   
   const result = await reportResponse.json();
   result.userName = lookupResult.fullName;
+  result.memberCode = lookupResult.memberCode;
   return result;
 }
 
 export async function handleGetMemberStats(toolArgs: any, authHeader: string) {
   const lookupResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?idNumber=${toolArgs.idNumber}&phone=${toolArgs.phone}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
     { headers: { Authorization: authHeader } }
   );
   
   const lookupResult = await lookupResponse.json();
-  if (!lookupResponse.ok || !lookupResult.userId) {
+  if (!lookupResponse.ok || !lookupResult.userId || !lookupResult.chamaId) {
     return { error: true, message: lookupResult.error, suggestions: lookupResult.suggestions || [] };
   }
   
   const statsResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/contribution-history/${toolArgs.chamaId}?userId=${lookupResult.userId}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/contribution-history/${lookupResult.chamaId}?userId=${lookupResult.userId}`,
     { headers: { Authorization: authHeader } }
   );
   
   const result = await statsResponse.json();
   result.userName = lookupResult.fullName;
+  result.memberCode = lookupResult.memberCode;
   return result;
 }
 
 export async function handleGetChamaSummary(toolArgs: any, authHeader: string) {
-  // Optional: Lookup user if ID and phone provided
-  if (toolArgs.idNumber && toolArgs.phone) {
-    const lookupResponse = await fetch(
-      `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?idNumber=${toolArgs.idNumber}&phone=${toolArgs.phone}`,
-      { headers: { Authorization: authHeader } }
-    );
-    
-    const lookupResult = await lookupResponse.json();
-    if (!lookupResponse.ok || !lookupResult.userId) {
-      return { error: true, message: lookupResult.error, suggestions: lookupResult.suggestions || [] };
-    }
+  // Lookup user and chama by member code
+  const lookupResponse = await fetch(
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
+    { headers: { Authorization: authHeader } }
+  );
+  
+  const lookupResult = await lookupResponse.json();
+  if (!lookupResponse.ok || !lookupResult.chamaId) {
+    return { error: true, message: lookupResult.error, suggestions: lookupResult.suggestions || [] };
   }
   
   const period = toolArgs.period || 30;
   const summaryResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/summary/${toolArgs.chamaId}?period=${period}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/summary/${lookupResult.chamaId}?period=${period}`,
     { headers: { Authorization: authHeader } }
   );
   
-  return await summaryResponse.json();
+  const result = await summaryResponse.json();
+  result.memberCode = lookupResult.memberCode;
+  return result;
 }

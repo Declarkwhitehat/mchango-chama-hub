@@ -240,19 +240,16 @@ COMPLETE PLATFORM KNOWLEDGE:
 🆕 YOU CAN NOW HELP USERS GET DETAILED CHAMA INFORMATION AND REPORTS!
 
 **What information you need from users:**
-- **Chama ID** (UUID, e.g., "abc123-def-456...")
-- **ID Number** (National ID, e.g., "12345678")
-- **Phone Number** (in any format):
-  - 07xxxxxxxx
-  - +2547xxxxxxxx
-  - +25407xxxxxxxx
-  - 7xxxxxxxx
-
+- **Member Code** (e.g., "ABC1", "XYZ2", "TSG5")
+  - This is displayed in their chama dashboard
+  - Format: Group code (letters) + Member number (digits)
+  - Example: "ABC1" means member 1 in chama with code ABC
+  
 **Important:** 
-- Always ask for ID number AND phone number (not user UUID)
-- Users know their ID number and phone - they don't know their UUID
-- System will automatically look up their account using these details
-- Phone numbers are automatically normalized to correct format
+- ONLY ask for the member code - nothing else needed!
+- The member code contains both chama identification and member identification
+- Users can find their member code prominently displayed in their chama dashboard
+- System automatically identifies the user and chama from this code
 
 When a user provides this information, you can:
 1. **Get Basic Chama Info** - Show chama name, member count, member names, and frequency
@@ -266,13 +263,10 @@ When a user provides this information, you can:
 
 **Example conversation:**
 User: "I want to see my chama report"
-You: "I can help you with that! Please provide:
-1. Your Chama ID
-2. Your National ID number  
-3. Your phone number (07... or +254...)"
+You: "I can help you with that! Please provide your Member Code (you can find it in your chama dashboard - it looks like ABC1, XYZ2, etc.)"
 
-User: "Chama ID: abc123..., ID: 12345678, Phone: 0712345678"
-You: [Use tools to fetch and display information]
+User: "My member code is ABC1"
+You: [Use tools to fetch and display information for member ABC1]
 
 **How to use these tools:**
 - Use get_chama_info when user asks about their chama details
@@ -340,24 +334,16 @@ You: [Use tools to fetch and display information]
             type: 'function',
             function: {
               name: 'get_chama_info',
-              description: 'Fetch basic chama information including name, member count, member names, and contribution frequency. User must provide their ID number and phone number for verification.',
+              description: 'Fetch basic chama information including name, member count, member names, and contribution frequency using member code.',
               parameters: {
                 type: 'object',
                 properties: {
-                  chamaId: {
+                  memberCode: {
                     type: 'string',
-                    description: 'The UUID of the chama'
-                  },
-                  idNumber: {
-                    type: 'string',
-                    description: 'User\'s national ID number (e.g., 12345678)'
-                  },
-                  phone: {
-                    type: 'string',
-                    description: 'User\'s phone number in any format: 07..., +2547..., +25407..., 254...'
+                    description: 'Member code from dashboard (e.g., ABC1, XYZ2)'
                   }
                 },
-                required: ['chamaId', 'idNumber', 'phone']
+                required: ['memberCode']
               }
             }
           },
@@ -365,24 +351,16 @@ You: [Use tools to fetch and display information]
             type: 'function',
             function: {
               name: 'get_member_position',
-              description: 'Get the user\'s position in the chama rotation and their next receiving date. User must provide their ID number and phone number for verification.',
+              description: 'Get the user\'s position in the chama rotation and their next receiving date.',
               parameters: {
                 type: 'object',
                 properties: {
-                  chamaId: {
+                  memberCode: {
                     type: 'string',
-                    description: 'The UUID of the chama'
-                  },
-                  idNumber: {
-                    type: 'string',
-                    description: 'User\'s national ID number'
-                  },
-                  phone: {
-                    type: 'string',
-                    description: 'User\'s phone number in any format'
+                    description: 'Member code from dashboard (e.g., ABC1, XYZ2)'
                   }
                 },
-                required: ['chamaId', 'idNumber', 'phone']
+                required: ['memberCode']
               }
             }
           },
@@ -390,21 +368,13 @@ You: [Use tools to fetch and display information]
             type: 'function',
             function: {
               name: 'generate_contribution_report',
-              description: 'Generate a downloadable report showing member contributions over a period (daily, weekly, or monthly). User must provide their ID number and phone number for verification.',
+              description: 'Generate a downloadable PDF report showing member contributions over a period (daily, weekly, or monthly).',
               parameters: {
                 type: 'object',
                 properties: {
-                  chamaId: {
+                  memberCode: {
                     type: 'string',
-                    description: 'The UUID of the chama'
-                  },
-                  idNumber: {
-                    type: 'string',
-                    description: 'User\'s national ID number'
-                  },
-                  phone: {
-                    type: 'string',
-                    description: 'User\'s phone number in any format'
+                    description: 'Member code from dashboard (e.g., ABC1, XYZ2)'
                   },
                   reportType: {
                     type: 'string',
@@ -412,7 +382,7 @@ You: [Use tools to fetch and display information]
                     description: 'Type of report: daily (1 day), weekly (7 days), or monthly (30 days)'
                   }
                 },
-                required: ['chamaId', 'idNumber', 'phone', 'reportType']
+                required: ['memberCode', 'reportType']
               }
             }
           },
@@ -420,21 +390,13 @@ You: [Use tools to fetch and display information]
             type: 'function',
             function: {
               name: 'get_member_stats',
-              description: 'Get detailed contribution statistics for a specific member including total contributions, missed days, and recent history. User must provide their ID number and phone number for verification.',
+              description: 'Get detailed contribution statistics for a specific member including total contributions, missed days, and recent history.',
               parameters: {
                 type: 'object',
                 properties: {
-                  chamaId: {
+                  memberCode: {
                     type: 'string',
-                    description: 'The UUID of the chama'
-                  },
-                  idNumber: {
-                    type: 'string',
-                    description: 'User\'s national ID number'
-                  },
-                  phone: {
-                    type: 'string',
-                    description: 'User\'s phone number in any format'
+                    description: 'Member code from dashboard (e.g., ABC1, XYZ2)'
                   },
                   period: {
                     type: 'number',
@@ -442,7 +404,7 @@ You: [Use tools to fetch and display information]
                     default: 30
                   }
                 },
-                required: ['chamaId', 'idNumber', 'phone']
+                required: ['memberCode']
               }
             }
           },
@@ -450,29 +412,21 @@ You: [Use tools to fetch and display information]
             type: 'function',
             function: {
               name: 'get_chama_summary',
-              description: 'Get overall chama statistics including total contributions, amounts, and attendance summary. Optional: provide ID number and phone for membership verification.',
+              description: 'Get overall chama statistics including total contributions, amounts, and attendance summary.',
               parameters: {
                 type: 'object',
                 properties: {
-                  chamaId: {
+                  memberCode: {
                     type: 'string',
-                    description: 'The UUID of the chama'
+                    description: 'Member code for verification (e.g., ABC1, XYZ2)'
                   },
                   period: {
                     type: 'number',
                     description: 'Number of days for the period (default: 30)',
                     default: 30
-                  },
-                  idNumber: {
-                    type: 'string',
-                    description: 'Optional: User\'s national ID number for membership verification'
-                  },
-                  phone: {
-                    type: 'string',
-                    description: 'Optional: User\'s phone number for membership verification'
                   }
                 },
-                required: ['chamaId']
+                required: ['memberCode']
               }
             }
           }

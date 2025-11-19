@@ -62,18 +62,17 @@ serve(async (req) => {
 
     // Route handlers
     if (action === 'lookup-user') {
-      // New endpoint: GET /chama-reports/lookup-user?idNumber=12345678&phone=0712345678
-      const idNumber = url.searchParams.get('idNumber');
-      const phone = url.searchParams.get('phone');
+      // New endpoint: GET /chama-reports/lookup-user?memberCode=ABC1
+      const memberCode = url.searchParams.get('memberCode');
       
-      if (!idNumber || !phone) {
+      if (!memberCode) {
         return new Response(
-          JSON.stringify({ error: 'ID number and phone number required' }),
+          JSON.stringify({ error: 'Member code required (e.g., ABC1, XYZ2)' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      return await lookupUser(supabase, idNumber, phone);
+      return await lookupUserByMemberCode(supabase, memberCode);
     } else if (action === 'info' && chamaId) {
       return await getChamaInfo(supabase, chamaId, userId);
     } else if (action === 'position' && chamaId) {
@@ -104,8 +103,81 @@ serve(async (req) => {
 });
 
 // Helper Functions
-async function lookupUser(supabase: any, idNumber: string, phone: string) {
-  // Normalize phone number
+async function lookupUserByMemberCode(supabase: any, memberCode: string) {
+  console.log(`Looking up user by member code: ${memberCode}`);
+  
+  // Member code format: "ABC1", "XYZ12" (group code + member number)
+  // Extract group code (letters) and member number (digits)
+  const match = memberCode.match(/^([A-Z]+)(\d+)$/i);
+  
+  if (!match) {
+    return new Response(
+      JSON.stringify({ 
+        error: 'Invalid member code format. Should be like ABC1, XYZ2, etc.',
+        suggestions: ['Check your member code from your chama dashboard']
+      }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  const groupCode = match[1].toUpperCase();
+  const memberCodeFull = memberCode.toUpperCase();
+  
+  console.log(`Parsed: Group code=${groupCode}, Full member code=${memberCodeFull}`);
+  
+  // Look up chama by group_code
+  const { data: chama, error: chamaError } = await supabase
+    .from('chama')
+    .select('id, name, group_code')
+    .eq('group_code', groupCode)
+    .single();
+  
+  if (chamaError || !chama) {
+    return new Response(
+      JSON.stringify({ 
+        error: `No chama found with group code "${groupCode}".`,
+        suggestions: ['Double-check your member code', 'Contact your chama manager']
+      }),
+      { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  // Look up member by chama_id and member_code
+  const { data: member, error: memberError } = await supabase
+    .from('chama_members')
+    .select('user_id, profiles:user_id(full_name)')
+    .eq('chama_id', chama.id)
+    .eq('member_code', memberCodeFull)
+    .single();
+  
+  if (memberError || !member || !member.user_id) {
+    return new Response(
+      JSON.stringify({ 
+        error: `Member code "${memberCodeFull}" not found in chama "${chama.name}".`,
+        suggestions: ['Verify your member code from your dashboard', 'Ensure you are an active member']
+      }),
+      { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  const fullName = member.profiles?.full_name || 'Unknown';
+  
+  return new Response(
+    JSON.stringify({ 
+      userId: member.user_id,
+      chamaId: chama.id,
+      chamaName: chama.name,
+      fullName: fullName,
+      memberCode: memberCodeFull,
+      message: `Found ${fullName} in ${chama.name}`
+    }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+// Keep the old normalizePhoneNumber for potential future use
+async function lookupUser_DEPRECATED(supabase: any, idNumber: string, phone: string) {
+  // This function is deprecated - use lookupUserByMemberCode instead
   const normalizedPhone = normalizePhoneNumber(phone);
   
   console.log(`Looking up user: ID ${idNumber}, Phone ${normalizedPhone}`);
