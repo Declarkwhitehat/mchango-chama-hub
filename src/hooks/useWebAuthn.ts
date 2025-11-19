@@ -49,12 +49,20 @@ export const useWebAuthn = () => {
         }
       );
 
-      if (error || !data) {
+      // Handle different error cases
+      if (error) {
+        console.log('Credential check error:', error);
+        return false;
+      }
+
+      // If the response has an error field (404 for no credentials), return false
+      if (data?.error) {
+        console.log('No credentials found:', data.error);
         return false;
       }
 
       // If credentials array exists and has items, user has registered biometric
-      return data.credentials && data.credentials.length > 0;
+      return data?.credentials && data.credentials.length > 0;
     } catch (error) {
       console.error('Error checking credentials:', error);
       return false;

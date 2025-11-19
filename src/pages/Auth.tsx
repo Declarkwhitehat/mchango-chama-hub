@@ -87,30 +87,33 @@ const Auth = () => {
   // Auto-trigger biometric authentication on page load
   useEffect(() => {
     const attemptAutoLogin = async () => {
-      // Don't auto-trigger if user cancelled biometric in this session
-      if (biometricCancelled) return;
-      
-      // Don't auto-trigger if device doesn't support WebAuthn
-      if (!isWebAuthnSupported()) return;
-
-      // Check for stored identifier from previous successful login
-      const storedIdentifier = localStorage.getItem('lastLoginIdentifier');
-      if (!storedIdentifier) return;
-
-      // Check if this user has registered credentials
-      const hasCredentials = await checkHasCredentials(storedIdentifier);
-      if (!hasCredentials) return;
-
-      // Auto-trigger the fingerprint prompt
-      setIsAutoPrompting(true);
-      
-      // Set a timeout - if no response after 10 seconds, fall back
-      const timeoutId = setTimeout(() => {
-        setIsAutoPrompting(false);
-        toast.info('Biometric timeout - please use password');
-      }, 10000);
-
       try {
+        // Don't auto-trigger if user cancelled biometric in this session
+        if (biometricCancelled) return;
+        
+        // Don't auto-trigger if device doesn't support WebAuthn
+        if (!isWebAuthnSupported()) return;
+
+        // Check for stored identifier from previous successful login
+        const storedIdentifier = localStorage.getItem('lastLoginIdentifier');
+        if (!storedIdentifier) return;
+
+        // Check if this user has registered credentials
+        const hasCredentials = await checkHasCredentials(storedIdentifier);
+        if (!hasCredentials) {
+          console.log('No biometric credentials found for auto-login');
+          return;
+        }
+
+        // Auto-trigger the fingerprint prompt
+        setIsAutoPrompting(true);
+        
+        // Set a timeout - if no response after 10 seconds, fall back
+        const timeoutId = setTimeout(() => {
+          setIsAutoPrompting(false);
+          toast.info('Biometric timeout - please use password');
+        }, 10000);
+
         const result = await authenticate(storedIdentifier);
         clearTimeout(timeoutId);
         
@@ -121,7 +124,7 @@ const Auth = () => {
           setIsAutoPrompting(false);
         }
       } catch (error) {
-        clearTimeout(timeoutId);
+        console.error('Auto-login error:', error);
         setIsAutoPrompting(false);
         setBiometricCancelled(true); // Don't auto-prompt again this session
       }
