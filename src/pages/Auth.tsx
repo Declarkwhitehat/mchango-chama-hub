@@ -200,16 +200,26 @@ const Auth = () => {
   };
 
   const handleEnableBiometric = async () => {
-    const result = await registerCredential();
-    if (result.success) {
-      setShowBiometricSetup(false);
-      navigate('/home');
+    setIsLoading(true);
+    try {
+      const result = await registerCredential();
+      if (result.success) {
+        toast.success('Biometric login enabled successfully!');
+        setShowBiometricSetup(false);
+        // Navigate to KYC if coming from signup (signupStep will be 'phone'), otherwise to home
+        navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to enable biometric login');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSkipBiometric = () => {
     setShowBiometricSetup(false);
-    navigate('/home');
+    // Navigate to KYC if coming from signup (signupStep will be 'phone'), otherwise to home
+    navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
   };
 
   const handleSignup = async (data: SignupFormData) => {
@@ -267,8 +277,14 @@ const Auth = () => {
         console.error('Failed to send welcome SMS:', smsError);
       }
       
-      toast.success("Account created! Please upload your ID documents.");
-      navigate("/kyc-upload");
+      toast.success("Account created successfully!");
+      
+      // Check if device supports biometric and prompt immediately
+      if (isWebAuthnSupported()) {
+        setShowBiometricSetup(true);
+      } else {
+        navigate('/kyc-upload');
+      }
     } catch (error: any) {
       toast.error("An unexpected error occurred");
     } finally {

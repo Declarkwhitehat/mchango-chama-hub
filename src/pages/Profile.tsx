@@ -6,13 +6,17 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { User, Mail, Phone, MapPin, LogOut, Edit, AlertCircle, CheckCircle, Clock, Key, Eye, EyeOff, Wallet } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { User, Mail, Phone, MapPin, LogOut, Edit, AlertCircle, CheckCircle, Clock, Key, Eye, EyeOff, Wallet, Fingerprint, Trash2, Plus, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import { PaymentMethodsManager } from "@/components/PaymentMethodsManager";
+import { useWebAuthn } from "@/hooks/useWebAuthn";
+import { useWebAuthnManagement } from "@/hooks/useWebAuthnManagement";
+import { format } from "date-fns";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -25,6 +29,18 @@ const Profile = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  
+  // Biometric management
+  const { isSupported: isWebAuthnSupported, registerCredential } = useWebAuthn();
+  const { isLoading: isLoadingCredentials, credentials, listCredentials, deleteCredential } = useWebAuthnManagement();
+  const [credentialToDelete, setCredentialToDelete] = useState<string | null>(null);
+  const [isAddingBiometric, setIsAddingBiometric] = useState(false);
+
+  useEffect(() => {
+    if (isWebAuthnSupported()) {
+      listCredentials();
+    }
+  }, []);
 
   const handleLogout = async () => {
     const { error } = await signOut();
@@ -65,6 +81,30 @@ const Profile = () => {
       toast.error(error.message || "Failed to update password");
     } finally {
       setIsUpdatingPassword(false);
+    }
+  };
+
+  const handleAddBiometric = async () => {
+    setIsAddingBiometric(true);
+    try {
+      const result = await registerCredential();
+      if (result.success) {
+        toast.success('Biometric device added successfully!');
+        await listCredentials(); // Refresh the list
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add biometric device');
+    } finally {
+      setIsAddingBiometric(false);
+    }
+  };
+
+  const handleDeleteBiometric = async () => {
+    if (!credentialToDelete) return;
+    
+    const result = await deleteCredential(credentialToDelete);
+    if (result.success) {
+      setCredentialToDelete(null);
     }
   };
 
@@ -316,6 +356,82 @@ const Profile = () => {
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* Biometric Login Section */}
+            {isWebAuthnSupported() && (
+              <div className="space-y-4 pt-6 border-t border-border">
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="h-5 w-5 text-primary" />
+                  <h3 className="text-base sm:text-lg font-semibold">Biometric Login</h3>
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Manage your biometric authentication devices. Your biometric data never leaves your device.
+                </p>
+
+                {isLoadingCredentials ? (
+                  <div className="text-xs sm:text-sm text-muted-foreground">Loading devices...</div>
+                ) : credentials.length === 0 ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 p-3 sm:p-4 bg-muted/50 rounded-lg border border-border">
+                      <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                      <p className="text-xs sm:text-sm text-muted-foreground">No biometric devices registered</p>
+                    </div>
+                    <Button
+                      onClick={handleAddBiometric}
+                      disabled={isAddingBiometric}
+                      className="w-full text-sm sm:text-base"
+                    >
+                      <Plus className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      {isAddingBiometric ? 'Adding...' : 'Add Biometric Device'}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {credentials.map((credential) => (
+                      <div
+                        key={credential.id}
+                        className="flex items-center justify-between p-3 sm:p-4 bg-muted/50 rounded-lg border border-border"
+                      >
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                          <Fingerprint className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm sm:text-base truncate">
+                              {credential.device_name || 'Biometric Device'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Registered {format(new Date(credential.created_at), 'MMM d, yyyy')}
+                            </p>
+                            {credential.last_used_at && (
+                              <p className="text-xs text-muted-foreground">
+                                Last used {format(new Date(credential.last_used_at), 'MMM d, yyyy')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCredentialToDelete(credential.credential_id)}
+                          className="flex-shrink-0"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                    
+                    <Button
+                      onClick={handleAddBiometric}
+                      disabled={isAddingBiometric}
+                      variant="outline"
+                      className="w-full text-sm sm:text-base"
+                    >
+                      <Plus className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      {isAddingBiometric ? 'Adding...' : 'Add Another Device'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -333,6 +449,27 @@ const Profile = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!credentialToDelete} onOpenChange={() => setCredentialToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Biometric Device?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this biometric device? You'll need to use your password or another registered device to log in.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBiometric}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove Device
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };
