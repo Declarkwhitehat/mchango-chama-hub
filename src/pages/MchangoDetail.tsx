@@ -89,7 +89,8 @@ const MchangoDetail = () => {
   };
 
   const handleShare = () => {
-    const shareUrl = `${window.location.origin}/mchango/${campaign?.slug}`;
+    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    const shareUrl = `${baseUrl}/mchango/${campaign?.slug}`;
     navigator.clipboard.writeText(shareUrl);
     toast.success("Link copied to clipboard!");
   };
