@@ -392,16 +392,6 @@ const ChamaDetail = () => {
           </Card>
         )}
 
-        {/* Commission Display - Visible to all approved members and admins (only when active) */}
-        {hasViewAccess && isActive && (
-          <CommissionDisplay 
-            totalCollected={totalContributions}
-            commissionRate={chama.commission_rate || 0.05}
-            type="chama"
-            showBreakdown={true}
-          />
-        )}
-
         {/* Manager Tools */}
         {isManager && (
           <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
