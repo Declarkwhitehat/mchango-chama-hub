@@ -198,8 +198,11 @@ export type Database = {
           joined_at: string
           last_payment_date: string | null
           member_code: string
+          missed_payments_count: number | null
+          next_cycle_credit: number | null
           next_due_date: string | null
           order_index: number | null
+          requires_admin_verification: boolean | null
           status: Database["public"]["Enums"]["member_status"]
           user_id: string | null
         }
@@ -213,8 +216,11 @@ export type Database = {
           joined_at?: string
           last_payment_date?: string | null
           member_code: string
+          missed_payments_count?: number | null
+          next_cycle_credit?: number | null
           next_due_date?: string | null
           order_index?: number | null
+          requires_admin_verification?: boolean | null
           status?: Database["public"]["Enums"]["member_status"]
           user_id?: string | null
         }
@@ -228,8 +234,11 @@ export type Database = {
           joined_at?: string
           last_payment_date?: string | null
           member_code?: string
+          missed_payments_count?: number | null
+          next_cycle_credit?: number | null
           next_due_date?: string | null
           order_index?: number | null
+          requires_admin_verification?: boolean | null
           status?: Database["public"]["Enums"]["member_status"]
           user_id?: string | null
         }
@@ -317,33 +326,58 @@ export type Database = {
       }
       contribution_cycles: {
         Row: {
+          beneficiary_member_id: string | null
           chama_id: string
           created_at: string | null
           cycle_number: number
           due_amount: number
           end_date: string
           id: string
+          is_complete: boolean | null
+          payout_amount: number | null
+          payout_processed: boolean | null
+          payout_processed_at: string | null
+          payout_type: string | null
           start_date: string
         }
         Insert: {
+          beneficiary_member_id?: string | null
           chama_id: string
           created_at?: string | null
           cycle_number: number
           due_amount: number
           end_date: string
           id?: string
+          is_complete?: boolean | null
+          payout_amount?: number | null
+          payout_processed?: boolean | null
+          payout_processed_at?: string | null
+          payout_type?: string | null
           start_date: string
         }
         Update: {
+          beneficiary_member_id?: string | null
           chama_id?: string
           created_at?: string | null
           cycle_number?: number
           due_amount?: number
           end_date?: string
           id?: string
+          is_complete?: boolean | null
+          payout_amount?: number | null
+          payout_processed?: boolean | null
+          payout_processed_at?: string | null
+          payout_type?: string | null
           start_date?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contribution_cycles_beneficiary_member_id_fkey"
+            columns: ["beneficiary_member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contribution_cycles_chama_id_fkey"
             columns: ["chama_id"]
@@ -579,31 +613,43 @@ export type Database = {
           amount_due: number
           amount_paid: number | null
           created_at: string | null
+          credited_to_next_cycle: boolean | null
           cycle_id: string
           id: string
+          is_late_payment: boolean | null
           is_paid: boolean | null
           member_id: string
           paid_at: string | null
+          payment_time: string | null
+          reminder_sent_at: string | null
         }
         Insert: {
           amount_due: number
           amount_paid?: number | null
           created_at?: string | null
+          credited_to_next_cycle?: boolean | null
           cycle_id: string
           id?: string
+          is_late_payment?: boolean | null
           is_paid?: boolean | null
           member_id: string
           paid_at?: string | null
+          payment_time?: string | null
+          reminder_sent_at?: string | null
         }
         Update: {
           amount_due?: number
           amount_paid?: number | null
           created_at?: string | null
+          credited_to_next_cycle?: boolean | null
           cycle_id?: string
           id?: string
+          is_late_payment?: boolean | null
           is_paid?: boolean | null
           member_id?: string
           paid_at?: string | null
+          payment_time?: string | null
+          reminder_sent_at?: string | null
         }
         Relationships: [
           {
@@ -1800,6 +1846,7 @@ export type Database = {
         Args: { p_chama_id: string; p_last_payment_date: string }
         Returns: string
       }
+      check_all_members_paid: { Args: { p_cycle_id: string }; Returns: boolean }
       check_kyc_approved: { Args: { _user_id: string }; Returns: boolean }
       check_loan_eligibility: {
         Args: { p_member_id: string }
