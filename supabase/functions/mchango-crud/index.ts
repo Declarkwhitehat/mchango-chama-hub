@@ -111,11 +111,20 @@ serve(async (req) => {
     if (req.method === 'POST') {
       let body;
       try {
-        const text = await req.text();
-        console.log('Request body text:', text.substring(0, 200)); // Log first 200 chars
-        body = text ? JSON.parse(text) : {};
+        // Clone request to allow reading body multiple times if needed
+        const clonedReq = req.clone();
+        body = await clonedReq.json();
+        
+        console.log('Parsed mchango data:', { 
+          title: body.title, 
+          hasDescription: !!body.description,
+          target_amount: body.target_amount,
+          hasImageUrl: !!body.image_url
+        });
       } catch (err) {
         console.error('JSON parse error:', err);
+        console.error('Error details:', err instanceof Error ? err.message : 'Unknown error');
+        
         return new Response(
           JSON.stringify({ 
             error: 'Invalid JSON in request body',
@@ -139,13 +148,6 @@ serve(async (req) => {
           }
         );
       }
-
-      console.log('Parsed mchango data:', { 
-        title: body.title, 
-        hasDescription: !!body.description,
-        target_amount: body.target_amount,
-        hasImageUrl: !!body.image_url
-      });
       
       // Require authentication
       const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
