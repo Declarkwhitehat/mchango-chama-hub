@@ -128,7 +128,9 @@ serve(async (req) => {
       console.log('Parsed body:', body);
       
       // Require authentication
-      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+      const { data: { user }, error: authError } = token 
+        ? await supabaseClient.auth.getUser(token)
+        : await supabaseClient.auth.getUser();
       console.log('mchango-crud POST user', { hasUser: !!user, userId: user?.id });
 
       if (authError || !user) {
