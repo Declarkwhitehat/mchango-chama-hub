@@ -40,6 +40,22 @@ COMPLETE PLATFORM KNOWLEDGE:
 - Members track: balance_credit (overpayments), balance_deficit (underpayments)
 - Can be public (searchable) or private (invite-only)
 - WhatsApp links for group communication
+- **Payment Cycle Management (ALL FREQUENCIES):**
+  * Universal cycle system applies to daily, 2-day, 3-day, weekly, monthly, and custom frequencies
+  * Real-time payment status with color indicators: green (paid), red (unpaid)
+  * Automated SMS reminders sent based on cycle schedule (e.g., 2 PM on payment day)
+  * Automated payouts processed at cycle end (e.g., 8 PM on payment day)
+  * Full payout if all members paid, partial payout if some paid (with manager notification)
+  * Late payments (after 8 PM cutoff) automatically credited to next cycle
+  * Members with multiple missed payments flagged for admin verification
+  * Manager receives notifications for repeated missed payments
+- **Member Identification & Offline Payments:**
+  * Each group gets unique 3-character code (e.g., "ABC")
+  * Each member gets composite ID: GroupCode + MemberNumber (e.g., "ABC1", "ABC2")
+  * Member ID displayed prominently in dashboard for easy reference
+  * For offline M-Pesa payments: member uses their composite ID as account number
+  * System automatically reconciles M-Pesa C2B callbacks using member ID
+  * Payments credited automatically within 1 minute (no manual intervention)
 
 **2. MCHANGO CAMPAIGNS (Fundraising/Crowdfunding)**
 - Create campaigns for: medical bills, education fees, funerals, business startup, community projects
@@ -57,6 +73,13 @@ COMPLETE PLATFORM KNOWLEDGE:
 - Set monthly targets and overall saving goals per group
 - Monthly threshold tracker: KSh 2,000 minimum to stay eligible for loans
 - After 3 consecutive months meeting threshold, members become loan-eligible
+- **Member Identification & Offline Payments:**
+  * Each group gets unique 3-character code (e.g., "XYZ")
+  * Each member gets composite ID: GroupCode + MemberNumber (e.g., "XYZ1", "XYZ2")
+  * Member ID displayed prominently in dashboard
+  * For offline M-Pesa payments: member uses their composite ID as account number
+  * System automatically reconciles M-Pesa C2B callbacks using member ID
+  * Deposits credited automatically within 1 minute
 - Deposit Features:
   * Members deposit anytime, not just monthly
   * Commission deducted from deposits
