@@ -10,7 +10,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.mchango-crud]
-verify_jwt = true
+verify_jwt = false
 
 [functions.chama-crud]
 verify_jwt = true
@@ -40,7 +40,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.mpesa-stk-push]
-verify_jwt = true
+verify_jwt = false
 
 [functions.mpesa-callback]
 verify_jwt = false

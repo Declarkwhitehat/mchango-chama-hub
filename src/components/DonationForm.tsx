@@ -77,8 +77,11 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
 
       if (donationError) throw donationError;
 
+      // Get session if user is logged in, but don't require it for guest donations
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
+      
+      // Only validate session for authenticated users
+      if (user && !session?.access_token) {
         toast({
           title: "Session Expired",
           description: "Please log in again to make a donation",
@@ -90,6 +93,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
 
       // Initiate M-Pesa STK Push
       const { data: stkResponse, error: stkError } = await supabase.functions.invoke("mpesa-stk-push", {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
         body: {
           phone_number: phone,
           amount: parseFloat(amount),
