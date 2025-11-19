@@ -1,4 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { 
+  handleGetChamaInfo, 
+  handleGetMemberPosition, 
+  handleGenerateReport, 
+  handleGetMemberStats, 
+  handleGetChamaSummary,
+  handleGetManagerContact 
+} from './tool-handlers.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -243,30 +251,36 @@ COMPLETE PLATFORM KNOWLEDGE:
 - **Member Code** (e.g., "ABC1", "XYZ2", "TSG5")
   - This is displayed in their chama dashboard
   - Format: Group code (letters) + Member number (digits)
-  - Example: "ABC1" means member 1 in chama with code ABC
+- **PLUS verification with EITHER:**
+  - National ID number (e.g., "12345678") OR
+  - Phone number (any format: 07..., +254..., etc.)
   
-**Important:** 
-- ONLY ask for the member code - nothing else needed!
-- The member code contains both chama identification and member identification
+**Important Security:** 
+- ALWAYS require BOTH member code AND (ID number OR phone number)
+- Member code identifies the chama/member, verification proves identity
+- This two-step process prevents unauthorized access
 - Users can find their member code prominently displayed in their chama dashboard
-- System automatically identifies the user and chama from this code
 
 When a user provides this information, you can:
 1. **Get Basic Chama Info** - Show chama name, member count, member names, and frequency
 2. **Show Member Position** - Tell users their position in rotation and next receiving date
-3. **Generate PDF Reports** - Create downloadable contribution reports:
-   - Daily report (1 day)
-   - Weekly report (7 days)  
-   - Monthly report (30 days)
+3. **Generate PDF Reports** - Create downloadable contribution reports (daily/weekly/monthly)
 4. **Member Statistics** - Show individual contribution history, missed days, balance
 5. **Chama Summary** - Overall statistics and attendance rates
+6. **Manager Contact** - Get manager's phone number (only for verified members)
 
 **Example conversation:**
 User: "I want to see my chama report"
-You: "I can help you with that! Please provide your Member Code (you can find it in your chama dashboard - it looks like ABC1, XYZ2, etc.)"
+You: "I can help you with that! To verify your identity, I need:
+1. Your Member Code (from your chama dashboard, like ABC1, XYZ2)
+2. Either your National ID number OR your phone number"
 
-User: "My member code is ABC1"
-You: [Use tools to fetch and display information for member ABC1]
+User: "My member code is ABC1 and my ID is 12345678"
+You: [Use tools to fetch and display information for verified member ABC1]
+
+User: "Can I get my manager's contact?"
+You: "Sure! I can help you with that. I already have your member code ABC1, and you're verified. Let me get the manager's contact for you."
+[Use get_manager_contact tool]
 
 **How to use these tools:**
 - Use get_chama_info when user asks about their chama details
@@ -344,13 +358,21 @@ You: [Use tools to fetch and display information for member ABC1]
             type: 'function',
             function: {
               name: 'get_chama_info',
-              description: 'Fetch basic chama information including name, member count, member names, and contribution frequency using member code.',
+              description: 'Fetch basic chama information. Requires member code AND either ID number OR phone for verification.',
               parameters: {
                 type: 'object',
                 properties: {
                   memberCode: {
                     type: 'string',
                     description: 'Member code from dashboard (e.g., ABC1, XYZ2)'
+                  },
+                  idNumber: {
+                    type: 'string',
+                    description: 'National ID number for verification (can be omitted if phone provided)'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'Phone number for verification (can be omitted if ID number provided)'
                   }
                 },
                 required: ['memberCode']
@@ -361,13 +383,21 @@ You: [Use tools to fetch and display information for member ABC1]
             type: 'function',
             function: {
               name: 'get_member_position',
-              description: 'Get the user\'s position in the chama rotation and their next receiving date.',
+              description: 'Get member\'s position in chama rotation. Requires verification.',
               parameters: {
                 type: 'object',
                 properties: {
                   memberCode: {
                     type: 'string',
-                    description: 'Member code from dashboard (e.g., ABC1, XYZ2)'
+                    description: 'Member code from dashboard'
+                  },
+                  idNumber: {
+                    type: 'string',
+                    description: 'National ID number for verification (optional if phone provided)'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'Phone number for verification (optional if ID provided)'
                   }
                 },
                 required: ['memberCode']
@@ -378,18 +408,26 @@ You: [Use tools to fetch and display information for member ABC1]
             type: 'function',
             function: {
               name: 'generate_contribution_report',
-              description: 'Generate a downloadable PDF report showing member contributions over a period (daily, weekly, or monthly).',
+              description: 'Generate PDF contribution report. Requires verification.',
               parameters: {
                 type: 'object',
                 properties: {
                   memberCode: {
                     type: 'string',
-                    description: 'Member code from dashboard (e.g., ABC1, XYZ2)'
+                    description: 'Member code from dashboard'
+                  },
+                  idNumber: {
+                    type: 'string',
+                    description: 'National ID number for verification (optional if phone provided)'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'Phone number for verification (optional if ID provided)'
                   },
                   reportType: {
                     type: 'string',
                     enum: ['daily', 'weekly', 'monthly'],
-                    description: 'Type of report: daily (1 day), weekly (7 days), or monthly (30 days)'
+                    description: 'Report period type'
                   }
                 },
                 required: ['memberCode', 'reportType']
@@ -400,13 +438,21 @@ You: [Use tools to fetch and display information for member ABC1]
             type: 'function',
             function: {
               name: 'get_member_stats',
-              description: 'Get detailed contribution statistics for a specific member including total contributions, missed days, and recent history.',
+              description: 'Get detailed member contribution statistics. Requires verification.',
               parameters: {
                 type: 'object',
                 properties: {
                   memberCode: {
                     type: 'string',
-                    description: 'Member code from dashboard (e.g., ABC1, XYZ2)'
+                    description: 'Member code from dashboard'
+                  },
+                  idNumber: {
+                    type: 'string',
+                    description: 'National ID number for verification (optional if phone provided)'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'Phone number for verification (optional if ID provided)'
                   },
                   period: {
                     type: 'number',
@@ -422,18 +468,51 @@ You: [Use tools to fetch and display information for member ABC1]
             type: 'function',
             function: {
               name: 'get_chama_summary',
-              description: 'Get overall chama statistics including total contributions, amounts, and attendance summary.',
+              description: 'Get overall chama statistics. Requires verification.',
               parameters: {
                 type: 'object',
                 properties: {
                   memberCode: {
                     type: 'string',
-                    description: 'Member code for verification (e.g., ABC1, XYZ2)'
+                    description: 'Member code for verification'
+                  },
+                  idNumber: {
+                    type: 'string',
+                    description: 'National ID number for verification (optional if phone provided)'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'Phone number for verification (optional if ID provided)'
                   },
                   period: {
                     type: 'number',
                     description: 'Number of days for the period (default: 30)',
                     default: 30
+                  }
+                },
+                required: ['memberCode']
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'get_manager_contact',
+              description: 'Get chama manager\'s contact information. Only available to verified members.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  memberCode: {
+                    type: 'string',
+                    description: 'Member code from dashboard'
+                  },
+                  idNumber: {
+                    type: 'string',
+                    description: 'National ID number for verification (optional if phone provided)'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'Phone number for verification (optional if ID provided)'
                   }
                 },
                 required: ['memberCode']

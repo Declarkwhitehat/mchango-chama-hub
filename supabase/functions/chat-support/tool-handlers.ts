@@ -4,9 +4,9 @@
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 
 export async function handleGetChamaInfo(toolArgs: any, authHeader: string) {
-  // Step 1: Lookup user and chama by member code
+  // Step 1: Lookup user and chama by member code with verification
   const lookupResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}&idNumber=${toolArgs.idNumber || ''}&phone=${toolArgs.phone || ''}`,
     { headers: { Authorization: authHeader } }
   );
   
@@ -15,7 +15,7 @@ export async function handleGetChamaInfo(toolArgs: any, authHeader: string) {
   if (!lookupResponse.ok || !lookupResult.userId || !lookupResult.chamaId) {
     return {
       error: true,
-      message: lookupResult.error || 'Could not find member with provided code',
+      message: lookupResult.error || 'Verification failed',
       suggestions: lookupResult.suggestions || []
     };
   }
@@ -32,9 +32,32 @@ export async function handleGetChamaInfo(toolArgs: any, authHeader: string) {
   return result;
 }
 
+export async function handleGetManagerContact(toolArgs: any, authHeader: string) {
+  // Lookup user and verify
+  const lookupResponse = await fetch(
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}&idNumber=${toolArgs.idNumber || ''}&phone=${toolArgs.phone || ''}`,
+    { headers: { Authorization: authHeader } }
+  );
+  
+  const lookupResult = await lookupResponse.json();
+  if (!lookupResponse.ok || !lookupResult.userId || !lookupResult.chamaId) {
+    return { error: true, message: lookupResult.error, suggestions: lookupResult.suggestions || [] };
+  }
+  
+  // Get manager contact
+  const managerResponse = await fetch(
+    `${SUPABASE_URL}/functions/v1/chama-reports/manager-contact/${lookupResult.chamaId}?userId=${lookupResult.userId}`,
+    { headers: { Authorization: authHeader } }
+  );
+  
+  const result = await managerResponse.json();
+  result.memberCode = lookupResult.memberCode;
+  return result;
+}
+
 export async function handleGetMemberPosition(toolArgs: any, authHeader: string) {
   const lookupResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}&idNumber=${toolArgs.idNumber || ''}&phone=${toolArgs.phone || ''}`,
     { headers: { Authorization: authHeader } }
   );
   
@@ -56,7 +79,7 @@ export async function handleGetMemberPosition(toolArgs: any, authHeader: string)
 
 export async function handleGenerateReport(toolArgs: any, authHeader: string) {
   const lookupResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}&idNumber=${toolArgs.idNumber || ''}&phone=${toolArgs.phone || ''}`,
     { headers: { Authorization: authHeader } }
   );
   
@@ -79,7 +102,7 @@ export async function handleGenerateReport(toolArgs: any, authHeader: string) {
 
 export async function handleGetMemberStats(toolArgs: any, authHeader: string) {
   const lookupResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}&idNumber=${toolArgs.idNumber || ''}&phone=${toolArgs.phone || ''}`,
     { headers: { Authorization: authHeader } }
   );
   
@@ -102,7 +125,7 @@ export async function handleGetMemberStats(toolArgs: any, authHeader: string) {
 export async function handleGetChamaSummary(toolArgs: any, authHeader: string) {
   // Lookup user and chama by member code
   const lookupResponse = await fetch(
-    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}`,
+    `${SUPABASE_URL}/functions/v1/chama-reports/lookup-user?memberCode=${toolArgs.memberCode}&idNumber=${toolArgs.idNumber || ''}&phone=${toolArgs.phone || ''}`,
     { headers: { Authorization: authHeader } }
   );
   

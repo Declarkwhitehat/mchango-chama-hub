@@ -62,8 +62,10 @@ serve(async (req) => {
 
     // Route handlers
     if (action === 'lookup-user') {
-      // New endpoint: GET /chama-reports/lookup-user?memberCode=ABC1
+      // New endpoint: GET /chama-reports/lookup-user?memberCode=ABC1&idNumber=12345678&phone=0712345678
       const memberCode = url.searchParams.get('memberCode');
+      const idNumber = url.searchParams.get('idNumber');
+      const phone = url.searchParams.get('phone');
       
       if (!memberCode) {
         return new Response(
@@ -72,7 +74,16 @@ serve(async (req) => {
         );
       }
       
-      return await lookupUserByMemberCode(supabase, memberCode);
+      if (!idNumber && !phone) {
+        return new Response(
+          JSON.stringify({ error: 'ID number or phone number required for verification' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      return await lookupUserByMemberCode(supabase, memberCode, idNumber, phone);
+    } else if (action === 'manager-contact' && chamaId) {
+      return await getManagerContact(supabase, chamaId, userId);
     } else if (action === 'info' && chamaId) {
       return await getChamaInfo(supabase, chamaId, userId);
     } else if (action === 'position' && chamaId) {
@@ -103,11 +114,10 @@ serve(async (req) => {
 });
 
 // Helper Functions
-async function lookupUserByMemberCode(supabase: any, memberCode: string) {
-  console.log(`Looking up user by member code: ${memberCode}`);
+async function lookupUserByMemberCode(supabase: any, memberCode: string, idNumber: string | null, phone: string | null) {
+  console.log(`Looking up user by member code: ${memberCode} with ID: ${idNumber}, Phone: ${phone}`);
   
   // Member code format: "ABC1", "XYZ12" (group code + member number)
-  // Extract group code (letters) and member number (digits)
   const match = memberCode.match(/^([A-Z]+)(\d+)$/i);
   
   if (!match) {
@@ -145,7 +155,7 @@ async function lookupUserByMemberCode(supabase: any, memberCode: string) {
   // Look up member by chama_id and member_code
   const { data: member, error: memberError } = await supabase
     .from('chama_members')
-    .select('user_id, profiles:user_id(full_name)')
+    .select('user_id, profiles:user_id(full_name, id_number, phone)')
     .eq('chama_id', chama.id)
     .eq('member_code', memberCodeFull)
     .single();
@@ -160,7 +170,35 @@ async function lookupUserByMemberCode(supabase: any, memberCode: string) {
     );
   }
   
-  const fullName = member.profiles?.full_name || 'Unknown';
+  // Verify ID number or phone number
+  const profile = member.profiles;
+  let verified = false;
+  
+  if (idNumber && profile?.id_number === idNumber) {
+    verified = true;
+  } else if (phone) {
+    const normalizedPhone = normalizePhoneNumber(phone);
+    const profilePhone = profile?.phone ? normalizePhoneNumber(profile.phone) : null;
+    if (normalizedPhone === profilePhone) {
+      verified = true;
+    }
+  }
+  
+  if (!verified) {
+    return new Response(
+      JSON.stringify({ 
+        error: 'Verification failed. The ID number or phone number does not match our records.',
+        suggestions: [
+          'Check your ID number is correct',
+          'Try using your registered phone number',
+          'Contact support if you need help'
+        ]
+      }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  const fullName = profile?.full_name || 'Unknown';
   
   return new Response(
     JSON.stringify({ 
@@ -169,7 +207,7 @@ async function lookupUserByMemberCode(supabase: any, memberCode: string) {
       chamaName: chama.name,
       fullName: fullName,
       memberCode: memberCodeFull,
-      message: `Found ${fullName} in ${chama.name}`
+      message: `Verified ${fullName} in ${chama.name}`
     }),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
@@ -299,6 +337,57 @@ async function getChamaInfo(supabase: any, chamaId: string, userId: string | nul
       frequency: frequencyMap[chama.contribution_frequency] || chama.contribution_frequency,
       groupCode: chama.group_code,
       status: chama.status
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function getManagerContact(supabase: any, chamaId: string, userId: string | null) {
+  // Verify user is a member first
+  if (!userId) {
+    return new Response(
+      JSON.stringify({ error: 'User verification required' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const { data: membership } = await supabase
+    .from('chama_members')
+    .select('id')
+    .eq('chama_id', chamaId)
+    .eq('user_id', userId)
+    .eq('approval_status', 'approved')
+    .single();
+
+  if (!membership) {
+    return new Response(
+      JSON.stringify({ error: 'You must be a verified member to access manager contact information' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Get manager information
+  const { data: manager, error: managerError } = await supabase
+    .from('chama_members')
+    .select('user_id, profiles:user_id(full_name, phone)')
+    .eq('chama_id', chamaId)
+    .eq('is_manager', true)
+    .eq('status', 'active')
+    .eq('approval_status', 'approved')
+    .single();
+
+  if (managerError || !manager) {
+    return new Response(
+      JSON.stringify({ error: 'Manager information not available' }),
+      { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return new Response(
+    JSON.stringify({
+      managerName: manager.profiles?.full_name || 'Unknown',
+      managerPhone: manager.profiles?.phone || 'Not available',
+      message: 'Manager contact information retrieved successfully'
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
