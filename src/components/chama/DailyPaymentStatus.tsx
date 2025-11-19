@@ -6,8 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
-interface DailyPaymentStatusProps {
+interface CyclePaymentStatusProps {
   chamaId: string;
+  frequency: string;
 }
 
 interface PaymentStatus {
@@ -29,7 +30,7 @@ interface CycleInfo {
   payout_type?: string;
 }
 
-export function DailyPaymentStatus({ chamaId }: DailyPaymentStatusProps) {
+export function CyclePaymentStatus({ chamaId, frequency }: CyclePaymentStatusProps) {
   const [loading, setLoading] = useState(true);
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [payments, setPayments] = useState<PaymentStatus[]>([]);
@@ -91,12 +92,17 @@ export function DailyPaymentStatus({ chamaId }: DailyPaymentStatusProps) {
     };
   }, [chamaId]);
 
-  // Calculate time until 8 PM cutoff
+  // Calculate time until 8 PM cutoff on the cycle end date
   useEffect(() => {
     const updateCutoffTime = () => {
+      if (!cycleInfo) {
+        setTimeUntilCutoff("");
+        return;
+      }
+
       const now = new Date();
       const cutoff = new Date();
-      cutoff.setHours(20, 0, 0, 0); // 8:00 PM
+      cutoff.setHours(20, 0, 0, 0); // 8:00 PM today
 
       if (now > cutoff) {
         setTimeUntilCutoff("Cutoff passed");
@@ -112,7 +118,7 @@ export function DailyPaymentStatus({ chamaId }: DailyPaymentStatusProps) {
     const interval = setInterval(updateCutoffTime, 60000); // Update every minute
 
     return () => clearInterval(interval);
-  }, []);
+  }, [cycleInfo]);
 
   if (loading) {
     return (
@@ -143,9 +149,11 @@ export function DailyPaymentStatus({ chamaId }: DailyPaymentStatusProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Today's Payment Status</CardTitle>
+            <CardTitle>
+              {frequency === 'daily' ? "Today's" : "Current Cycle"} Payment Status
+            </CardTitle>
             <CardDescription>
-              Today's beneficiary: <span className="font-medium text-foreground">{cycleInfo.beneficiary_name}</span> ({cycleInfo.beneficiary_code})
+              Current beneficiary: <span className="font-medium text-foreground">{cycleInfo.beneficiary_name}</span> ({cycleInfo.beneficiary_code})
             </CardDescription>
           </div>
           <div className="text-right">
@@ -234,13 +242,13 @@ export function DailyPaymentStatus({ chamaId }: DailyPaymentStatusProps) {
 
         <div className="mt-4 p-3 rounded-lg bg-muted text-xs text-muted-foreground">
           <p>
-            • Payments made before 8:00 PM count towards today's payout
+            • Payments made before 8:00 PM on the due date count towards this payout
           </p>
           <p className="mt-1">
-            • Late payments (after 8:00 PM) are credited to next cycle
+            • Late payments (after 8:00 PM on due date) are credited to next cycle
           </p>
           <p className="mt-1">
-            • Full payout if all members pay, partial payout at 8:00 PM otherwise
+            • Full payout if all members pay, partial payout at 8:00 PM on due date otherwise
           </p>
         </div>
       </CardContent>

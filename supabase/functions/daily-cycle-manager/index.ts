@@ -19,21 +19,20 @@ Deno.serve(async (req) => {
 
     const action = pathParts[0];
 
-    // CREATE TODAY'S CYCLE
+    // CREATE CYCLE FOR TODAY
     if (action === 'create-today' && req.method === 'POST') {
       const { chamaId } = await req.json();
 
-      // Get chama details
+      // Get chama details - work with ALL frequencies
       const { data: chama, error: chamaError } = await supabase
         .from('chama')
         .select('*, chama_members!inner(*)')
         .eq('id', chamaId)
-        .eq('contribution_frequency', 'daily')
         .eq('status', 'active')
         .single();
 
       if (chamaError || !chama) {
-        return new Response(JSON.stringify({ error: 'Chama not found or not daily' }), {
+        return new Response(JSON.stringify({ error: 'Chama not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -71,12 +70,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Determine today's beneficiary based on payout order
-      const daysSinceStart = Math.floor((new Date().getTime() - new Date(chama.created_at).getTime()) / (1000 * 60 * 60 * 24));
-      const beneficiaryIndex = daysSinceStart % members.length;
-      const beneficiary = members[beneficiaryIndex];
-
-      // Get latest cycle number
+      // Determine today's beneficiary based on payout order and cycle count
       const { data: latestCycle } = await supabase
         .from('contribution_cycles')
         .select('cycle_number')
@@ -86,12 +80,35 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       const cycleNumber = (latestCycle?.cycle_number || 0) + 1;
+      const beneficiaryIndex = (cycleNumber - 1) % members.length;
+      const beneficiary = members[beneficiaryIndex];
 
-      // Create new cycle
+      // Calculate cycle dates based on contribution frequency
       const startDate = new Date();
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date();
-      endDate.setHours(23, 59, 59, 999);
+      
+      switch (chama.contribution_frequency) {
+        case 'daily':
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'weekly':
+          endDate.setDate(endDate.getDate() + 6);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'monthly':
+          endDate.setMonth(endDate.getMonth() + 1);
+          endDate.setDate(0); // Last day of month
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'every_n_days':
+          endDate.setDate(endDate.getDate() + (chama.every_n_days_count || 7) - 1);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        default:
+          endDate.setDate(endDate.getDate() + 6);
+          endDate.setHours(23, 59, 59, 999);
+      }
 
       const { data: newCycle, error: cycleError } = await supabase
         .from('contribution_cycles')

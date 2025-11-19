@@ -173,6 +173,93 @@ serve(async (req) => {
 
       if (error) throw error;
 
+      // Check for active cycle and handle cycle payment tracking
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      
+      const { data: cycle } = await supabaseClient
+        .from('contribution_cycles')
+        .select('*')
+        .eq('chama_id', body.chama_id)
+        .lte('start_date', today)
+        .gte('end_date', today)
+        .eq('payout_processed', false)
+        .maybeSingle();
+
+      let isLatePayment = false;
+      
+      if (cycle) {
+        // Check if payment is after 8 PM on cycle end date
+        const cycleEndDate = new Date(cycle.end_date);
+        const cutoffTime = new Date(cycleEndDate);
+        cutoffTime.setHours(20, 0, 0, 0); // 8:00 PM on end date
+
+        isLatePayment = now > cutoffTime;
+
+        if (isLatePayment) {
+          // Credit to next cycle
+          const { error: creditError } = await supabaseClient
+            .from('chama_members')
+            .update({
+              next_cycle_credit: member.next_cycle_credit + body.amount
+            })
+            .eq('id', body.member_id);
+
+          if (!creditError) {
+            // Send late payment notification
+            const { data: profile } = await supabaseClient
+              .from('profiles')
+              .select('phone')
+              .eq('id', member.user_id)
+              .single();
+
+            if (profile?.phone) {
+              const nextCycleDate = new Date(cycle.end_date);
+              nextCycleDate.setDate(nextCycleDate.getDate() + 1);
+              
+              await supabaseClient.functions.invoke('send-transactional-sms', {
+                body: {
+                  phone: profile.phone,
+                  message: `Your payment of KES ${body.amount} was received after 8 PM. It has been credited to your next cycle contribution on ${nextCycleDate.toISOString().split('T')[0]}.`,
+                  eventType: 'late_payment_credit'
+                }
+              });
+            }
+          }
+        } else {
+          // Record in member_cycle_payments
+          const { error: paymentError } = await supabaseClient
+            .from('member_cycle_payments')
+            .upsert({
+              member_id: body.member_id,
+              cycle_id: cycle.id,
+              amount_paid: body.amount,
+              amount_due: cycle.due_amount,
+              is_paid: true,
+              paid_at: now.toISOString(),
+              payment_time: now.toISOString(),
+              is_late_payment: false
+            }, {
+              onConflict: 'member_id,cycle_id'
+            });
+
+          if (paymentError) {
+            console.error('Error recording cycle payment:', paymentError);
+          }
+
+          // Reset missed payment count if this resolves it
+          if (member.missed_payments_count > 0) {
+            await supabaseClient
+              .from('chama_members')
+              .update({
+                missed_payments_count: Math.max(0, member.missed_payments_count - 1),
+                requires_admin_verification: member.missed_payments_count - 1 >= 1
+              })
+              .eq('id', body.member_id);
+          }
+        }
+      }
+
       // Update member balance
       if (creditDelta > 0 || deficitDelta > 0) {
         const { error: updateError } = await supabaseClient
