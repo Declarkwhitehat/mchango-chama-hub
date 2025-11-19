@@ -6,6 +6,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to normalize phone numbers to +254 format
+function normalizePhoneNumber(phone: string): string {
+  // Remove spaces and dashes
+  let normalized = phone.replace(/[\s-]/g, '');
+  
+  // Handle different formats
+  if (normalized.startsWith('07')) {
+    // 07... → +2547...
+    normalized = '+254' + normalized.substring(1);
+  } else if (normalized.startsWith('7')) {
+    // 7... → +2547...
+    normalized = '+254' + normalized;
+  } else if (normalized.startsWith('254')) {
+    // 254... → +254...
+    normalized = '+' + normalized;
+  } else if (!normalized.startsWith('+')) {
+    // Assume Kenyan number, add +254
+    normalized = '+254' + normalized;
+  }
+  
+  return normalized;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,7 +61,20 @@ serve(async (req) => {
     const userId = url.searchParams.get('userId');
 
     // Route handlers
-    if (action === 'info' && chamaId) {
+    if (action === 'lookup-user') {
+      // New endpoint: GET /chama-reports/lookup-user?idNumber=12345678&phone=0712345678
+      const idNumber = url.searchParams.get('idNumber');
+      const phone = url.searchParams.get('phone');
+      
+      if (!idNumber || !phone) {
+        return new Response(
+          JSON.stringify({ error: 'ID number and phone number required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      return await lookupUser(supabase, idNumber, phone);
+    } else if (action === 'info' && chamaId) {
       return await getChamaInfo(supabase, chamaId, userId);
     } else if (action === 'position' && chamaId) {
       return await getMemberPosition(supabase, chamaId, userId);
@@ -66,6 +102,73 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper Functions
+async function lookupUser(supabase: any, idNumber: string, phone: string) {
+  // Normalize phone number
+  const normalizedPhone = normalizePhoneNumber(phone);
+  
+  console.log(`Looking up user: ID ${idNumber}, Phone ${normalizedPhone}`);
+  
+  // Query profiles table
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, phone, id_number')
+    .eq('id_number', idNumber)
+    .eq('phone', normalizedPhone)
+    .single();
+  
+  if (error || !profile) {
+    let errorMessage = 'User not found.';
+    const suggestions = [];
+    
+    // Check if ID exists but phone doesn't match
+    const { data: idCheck } = await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id_number', idNumber)
+      .single();
+    
+    if (idCheck) {
+      errorMessage = 'ID number found but phone number does not match.';
+      suggestions.push('Check your phone number format');
+      suggestions.push('Try: +254... or 07...');
+    } else {
+      // Check if phone exists but ID doesn't match
+      const { data: phoneCheck } = await supabase
+        .from('profiles')
+        .select('id_number')
+        .eq('phone', normalizedPhone)
+        .single();
+      
+      if (phoneCheck) {
+        errorMessage = 'Phone number found but ID number does not match.';
+        suggestions.push('Double-check your ID number');
+      } else {
+        suggestions.push('Make sure you have registered an account');
+        suggestions.push('Contact support if you need help');
+      }
+    }
+    
+    return new Response(
+      JSON.stringify({ 
+        error: errorMessage,
+        suggestions: suggestions,
+        details: 'Make sure to use the same phone number and ID number you registered with.'
+      }),
+      { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  return new Response(
+    JSON.stringify({ 
+      userId: profile.id,
+      fullName: profile.full_name,
+      message: `Found user: ${profile.full_name}`
+    }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
 
 async function getChamaInfo(supabase: any, chamaId: string, userId: string | null) {
   // Verify user is member

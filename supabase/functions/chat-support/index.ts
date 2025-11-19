@@ -239,7 +239,22 @@ COMPLETE PLATFORM KNOWLEDGE:
 **CHAMA INFORMATION & REPORTS:**
 🆕 YOU CAN NOW HELP USERS GET DETAILED CHAMA INFORMATION AND REPORTS!
 
-When a user provides their chama ID and user ID, you can:
+**What information you need from users:**
+- **Chama ID** (UUID, e.g., "abc123-def-456...")
+- **ID Number** (National ID, e.g., "12345678")
+- **Phone Number** (in any format):
+  - 07xxxxxxxx
+  - +2547xxxxxxxx
+  - +25407xxxxxxxx
+  - 7xxxxxxxx
+
+**Important:** 
+- Always ask for ID number AND phone number (not user UUID)
+- Users know their ID number and phone - they don't know their UUID
+- System will automatically look up their account using these details
+- Phone numbers are automatically normalized to correct format
+
+When a user provides this information, you can:
 1. **Get Basic Chama Info** - Show chama name, member count, member names, and frequency
 2. **Show Member Position** - Tell users their position in rotation and next receiving date
 3. **Generate PDF Reports** - Create downloadable contribution reports:
@@ -248,6 +263,16 @@ When a user provides their chama ID and user ID, you can:
    - Monthly report (30 days)
 4. **Member Statistics** - Show individual contribution history, missed days, balance
 5. **Chama Summary** - Overall statistics and attendance rates
+
+**Example conversation:**
+User: "I want to see my chama report"
+You: "I can help you with that! Please provide:
+1. Your Chama ID
+2. Your National ID number  
+3. Your phone number (07... or +254...)"
+
+User: "Chama ID: abc123..., ID: 12345678, Phone: 0712345678"
+You: [Use tools to fetch and display information]
 
 **How to use these tools:**
 - Use get_chama_info when user asks about their chama details
@@ -315,7 +340,7 @@ When a user provides their chama ID and user ID, you can:
             type: 'function',
             function: {
               name: 'get_chama_info',
-              description: 'Fetch basic chama information including name, member count, member names, and contribution frequency. Use when user provides chama ID.',
+              description: 'Fetch basic chama information including name, member count, member names, and contribution frequency. User must provide their ID number and phone number for verification.',
               parameters: {
                 type: 'object',
                 properties: {
@@ -323,12 +348,16 @@ When a user provides their chama ID and user ID, you can:
                     type: 'string',
                     description: 'The UUID of the chama'
                   },
-                  userId: {
+                  idNumber: {
                     type: 'string',
-                    description: 'The UUID of the user requesting info'
+                    description: 'User\'s national ID number (e.g., 12345678)'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'User\'s phone number in any format: 07..., +2547..., +25407..., 254...'
                   }
                 },
-                required: ['chamaId', 'userId']
+                required: ['chamaId', 'idNumber', 'phone']
               }
             }
           },
@@ -336,7 +365,7 @@ When a user provides their chama ID and user ID, you can:
             type: 'function',
             function: {
               name: 'get_member_position',
-              description: 'Get the user\'s position in the chama rotation and their next receiving date',
+              description: 'Get the user\'s position in the chama rotation and their next receiving date. User must provide their ID number and phone number for verification.',
               parameters: {
                 type: 'object',
                 properties: {
@@ -344,12 +373,16 @@ When a user provides their chama ID and user ID, you can:
                     type: 'string',
                     description: 'The UUID of the chama'
                   },
-                  userId: {
+                  idNumber: {
                     type: 'string',
-                    description: 'The UUID of the user'
+                    description: 'User\'s national ID number'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'User\'s phone number in any format'
                   }
                 },
-                required: ['chamaId', 'userId']
+                required: ['chamaId', 'idNumber', 'phone']
               }
             }
           },
@@ -357,7 +390,7 @@ When a user provides their chama ID and user ID, you can:
             type: 'function',
             function: {
               name: 'generate_contribution_report',
-              description: 'Generate a downloadable report showing member contributions over a period (daily, weekly, or monthly)',
+              description: 'Generate a downloadable report showing member contributions over a period (daily, weekly, or monthly). User must provide their ID number and phone number for verification.',
               parameters: {
                 type: 'object',
                 properties: {
@@ -365,9 +398,13 @@ When a user provides their chama ID and user ID, you can:
                     type: 'string',
                     description: 'The UUID of the chama'
                   },
-                  userId: {
+                  idNumber: {
                     type: 'string',
-                    description: 'The UUID of the user requesting the report'
+                    description: 'User\'s national ID number'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'User\'s phone number in any format'
                   },
                   reportType: {
                     type: 'string',
@@ -375,7 +412,7 @@ When a user provides their chama ID and user ID, you can:
                     description: 'Type of report: daily (1 day), weekly (7 days), or monthly (30 days)'
                   }
                 },
-                required: ['chamaId', 'userId', 'reportType']
+                required: ['chamaId', 'idNumber', 'phone', 'reportType']
               }
             }
           },
@@ -383,7 +420,7 @@ When a user provides their chama ID and user ID, you can:
             type: 'function',
             function: {
               name: 'get_member_stats',
-              description: 'Get detailed contribution statistics for a specific member including total contributions, missed days, and recent history',
+              description: 'Get detailed contribution statistics for a specific member including total contributions, missed days, and recent history. User must provide their ID number and phone number for verification.',
               parameters: {
                 type: 'object',
                 properties: {
@@ -391,9 +428,13 @@ When a user provides their chama ID and user ID, you can:
                     type: 'string',
                     description: 'The UUID of the chama'
                   },
-                  userId: {
+                  idNumber: {
                     type: 'string',
-                    description: 'The UUID of the user'
+                    description: 'User\'s national ID number'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'User\'s phone number in any format'
                   },
                   period: {
                     type: 'number',
@@ -401,7 +442,7 @@ When a user provides their chama ID and user ID, you can:
                     default: 30
                   }
                 },
-                required: ['chamaId', 'userId']
+                required: ['chamaId', 'idNumber', 'phone']
               }
             }
           },
@@ -409,7 +450,7 @@ When a user provides their chama ID and user ID, you can:
             type: 'function',
             function: {
               name: 'get_chama_summary',
-              description: 'Get overall chama statistics including total contributions, amounts, and attendance summary',
+              description: 'Get overall chama statistics including total contributions, amounts, and attendance summary. Optional: provide ID number and phone for membership verification.',
               parameters: {
                 type: 'object',
                 properties: {
@@ -421,6 +462,14 @@ When a user provides their chama ID and user ID, you can:
                     type: 'number',
                     description: 'Number of days for the period (default: 30)',
                     default: 30
+                  },
+                  idNumber: {
+                    type: 'string',
+                    description: 'Optional: User\'s national ID number for membership verification'
+                  },
+                  phone: {
+                    type: 'string',
+                    description: 'Optional: User\'s phone number for membership verification'
                   }
                 },
                 required: ['chamaId']
