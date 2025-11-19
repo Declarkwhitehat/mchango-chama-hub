@@ -117,6 +117,9 @@ const MchangoCreate = () => {
 
       const res = await supabase.functions.invoke("mchango-crud", {
         body: mchangoData,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (res.error) {
