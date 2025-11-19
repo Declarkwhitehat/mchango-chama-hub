@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -147,15 +147,32 @@ export default function SavingsGroupMemberDashboard({
 
   return (
     <div className="space-y-6">
+      {/* Member ID Badge - Prominent Display */}
+      <Card className="border-primary bg-gradient-to-r from-primary/10 via-primary/5 to-background">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground mb-1">Your Member ID</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <code className="text-4xl font-bold text-primary tracking-wider bg-background/80 px-4 py-2 rounded-lg border-2 border-primary/30">
+                  {membership.unique_member_id}
+                </code>
+                <Badge variant="secondary" className="text-xs">
+                  Use for offline payments
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Use this ID as account number when making M-Pesa payments
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold mb-1">{group.name}</h1>
         <p className="text-muted-foreground">Member Dashboard</p>
-        {membership.unique_member_id && (
-          <Badge variant="secondary" className="mt-2">
-            ID: {membership.unique_member_id}
-          </Badge>
-        )}
       </div>
 
       {/* Loan Eligibility Alert */}

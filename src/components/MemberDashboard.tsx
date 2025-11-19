@@ -155,8 +155,30 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Member ID Badge - Prominent Display */}
+      <Card className="border-primary bg-gradient-to-r from-primary/10 via-primary/5 to-background">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground mb-1">Your Member ID</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <code className="text-4xl font-bold text-primary tracking-wider bg-background/80 px-4 py-2 rounded-lg border-2 border-primary/30">
+                  {member.member_code}
+                </code>
+                <Badge variant="secondary" className="text-xs">
+                  Use for offline payments
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Use this ID as account number when making M-Pesa payments
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Commission Display - Show chama-wide commission info */}
-      <CommissionDisplay 
+      <CommissionDisplay
         totalCollected={totalContributions}
         commissionRate={chama.commission_rate || 0.05}
         type="chama"
