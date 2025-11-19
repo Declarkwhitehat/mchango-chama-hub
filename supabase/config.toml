@@ -56,3 +56,9 @@ verify_jwt = true
 
 [functions.chat-support]
 verify_jwt = false
+
+[functions.mpesa-c2b-callback]
+verify_jwt = false
+
+[functions.mpesa-c2b-validation]
+verify_jwt = false

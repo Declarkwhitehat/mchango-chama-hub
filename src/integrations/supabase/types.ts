@@ -67,6 +67,7 @@ export type Database = {
           created_by: string
           description: string | null
           every_n_days_count: number | null
+          group_code: string | null
           id: string
           is_public: boolean | null
           max_members: number
@@ -86,6 +87,7 @@ export type Database = {
           created_by: string
           description?: string | null
           every_n_days_count?: number | null
+          group_code?: string | null
           id?: string
           is_public?: boolean | null
           max_members?: number
@@ -105,6 +107,7 @@ export type Database = {
           created_by?: string
           description?: string | null
           every_n_days_count?: number | null
+          group_code?: string | null
           id?: string
           is_public?: boolean | null
           max_members?: number
@@ -1379,6 +1382,7 @@ export type Database = {
           cycle_end_date: string
           cycle_start_date: string
           description: string | null
+          group_code: string | null
           group_profit_pool: number
           id: string
           manager_id: string
@@ -1404,6 +1408,7 @@ export type Database = {
           cycle_end_date: string
           cycle_start_date: string
           description?: string | null
+          group_code?: string | null
           group_profit_pool?: number
           id?: string
           manager_id: string
@@ -1429,6 +1434,7 @@ export type Database = {
           cycle_end_date?: string
           cycle_start_date?: string
           description?: string | null
+          group_code?: string | null
           group_profit_pool?: number
           id?: string
           manager_id?: string
@@ -1801,10 +1807,15 @@ export type Database = {
       }
       cleanup_expired_otps: { Args: never; Returns: undefined }
       cleanup_old_chat_messages: { Args: never; Returns: undefined }
+      generate_group_code: { Args: never; Returns: string }
       generate_group_invite_code: { Args: never; Returns: string }
       generate_invite_code: { Args: never; Returns: string }
       generate_member_code: {
         Args: { p_chama_id: string; p_order_index: number }
+        Returns: string
+      }
+      generate_short_member_code: {
+        Args: { p_group_code: string; p_member_number: number }
         Returns: string
       }
       generate_slug: { Args: { title: string }; Returns: string }
