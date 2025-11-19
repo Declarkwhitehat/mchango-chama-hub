@@ -26,6 +26,41 @@ export const useWebAuthn = () => {
            navigator.credentials !== undefined;
   };
 
+  // Check if user has registered biometric credentials
+  const checkHasCredentials = async (emailOrPhone: string) => {
+    if (!isSupported()) {
+      return false;
+    }
+
+    try {
+      // Determine if input is email or phone
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const isEmail = emailRegex.test(emailOrPhone);
+
+      // Check with server for registered credentials
+      const { data, error } = await supabase.functions.invoke(
+        'webauthn-authenticate',
+        {
+          body: {
+            action: 'generate-challenge',
+            email: isEmail ? emailOrPhone : undefined,
+            phone: !isEmail ? emailOrPhone : undefined
+          }
+        }
+      );
+
+      if (error || !data) {
+        return false;
+      }
+
+      // If credentials array exists and has items, user has registered biometric
+      return data.credentials && data.credentials.length > 0;
+    } catch (error) {
+      console.error('Error checking credentials:', error);
+      return false;
+    }
+  };
+
   // Register a new credential (for enabling biometric login)
   const registerCredential = async (deviceName?: string) => {
     if (!isSupported()) {
@@ -224,6 +259,7 @@ export const useWebAuthn = () => {
     isSupported,
     registerCredential,
     authenticate,
+    checkHasCredentials,
     isLoading
   };
 };

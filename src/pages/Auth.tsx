@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,7 +64,7 @@ type SignupFormData = z.infer<typeof signupSchema>;
 const Auth = () => {
   const navigate = useNavigate();
   const { signIn, signUp, user } = useAuth();
-  const { isSupported: isWebAuthnSupported, registerCredential, authenticate, isLoading: isWebAuthnLoading } = useWebAuthn();
+  const { isSupported: isWebAuthnSupported, registerCredential, authenticate, checkHasCredentials, isLoading: isWebAuthnLoading } = useWebAuthn();
   const [isLoading, setIsLoading] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -73,6 +73,8 @@ const Auth = () => {
   const [signupStep, setSignupStep] = useState<'details' | 'phone'>('details');
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [biometricIdentifier, setBiometricIdentifier] = useState('');
+  const [isAutoPrompting, setIsAutoPrompting] = useState(false);
+  const [biometricCancelled, setBiometricCancelled] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
     hasUpperCase: false,
@@ -81,6 +83,52 @@ const Auth = () => {
     hasSpecialChar: false,
     hasMinLength: false,
   });
+
+  // Auto-trigger biometric authentication on page load
+  useEffect(() => {
+    const attemptAutoLogin = async () => {
+      // Don't auto-trigger if user cancelled biometric in this session
+      if (biometricCancelled) return;
+      
+      // Don't auto-trigger if device doesn't support WebAuthn
+      if (!isWebAuthnSupported()) return;
+
+      // Check for stored identifier from previous successful login
+      const storedIdentifier = localStorage.getItem('lastLoginIdentifier');
+      if (!storedIdentifier) return;
+
+      // Check if this user has registered credentials
+      const hasCredentials = await checkHasCredentials(storedIdentifier);
+      if (!hasCredentials) return;
+
+      // Auto-trigger the fingerprint prompt
+      setIsAutoPrompting(true);
+      
+      // Set a timeout - if no response after 10 seconds, fall back
+      const timeoutId = setTimeout(() => {
+        setIsAutoPrompting(false);
+        toast.info('Biometric timeout - please use password');
+      }, 10000);
+
+      try {
+        const result = await authenticate(storedIdentifier);
+        clearTimeout(timeoutId);
+        
+        if (result.success) {
+          toast.success('Welcome back!');
+          navigate('/');
+        } else {
+          setIsAutoPrompting(false);
+        }
+      } catch (error) {
+        clearTimeout(timeoutId);
+        setIsAutoPrompting(false);
+        setBiometricCancelled(true); // Don't auto-prompt again this session
+      }
+    };
+
+    attemptAutoLogin();
+  }, [isWebAuthnSupported, checkHasCredentials, authenticate, biometricCancelled, navigate]);
 
   // Calculate password strength
   const calculatePasswordStrength = (password: string) => {
@@ -155,6 +203,9 @@ const Auth = () => {
         return;
       }
       
+      // Store identifier for next auto-login
+      localStorage.setItem('lastLoginIdentifier', data.emailOrPhone);
+      
       toast.success("Welcome back!");
       
       // Check if user is admin and redirect appropriately
@@ -195,8 +246,15 @@ const Auth = () => {
 
     const result = await authenticate(emailOrPhone);
     if (result.success) {
+      // Store identifier for next auto-login
+      localStorage.setItem('lastLoginIdentifier', emailOrPhone);
       navigate('/home');
     }
+  };
+
+  const handleUsePasswordInstead = () => {
+    setIsAutoPrompting(false);
+    setBiometricCancelled(true);
   };
 
   const handleEnableBiometric = async () => {
@@ -329,96 +387,111 @@ const Auth = () => {
                     <CardDescription>Enter your credentials to access your account</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Form {...loginForm}>
-                      <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
-                        <FormField
-                          control={loginForm.control}
-                          name="emailOrPhone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email or Phone Number</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Enter email or phone number"
-                                  {...field}
-                                  autoComplete="username"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={loginForm.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Password</FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <Input 
-                                    type={showLoginPassword ? "text" : "password"} 
-                                    {...field} 
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                                    onClick={() => setShowLoginPassword(!showLoginPassword)}
-                                  >
-                                    {showLoginPassword ? (
-                                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                                    ) : (
-                                      <Eye className="h-4 w-4 text-muted-foreground" />
-                                    )}
-                                  </Button>
-                                </div>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                    {isAutoPrompting ? (
+                      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                        <Fingerprint className="h-16 w-16 text-primary animate-pulse" />
+                        <p className="text-lg font-medium">Scanning for fingerprint...</p>
+                        <p className="text-sm text-muted-foreground">Touch your fingerprint sensor to log in</p>
                         <Button
-                          type="submit"
-                          variant="hero"
-                          className="w-full"
-                          disabled={isLoading}
+                          variant="ghost"
+                          onClick={handleUsePasswordInstead}
+                          className="mt-4"
                         >
-                          {isLoading ? "Logging in..." : "Login"}
+                          Use password instead
                         </Button>
-                        
-                        {isWebAuthnSupported() && (
-                          <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                              <span className="w-full border-t border-border" />
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                              <span className="bg-card px-2 text-muted-foreground">Or</span>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {isWebAuthnSupported() && (
+                      </div>
+                    ) : (
+                      <Form {...loginForm}>
+                        <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+                          <FormField
+                            control={loginForm.control}
+                            name="emailOrPhone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email or Phone Number</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="Enter email or phone number"
+                                    {...field}
+                                    autoComplete="username"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={loginForm.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Password</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Input 
+                                      type={showLoginPassword ? "text" : "password"} 
+                                      {...field} 
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                                    >
+                                      {showLoginPassword ? (
+                                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                      ) : (
+                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                           <Button
-                            type="button"
-                            variant="outline"
+                            type="submit"
+                            variant="hero"
                             className="w-full"
-                            disabled={isWebAuthnLoading}
-                            onClick={handleBiometricLogin}
+                            disabled={isLoading}
                           >
-                            <Fingerprint className="mr-2 h-4 w-4" />
-                            {isWebAuthnLoading ? "Authenticating..." : "Use Fingerprint/Face ID"}
+                            {isLoading ? "Logging in..." : "Login"}
                           </Button>
-                        )}
-                        
-                        <div className="text-center">
-                          <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-                            Forgot password?
-                          </Link>
-                        </div>
-                      </form>
-                    </Form>
+                          
+                          {isWebAuthnSupported() && !biometricCancelled && (
+                            <>
+                              <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                  <span className="w-full border-t border-border" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                  <span className="bg-card px-2 text-muted-foreground">Or</span>
+                                </div>
+                              </div>
+                              
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full"
+                                disabled={isWebAuthnLoading}
+                                onClick={handleBiometricLogin}
+                              >
+                                <Fingerprint className="mr-2 h-4 w-4" />
+                                {isWebAuthnLoading ? "Authenticating..." : "Use Fingerprint/Face ID"}
+                              </Button>
+                            </>
+                          )}
+                          
+                          <div className="text-center">
+                            <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                              Forgot password?
+                            </Link>
+                          </div>
+                        </form>
+                      </Form>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
