@@ -14,9 +14,9 @@ interface Message {
 }
 
 const LANGUAGE_GREETINGS = {
-  english: 'Hello! I\'m Declark Chacha, your AI assistant 👋 I\'m here to help you with any questions about Chama Groups, Mchango Campaigns, and Savings Groups. How can I assist you today?\n\n💡 Need to speak with someone? Just ask and I can arrange a callback!',
-  swahili: 'Habari! Mimi ni Declark Chacha, msaidizi wako wa AI 👋 Niko hapa kukusaidia na maswali yoyote kuhusu Vikundi vya Chama, Kampeni za Mchango, na Vikundi vya Akiba. Naweza kukusaidia vipi leo?\n\n💡 Unahitaji kuongea na mtu? Niambie tu na nitaandaa kupigwa simu!',
-  sheng: 'Vipi! Nai-call Declark Chacha, AI assistant wako 👋 Niko hapa ku-help na maswali zote za Chama Groups, Mchango Campaigns, na Savings Groups. Naweza ku-help aje leo?\n\n💡 Unataka kuongelesha na mse? Niambie tu nita-arrange callback!',
+  english: 'Hello! 👋 I\'m here to help you with any questions about Chama Groups, Mchango Campaigns, and Savings Groups. How can I assist you today?\n\n💡 Need to speak with someone? Just ask and I can arrange a callback!',
+  swahili: 'Habari! 👋 Niko hapa kukusaidia na maswali yoyote kuhusu Vikundi vya Chama, Kampeni za Mchango, na Vikundi vya Akiba. Naweza kukusaidia vipi leo?\n\n💡 Unahitaji kuongea na mtu? Niambie tu na nitaandaa kupigwa simu!',
+  sheng: 'Vipi! 👋 Niko hapa ku-help na maswali zote za Chama Groups, Mchango Campaigns, na Savings Groups. Naweza ku-help aje leo?\n\n💡 Unataka kuongelesha na mse? Niambie tu nita-arrange callback!',
 };
 
 export function ChatSupport() {
@@ -273,31 +273,30 @@ export function ChatSupport() {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 h-14 rounded-full shadow-lg hover:shadow-xl transition-all z-50 bg-primary hover:bg-primary/90"
+          className="fixed bottom-4 right-4 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-lg hover:shadow-xl transition-all z-50 bg-primary hover:bg-primary/90 p-0"
         >
-          <MessageCircle className="h-5 w-5 mr-2" />
-          <span className="font-medium">Declark Chacha</span>
+          <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
         </Button>
       )}
 
       {/* Chat Window */}
       {isOpen && (
-        <Card className="fixed bottom-6 right-6 w-[400px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-[calc(100vw-2rem)] max-md:h-[calc(100vh-2rem)] max-md:max-h-[600px]">
+        <Card className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-[calc(100vw-1rem)] max-md:h-[calc(100vh-1rem)] max-md:bottom-0 max-md:right-0 max-md:rounded-none">
           {/* Header */}
-          <div className="p-4 border-b bg-primary text-primary-foreground rounded-t-lg space-y-3">
+          <div className="p-3 border-b bg-primary text-primary-foreground rounded-t-lg space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5" />
-                <h3 className="font-semibold">Declark Chacha</h3>
+                <MessageCircle className="h-4 w-4" />
+                <h3 className="font-semibold text-sm">AI Assistant</h3>
               </div>
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsOpen(false)}
-                  className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
+                  className="h-7 w-7 text-primary-foreground hover:bg-primary/80"
                 >
-                  <Minimize2 className="h-4 w-4" />
+                  <Minimize2 className="h-3 w-3" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -311,18 +310,18 @@ export function ChatSupport() {
                     }]);
                     setShowCallbackForm(false);
                   }}
-                  className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
+                  className="h-7 w-7 text-primary-foreground hover:bg-primary/80"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3 w-3" />
                 </Button>
               </div>
             </div>
             
             {/* Language Selector */}
             <div className="flex items-center gap-2">
-              <Languages className="h-4 w-4" />
+              <Languages className="h-3 w-3" />
               <Select value={language} onValueChange={handleLanguageChange}>
-                <SelectTrigger className="h-8 w-[140px] bg-primary-foreground text-primary border-0">
+                <SelectTrigger className="h-7 w-[100px] bg-primary-foreground text-primary border-0 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
