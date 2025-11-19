@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { checkRateLimit, getClientIP } from '../_shared/rateLimiter.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +30,33 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Phone number, OTP, and new password are required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // Check rate limit for phone
+    const phoneRateLimit = await checkRateLimit(supabase, phone, 'phone', 'password_reset_confirm');
+    if (!phoneRateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          error: phoneRateLimit.error || 'Too many password reset attempts. Please try again later.',
+          remainingAttempts: phoneRateLimit.remainingAttempts,
+          resetTime: phoneRateLimit.resetTime
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+      );
+    }
+
+    // Check rate limit for IP
+    const clientIP = getClientIP(req);
+    const ipRateLimit = await checkRateLimit(supabase, clientIP, 'ip', 'password_reset_confirm');
+    if (!ipRateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          error: ipRateLimit.error || 'Too many requests from your location. Please try again later.',
+          remainingAttempts: ipRateLimit.remainingAttempts,
+          resetTime: ipRateLimit.resetTime
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
       );
     }
 

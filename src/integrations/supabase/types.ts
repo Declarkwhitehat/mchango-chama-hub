@@ -873,6 +873,39 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_attempts: {
+        Row: {
+          action: string
+          attempts: number
+          created_at: string
+          id: string
+          identifier: string
+          identifier_type: Database["public"]["Enums"]["rate_limit_type"]
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          action: string
+          attempts?: number
+          created_at?: string
+          id?: string
+          identifier: string
+          identifier_type: Database["public"]["Enums"]["rate_limit_type"]
+          updated_at?: string
+          window_start?: string
+        }
+        Update: {
+          action?: string
+          attempts?: number
+          created_at?: string
+          id?: string
+          identifier?: string
+          identifier_type?: Database["public"]["Enums"]["rate_limit_type"]
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       saving_deposits: {
         Row: {
           balance_after: number
@@ -1854,6 +1887,7 @@ export type Database = {
       }
       cleanup_expired_otps: { Args: never; Returns: undefined }
       cleanup_old_chat_messages: { Args: never; Returns: undefined }
+      cleanup_old_rate_limits: { Args: never; Returns: undefined }
       generate_group_code: { Args: never; Returns: string }
       generate_group_invite_code: { Args: never; Returns: string }
       generate_invite_code: { Args: never; Returns: string }
@@ -1913,6 +1947,7 @@ export type Database = {
       member_status: "active" | "inactive" | "left"
       payment_method_type: "mpesa" | "airtel_money" | "bank_account"
       payout_status: "pending" | "processing" | "completed" | "failed"
+      rate_limit_type: "ip" | "phone" | "email"
       transaction_status: "pending" | "completed" | "failed" | "refunded"
       transaction_type: "donation" | "contribution" | "payout"
     }
@@ -2050,6 +2085,7 @@ export const Constants = {
       member_status: ["active", "inactive", "left"],
       payment_method_type: ["mpesa", "airtel_money", "bank_account"],
       payout_status: ["pending", "processing", "completed", "failed"],
+      rate_limit_type: ["ip", "phone", "email"],
       transaction_status: ["pending", "completed", "failed", "refunded"],
       transaction_type: ["donation", "contribution", "payout"],
     },
