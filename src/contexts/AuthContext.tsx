@@ -20,7 +20,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signIn: (emailOrPhone: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, userData: any) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
   refreshProfile: () => Promise<void>;
@@ -101,11 +101,43 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (emailOrPhone: string, password: string) => {
+    let emailToUse = emailOrPhone;
+    
+    // Detect if input is a phone number
+    const isPhone = /^[\+\d]/.test(emailOrPhone.trim()) && !emailOrPhone.includes('@');
+    
+    if (isPhone) {
+      // Normalize phone to +254 format
+      let normalizedPhone = emailOrPhone.trim();
+      if (normalizedPhone.startsWith('0')) {
+        normalizedPhone = '+254' + normalizedPhone.substring(1);
+      } else if (normalizedPhone.startsWith('7') || normalizedPhone.startsWith('1')) {
+        normalizedPhone = '+254' + normalizedPhone;
+      } else if (!normalizedPhone.startsWith('+')) {
+        normalizedPhone = '+' + normalizedPhone;
+      }
+      
+      // Query profiles table to get email
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('phone', normalizedPhone)
+        .single();
+      
+      if (profileError || !profile?.email) {
+        return { error: { message: 'No account found with this phone number' } };
+      }
+      
+      emailToUse = profile.email;
+    }
+    
+    // Proceed with email-based authentication
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: emailToUse,
       password,
     });
+    
     return { error };
   };
 
