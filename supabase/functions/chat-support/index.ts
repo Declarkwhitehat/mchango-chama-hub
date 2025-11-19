@@ -236,6 +236,31 @@ COMPLETE PLATFORM KNOWLEDGE:
 - Withdrawal processes
 - Status meanings
 
+**CHAMA INFORMATION & REPORTS:**
+🆕 YOU CAN NOW HELP USERS GET DETAILED CHAMA INFORMATION AND REPORTS!
+
+When a user provides their chama ID and user ID, you can:
+1. **Get Basic Chama Info** - Show chama name, member count, member names, and frequency
+2. **Show Member Position** - Tell users their position in rotation and next receiving date
+3. **Generate PDF Reports** - Create downloadable contribution reports:
+   - Daily report (1 day)
+   - Weekly report (7 days)  
+   - Monthly report (30 days)
+4. **Member Statistics** - Show individual contribution history, missed days, balance
+5. **Chama Summary** - Overall statistics and attendance rates
+
+**How to use these tools:**
+- Use get_chama_info when user asks about their chama details
+- Use get_member_position when user asks about rotation or receiving day
+- Use generate_contribution_report when user requests a report (specify daily/weekly/monthly)
+- Use get_member_stats for individual member contribution details
+- Use get_chama_summary for overall chama performance
+
+**Important:**
+- You are ONLY fetching and displaying information
+- You CANNOT manage chamas, approve members, or process payments
+- For management tasks, direct users to the web interface
+
 🔄 USE request_callback TOOL FOR:
 - "Why was my KYC rejected?"
 - "Where is my withdrawal?"
@@ -283,6 +308,122 @@ COMPLETE PLATFORM KNOWLEDGE:
                   }
                 },
                 required: ['reason']
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'get_chama_info',
+              description: 'Fetch basic chama information including name, member count, member names, and contribution frequency. Use when user provides chama ID.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  chamaId: {
+                    type: 'string',
+                    description: 'The UUID of the chama'
+                  },
+                  userId: {
+                    type: 'string',
+                    description: 'The UUID of the user requesting info'
+                  }
+                },
+                required: ['chamaId', 'userId']
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'get_member_position',
+              description: 'Get the user\'s position in the chama rotation and their next receiving date',
+              parameters: {
+                type: 'object',
+                properties: {
+                  chamaId: {
+                    type: 'string',
+                    description: 'The UUID of the chama'
+                  },
+                  userId: {
+                    type: 'string',
+                    description: 'The UUID of the user'
+                  }
+                },
+                required: ['chamaId', 'userId']
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'generate_contribution_report',
+              description: 'Generate a downloadable report showing member contributions over a period (daily, weekly, or monthly)',
+              parameters: {
+                type: 'object',
+                properties: {
+                  chamaId: {
+                    type: 'string',
+                    description: 'The UUID of the chama'
+                  },
+                  userId: {
+                    type: 'string',
+                    description: 'The UUID of the user requesting the report'
+                  },
+                  reportType: {
+                    type: 'string',
+                    enum: ['daily', 'weekly', 'monthly'],
+                    description: 'Type of report: daily (1 day), weekly (7 days), or monthly (30 days)'
+                  }
+                },
+                required: ['chamaId', 'userId', 'reportType']
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'get_member_stats',
+              description: 'Get detailed contribution statistics for a specific member including total contributions, missed days, and recent history',
+              parameters: {
+                type: 'object',
+                properties: {
+                  chamaId: {
+                    type: 'string',
+                    description: 'The UUID of the chama'
+                  },
+                  userId: {
+                    type: 'string',
+                    description: 'The UUID of the user'
+                  },
+                  period: {
+                    type: 'number',
+                    description: 'Number of days to look back (default: 30)',
+                    default: 30
+                  }
+                },
+                required: ['chamaId', 'userId']
+              }
+            }
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'get_chama_summary',
+              description: 'Get overall chama statistics including total contributions, amounts, and attendance summary',
+              parameters: {
+                type: 'object',
+                properties: {
+                  chamaId: {
+                    type: 'string',
+                    description: 'The UUID of the chama'
+                  },
+                  period: {
+                    type: 'number',
+                    description: 'Number of days for the period (default: 30)',
+                    default: 30
+                  }
+                },
+                required: ['chamaId']
               }
             }
           }
