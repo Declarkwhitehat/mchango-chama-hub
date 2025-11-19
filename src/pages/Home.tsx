@@ -143,7 +143,7 @@ const Home = () => {
       if (chamaError) throw chamaError;
       setChamaList(chamas || []);
 
-      // Fetch chamas where user is a member
+      // Fetch chamas where user is a member (excluding chamas they created)
       const { data: memberChamas, error: memberChamaError } = await supabase
         .from('chama_members')
         .select(`
@@ -154,11 +154,13 @@ const Home = () => {
             description,
             created_at,
             contribution_amount,
-            contribution_frequency
+            contribution_frequency,
+            created_by
           )
         `)
         .eq('user_id', user.id)
-        .eq('approval_status', 'approved');
+        .eq('approval_status', 'approved')
+        .neq('chama.created_by', user.id);
 
       if (memberChamaError) throw memberChamaError;
       
