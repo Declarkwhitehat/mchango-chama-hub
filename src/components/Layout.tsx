@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Home, User, Menu, ArrowLeft, Shield, Users, Heart } from "lucide-react";
+import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -99,6 +99,12 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                   <Button variant="ghost" className="w-full justify-start">
                     <User className="mr-2 h-4 w-4" />
                     Profile
+                  </Button>
+                </Link>
+                <Link to="/about">
+                  <Button variant="ghost" className="w-full justify-start">
+                    <Info className="mr-2 h-4 w-4" />
+                    About Us
                   </Button>
                 </Link>
                 {isAdmin && (
