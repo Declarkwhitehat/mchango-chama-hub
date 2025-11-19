@@ -113,12 +113,10 @@ const MchangoCreate = () => {
         end_date: new Date(Date.now() + Number(formData.get("duration")) * 24 * 60 * 60 * 1000).toISOString(),
       };
 
+      console.log('Sending mchango data to edge function:', JSON.stringify(mchangoData));
+
       const res = await supabase.functions.invoke("mchango-crud", {
         body: mchangoData,
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
       });
 
       if (res.error) {

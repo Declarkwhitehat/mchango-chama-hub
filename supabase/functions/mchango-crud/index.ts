@@ -110,25 +110,16 @@ serve(async (req) => {
     // POST /mchango-crud - Create new mchango (KYC-approved users only)
     if (req.method === 'POST') {
       let body;
+      
       try {
-        // Clone request to allow reading body multiple times if needed
-        const clonedReq = req.clone();
-        body = await clonedReq.json();
-        
-        console.log('Parsed mchango data:', { 
-          title: body.title, 
-          hasDescription: !!body.description,
-          target_amount: body.target_amount,
-          hasImageUrl: !!body.image_url
-        });
+        body = await req.json();
+        console.log('Received mchango data:', JSON.stringify(body).substring(0, 200));
       } catch (err) {
-        console.error('JSON parse error:', err);
-        console.error('Error details:', err instanceof Error ? err.message : 'Unknown error');
-        
+        console.error('Failed to parse JSON body:', err);
         return new Response(
           JSON.stringify({ 
-            error: 'Invalid JSON in request body',
-            details: err instanceof Error ? err.message : 'Unknown error'
+            error: 'Invalid request body',
+            details: 'Request body must be valid JSON'
           }), 
           { 
             status: 400,
@@ -138,16 +129,23 @@ serve(async (req) => {
       }
 
       // Validate body has required fields
-      if (!body || Object.keys(body).length === 0) {
-        console.error('Empty request body');
+      if (!body || typeof body !== 'object') {
+        console.error('Invalid body type:', typeof body);
         return new Response(
-          JSON.stringify({ error: 'Request body is required' }), 
+          JSON.stringify({ error: 'Request body must be a JSON object' }), 
           { 
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           }
         );
       }
+
+      console.log('Validated mchango data:', { 
+        title: body.title, 
+        hasDescription: !!body.description,
+        target_amount: body.target_amount,
+        hasImageUrl: !!body.image_url
+      });
       
       // Require authentication
       const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
