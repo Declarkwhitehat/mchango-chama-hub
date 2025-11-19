@@ -7,14 +7,13 @@ interface RateLimitResult {
   error?: string;
 }
 
-const RATE_LIMIT_WINDOW = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
-const MAX_ATTEMPTS = 3;
-
 export async function checkRateLimit(
   supabase: SupabaseClient,
   identifier: string,
   identifierType: 'ip' | 'phone' | 'email',
-  action: string
+  action: string,
+  windowMs: number = 4 * 60 * 60 * 1000, // Default: 4 hours
+  maxAttempts: number = 3 // Default: 3 attempts
 ): Promise<RateLimitResult> {
   try {
     // First, clean up old rate limit records
@@ -32,7 +31,7 @@ export async function checkRateLimit(
     if (fetchError) {
       console.error('Rate limit fetch error:', fetchError);
       // On error, allow the request but log it
-      return { allowed: true, remainingAttempts: MAX_ATTEMPTS };
+      return { allowed: true, remainingAttempts: maxAttempts };
     }
 
     const now = new Date();
@@ -55,15 +54,15 @@ export async function checkRateLimit(
 
       return {
         allowed: true,
-        remainingAttempts: MAX_ATTEMPTS - 1,
+        remainingAttempts: maxAttempts - 1,
       };
     }
 
-    // Check if window has expired (older than 4 hours)
+    // Check if window has expired
     const windowStart = new Date(existingRecord.window_start);
     const timeSinceWindowStart = now.getTime() - windowStart.getTime();
 
-    if (timeSinceWindowStart > RATE_LIMIT_WINDOW) {
+    if (timeSinceWindowStart > windowMs) {
       // Window expired, reset the counter
       const { error: updateError } = await supabase
         .from('rate_limit_attempts')
@@ -80,13 +79,13 @@ export async function checkRateLimit(
 
       return {
         allowed: true,
-        remainingAttempts: MAX_ATTEMPTS - 1,
+        remainingAttempts: maxAttempts - 1,
       };
     }
 
     // Window is still active, check attempts
-    if (existingRecord.attempts >= MAX_ATTEMPTS) {
-      const resetTime = new Date(windowStart.getTime() + RATE_LIMIT_WINDOW);
+    if (existingRecord.attempts >= maxAttempts) {
+      const resetTime = new Date(windowStart.getTime() + windowMs);
       const minutesUntilReset = Math.ceil((resetTime.getTime() - now.getTime()) / (60 * 1000));
       
       return {
@@ -113,12 +112,12 @@ export async function checkRateLimit(
 
     return {
       allowed: true,
-      remainingAttempts: MAX_ATTEMPTS - newAttempts,
+      remainingAttempts: maxAttempts - newAttempts,
     };
   } catch (error) {
     console.error('Rate limit check error:', error);
     // On unexpected error, allow the request
-    return { allowed: true, remainingAttempts: MAX_ATTEMPTS };
+    return { allowed: true, remainingAttempts: maxAttempts };
   }
 }
 
