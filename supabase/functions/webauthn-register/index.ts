@@ -36,6 +36,74 @@ serve(async (req) => {
       );
     }
 
+    // Handle GET request - list user's credentials
+    if (req.method === 'GET') {
+      const { data: credentials, error: listError } = await supabase
+        .from('webauthn_credentials')
+        .select('id, credential_id, device_name, created_at, last_used_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (listError) {
+        console.error('Error listing credentials:', listError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to list credentials' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ credentials: credentials || [] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Handle DELETE request - remove a specific credential
+    if (req.method === 'DELETE') {
+      const url = new URL(req.url);
+      const credentialId = url.searchParams.get('credentialId');
+
+      if (!credentialId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing credentialId parameter' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Verify the credential belongs to the user
+      const { data: credential, error: checkError } = await supabase
+        .from('webauthn_credentials')
+        .select('user_id')
+        .eq('credential_id', credentialId)
+        .single();
+
+      if (checkError || !credential || credential.user_id !== user.id) {
+        return new Response(
+          JSON.stringify({ error: 'Credential not found or unauthorized' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { error: deleteError } = await supabase
+        .from('webauthn_credentials')
+        .delete()
+        .eq('credential_id', credentialId);
+
+      if (deleteError) {
+        console.error('Error deleting credential:', deleteError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to delete credential' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, message: 'Credential removed successfully' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Handle POST request - registration actions
     const { action, credentialId, publicKey, deviceName } = await req.json();
 
     if (action === 'generate-challenge') {
