@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { PayoutQueue } from "@/components/savings/PayoutQueue";
-import { DailyPaymentStatus } from "@/components/chama/DailyPaymentStatus";
+import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
 import { CheckCircle2, TrendingUp, Calendar, CreditCard, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -156,10 +156,8 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Daily Payment Status - Only for daily frequency chamas */}
-      {chama.contribution_frequency === 'daily' && (
-        <DailyPaymentStatus chamaId={chamaId} />
-      )}
+      {/* Cycle Payment Status - For all contribution frequencies */}
+      <CyclePaymentStatus chamaId={chamaId} frequency={chama.contribution_frequency} />
 
       {/* Member ID Badge - Prominent Display */}
       <Card className="border-primary bg-gradient-to-r from-primary/10 via-primary/5 to-background">

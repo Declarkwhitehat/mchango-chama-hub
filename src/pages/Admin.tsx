@@ -7,6 +7,7 @@ import { UsersManagement } from "@/components/admin/UsersManagement";
 import { CampaignsManagement } from "@/components/admin/CampaignsManagement";
 import { ChamaManagement } from "@/components/admin/ChamaManagement";
 import { SavingsGroupManagement } from "@/components/admin/SavingsGroupManagement";
+import { MemberVerification } from "@/components/admin/MemberVerification";
 import { Users, TrendingUp, DollarSign, Activity, FileCheck, PiggyBank } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -197,7 +198,7 @@ const Admin = () => {
 
         {/* Detailed Views */}
         <Tabs defaultValue="kyc" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="kyc">
               KYC Queue
               {stats.pendingKyc > 0 && (
@@ -206,6 +207,7 @@ const Admin = () => {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="verification">Verification</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
             <TabsTrigger value="groups">Chama Groups</TabsTrigger>
@@ -238,6 +240,10 @@ const Admin = () => {
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="verification">
+            <MemberVerification />
           </TabsContent>
 
           <TabsContent value="users">

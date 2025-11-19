@@ -48,11 +48,10 @@ Deno.serve(async (req) => {
     // Get today's date
     const today = new Date().toISOString().split('T')[0];
 
-    // Get all active daily chamas
+    // Get all active chamas (all frequencies)
     const { data: chamas, error: chamasError } = await supabase
       .from('chama')
-      .select('id, name, contribution_amount')
-      .eq('contribution_frequency', 'daily')
+      .select('id, name, contribution_amount, contribution_frequency')
       .eq('status', 'active');
 
     if (chamasError) {
@@ -67,13 +66,14 @@ Deno.serve(async (req) => {
     let errors = 0;
 
     for (const chama of chamas || []) {
-      // Get today's cycle
+      // Get current active cycle (due date is today or in the future, but started)
       const { data: cycle } = await supabase
         .from('contribution_cycles')
-        .select('id')
+        .select('id, end_date')
         .eq('chama_id', chama.id)
-        .gte('start_date', today)
-        .lte('end_date', today)
+        .lte('start_date', today)
+        .gte('end_date', today)
+        .eq('payout_processed', false)
         .maybeSingle();
 
       if (!cycle) {
