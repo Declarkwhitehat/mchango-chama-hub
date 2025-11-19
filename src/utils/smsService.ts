@@ -108,6 +108,21 @@ export const SMS_TEMPLATES = {
   paymentReceived: (amount: number, reference: string) =>
     `Payment of KES ${amount} received successfully. Ref: ${reference}`,
   
+  dailyPaymentReminder: (name: string, amount: number, memberCode: string) =>
+    `Hi ${name}, reminder: Your contribution of KES ${amount} is due today. Pay via M-Pesa or online. Member ID: ${memberCode}`,
+  
+  fullPayoutNotice: (amount: number, chamaName: string, requiresVerification: boolean) =>
+    `Your chama "${chamaName}" payout of KES ${amount.toFixed(2)} has been processed. Full payout - all members contributed! ${requiresVerification ? 'Pending admin approval.' : "You'll receive it shortly."}`,
+  
+  partialPayoutNotice: (amount: number, chamaName: string, paidCount: number, totalCount: number, requiresVerification: boolean) =>
+    `Your chama "${chamaName}" payout of KES ${amount.toFixed(2)} has been processed. Partial payout (${paidCount}/${totalCount} members paid). ${requiresVerification ? 'Pending admin approval.' : "You'll receive it shortly."}`,
+  
+  latePaymentCredit: (amount: number, nextCycleDate: string) =>
+    `Your payment of KES ${amount} was received after 8 PM. It has been credited to your next cycle contribution on ${nextCycleDate}.`,
+  
+  managerMissedPaymentAlert: (memberName: string, memberCode: string, chamaName: string, missedCount: number) =>
+    `Alert: Member ${memberName} (${memberCode}) has missed ${missedCount} contributions in your Chama "${chamaName}". Please follow up.`,
+  
   withdrawalApproved: (amount: number) =>
     `Your withdrawal request of KES ${amount} has been approved and will be processed shortly.`,
   

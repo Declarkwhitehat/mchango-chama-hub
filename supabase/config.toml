@@ -62,3 +62,12 @@ verify_jwt = false
 
 [functions.mpesa-c2b-validation]
 verify_jwt = false
+
+[functions.daily-cycle-manager]
+verify_jwt = false
+
+[functions.daily-reminder-cron]
+verify_jwt = false
+
+[functions.daily-payout-cron]
+verify_jwt = false
