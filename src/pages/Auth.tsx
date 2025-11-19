@@ -9,13 +9,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Eye, EyeOff, Check, X } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Check, X, Fingerprint } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PhoneVerification } from "@/components/PhoneVerification";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
+import { useWebAuthn } from "@/hooks/useWebAuthn";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const loginSchema = z.object({
   emailOrPhone: z.string()
@@ -62,12 +64,15 @@ type SignupFormData = z.infer<typeof signupSchema>;
 const Auth = () => {
   const navigate = useNavigate();
   const { signIn, signUp, user } = useAuth();
+  const { isSupported: isWebAuthnSupported, registerCredential, authenticate, isLoading: isWebAuthnLoading } = useWebAuthn();
   const [isLoading, setIsLoading] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [signupStep, setSignupStep] = useState<'details' | 'phone'>('details');
+  const [showBiometricSetup, setShowBiometricSetup] = useState(false);
+  const [biometricIdentifier, setBiometricIdentifier] = useState('');
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
     hasUpperCase: false,
@@ -165,7 +170,13 @@ const Auth = () => {
         if (adminRole) {
           navigate("/admin");
         } else {
-          navigate("/home");
+          // Offer biometric setup for next time
+          if (isWebAuthnSupported()) {
+            setBiometricIdentifier(data.emailOrPhone);
+            setShowBiometricSetup(true);
+          } else {
+            navigate("/home");
+          }
         }
       }
     } catch (error: any) {
@@ -173,6 +184,32 @@ const Auth = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleBiometricLogin = async () => {
+    const emailOrPhone = loginForm.getValues('emailOrPhone');
+    if (!emailOrPhone) {
+      toast.error('Please enter your email or phone number first');
+      return;
+    }
+
+    const result = await authenticate(emailOrPhone);
+    if (result.success) {
+      navigate('/home');
+    }
+  };
+
+  const handleEnableBiometric = async () => {
+    const result = await registerCredential();
+    if (result.success) {
+      setShowBiometricSetup(false);
+      navigate('/home');
+    }
+  };
+
+  const handleSkipBiometric = () => {
+    setShowBiometricSetup(false);
+    navigate('/home');
   };
 
   const handleSignup = async (data: SignupFormData) => {
@@ -334,6 +371,31 @@ const Auth = () => {
                         >
                           {isLoading ? "Logging in..." : "Login"}
                         </Button>
+                        
+                        {isWebAuthnSupported() && (
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <span className="w-full border-t border-border" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                              <span className="bg-card px-2 text-muted-foreground">Or</span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {isWebAuthnSupported() && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            disabled={isWebAuthnLoading}
+                            onClick={handleBiometricLogin}
+                          >
+                            <Fingerprint className="mr-2 h-4 w-4" />
+                            {isWebAuthnLoading ? "Authenticating..." : "Use Fingerprint/Face ID"}
+                          </Button>
+                        )}
+                        
                         <div className="text-center">
                           <Link to="/forgot-password" className="text-sm text-primary hover:underline">
                             Forgot password?
@@ -591,6 +653,41 @@ const Auth = () => {
           </div>
         </div>
       </div>
+
+      {/* Biometric Setup Dialog */}
+      <Dialog open={showBiometricSetup} onOpenChange={setShowBiometricSetup}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Fingerprint className="h-5 w-5 text-primary" />
+              Enable Biometric Login?
+            </DialogTitle>
+            <DialogDescription>
+              Use your fingerprint or face recognition for faster and more secure login next time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Your biometric data stays secure on your device and is never shared. You can always use your password if needed.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSkipBiometric}
+              disabled={isWebAuthnLoading}
+            >
+              Maybe Later
+            </Button>
+            <Button
+              onClick={handleEnableBiometric}
+              disabled={isWebAuthnLoading}
+            >
+              {isWebAuthnLoading ? "Setting up..." : "Enable Biometric Login"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
