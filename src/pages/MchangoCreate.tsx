@@ -16,6 +16,8 @@ const MchangoCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -38,6 +40,26 @@ const MchangoCreate = () => {
     checkKycStatus();
   }, [navigate]);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please upload an image file (JPG, PNG, etc.)");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be less than 5MB");
+      return;
+    }
+
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
@@ -52,6 +74,30 @@ const MchangoCreate = () => {
         navigate("/auth");
         return;
       }
+      let imageUrl = null;
+
+      // Upload image if one was selected
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${userCheck.user.id}/campaign-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('campaign-images')
+          .upload(fileName, imageFile);
+
+        if (uploadError) {
+          console.error("Image upload error:", uploadError);
+          throw new Error("Failed to upload image");
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('campaign-images')
+          .getPublicUrl(fileName);
+
+        imageUrl = urlData.publicUrl;
+      }
+
       const form = formRef.current;
       if (!form) {
         throw new Error("Form not found");
@@ -63,7 +109,7 @@ const MchangoCreate = () => {
         description: formData.get("description") as string,
         target_amount: Number(formData.get("goal")),
         category: formData.get("category") as string,
-        image_url: formData.get("image") as string || null,
+        image_url: imageUrl,
         end_date: new Date(Date.now() + Number(formData.get("duration")) * 24 * 60 * 60 * 1000).toISOString(),
       };
 
@@ -235,14 +281,41 @@ const MchangoCreate = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="image">Campaign Image URL (optional)</Label>
+                <Label htmlFor="image">Campaign Image (optional)</Label>
                 <Input
                   id="image"
                   name="image"
-                  type="url"
-                  placeholder="https://example.com/image.jpg"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
                   disabled={kycStatus !== "approved"}
+                  className="cursor-pointer"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Recommended: Square image, at least 800x800px, max 5MB
+                </p>
+                
+                {imagePreview && (
+                  <div className="mt-4 border rounded-lg overflow-hidden">
+                    <img 
+                      src={imagePreview} 
+                      alt="Campaign preview" 
+                      className="w-full h-48 object-cover"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreview("");
+                      }}
+                      className="w-full"
+                    >
+                      Remove Image
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="pt-4">
