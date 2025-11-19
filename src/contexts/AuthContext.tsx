@@ -102,43 +102,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const signIn = async (emailOrPhone: string, password: string) => {
-    let emailToUse = emailOrPhone;
-    
-    // Detect if input is a phone number
-    const isPhone = /^[\+\d]/.test(emailOrPhone.trim()) && !emailOrPhone.includes('@');
-    
-    if (isPhone) {
-      // Normalize phone to +254 format
-      let normalizedPhone = emailOrPhone.trim();
-      if (normalizedPhone.startsWith('0')) {
-        normalizedPhone = '+254' + normalizedPhone.substring(1);
-      } else if (normalizedPhone.startsWith('7') || normalizedPhone.startsWith('1')) {
-        normalizedPhone = '+254' + normalizedPhone;
-      } else if (!normalizedPhone.startsWith('+')) {
-        normalizedPhone = '+' + normalizedPhone;
+    try {
+      // Call rate-limited login edge function
+      const { data: loginData, error: loginError } = await supabase.functions.invoke('login', {
+        body: { identifier: emailOrPhone, password }
+      });
+
+      if (loginError) {
+        throw loginError;
+      }
+
+      if (loginData.error) {
+        throw new Error(loginData.error);
+      }
+
+      // Set session from edge function response
+      if (loginData.session) {
+        await supabase.auth.setSession(loginData.session);
       }
       
-      // Query profiles table to get email
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('phone', normalizedPhone)
-        .single();
-      
-      if (profileError || !profile?.email) {
-        return { error: { message: 'No account found with this phone number' } };
-      }
-      
-      emailToUse = profile.email;
+      return { error: null };
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      return { error };
     }
-    
-    // Proceed with email-based authentication
-    const { error } = await supabase.auth.signInWithPassword({
-      email: emailToUse,
-      password,
-    });
-    
-    return { error };
   };
 
   const signUp = async (email: string, password: string, userData: any) => {
