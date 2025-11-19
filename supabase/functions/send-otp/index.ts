@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { checkRateLimit, getClientIP } from '../_shared/rateLimiter.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,24 +16,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 interface SendOTPRequest {
   phone: string;
 }
-
-// Rate limiting: max 3 OTP requests per phone per hour
-const checkRateLimit = async (supabase: any, phone: string): Promise<boolean> => {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  
-  const { data, error } = await supabase
-    .from('otp_verifications')
-    .select('id')
-    .eq('phone', phone)
-    .gte('created_at', oneHourAgo);
-
-  if (error) {
-    console.error('Rate limit check error:', error);
-    return false;
-  }
-
-  return data.length < 3;
-};
 
 const sendSMS = async (phone: string, message: string): Promise<boolean> => {
   try {
@@ -81,11 +64,29 @@ serve(async (req) => {
       );
     }
 
-    // Check rate limit
-    const canSend = await checkRateLimit(supabase, phone);
-    if (!canSend) {
+    // Check rate limit for phone
+    const phoneRateLimit = await checkRateLimit(supabase, phone, 'phone', 'forgot_password');
+    if (!phoneRateLimit.allowed) {
       return new Response(
-        JSON.stringify({ error: 'Too many OTP requests. Please try again later.' }),
+        JSON.stringify({ 
+          error: phoneRateLimit.error || 'Too many OTP requests. Please try again later.',
+          remainingAttempts: phoneRateLimit.remainingAttempts,
+          resetTime: phoneRateLimit.resetTime
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+      );
+    }
+
+    // Check rate limit for IP
+    const clientIP = getClientIP(req);
+    const ipRateLimit = await checkRateLimit(supabase, clientIP, 'ip', 'forgot_password');
+    if (!ipRateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          error: ipRateLimit.error || 'Too many requests from your location. Please try again later.',
+          remainingAttempts: ipRateLimit.remainingAttempts,
+          resetTime: ipRateLimit.resetTime
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
       );
     }

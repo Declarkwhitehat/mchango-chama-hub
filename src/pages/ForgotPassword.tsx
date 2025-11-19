@@ -102,28 +102,49 @@ const ForgotPassword = () => {
           return;
         }
 
-        // Send OTP
-        const { error: otpError } = await supabase.functions.invoke('send-otp', {
+        // Send OTP with rate limiting
+        const { data: otpData, error: otpError } = await supabase.functions.invoke('send-otp', {
           body: { phone }
         });
 
         if (otpError) {
-          toast.error("Failed to send OTP. Please try again.");
+          if (otpError.message?.includes('Too many') || otpError.message?.includes('429')) {
+            toast.error(otpError.message || "Too many attempts. Please try again later.");
+          } else {
+            toast.error("Failed to send OTP. Please try again.");
+          }
+          return;
+        }
+
+        if (otpData?.error) {
+          toast.error(otpData.error);
           return;
         }
 
         toast.success("OTP sent to your phone");
         setStep('otp');
       } else {
-        // Email flow: Use Supabase's built-in password reset
+        // Email flow: Use rate-limited password reset
         const redirectUrl = `${window.location.origin}/reset-password`;
         
-        const { error } = await supabase.auth.resetPasswordForEmail(data.emailOrPhone, {
-          redirectTo: redirectUrl,
+        const { data: resetData, error } = await supabase.functions.invoke('request-password-reset', {
+          body: {
+            email: data.emailOrPhone,
+            redirectTo: redirectUrl,
+          }
         });
         
         if (error) {
-          toast.error(error.message);
+          if (error.message?.includes('Too many')) {
+            toast.error(error.message);
+          } else {
+            toast.error("Failed to send password reset email. Please try again.");
+          }
+          return;
+        }
+
+        if (resetData?.error) {
+          toast.error(resetData.error);
           return;
         }
         
@@ -131,7 +152,11 @@ const ForgotPassword = () => {
         toast.success("Password reset email sent! Check your inbox.");
       }
     } catch (error: any) {
-      toast.error(error.message || "An error occurred");
+      if (error.message?.includes('Too many') || error.message?.includes('rate limit')) {
+        toast.error("Too many password reset attempts. Please try again later.");
+      } else {
+        toast.error(error.message || "An error occurred");
+      }
     } finally {
       setIsLoading(false);
     }
