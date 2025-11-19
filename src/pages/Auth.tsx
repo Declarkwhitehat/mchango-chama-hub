@@ -18,7 +18,20 @@ import { PhoneVerification } from "@/components/PhoneVerification";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  emailOrPhone: z.string()
+    .min(1, "Email or phone number is required")
+    .refine(
+      (val) => {
+        // Check if it's a valid email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailRegex.test(val)) return true;
+        
+        // Check if it's a valid phone (international format or Kenyan format)
+        const phoneRegex = /^(\+?\d{10,15}|0\d{9}|[17]\d{8,9})$/;
+        return phoneRegex.test(val.replace(/\s/g, ''));
+      },
+      { message: "Must be a valid email or phone number (e.g., +254712345678 or 0712345678 or email@example.com)" }
+    ),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
@@ -122,11 +135,11 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await signIn(data.email, data.password);
+      const { error } = await signIn(data.emailOrPhone, data.password);
       
       if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          toast.error("Invalid email or password. Please check your credentials and try again.");
+        if (error.message.includes("Invalid login credentials") || error.message.includes("No account found")) {
+          toast.error("Invalid credentials. Please check your email/phone and password.");
         } else if (error.message.includes("Email not confirmed")) {
           toast.error("Please verify your email address before logging in. Check your inbox.");
         } else if (error.message.includes("Too many requests")) {
@@ -267,15 +280,15 @@ const Auth = () => {
                       <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                         <FormField
                           control={loginForm.control}
-                          name="email"
+                          name="emailOrPhone"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Email</FormLabel>
+                              <FormLabel>Email or Phone Number</FormLabel>
                               <FormControl>
                                 <Input
-                                  type="email"
-                                  placeholder="name@example.com"
+                                  placeholder="Enter email or phone number"
                                   {...field}
+                                  autoComplete="username"
                                 />
                               </FormControl>
                               <FormMessage />
