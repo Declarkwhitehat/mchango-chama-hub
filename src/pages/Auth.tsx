@@ -73,7 +73,6 @@ const Auth = () => {
   const [signupStep, setSignupStep] = useState<'details' | 'phone'>('details');
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [biometricIdentifier, setBiometricIdentifier] = useState('');
-  const [isAutoPrompting, setIsAutoPrompting] = useState(false);
   const [biometricCancelled, setBiometricCancelled] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
@@ -105,28 +104,21 @@ const Auth = () => {
           return;
         }
 
-        // Auto-trigger the fingerprint prompt
-        setIsAutoPrompting(true);
-        
-        // Set a timeout - if no response after 10 seconds, fall back
-        const timeoutId = setTimeout(() => {
-          setIsAutoPrompting(false);
-          toast.info('Biometric timeout - please use password');
-        }, 10000);
-
+        // Trigger fingerprint prompt silently (browser handles the UI)
         const result = await authenticate(storedIdentifier);
-        clearTimeout(timeoutId);
         
         if (result.success) {
           toast.success('Welcome back!');
           navigate('/');
         } else {
-          setIsAutoPrompting(false);
+          // If biometric failed, show clear message to use password
+          setBiometricCancelled(true);
+          toast.error('Fingerprint authentication failed. Please use your password.');
         }
       } catch (error) {
         console.error('Auto-login error:', error);
-        setIsAutoPrompting(false);
         setBiometricCancelled(true); // Don't auto-prompt again this session
+        toast.error('Fingerprint authentication cancelled. Please use your password.');
       }
     };
 
@@ -253,11 +245,6 @@ const Auth = () => {
       localStorage.setItem('lastLoginIdentifier', emailOrPhone);
       navigate('/home');
     }
-  };
-
-  const handleUsePasswordInstead = () => {
-    setIsAutoPrompting(false);
-    setBiometricCancelled(true);
   };
 
   const handleEnableBiometric = async () => {
@@ -390,21 +377,7 @@ const Auth = () => {
                     <CardDescription>Enter your credentials to access your account</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {isAutoPrompting ? (
-                      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                        <Fingerprint className="h-16 w-16 text-primary animate-pulse" />
-                        <p className="text-lg font-medium">Scanning for fingerprint...</p>
-                        <p className="text-sm text-muted-foreground">Touch your fingerprint sensor to log in</p>
-                        <Button
-                          variant="ghost"
-                          onClick={handleUsePasswordInstead}
-                          className="mt-4"
-                        >
-                          Use password instead
-                        </Button>
-                      </div>
-                    ) : (
-                      <Form {...loginForm}>
+                    <Form {...loginForm}>
                         <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                           <FormField
                             control={loginForm.control}
@@ -494,7 +467,6 @@ const Auth = () => {
                           </div>
                         </form>
                       </Form>
-                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
