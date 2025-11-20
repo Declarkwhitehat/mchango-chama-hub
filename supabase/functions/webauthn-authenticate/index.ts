@@ -61,9 +61,11 @@ serve(async (req) => {
         .eq('user_id', userId);
 
       if (credError || !credentials || credentials.length === 0) {
+        // Return 200 with hasCredentials: false instead of 404
+        // This is not an error - just means no credentials are registered yet
         return new Response(
-          JSON.stringify({ error: 'No biometric credentials registered' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ hasCredentials: false }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
