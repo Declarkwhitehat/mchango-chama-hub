@@ -55,9 +55,8 @@ export const useWebAuthn = () => {
         return false;
       }
 
-      // If the response has an error field (404 for no credentials), return false
-      if (data?.error) {
-        console.log('No credentials found:', data.error);
+      // Check the new response format: hasCredentials boolean
+      if (data?.hasCredentials === false) {
         return false;
       }
 
@@ -191,6 +190,11 @@ export const useWebAuthn = () => {
 
       if (challengeError || !challengeData) {
         throw new Error(challengeData?.error || 'Failed to generate challenge');
+      }
+
+      // Check if user has no credentials registered
+      if (challengeData.hasCredentials === false) {
+        throw new Error('No biometric credentials found for this account');
       }
 
       const { challenge, credentials } = challengeData;
