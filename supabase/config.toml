@@ -74,3 +74,21 @@ verify_jwt = false
 
 [functions.daily-payout-cron]
 verify_jwt = false
+
+[functions.login]
+verify_jwt = false
+
+[functions.reset-password-phone]
+verify_jwt = false
+
+[functions.request-password-reset]
+verify_jwt = false
+
+[functions.webauthn-register]
+verify_jwt = true
+
+[functions.webauthn-authenticate]
+verify_jwt = false
+
+[functions.capture-login-ip]
+verify_jwt = true
