@@ -38,7 +38,9 @@ export function CyclePaymentStatus({ chamaId, frequency }: CyclePaymentStatusPro
 
   const loadPaymentStatus = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('daily-cycle-manager/current/' + chamaId);
+      const { data, error } = await supabase.functions.invoke('daily-cycle-manager', {
+        body: { action: 'current', chamaId }
+      });
 
       if (error) throw error;
 
