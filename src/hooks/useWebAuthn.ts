@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -27,7 +27,7 @@ export const useWebAuthn = () => {
   };
 
   // Check if user has registered biometric credentials
-  const checkHasCredentials = async (emailOrPhone: string) => {
+  const checkHasCredentials = useCallback(async (emailOrPhone: string) => {
     if (!isSupported()) {
       return false;
     }
@@ -66,10 +66,10 @@ export const useWebAuthn = () => {
       console.error('Error checking credentials:', error);
       return false;
     }
-  };
+  }, []);
 
   // Register a new credential (for enabling biometric login)
-  const registerCredential = async (deviceName?: string) => {
+  const registerCredential = useCallback(async (deviceName?: string) => {
     if (!isSupported()) {
       toast.error('Biometric authentication is not supported on this device');
       return { success: false };
@@ -161,10 +161,10 @@ export const useWebAuthn = () => {
       setIsLoading(false);
       return { success: false };
     }
-  };
+  }, []);
 
   // Authenticate using biometric
-  const authenticate = async (emailOrPhone: string) => {
+  const authenticate = useCallback(async (emailOrPhone: string) => {
     if (!isSupported()) {
       toast.error('Biometric authentication is not supported on this device');
       return { success: false };
@@ -265,7 +265,7 @@ export const useWebAuthn = () => {
       setIsLoading(false);
       return { success: false };
     }
-  };
+  }, []);
 
   return {
     isSupported,
