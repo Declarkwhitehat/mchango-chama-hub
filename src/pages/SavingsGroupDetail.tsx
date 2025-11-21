@@ -54,7 +54,7 @@ export default function SavingsGroupDetail() {
         description: error.message,
         variant: "destructive",
       });
-      navigate("/savings-group");
+      navigate("/savings-groups");
     } finally {
       setLoading(false);
     }
@@ -85,7 +85,7 @@ export default function SavingsGroupDetail() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <Button
           variant="ghost"
-          onClick={() => navigate("/savings-group")}
+          onClick={() => navigate("/savings-groups")}
           className="mb-6"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />

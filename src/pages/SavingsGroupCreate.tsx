@@ -151,7 +151,7 @@ export default function SavingsGroupCreate() {
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         <Button
           variant="ghost"
-          onClick={() => navigate("/savings-group")}
+          onClick={() => navigate("/savings-groups")}
           className="mb-6"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -327,7 +327,7 @@ export default function SavingsGroupCreate() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate("/savings-group")}
+                  onClick={() => navigate("/savings-groups")}
                   disabled={loading}
                   className="w-full sm:w-auto"
                 >
