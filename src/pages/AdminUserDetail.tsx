@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Layout } from "@/components/Layout";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -234,26 +234,26 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
 
   if (loading) {
     return (
-      <Layout showBackButton title="User Details">
+      <AdminLayout>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
-      </Layout>
+      </AdminLayout>
     );
   }
 
   if (!user) {
     return (
-      <Layout showBackButton title="User Details">
+      <AdminLayout>
         <div className="text-center py-12">
           <p className="text-muted-foreground">User not found</p>
         </div>
-      </Layout>
+      </AdminLayout>
     );
   }
 
   return (
-    <Layout showBackButton title={`User: ${user.full_name}`}>
+    <AdminLayout>
       <div className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
         {/* Header Section */}
         <div className="flex items-start justify-between">
@@ -820,7 +820,7 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    </AdminLayout>
   );
 };
 
