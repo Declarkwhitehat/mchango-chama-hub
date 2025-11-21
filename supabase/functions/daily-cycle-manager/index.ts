@@ -11,17 +11,19 @@ Deno.serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const url = new URL(req.url);
-    const pathParts = url.pathname.split('/').filter(p => p);
     
-    // Remove function name if present
-    if (pathParts[0] === 'daily-cycle-manager') pathParts.shift();
-
-    const action = pathParts[0];
+    // For POST requests, read action from body
+    let action = '';
+    let requestBody: any = {};
+    
+    if (req.method === 'POST') {
+      requestBody = await req.json();
+      action = requestBody.action;
+    }
 
     // CREATE CYCLE FOR TODAY
     if (action === 'create-today' && req.method === 'POST') {
-      const { chamaId } = await req.json();
+      const { chamaId } = requestBody;
 
       // Get chama details - work with ALL frequencies
       const { data: chama, error: chamaError } = await supabase
@@ -156,7 +158,7 @@ Deno.serve(async (req) => {
 
     // GET CURRENT CYCLE
     if (action === 'current' && req.method === 'POST') {
-      const { chamaId } = await req.json();
+      const { chamaId } = requestBody;
       const today = new Date().toISOString().split('T')[0];
 
       const { data: cycle, error } = await supabase
