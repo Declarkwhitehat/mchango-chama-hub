@@ -18,6 +18,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { EnhancedAnalytics } from "@/components/admin/EnhancedAnalytics";
+import { PlatformStatistics } from "@/components/admin/PlatformStatistics";
+import { CommissionOverview } from "@/components/admin/CommissionOverview";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -244,6 +247,15 @@ const AdminDashboard = () => {
             <span className="text-sm text-muted-foreground">{stats.recentTransactions} today</span>
           </Button>
         </div>
+
+        {/* Platform Statistics */}
+        <PlatformStatistics />
+
+        {/* Commission Overview */}
+        <CommissionOverview />
+
+        {/* Enhanced Analytics */}
+        <EnhancedAnalytics />
 
         {/* Platform Overview */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
