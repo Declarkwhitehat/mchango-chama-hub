@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { isPWAMode } from '@/lib/utils';
 
 // Helper function to convert base64 to Uint8Array
 const base64ToUint8Array = (base64: string): Uint8Array => {
@@ -20,8 +21,12 @@ const uint8ArrayToBase64 = (array: Uint8Array): string => {
 export const useWebAuthn = () => {
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check if WebAuthn is supported
+  // Check if WebAuthn is supported AND running as installed PWA
   const isSupported = () => {
+    // Only enable biometric in installed PWA, not in regular browser
+    if (!isPWAMode()) {
+      return false;
+    }
     return window.PublicKeyCredential !== undefined && 
            navigator.credentials !== undefined;
   };
