@@ -11,6 +11,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let sanitizedQuery = '';
+  let searchType = 'all';
+
   try {
     const authHeader = req.headers.get('Authorization');
     const supabaseClient = createClient(
@@ -49,8 +52,8 @@ serve(async (req) => {
     const { query, type } = await req.json();
     
     // Sanitize and validate input
-    const sanitizedQuery = (query || '').trim().substring(0, 100);
-    const searchType = type || 'all';
+    sanitizedQuery = (query || '').trim().substring(0, 100);
+    searchType = type || 'all';
     
     console.log('Admin search:', { query: sanitizedQuery, type: searchType });
 
@@ -73,7 +76,7 @@ serve(async (req) => {
     };
 
     // Search users (limit 50 results)
-    if (searchType === 'all' || searchType === 'user' || searchType === 'email' || searchType === 'phone') {
+    if (searchType === 'all' || searchType === 'user' || searchType === 'email' || searchType === 'phone' || searchType === 'id_number') {
       const userQuery = supabaseClient
         .from('profiles')
         .select('*');
@@ -82,11 +85,18 @@ serve(async (req) => {
         userQuery.ilike('email', `%${sanitizedQuery}%`);
       } else if (searchType === 'phone') {
         userQuery.ilike('phone', `%${sanitizedQuery}%`);
+      } else if (searchType === 'id_number') {
+        userQuery.ilike('id_number', `%${sanitizedQuery}%`);
+      } else if (searchType === 'user') {
+        userQuery.ilike('full_name', `%${sanitizedQuery}%`);
       } else {
         userQuery.or(`full_name.ilike.%${sanitizedQuery}%,email.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%,id_number.ilike.%${sanitizedQuery}%`);
       }
 
-      const { data: users } = await userQuery.limit(50);
+      const { data: users, error: usersError } = await userQuery.limit(50);
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+      }
       results.users = users || [];
     }
 
@@ -173,16 +183,32 @@ serve(async (req) => {
     console.error('Error in admin-search:', {
       message: error.message,
       code: error.code,
-      details: error.details
+      details: error.details,
+      hint: error.hint,
+      query: sanitizedQuery,
+      type: searchType
     });
     
     let safeMessage = 'An error occurred processing your request';
-    if (error.code === '23505') safeMessage = 'Duplicate record';
-    else if (error.code === '23503') safeMessage = 'Referenced record not found';
-    else if (error.code === '42501') safeMessage = 'Permission denied';
+    let statusCode = 500;
     
-    return new Response(JSON.stringify({ error: safeMessage }), {
-      status: 500,
+    if (error.code === '23505') {
+      safeMessage = 'Duplicate record found';
+    } else if (error.code === '23503') {
+      safeMessage = 'Referenced record not found';
+    } else if (error.code === '42501') {
+      safeMessage = 'Permission denied';
+      statusCode = 403;
+    } else if (error.message?.includes('fetch')) {
+      safeMessage = 'Network error. Please check your connection.';
+      statusCode = 503;
+    }
+    
+    return new Response(JSON.stringify({ 
+      error: safeMessage,
+      details: error.message 
+    }), {
+      status: statusCode,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
