@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -75,6 +75,7 @@ const Auth = () => {
   const [biometricIdentifier, setBiometricIdentifier] = useState('');
   const [biometricCancelled, setBiometricCancelled] = useState(false);
   const [isInitialCheck, setIsInitialCheck] = useState(true);
+  const hasAttemptedAutoLogin = useRef(false);
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
     hasUpperCase: false,
@@ -86,26 +87,30 @@ const Auth = () => {
 
   // Auto-trigger biometric authentication on page load
   useEffect(() => {
+    // Guard: Only run once per component mount
+    if (hasAttemptedAutoLogin.current) {
+      return;
+    }
+
     const attemptAutoLogin = async () => {
       try {
-        setIsInitialCheck(true); // Start checking
+        // Mark as attempted immediately and stop showing loading
+        hasAttemptedAutoLogin.current = true;
+        setIsInitialCheck(false);
         
         // Don't auto-trigger if user cancelled biometric in this session
         if (biometricCancelled) {
-          setIsInitialCheck(false);
           return;
         }
         
         // Don't auto-trigger if device doesn't support WebAuthn
         if (!isWebAuthnSupported()) {
-          setIsInitialCheck(false);
           return;
         }
 
         // Check for stored identifier from previous successful login
         const storedIdentifier = localStorage.getItem('lastLoginIdentifier');
         if (!storedIdentifier) {
-          setIsInitialCheck(false);
           return;
         }
 
@@ -113,7 +118,6 @@ const Auth = () => {
         const hasCredentials = await checkHasCredentials(storedIdentifier);
         if (!hasCredentials) {
           console.log('No biometric credentials found for auto-login');
-          setIsInitialCheck(false);
           return;
         }
 
@@ -125,13 +129,11 @@ const Auth = () => {
           navigate('/');
         } else {
           // If biometric failed, show clear message to use password
-          setIsInitialCheck(false);
           setBiometricCancelled(true);
           toast.error('Fingerprint authentication failed. Please use your password.');
         }
       } catch (error) {
         console.error('Auto-login error:', error);
-        setIsInitialCheck(false);
         setBiometricCancelled(true); // Don't auto-prompt again this session
         toast.error('Fingerprint authentication cancelled. Please use your password.');
       }
