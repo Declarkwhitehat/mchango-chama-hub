@@ -101,7 +101,7 @@ export function AdminSidebar() {
 
   const toolsItems = [
     { title: "Users Management", url: "/admin/users", icon: Users },
-    { title: "Account Adjustments", url: "/admin/adjustments", icon: Settings },
+    { title: "Member Search", url: "/admin/search", icon: Search },
     { title: "Data Export", url: "/admin/export", icon: Download },
   ];
 

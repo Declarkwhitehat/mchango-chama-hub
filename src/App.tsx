@@ -36,8 +36,8 @@ import AdminSavingsGroups from "./pages/AdminSavingsGroups";
 import AdminCampaigns from "./pages/AdminCampaigns";
 import AdminCallbacks from "./pages/AdminCallbacks";
 import AdminAudit from "./pages/AdminAudit";
-import AdminAdjustments from "./pages/AdminAdjustments";
 import AdminExport from "./pages/AdminExport";
+import AdminSearch from "./pages/AdminSearch";
 import KYCUpload from "./pages/KYCUpload";
 import NotFound from "./pages/NotFound";
 import AboutUs from "./pages/AboutUs";
@@ -96,7 +96,7 @@ const App = () => (
           <Route path="/admin/campaigns" element={<AdminProtectedRoute><AdminCampaigns /></AdminProtectedRoute>} />
           <Route path="/admin/callbacks" element={<AdminProtectedRoute><AdminCallbacks /></AdminProtectedRoute>} />
           <Route path="/admin/audit" element={<AdminProtectedRoute><AdminAudit /></AdminProtectedRoute>} />
-          <Route path="/admin/adjustments" element={<AdminProtectedRoute><AdminAdjustments /></AdminProtectedRoute>} />
+          <Route path="/admin/search" element={<AdminProtectedRoute><AdminSearch /></AdminProtectedRoute>} />
           <Route path="/admin/export" element={<AdminProtectedRoute><AdminExport /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

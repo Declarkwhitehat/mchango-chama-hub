@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogIn, UserPlus, Users, Heart, PiggyBank, User, LogOut, Activity, Settings, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { Menu, X, LogIn, UserPlus, Users, Heart, PiggyBank, User, LogOut, Activity, Settings, ChevronDown, LayoutDashboard } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -17,9 +18,30 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
   const { user, signOut, profile } = useAuth();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+      
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      
+      setIsAdmin(!!data);
+    };
+    
+    checkAdminStatus();
+  }, [user]);
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -54,31 +76,44 @@ export const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-2 lg:gap-4">
-            <Button 
-              variant="ghost" 
-              onClick={() => navigate('/chama')}
-              className="gap-2"
-            >
-              <Users className="h-4 w-4" />
-              Browse Chamas
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={() => navigate('/mchango')}
-              className="gap-2"
-            >
-              <Heart className="h-4 w-4" />
-              Browse Campaigns
-            </Button>
-            {user && profile?.kyc_status === 'approved' && (
+            {isAdmin ? (
               <Button 
                 variant="ghost" 
-                onClick={() => navigate('/savings-groups')}
+                onClick={() => navigate('/admin')}
                 className="gap-2"
               >
-                <PiggyBank className="h-4 w-4" />
-                Savings Groups
+                <LayoutDashboard className="h-4 w-4" />
+                Admin Dashboard
               </Button>
+            ) : (
+              <>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => navigate('/chama')}
+                  className="gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Browse Chamas
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => navigate('/mchango')}
+                  className="gap-2"
+                >
+                  <Heart className="h-4 w-4" />
+                  Browse Campaigns
+                </Button>
+                {user && profile?.kyc_status === 'approved' && (
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => navigate('/savings-groups')}
+                    className="gap-2"
+                  >
+                    <PiggyBank className="h-4 w-4" />
+                    Savings Groups
+                  </Button>
+                )}
+              </>
             )}
             {user ? (
               <>
@@ -166,40 +201,56 @@ export const Header = () => {
         {mobileMenuOpen && (
           <div className="md:hidden py-3 sm:py-4 border-t border-border animate-in slide-in-from-top-2">
             <nav className="flex flex-col gap-1.5 sm:gap-2">
-              <Button 
-                variant="ghost" 
-                onClick={() => {
-                  navigate('/chama');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full justify-start gap-2"
-              >
-                <Users className="h-4 w-4" />
-                Browse Chamas
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => {
-                  navigate('/mchango');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full justify-start gap-2"
-              >
-                <Heart className="h-4 w-4" />
-                Browse Campaigns
-              </Button>
-              {user && profile?.kyc_status === 'approved' && (
+              {isAdmin ? (
                 <Button 
                   variant="ghost" 
                   onClick={() => {
-                    navigate('/savings-groups');
+                    navigate('/admin');
                     setMobileMenuOpen(false);
                   }}
                   className="w-full justify-start gap-2"
                 >
-                  <PiggyBank className="h-4 w-4" />
-                  Savings Groups
+                  <LayoutDashboard className="h-4 w-4" />
+                  Admin Dashboard
                 </Button>
+              ) : (
+                <>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      navigate('/chama');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <Users className="h-4 w-4" />
+                    Browse Chamas
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      navigate('/mchango');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <Heart className="h-4 w-4" />
+                    Browse Campaigns
+                  </Button>
+                  {user && profile?.kyc_status === 'approved' && (
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => {
+                        navigate('/savings-groups');
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full justify-start gap-2"
+                    >
+                      <PiggyBank className="h-4 w-4" />
+                      Savings Groups
+                    </Button>
+                  )}
+                </>
               )}
               {user ? (
                 <>

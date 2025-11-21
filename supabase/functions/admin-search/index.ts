@@ -90,14 +90,29 @@ serve(async (req) => {
       results.users = users || [];
     }
 
-    // Search member codes (limit 50)
+    // Search member codes (limit 50) with comprehensive data
     if (searchType === 'all' || searchType === 'member_code') {
       const { data: members } = await supabaseClient
         .from('chama_members')
         .select(`
           *,
-          profiles (full_name, email),
-          chama (name, slug)
+          profiles (
+            full_name, 
+            email, 
+            phone, 
+            id_number,
+            kyc_status,
+            payment_details_completed
+          ),
+          chama (
+            name, 
+            slug, 
+            group_code,
+            contribution_amount,
+            contribution_frequency,
+            status,
+            max_members
+          )
         `)
         .ilike('member_code', `%${sanitizedQuery}%`)
         .limit(50);
