@@ -57,7 +57,7 @@ export const SearchBar = ({ onSearch, onClear, isLoading }: SearchBarProps) => {
           }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="pr-20"
+          className="pr-20 text-foreground bg-background"
         />
         {query && (
           <Button
