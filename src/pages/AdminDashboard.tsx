@@ -1,331 +1,346 @@
-import { useState } from "react";
-import { Layout } from "@/components/Layout";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SearchBar } from "@/components/admin/SearchBar";
-import { TransactionsTable } from "@/components/admin/TransactionsTable";
-import { AuditLogsTable } from "@/components/admin/AuditLogsTable";
-import { AccountAdjustment } from "@/components/admin/AccountAdjustment";
-import { WithdrawalsManagement } from "@/components/admin/WithdrawalsManagement";
-import { PlatformStatistics } from "@/components/admin/PlatformStatistics";
-import { SavingsGroupManagement } from "@/components/admin/SavingsGroupManagement";
-import { CommissionOverview } from "@/components/admin/CommissionOverview";
-import { ChamaManagement } from "@/components/admin/ChamaManagement";
-import { CustomerCallbacks } from "@/components/admin/CustomerCallbacks";
-import { DataExport } from "@/components/admin/DataExport";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Users, TrendingUp, Activity, ExternalLink } from "lucide-react";
+import { 
+  Users, 
+  FileCheck, 
+  TrendingUp, 
+  Activity, 
+  PiggyBank, 
+  DollarSign,
+  ArrowRight,
+  AlertCircle,
+  PhoneCall,
+  CreditCard
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
-
-interface SearchResults {
-  users: any[];
-  members: any[];
-  mchangos: any[];
-  chamas: any[];
-  transactions: any[];
-}
+import { Badge } from "@/components/ui/badge";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    verifiedUsers: 0,
+    pendingKyc: 0,
+    activeCampaigns: 0,
+    activeChamas: 0,
+    activeSavingsGroups: 0,
+    totalRevenue: 0,
+    pendingWithdrawals: 0,
+    pendingCallbacks: 0,
+    recentTransactions: 0,
+  });
 
-  const handleSearch = async (query: string, type: string) => {
-    setIsSearching(true);
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast({
-          title: "Session Expired",
-          description: "Please log in again to perform searches",
-          variant: "destructive",
-        });
-        navigate("/auth");
-        return;
-      }
+      setLoading(true);
 
-      const { data, error } = await supabase.functions.invoke('admin-search', {
-        body: { query, type }
+      // Fetch all data in parallel
+      const [
+        usersResult,
+        verifiedUsersResult,
+        pendingKycResult,
+        campaignsResult,
+        chamasResult,
+        savingsGroupsResult,
+        revenueResult,
+        withdrawalsResult,
+        callbacksResult,
+        transactionsResult
+      ] = await Promise.all([
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'pending').not('kyc_submitted_at', 'is', null),
+        supabase.from('mchango').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('chama').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('saving_groups').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('company_earnings').select('amount'),
+        supabase.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('customer_callbacks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('transactions').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      ]);
+
+      const totalRevenue = revenueResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
+
+      setStats({
+        totalUsers: usersResult.count || 0,
+        verifiedUsers: verifiedUsersResult.count || 0,
+        pendingKyc: pendingKycResult.count || 0,
+        activeCampaigns: campaignsResult.count || 0,
+        activeChamas: chamasResult.count || 0,
+        activeSavingsGroups: savingsGroupsResult.count || 0,
+        totalRevenue,
+        pendingWithdrawals: withdrawalsResult.count || 0,
+        pendingCallbacks: callbacksResult.count || 0,
+        recentTransactions: transactionsResult.count || 0,
       });
-
-      if (error) throw error;
-      setSearchResults(data.data);
     } catch (error: any) {
-      console.error('Search error:', error);
+      console.error('Error fetching dashboard data:', error);
       toast({
-        title: "Search Failed",
-        description: error.message || "Failed to perform search",
+        title: "Error",
+        description: "Failed to load dashboard data",
         variant: "destructive",
       });
     } finally {
-      setIsSearching(false);
+      setLoading(false);
     }
   };
 
-  const handleClearSearch = () => {
-    setSearchResults(null);
-  };
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="container px-4 py-8 max-w-7xl mx-auto">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-muted rounded w-64" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="h-32 bg-muted rounded-lg" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
-    <Layout showBackButton title="Admin Dashboard">
-      <div className="container px-4 py-8 max-w-[1600px] mx-auto space-y-8">
-        {/* Header Section */}
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Admin Dashboard
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Complete platform management and analytics
+    <AdminLayout>
+      <div className="container px-4 py-8 max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-2">
+            Welcome back! Here's an overview of your platform.
           </p>
         </div>
 
-        {/* Platform Statistics */}
-        <PlatformStatistics />
+        {/* Key Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total Users */}
+          <Card className="border-l-4 border-l-primary hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardDescription>Total Users</CardDescription>
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.totalUsers.toLocaleString()}</div>
+              <p className="text-sm text-muted-foreground mt-2">
+                {stats.verifiedUsers} verified
+              </p>
+            </CardContent>
+          </Card>
 
-        {/* Commission Overview - Prominent Position */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold">Platform Revenue</h2>
-          </div>
-          <CommissionOverview />
+          {/* Pending KYC */}
+          <Card className="border-l-4 border-l-destructive hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardDescription>Pending KYC</CardDescription>
+                <FileCheck className="h-5 w-5 text-destructive" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.pendingKyc}</div>
+              <Button
+                variant="link"
+                className="p-0 h-auto mt-2 text-sm"
+                onClick={() => navigate("/admin/kyc")}
+              >
+                Review now <ArrowRight className="ml-1 h-3 w-3" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Active Groups */}
+          <Card className="border-l-4 border-l-accent hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardDescription>Active Groups</CardDescription>
+                <Activity className="h-5 w-5 text-accent" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">
+                {(stats.activeChamas + stats.activeSavingsGroups).toLocaleString()}
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                {stats.activeChamas} Chamas, {stats.activeSavingsGroups} Savings
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Total Revenue */}
+          <Card className="border-l-4 border-l-secondary hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardDescription>Total Revenue</CardDescription>
+                <DollarSign className="h-5 w-5 text-secondary" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">
+                KES {(stats.totalRevenue / 1000).toFixed(1)}K
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Commission earned
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Data Export Section */}
-        <DataExport />
-
-        {/* Global Search */}
-        <Card className="border-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Search className="h-5 w-5 text-primary" />
-              Universal Search
-            </CardTitle>
-            <CardDescription>
-              Search users, member codes, mchango slugs, transaction IDs, and more
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SearchBar
-              onSearch={handleSearch}
-              onClear={handleClearSearch}
-              isLoading={isSearching}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Search Results */}
-        {searchResults && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Search Results</h2>
-
-            {/* Users Results */}
-            {searchResults.users.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Users ({searchResults.users.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {searchResults.users.map((user) => (
-                      <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{user.full_name}</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
-                          <div className="flex gap-4 text-xs text-muted-foreground mt-1">
-                            <span className="font-mono">ID: {user.id_number}</span>
-                            <span>Phone: {user.phone}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={
-                            user.kyc_status === 'approved' ? 'default' :
-                            user.kyc_status === 'rejected' ? 'destructive' : 'secondary'
-                          }>
-                            {user.kyc_status}
-                          </Badge>
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/admin/user/${user.id}`)}>
-                            View Details
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Button
+            onClick={() => navigate("/admin/kyc")}
+            className="h-auto py-6 flex flex-col items-start gap-2 bg-gradient-to-br from-primary to-primary-glow hover:shadow-lg"
+          >
+            <FileCheck className="h-5 w-5" />
+            <span className="font-semibold">Review KYC</span>
+            {stats.pendingKyc > 0 && (
+              <Badge variant="secondary">{stats.pendingKyc} pending</Badge>
             )}
+          </Button>
 
-            {/* Members Results */}
-            {searchResults.members.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Members ({searchResults.members.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {searchResults.members.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{member.member_code}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {member.profiles?.full_name} • {member.chama?.name}
-                          </p>
-                        </div>
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/chama/${member.chama?.slug}`)}>
-                          View Chama
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+          <Button
+            onClick={() => navigate("/admin/withdrawals")}
+            variant="outline"
+            className="h-auto py-6 flex flex-col items-start gap-2 hover:bg-accent/10 hover:border-accent"
+          >
+            <CreditCard className="h-5 w-5" />
+            <span className="font-semibold">Withdrawals</span>
+            {stats.pendingWithdrawals > 0 && (
+              <Badge variant="destructive">{stats.pendingWithdrawals} pending</Badge>
             )}
+          </Button>
 
-            {/* Mchangos Results */}
-            {searchResults.mchangos.length > 0 && (
-              <Card>
-                <CardHeader>
+          <Button
+            onClick={() => navigate("/admin/callbacks")}
+            variant="outline"
+            className="h-auto py-6 flex flex-col items-start gap-2 hover:bg-accent/10 hover:border-accent"
+          >
+            <PhoneCall className="h-5 w-5" />
+            <span className="font-semibold">Support Callbacks</span>
+            {stats.pendingCallbacks > 0 && (
+              <Badge variant="destructive">{stats.pendingCallbacks} pending</Badge>
+            )}
+          </Button>
+
+          <Button
+            onClick={() => navigate("/admin/transactions")}
+            variant="outline"
+            className="h-auto py-6 flex flex-col items-start gap-2 hover:bg-accent/10 hover:border-accent"
+          >
+            <Activity className="h-5 w-5" />
+            <span className="font-semibold">Recent Activity</span>
+            <span className="text-sm text-muted-foreground">{stats.recentTransactions} today</span>
+          </Button>
+        </div>
+
+        {/* Platform Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Campaigns Overview */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
                   <CardTitle className="flex items-center gap-2">
                     <TrendingUp className="h-5 w-5" />
-                    Mchangos ({searchResults.mchangos.length})
+                    Campaigns
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {searchResults.mchangos.map((mchango) => (
-                      <div key={mchango.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{mchango.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {mchango.slug} • KES {mchango.current_amount.toLocaleString()} / {mchango.target_amount.toLocaleString()}
-                          </p>
-                        </div>
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/mchango/${mchango.slug}`)}>
-                          View
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                  <CardDescription className="mt-1">Active fundraising campaigns</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate("/admin/campaigns")}>
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold mb-2">{stats.activeCampaigns}</div>
+              <p className="text-sm text-muted-foreground">Active campaigns</p>
+            </CardContent>
+          </Card>
 
-            {/* Transactions Results */}
-            {searchResults.transactions.length > 0 && (
-              <Card>
-                <CardHeader>
+          {/* Savings Groups Overview */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    Transactions ({searchResults.transactions.length})
+                    <PiggyBank className="h-5 w-5" />
+                    Savings Groups
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {searchResults.transactions.map((tx) => (
-                      <div key={tx.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <p className="font-medium">KES {tx.amount.toLocaleString()}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {tx.payment_reference} • {tx.profiles?.full_name || 'Unknown'}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(tx.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'}>
-                          {tx.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* No Results */}
-            {searchResults.users.length === 0 &&
-             searchResults.members.length === 0 &&
-             searchResults.mchangos.length === 0 &&
-             searchResults.chamas.length === 0 &&
-             searchResults.transactions.length === 0 && (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">No results found</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* Management Sections */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Activity className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold">Platform Management</h2>
-          </div>
-          
-          <Tabs defaultValue="savings" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-7 h-auto gap-2 bg-muted/50 p-2">
-              <TabsTrigger value="savings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Savings Groups
-              </TabsTrigger>
-              <TabsTrigger value="chama" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Chama Groups
-              </TabsTrigger>
-              <TabsTrigger value="withdrawals" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Withdrawals
-              </TabsTrigger>
-              <TabsTrigger value="transactions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Transactions
-              </TabsTrigger>
-              <TabsTrigger value="audit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Audit Logs
-              </TabsTrigger>
-              <TabsTrigger value="adjustment" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Adjustments
-              </TabsTrigger>
-              <TabsTrigger value="callbacks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Callbacks
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="savings" className="mt-6">
-              <SavingsGroupManagement />
-            </TabsContent>
-
-            <TabsContent value="chama" className="mt-6">
-              <ChamaManagement />
-            </TabsContent>
-
-            <TabsContent value="withdrawals" className="mt-6">
-              <WithdrawalsManagement />
-            </TabsContent>
-
-            <TabsContent value="transactions" className="mt-6">
-              <TransactionsTable />
-            </TabsContent>
-
-            <TabsContent value="audit" className="mt-6">
-              <AuditLogsTable />
-            </TabsContent>
-
-            <TabsContent value="adjustment" className="mt-6">
-              <AccountAdjustment />
-            </TabsContent>
-
-            <TabsContent value="callbacks" className="mt-6">
-              <CustomerCallbacks />
-            </TabsContent>
-          </Tabs>
+                  <CardDescription className="mt-1">Active savings groups</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate("/admin/savings-groups")}>
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold mb-2">{stats.activeSavingsGroups}</div>
+              <p className="text-sm text-muted-foreground">Active groups</p>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Alerts Section */}
+        {(stats.pendingKyc > 0 || stats.pendingWithdrawals > 0 || stats.pendingCallbacks > 0) && (
+          <Card className="border-l-4 border-l-destructive bg-destructive/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                Attention Required
+              </CardTitle>
+              <CardDescription>Items that need your immediate attention</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {stats.pendingKyc > 0 && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background border">
+                  <div>
+                    <p className="font-medium">KYC Verifications</p>
+                    <p className="text-sm text-muted-foreground">{stats.pendingKyc} pending verification</p>
+                  </div>
+                  <Button size="sm" onClick={() => navigate("/admin/kyc")}>
+                    Review
+                  </Button>
+                </div>
+              )}
+              {stats.pendingWithdrawals > 0 && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background border">
+                  <div>
+                    <p className="font-medium">Withdrawal Requests</p>
+                    <p className="text-sm text-muted-foreground">{stats.pendingWithdrawals} pending approval</p>
+                  </div>
+                  <Button size="sm" onClick={() => navigate("/admin/withdrawals")}>
+                    Process
+                  </Button>
+                </div>
+              )}
+              {stats.pendingCallbacks > 0 && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background border">
+                  <div>
+                    <p className="font-medium">Customer Callbacks</p>
+                    <p className="text-sm text-muted-foreground">{stats.pendingCallbacks} awaiting response</p>
+                  </div>
+                  <Button size="sm" onClick={() => navigate("/admin/callbacks")}>
+                    View
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
-    </Layout>
+    </AdminLayout>
   );
 };
 
