@@ -34,19 +34,27 @@ export const SearchBar = ({ onSearch, onClear, isLoading }: SearchBarProps) => {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All</SelectItem>
-          <SelectItem value="user">User (Name/Phone/ID)</SelectItem>
+          <SelectItem value="user">User Name</SelectItem>
           <SelectItem value="member_code">Member Code</SelectItem>
-          <SelectItem value="mchango_slug">Mchango Slug</SelectItem>
-          <SelectItem value="transaction_id">Transaction ID</SelectItem>
+          <SelectItem value="id_number">ID Number</SelectItem>
           <SelectItem value="email">Email</SelectItem>
           <SelectItem value="phone">Phone</SelectItem>
+          <SelectItem value="mchango_slug">Mchango Slug</SelectItem>
+          <SelectItem value="transaction_id">Transaction ID</SelectItem>
         </SelectContent>
       </Select>
 
       <div className="flex-1 relative">
         <Input
           type="text"
-          placeholder={`Search ${searchType === 'all' ? 'anything' : searchType}...`}
+          placeholder={
+            searchType === 'member_code' ? 'e.g., FDE1, ABC2' :
+            searchType === 'phone' ? 'e.g., 0712345678 or +254712345678' :
+            searchType === 'email' ? 'e.g., user@example.com' :
+            searchType === 'id_number' ? 'e.g., 12345678' :
+            searchType === 'user' ? 'e.g., John Doe' :
+            'Search anything...'
+          }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="pr-20"
