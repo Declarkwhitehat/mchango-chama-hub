@@ -54,15 +54,38 @@ const Home = () => {
   const [memberSavingsGroupList, setMemberSavingsGroupList] = useState<SavingsGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentSetup, setShowPaymentSetup] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { user, profile, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
+  // Check if user has admin role
+  useEffect(() => {
+    const checkAdminRole = async () => {
+      if (!user?.id) {
+        setIsAdmin(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      setIsAdmin(!error && data !== null);
+    };
+
+    checkAdminRole();
+  }, [user?.id]);
+
   useEffect(() => {
     // Show payment setup modal if KYC approved but payment details not completed
-    if (profile && profile.kyc_status === 'approved' && !profile.payment_details_completed) {
+    // EXCEPT for admin users who don't need payment methods
+    if (profile && profile.kyc_status === 'approved' && !profile.payment_details_completed && !isAdmin) {
       setShowPaymentSetup(true);
     }
-  }, [profile]);
+  }, [profile, isAdmin]);
 
   const handlePaymentSetupComplete = async () => {
     setShowPaymentSetup(false);
