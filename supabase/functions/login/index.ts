@@ -96,23 +96,39 @@ Deno.serve(async (req) => {
     // If phone number, look up email from profiles
     let loginEmail = normalizedIdentifier;
     if (identifierType === 'phone') {
+      console.log('[LOGIN DEBUG] Looking up profile for phone:', normalizedIdentifier);
+      
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('email')
+        .select('email, id, full_name')
         .eq('phone', normalizedIdentifier)
         .limit(1)
         .single();
 
       if (profileError || !profile) {
-        console.error('Profile lookup error:', profileError);
+        console.error('[LOGIN DEBUG] Profile lookup failed:', {
+          phone: normalizedIdentifier,
+          error: profileError,
+          errorCode: profileError?.code,
+          errorMessage: profileError?.message,
+          errorDetails: profileError?.details
+        });
         return new Response(
-          JSON.stringify({ error: 'Invalid credentials' }),
+          JSON.stringify({ error: 'Invalid credentials - phone number not found' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
+      console.log('[LOGIN DEBUG] Profile found:', {
+        profileId: profile.id,
+        email: profile.email,
+        name: profile.full_name
+      });
+      
       loginEmail = profile.email;
     }
+
+    console.log('[LOGIN DEBUG] Attempting authentication with email:', loginEmail);
 
     // Attempt login using Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -121,15 +137,26 @@ Deno.serve(async (req) => {
     });
 
     if (authError) {
-      console.error('Authentication error:', authError.message);
+      console.error('[LOGIN DEBUG] Authentication failed:', {
+        email: loginEmail,
+        originalIdentifier: identifier,
+        identifierType: identifierType,
+        errorMessage: authError.message,
+        errorName: authError.name,
+        errorStatus: authError.status,
+        errorCode: authError.code
+      });
       return new Response(
         JSON.stringify({ 
-          error: 'Invalid credentials',
+          error: 'Invalid credentials - authentication failed',
+          details: authError.message,
           remainingAttempts: Math.min(identifierRateLimit.remainingAttempts, ipRateLimit.remainingAttempts)
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('[LOGIN DEBUG] Authentication successful for user:', authData.user.id);
 
     // Login successful - return session
     return new Response(
