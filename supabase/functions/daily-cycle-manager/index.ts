@@ -155,8 +155,8 @@ Deno.serve(async (req) => {
     }
 
     // GET CURRENT CYCLE
-    if (action === 'current' && req.method === 'GET') {
-      const chamaId = pathParts[1];
+    if (action === 'current' && req.method === 'POST') {
+      const { chamaId } = await req.json();
       const today = new Date().toISOString().split('T')[0];
 
       const { data: cycle, error } = await supabase
