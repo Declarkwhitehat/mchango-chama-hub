@@ -23,12 +23,23 @@ export const useWebAuthn = () => {
 
   // Check if WebAuthn is supported AND running as installed PWA
   const isSupported = () => {
+    const pwaMode = isPWAMode();
+    const hasWebAuthn = window.PublicKeyCredential !== undefined && 
+                        navigator.credentials !== undefined;
+    
+    // Debug logging to help troubleshoot biometric visibility
+    console.log('[WebAuthn] Support check:', { 
+      isPWA: pwaMode, 
+      hasWebAuthn,
+      displayMode: window.matchMedia('(display-mode: standalone)').matches,
+      standalone: (window.navigator as any).standalone
+    });
+    
     // Only enable biometric in installed PWA, not in regular browser
-    if (!isPWAMode()) {
+    if (!pwaMode) {
       return false;
     }
-    return window.PublicKeyCredential !== undefined && 
-           navigator.credentials !== undefined;
+    return hasWebAuthn;
   };
 
   // Check if user has registered biometric credentials
