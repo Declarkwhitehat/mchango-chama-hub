@@ -100,7 +100,8 @@ Deno.serve(async (req) => {
         .from('profiles')
         .select('email')
         .eq('phone', normalizedIdentifier)
-        .maybeSingle();
+        .limit(1)
+        .single();
 
       if (profileError || !profile) {
         console.error('Profile lookup error:', profileError);

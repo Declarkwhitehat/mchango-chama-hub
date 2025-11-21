@@ -819,7 +819,7 @@ export type Database = {
           last_login_at: string | null
           last_login_ip: unknown
           payment_details_completed: boolean | null
-          phone: string
+          phone: string | null
           phone_otp_verified: boolean | null
           phone_verified: boolean | null
           signup_ip: unknown
@@ -842,7 +842,7 @@ export type Database = {
           last_login_at?: string | null
           last_login_ip?: unknown
           payment_details_completed?: boolean | null
-          phone: string
+          phone?: string | null
           phone_otp_verified?: boolean | null
           phone_verified?: boolean | null
           signup_ip?: unknown
@@ -865,7 +865,7 @@ export type Database = {
           last_login_at?: string | null
           last_login_ip?: unknown
           payment_details_completed?: boolean | null
-          phone?: string
+          phone?: string | null
           phone_otp_verified?: boolean | null
           phone_verified?: boolean | null
           signup_ip?: unknown

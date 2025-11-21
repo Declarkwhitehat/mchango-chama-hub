@@ -113,6 +113,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
 
       if (loginData.error) {
+        // Provide user-friendly error messages
+        if (loginData.error.includes('Invalid credentials')) {
+          throw new Error('Invalid email/phone or password. Please check your credentials and try again.');
+        }
+        if (loginData.error.includes('Too many login attempts')) {
+          throw new Error(loginData.error);
+        }
         throw new Error(loginData.error);
       }
 
