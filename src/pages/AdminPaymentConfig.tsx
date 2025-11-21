@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Layout } from "@/components/Layout";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,11 +67,11 @@ export default function AdminPaymentConfig() {
 
   if (loading) {
     return (
-      <Layout>
+      <AdminLayout>
         <div className="container mx-auto py-8">
           <p>Loading...</p>
         </div>
-      </Layout>
+      </AdminLayout>
     );
   }
 
@@ -80,7 +80,7 @@ export default function AdminPaymentConfig() {
   }
 
   return (
-    <Layout>
+    <AdminLayout>
       <div className="container max-w-4xl mx-auto py-8 space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Payment Configuration</h1>
@@ -223,6 +223,6 @@ export default function AdminPaymentConfig() {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </AdminLayout>
   );
 }

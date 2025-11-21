@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Layout } from "@/components/Layout";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -263,16 +263,16 @@ const AdminKYC = () => {
 
   if (loading) {
     return (
-      <Layout>
+      <AdminLayout>
         <div className="container px-4 py-6 pb-24">
           <p>Loading...</p>
         </div>
-      </Layout>
+      </AdminLayout>
     );
   }
 
   return (
-    <Layout>
+    <AdminLayout>
       <div className="container px-4 py-6 pb-24 max-w-6xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold">KYC Review Queue</h1>
@@ -435,7 +435,7 @@ const AdminKYC = () => {
           </div>
         )}
       </div>
-    </Layout>
+    </AdminLayout>
   );
 };
 

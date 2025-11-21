@@ -25,10 +25,19 @@ import SavingsGroupJoin from "./pages/SavingsGroupJoin";
 import SavingsGroupDetail from "./pages/SavingsGroupDetail";
 import MemberActivity from "./pages/MemberActivity";
 import Activity from "./pages/Activity";
-import Admin from "./pages/Admin";
 import AdminKYC from "./pages/AdminKYC";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUserDetail from "./pages/AdminUserDetail";
+import AdminUsers from "./pages/AdminUsers";
+import AdminTransactions from "./pages/AdminTransactions";
+import AdminWithdrawals from "./pages/AdminWithdrawals";
+import AdminChamas from "./pages/AdminChamas";
+import AdminSavingsGroups from "./pages/AdminSavingsGroups";
+import AdminCampaigns from "./pages/AdminCampaigns";
+import AdminCallbacks from "./pages/AdminCallbacks";
+import AdminAudit from "./pages/AdminAudit";
+import AdminAdjustments from "./pages/AdminAdjustments";
+import AdminExport from "./pages/AdminExport";
 import KYCUpload from "./pages/KYCUpload";
 import NotFound from "./pages/NotFound";
 import AboutUs from "./pages/AboutUs";
@@ -75,10 +84,20 @@ const App = () => (
           <Route path="/savings-groups/:id" element={<ProtectedRoute><SavingsGroupDetail /></ProtectedRoute>} />
           <Route path="/savings-groups/:groupId/activity" element={<ProtectedRoute><MemberActivity /></ProtectedRoute>} />
           
-          <Route path="/admin" element={<AdminProtectedRoute><Admin /></AdminProtectedRoute>} />
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
           <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />
-          <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
+          <Route path="/admin/users" element={<AdminProtectedRoute><AdminUsers /></AdminProtectedRoute>} />
           <Route path="/admin/user/:userId" element={<AdminProtectedRoute><AdminUserDetail /></AdminProtectedRoute>} />
+          <Route path="/admin/transactions" element={<AdminProtectedRoute><AdminTransactions /></AdminProtectedRoute>} />
+          <Route path="/admin/withdrawals" element={<AdminProtectedRoute><AdminWithdrawals /></AdminProtectedRoute>} />
+          <Route path="/admin/chamas" element={<AdminProtectedRoute><AdminChamas /></AdminProtectedRoute>} />
+          <Route path="/admin/savings-groups" element={<AdminProtectedRoute><AdminSavingsGroups /></AdminProtectedRoute>} />
+          <Route path="/admin/campaigns" element={<AdminProtectedRoute><AdminCampaigns /></AdminProtectedRoute>} />
+          <Route path="/admin/callbacks" element={<AdminProtectedRoute><AdminCallbacks /></AdminProtectedRoute>} />
+          <Route path="/admin/audit" element={<AdminProtectedRoute><AdminAudit /></AdminProtectedRoute>} />
+          <Route path="/admin/adjustments" element={<AdminProtectedRoute><AdminAdjustments /></AdminProtectedRoute>} />
+          <Route path="/admin/export" element={<AdminProtectedRoute><AdminExport /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
