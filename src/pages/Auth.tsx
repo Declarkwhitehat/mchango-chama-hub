@@ -297,6 +297,32 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
+      // Check if phone number is already registered
+      const { data: existingPhone } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', data.phone)
+        .maybeSingle();
+
+      if (existingPhone) {
+        toast.error("This phone number is already registered. Please use a different number or log in.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if ID number is already registered
+      const { data: existingId } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id_number', data.id_number)
+        .maybeSingle();
+
+      if (existingId) {
+        toast.error("This ID number is already registered. Please contact support if you believe this is an error.");
+        setIsLoading(false);
+        return;
+      }
+
       const { error: signUpError } = await signUp(data.email, data.password, {
         full_name: data.full_name,
         id_number: data.id_number,
@@ -304,7 +330,18 @@ const Auth = () => {
       });
       
       if (signUpError) {
-        if (signUpError.message.includes("already registered") || signUpError.message.includes("User already")) {
+        // Handle duplicate phone number
+        if (signUpError.message.includes("phone number is already registered") || 
+            signUpError.message.includes("profiles_phone_unique")) {
+          toast.error("This phone number is already registered. Please use a different number or log in.");
+        }
+        // Handle duplicate ID number
+        else if (signUpError.message.includes("ID number is already registered") || 
+                 signUpError.message.includes("profiles_id_number_key")) {
+          toast.error("This ID number is already registered. Please contact support if this is an error.");
+        }
+        // Handle duplicate email
+        else if (signUpError.message.includes("already registered") || signUpError.message.includes("User already")) {
           toast.error("This email is already registered. Please log in or use a different email.");
         } else if (signUpError.message.includes("Password")) {
           toast.error("Password is too weak. Please use a stronger password.");
