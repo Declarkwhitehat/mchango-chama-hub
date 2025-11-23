@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Profile {
   id: string;
@@ -100,6 +101,36 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Phase 2: Session Timeout Protection
+  useEffect(() => {
+    if (!session) return;
+
+    const checkSessionExpiry = setInterval(async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (currentSession?.expires_at) {
+        const expiryTime = new Date(currentSession.expires_at * 1000);
+        const now = new Date();
+        const timeUntilExpiry = expiryTime.getTime() - now.getTime();
+        
+        // Warn user 5 minutes before expiry
+        if (timeUntilExpiry < 5 * 60 * 1000 && timeUntilExpiry > 0) {
+          toast.warning("Your session will expire soon. Please save your work.", {
+            duration: 10000,
+          });
+        }
+        
+        // Force logout on expiry
+        if (timeUntilExpiry <= 0) {
+          await signOut();
+          toast.error("Your session has expired. Please log in again.");
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(checkSessionExpiry);
+  }, [session]);
 
   const signIn = async (emailOrPhone: string, password: string) => {
     try {
