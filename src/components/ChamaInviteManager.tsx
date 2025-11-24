@@ -129,7 +129,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
   };
 
   const copyInviteLink = async (code: string) => {
-    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    const baseUrl = 'https://mchango-chama-hub.lovable.app';
     const inviteUrl = `${baseUrl}/chama/join/${chamaSlug}?code=${code}`;
     await navigator.clipboard.writeText(inviteUrl);
     setCopiedCode(code);

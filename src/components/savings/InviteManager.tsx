@@ -100,7 +100,7 @@ export function SavingsGroupInviteManager({ groupId }: InviteManagerProps) {
   };
 
   const copyInviteLink = (code: string) => {
-    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    const baseUrl = 'https://mchango-chama-hub.lovable.app';
     const link = `${baseUrl}/savings-groups/join?code=${code}`;
     navigator.clipboard.writeText(link);
     toast.success('Invite link copied to clipboard!');
@@ -175,7 +175,7 @@ export function SavingsGroupInviteManager({ groupId }: InviteManagerProps) {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <Input
-                        value={`${import.meta.env.VITE_APP_URL || window.location.origin}/savings-groups/join?code=${invite.code}`}
+                        value={`https://mchango-chama-hub.lovable.app/savings-groups/join?code=${invite.code}`}
                         readOnly
                         className="font-mono text-sm"
                       />
