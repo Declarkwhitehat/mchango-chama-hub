@@ -92,3 +92,12 @@ verify_jwt = false
 
 [functions.capture-login-ip]
 verify_jwt = true
+
+[functions.chama-cycle-complete]
+verify_jwt = false
+
+[functions.chama-rejoin]
+verify_jwt = true
+
+[functions.chama-start-new-cycle]
+verify_jwt = true

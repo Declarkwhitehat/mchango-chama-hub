@@ -210,6 +210,65 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Check if cycle is complete (all approved members received payout)
+      const { data: allCycles } = await supabase
+        .from('contribution_cycles')
+        .select('id')
+        .eq('chama_id', chama.id)
+        .eq('payout_processed', true);
+
+      const { data: allMembers } = await supabase
+        .from('chama_members')
+        .select('id')
+        .eq('chama_id', chama.id)
+        .eq('approval_status', 'approved')
+        .eq('status', 'active');
+
+      // If everyone got their payout turn, mark cycle as complete
+      if (allCycles && allMembers && allCycles.length === allMembers.length) {
+        console.log(`🎉 Full cycle complete for chama ${chama.name}`);
+
+        // Record cycle completion
+        const { error: historyError } = await supabase
+          .from('chama_cycle_history')
+          .insert({
+            chama_id: chama.id,
+            cycle_round: chama.current_cycle_round || 1,
+            started_at: chama.created_at,
+            completed_at: new Date().toISOString(),
+            total_members: allMembers.length,
+            total_payouts_made: allCycles.length
+          });
+
+        if (historyError) {
+          console.error('Error recording cycle history:', historyError);
+        }
+
+        // Update chama status
+        const { error: statusError } = await supabase
+          .from('chama')
+          .update({
+            last_cycle_completed_at: new Date().toISOString(),
+            accepting_rejoin_requests: true,
+            status: 'cycle_complete'
+          })
+          .eq('id', chama.id);
+
+        if (statusError) {
+          console.error('Error updating chama status:', statusError);
+        } else {
+          // Trigger cycle completion notifications
+          try {
+            await supabase.functions.invoke('chama-cycle-complete', {
+              body: { chamaId: chama.id }
+            });
+            console.log('Triggered cycle completion notifications');
+          } catch (invokeError) {
+            console.error('Error invoking cycle-complete function:', invokeError);
+          }
+        }
+      }
+
       payoutsProcessed++;
     }
 

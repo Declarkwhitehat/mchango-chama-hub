@@ -128,4 +128,22 @@ export const SMS_TEMPLATES = {
   
   chamaStarted: (chamaName: string, amount: number, frequency: string, memberNumber: number, payoutDate: string, startDate: string) =>
     `Your Chama "${chamaName}" has officially started! You will contribute KES ${amount.toLocaleString()} ${frequency}, starting ${startDate}. You are member #${memberNumber}, and your payout date will be ${payoutDate}.`,
+  
+  paymentReminder: (chamaName: string, amount: number, dueDate: string, memberCode: string) =>
+    `⏰ Reminder: Your contribution of KSh ${amount.toLocaleString()} for "${chamaName}" is due on ${dueDate}. Member ID: ${memberCode}. Pay on time to avoid missing your payout turn!`,
+  
+  cycleComplete: (chamaName: string, managerName: string, managerPhone: string, memberCode: string) =>
+    `🎉 Great news! Your chama "${chamaName}" has completed its full cycle. All members have received their payouts! Would you like to rejoin for another cycle? Reply to your manager ${managerName} at ${managerPhone} or log in to the app. Member ID: ${memberCode}`,
+  
+  rejoinRequestSubmitted: (memberName: string, chamaName: string) =>
+    `New rejoin request for "${chamaName}" from ${memberName}. Log in to the app to approve or reject this request.`,
+  
+  rejoinApproved: (chamaName: string) =>
+    `✅ Your rejoin request for "${chamaName}" has been approved! You'll be notified when the new cycle starts with your new payout position.`,
+  
+  rejoinRejected: (chamaName: string, reason?: string) =>
+    `❌ Your rejoin request for "${chamaName}" was not approved. ${reason || 'Please contact the manager for more information.'}`,
+  
+  newCycleStarted: (chamaName: string, memberNumber: number, payoutDate: string) =>
+    `🔄 New cycle started for "${chamaName}"! You're member #${memberNumber}. Your payout date: ${payoutDate}. Contributions start now. Good luck! 🎯`,
 };
