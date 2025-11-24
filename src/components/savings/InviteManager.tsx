@@ -72,17 +72,28 @@ export function SavingsGroupInviteManager({ groupId }: InviteManagerProps) {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('savings-group-invite/generate', {
-        body: { groupId },
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-invite/generate`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ groupId }),
+        }
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate invite code');
+      }
 
       toast.success('Invite code generated!');
       await fetchInviteCodes();
     } catch (error) {
       console.error('Error generating invite code:', error);
-      toast.error('Failed to generate invite code');
+      toast.error(error instanceof Error ? error.message : 'Failed to generate invite code');
     } finally {
       setGenerating(false);
     }
