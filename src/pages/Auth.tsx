@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -63,6 +63,8 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 const Auth = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.returnTo;
   const { signIn, signUp, user } = useAuth();
   const { isSupported: isWebAuthnSupported, registerCredential, authenticate, checkHasCredentials, isLoading: isWebAuthnLoading } = useWebAuthn();
   const [isLoading, setIsLoading] = useState(false);
@@ -126,7 +128,11 @@ const Auth = () => {
         
         if (result.success) {
           toast.success('Welcome back!');
-          navigate('/');
+          if (returnTo) {
+            navigate(returnTo, { replace: true });
+          } else {
+            navigate('/');
+          }
         } else {
           // If biometric failed, show clear message to use password
           setBiometricCancelled(true);
@@ -220,6 +226,12 @@ const Auth = () => {
       
       toast.success("Welcome back!");
       
+      // Check if there's a return URL
+      if (returnTo) {
+        navigate(returnTo, { replace: true });
+        return;
+      }
+      
       // Check if user is admin and redirect appropriately
       const { data: userData } = await supabase.auth.getUser();
       if (userData.user) {
@@ -260,7 +272,12 @@ const Auth = () => {
     if (result.success) {
       // Store identifier for next auto-login
       localStorage.setItem('lastLoginIdentifier', emailOrPhone);
-      navigate('/home');
+      
+      if (returnTo) {
+        navigate(returnTo, { replace: true });
+      } else {
+        navigate('/home');
+      }
     }
   };
 
@@ -271,8 +288,13 @@ const Auth = () => {
       if (result.success) {
         toast.success('Biometric login enabled successfully!');
         setShowBiometricSetup(false);
-        // Navigate to KYC if coming from signup (signupStep will be 'phone'), otherwise to home
-        navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
+        
+        // Redirect based on returnTo, signup step, or default
+        if (returnTo) {
+          navigate(returnTo, { replace: true });
+        } else {
+          navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
+        }
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to enable biometric login');
@@ -283,8 +305,13 @@ const Auth = () => {
 
   const handleSkipBiometric = () => {
     setShowBiometricSetup(false);
-    // Navigate to KYC if coming from signup (signupStep will be 'phone'), otherwise to home
-    navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
+    
+    // Redirect based on returnTo, signup step, or default
+    if (returnTo) {
+      navigate(returnTo, { replace: true });
+    } else {
+      navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
+    }
   };
 
   const handleSignup = async (data: SignupFormData) => {
@@ -385,7 +412,12 @@ const Auth = () => {
       if (isWebAuthnSupported()) {
         setShowBiometricSetup(true);
       } else {
-        navigate('/kyc-upload');
+        // Redirect based on returnTo or default
+        if (returnTo) {
+          navigate(returnTo, { replace: true });
+        } else {
+          navigate('/kyc-upload');
+        }
       }
     } catch (error: any) {
       toast.error("An unexpected error occurred");
