@@ -55,8 +55,12 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
       
-      const { data, error } = await supabase.functions.invoke(`chama-join/pending/${chamaId}`, {
-        method: 'GET'
+      const { data, error } = await supabase.functions.invoke("chama-join", {
+        method: 'GET',
+        body: {
+          action: "pending",
+          chama_id: chamaId
+        }
       });
       
       if (error) {
@@ -76,8 +80,13 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
       
-      const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`, {
-        method: "GET"
+      // Use the Supabase project URL to call the edge function with path
+      const { data, error } = await supabase.functions.invoke("chama-invite", {
+        method: "GET",
+        body: { 
+          action: "list",
+          chama_id: chamaId 
+        }
       });
     
       if (error) {
