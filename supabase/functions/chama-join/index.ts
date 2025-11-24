@@ -500,17 +500,25 @@ serve(async (req) => {
 
     // GET /chama-join - Get pending join requests (manager only)
     if (req.method === 'GET') {
+      // Try to get chama_id from body first, then URL query params, then path
+      let body = {};
+      try {
+        body = await req.json();
+      } catch (e) {
+        // No body, that's ok
+      }
+      
       const url = new URL(req.url);
       const pathname = url.pathname;
       const parts = pathname.split('/').filter(Boolean); // [ 'chama-join', 'pending', ':id' ]
 
-      // Support both query param (?chama_id=...) and REST path (/chama-join/pending/:id)
-      let chama_id = url.searchParams.get('chama_id');
+      // Support body { action: "pending", chama_id: "..." }, query param (?chama_id=...), or REST path
+      let chama_id = (body as any).chama_id || url.searchParams.get('chama_id');
       if (!chama_id && parts.length >= 3 && parts[1] === 'pending') {
         chama_id = parts[2];
       }
 
-      console.log('Fetching pending requests', { pathname, parts, chama_id_present: !!chama_id });
+      console.log('Fetching pending requests', { pathname, parts, chama_id_present: !!chama_id, hasBody: Object.keys(body).length > 0 });
 
       if (!chama_id) {
         return new Response(JSON.stringify({ 
