@@ -76,15 +76,25 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
       
-      const { data, error } = await supabase.functions.invoke("chama-invite", {
-        body: { action: "list", chama_id: chamaId }
-      });
-    
-      if (error) {
-        console.error("Error loading invite codes:", error);
-      } else {
-        setInviteCodes(data.data || []);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-invite`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: "list", chama_id: chamaId }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to load invite codes');
       }
+
+      const data = await response.json();
+      setInviteCodes(data.data || []);
     } catch (err) {
       console.error("Failed to load invite codes:", err);
     } finally {
@@ -105,11 +115,22 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("chama-invite", {
-        body: { action: "generate", chama_id: chamaId }
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-invite`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: "generate", chama_id: chamaId }),
+        }
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate invite code');
+      }
 
       toast({
         title: "Success!",
