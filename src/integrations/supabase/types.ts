@@ -60,16 +60,19 @@ export type Database = {
       }
       chama: {
         Row: {
+          accepting_rejoin_requests: boolean | null
           commission_rate: number | null
           contribution_amount: number
           contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
           created_at: string
           created_by: string
+          current_cycle_round: number | null
           description: string | null
           every_n_days_count: number | null
           group_code: string | null
           id: string
           is_public: boolean | null
+          last_cycle_completed_at: string | null
           max_members: number
           min_members: number | null
           name: string
@@ -80,16 +83,19 @@ export type Database = {
           whatsapp_link: string | null
         }
         Insert: {
+          accepting_rejoin_requests?: boolean | null
           commission_rate?: number | null
           contribution_amount: number
           contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
           created_at?: string
           created_by: string
+          current_cycle_round?: number | null
           description?: string | null
           every_n_days_count?: number | null
           group_code?: string | null
           id?: string
           is_public?: boolean | null
+          last_cycle_completed_at?: string | null
           max_members?: number
           min_members?: number | null
           name: string
@@ -100,16 +106,19 @@ export type Database = {
           whatsapp_link?: string | null
         }
         Update: {
+          accepting_rejoin_requests?: boolean | null
           commission_rate?: number | null
           contribution_amount?: number
           contribution_frequency?: Database["public"]["Enums"]["contribution_frequency"]
           created_at?: string
           created_by?: string
+          current_cycle_round?: number | null
           description?: string | null
           every_n_days_count?: number | null
           group_code?: string | null
           id?: string
           is_public?: boolean | null
+          last_cycle_completed_at?: string | null
           max_members?: number
           min_members?: number | null
           name?: string
@@ -125,6 +134,47 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chama_cycle_history: {
+        Row: {
+          chama_id: string
+          completed_at: string | null
+          created_at: string | null
+          cycle_round: number
+          id: string
+          started_at: string
+          total_members: number
+          total_payouts_made: number
+        }
+        Insert: {
+          chama_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          cycle_round: number
+          id?: string
+          started_at: string
+          total_members: number
+          total_payouts_made: number
+        }
+        Update: {
+          chama_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          cycle_round?: number
+          id?: string
+          started_at?: string
+          total_members?: number
+          total_payouts_made?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_cycle_history_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
             referencedColumns: ["id"]
           },
         ]
@@ -255,6 +305,57 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chama_rejoin_requests: {
+        Row: {
+          chama_id: string
+          id: string
+          notes: string | null
+          previous_member_id: string | null
+          requested_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          chama_id: string
+          id?: string
+          notes?: string | null
+          previous_member_id?: string | null
+          requested_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          chama_id?: string
+          id?: string
+          notes?: string | null
+          previous_member_id?: string | null
+          requested_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_rejoin_requests_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_rejoin_requests_previous_member_id_fkey"
+            columns: ["previous_member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
             referencedColumns: ["id"]
           },
         ]
@@ -1973,7 +2074,12 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
-      chama_status: "active" | "inactive" | "completed" | "pending"
+      chama_status:
+        | "active"
+        | "inactive"
+        | "completed"
+        | "pending"
+        | "cycle_complete"
       contribution_frequency: "daily" | "weekly" | "monthly" | "every_n_days"
       kyc_status: "pending" | "approved" | "rejected"
       mchango_status: "active" | "completed" | "cancelled"
@@ -2111,7 +2217,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
-      chama_status: ["active", "inactive", "completed", "pending"],
+      chama_status: [
+        "active",
+        "inactive",
+        "completed",
+        "pending",
+        "cycle_complete",
+      ],
       contribution_frequency: ["daily", "weekly", "monthly", "every_n_days"],
       kyc_status: ["pending", "approved", "rejected"],
       mchango_status: ["active", "completed", "cancelled"],

@@ -13,6 +13,8 @@ import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
+import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
+import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
 import { Users, Calendar, TrendingUp, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -25,10 +27,14 @@ interface ChamaData {
   contribution_amount: number;
   contribution_frequency: string;
   max_members: number;
+  min_members?: number;
   commission_rate: number;
   status: string;
   created_at: string;
   every_n_days_count?: number;
+  current_cycle_round?: number;
+  last_cycle_completed_at?: string;
+  accepting_rejoin_requests?: boolean;
   profiles: {
     full_name: string;
     email: string;
@@ -40,6 +46,7 @@ interface ChamaData {
     is_manager: boolean;
     approval_status: string;
     joined_at: string;
+    user_id?: string;
     profiles: {
       full_name: string;
       email: string;
@@ -295,6 +302,7 @@ const ChamaDetail = () => {
   const hasViewAccess = isAdmin || isMember; // Admins can view without being members
   const isPendingStatus = chama.status === 'pending';
   const isActive = chama.status === 'active';
+  const isCycleComplete = chama.status === 'cycle_complete';
 
   return (
     <Layout showBackButton>
@@ -309,6 +317,7 @@ const ChamaDetail = () => {
                 </Badge>
                 {isPendingStatus && <Badge variant="secondary">Pending Start</Badge>}
                 {isActive && <Badge variant="default">Active</Badge>}
+                {isCycleComplete && <Badge variant="secondary">Cycle Complete</Badge>}
               </div>
               <div className="flex gap-2">
                 {isManager && <Badge variant="default">Manager</Badge>}
@@ -390,6 +399,24 @@ const ChamaDetail = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Cycle Complete Banner - Visible to members */}
+        {isMember && isCycleComplete && currentUserMembership?.user_id && (
+          <CycleCompleteBanner 
+            chamaId={chama.id} 
+            chamaName={chama.name}
+            userId={currentUserMembership.user_id}
+          />
+        )}
+
+        {/* Cycle Complete Manager - Visible to managers */}
+        {isManager && isCycleComplete && (
+          <CycleCompleteManager
+            chamaId={chama.id}
+            chamaName={chama.name}
+            minMembers={chama.min_members || 5}
+          />
         )}
 
         {/* Manager Tools */}
