@@ -76,8 +76,8 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
       
-      const { data, error } = await supabase.functions.invoke(`chama-invite/list/${chamaId}`, {
-        method: "GET"
+      const { data, error } = await supabase.functions.invoke("chama-invite", {
+        body: { action: "list", chama_id: chamaId }
       });
     
       if (error) {
@@ -105,8 +105,8 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("chama-invite/generate", {
-        body: { chama_id: chamaId }
+      const { data, error } = await supabase.functions.invoke("chama-invite", {
+        body: { action: "generate", chama_id: chamaId }
       });
 
       if (error) throw error;

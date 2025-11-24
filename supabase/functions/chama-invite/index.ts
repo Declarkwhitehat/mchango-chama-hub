@@ -27,19 +27,23 @@ serve(async (req) => {
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
     
+    // Get body for action-based routing
+    const body = req.method !== 'GET' && req.method !== 'OPTIONS' 
+      ? await req.json() 
+      : null;
+    const action = body?.action;
+    
     console.log('chama-invite request', { 
       method: req.method, 
-      path: req.url,
-      pathname: url.pathname,
+      action,
+      body,
       pathParts,
       hasAuth: !!authHeader 
     });
 
-    // Public endpoint - GET /chama-invite/validate/:code - Validate invite code
-    if (req.method === 'GET' && pathParts.includes('validate')) {
-      const codeIndex = pathParts.indexOf('validate') + 1;
-      const code = pathParts[codeIndex];
-
+    // Public endpoint - validate code (no auth required)
+    if (action === 'validate' && body?.code) {
+      const code = body.code;
       if (!code) {
         return new Response(JSON.stringify({ 
           error: 'Code is required',
@@ -116,10 +120,9 @@ serve(async (req) => {
       );
     }
 
-    // POST /chama-invite/generate - Generate new invite code
-    if (req.method === 'POST' && pathParts.includes('generate')) {
+    // Generate new invite code
+    if (action === 'generate') {
       console.log('Generate invite code request');
-      const body = await req.json();
       const { chama_id, expires_in_days } = body;
 
       if (!chama_id) {
@@ -198,20 +201,13 @@ serve(async (req) => {
       });
     }
 
-    // GET /chama-invite/list/:chama_id - List invite codes for a chama
-    if (req.method === 'GET') {
-      // Handle both /chama-invite/list/:chamaId and /chama-invite/:chamaId
-      let chamaId;
-      if (pathParts.includes('list')) {
-        const listIndex = pathParts.indexOf('list');
-        chamaId = pathParts[listIndex + 1];
-      } else {
-        chamaId = pathParts[pathParts.length - 1];
-      }
+    // List invite codes for a chama
+    if (action === 'list') {
+      const chamaId = body?.chama_id;
 
-      console.log('List invite codes request:', { chamaId, pathParts });
+      console.log('List invite codes request:', { chamaId });
 
-      if (!chamaId || chamaId === 'chama-invite') {
+      if (!chamaId) {
         return new Response(JSON.stringify({ error: 'chama_id is required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
