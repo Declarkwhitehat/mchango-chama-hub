@@ -104,7 +104,16 @@ serve(async (req) => {
     }
 
     // All other endpoints require authentication
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const jwt = authHeader?.replace('Bearer ', '');
+    if (!jwt) {
+      console.error('No JWT token provided');
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(jwt);
 
     console.log('Auth check:', { 
       hasUser: !!user, 
