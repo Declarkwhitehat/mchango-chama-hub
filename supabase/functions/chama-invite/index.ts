@@ -26,14 +26,12 @@ serve(async (req) => {
     
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
-    const action = pathParts[pathParts.length - 1];
     
     console.log('chama-invite request', { 
       method: req.method, 
       path: req.url,
       pathname: url.pathname,
       pathParts,
-      action,
       hasAuth: !!authHeader 
     });
 
@@ -104,7 +102,14 @@ serve(async (req) => {
     // All other endpoints require authentication
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
 
+    console.log('Auth check:', { 
+      hasUser: !!user, 
+      userId: user?.id,
+      authError: authError?.message 
+    });
+
     if (authError || !user) {
+      console.error('Authentication failed:', authError);
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -112,7 +117,8 @@ serve(async (req) => {
     }
 
     // POST /chama-invite/generate - Generate new invite code
-    if (req.method === 'POST' && (action === 'generate' || pathParts.includes('generate'))) {
+    if (req.method === 'POST' && pathParts.includes('generate')) {
+      console.log('Generate invite code request');
       const body = await req.json();
       const { chama_id, expires_in_days } = body;
 
@@ -124,7 +130,9 @@ serve(async (req) => {
       }
 
       // Verify user is a manager
-      const { data: membership } = await supabaseClient
+      console.log('Checking manager status:', { userId: user.id, chamaId: chama_id });
+      
+      const { data: membership, error: memberError } = await supabaseClient
         .from('chama_members')
         .select('is_manager')
         .eq('chama_id', chama_id)
@@ -132,7 +140,10 @@ serve(async (req) => {
         .eq('status', 'active')
         .single();
 
-      if (!membership || !membership.is_manager) {
+      console.log('Manager check result:', { membership, error: memberError });
+
+      if (memberError || !membership || !membership.is_manager) {
+        console.error('Manager verification failed:', memberError);
         return new Response(JSON.stringify({ 
           error: 'Only chama managers can generate invite codes' 
         }), {
@@ -149,6 +160,8 @@ serve(async (req) => {
       const expiresAt = expires_in_days 
         ? new Date(Date.now() + expires_in_days * 24 * 60 * 60 * 1000).toISOString()
         : null;
+
+      console.log('Generated code:', code);
 
       const { data, error } = await supabaseClient
         .from('chama_invite_codes')
@@ -169,22 +182,34 @@ serve(async (req) => {
         `)
         .single();
 
+      console.log('Insert result:', { success: !!data, error: error?.message });
+
       if (error) {
         console.error('Failed to generate invite code:', error);
         return new Response(
-          JSON.stringify({ error: 'Failed to generate invite code' }),
+          JSON.stringify({ error: 'Failed to generate invite code', details: error.message }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
+      console.log('Successfully generated invite code');
       return new Response(JSON.stringify({ data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // GET /chama-invite/:chama_id - List invite codes for a chama
+    // GET /chama-invite/list/:chama_id - List invite codes for a chama
     if (req.method === 'GET') {
-      const chamaId = pathParts[pathParts.length - 1];
+      // Handle both /chama-invite/list/:chamaId and /chama-invite/:chamaId
+      let chamaId;
+      if (pathParts.includes('list')) {
+        const listIndex = pathParts.indexOf('list');
+        chamaId = pathParts[listIndex + 1];
+      } else {
+        chamaId = pathParts[pathParts.length - 1];
+      }
+
+      console.log('List invite codes request:', { chamaId, pathParts });
 
       if (!chamaId || chamaId === 'chama-invite') {
         return new Response(JSON.stringify({ error: 'chama_id is required' }), {
@@ -194,7 +219,9 @@ serve(async (req) => {
       }
 
       // Verify user is a manager
-      const { data: membership } = await supabaseClient
+      console.log('Verifying manager status for list:', { userId: user.id, chamaId });
+      
+      const { data: membership, error: memberError } = await supabaseClient
         .from('chama_members')
         .select('is_manager')
         .eq('chama_id', chamaId)
@@ -202,7 +229,10 @@ serve(async (req) => {
         .eq('status', 'active')
         .single();
 
-      if (!membership || !membership.is_manager) {
+      console.log('Manager check for list:', { membership, error: memberError });
+
+      if (memberError || !membership || !membership.is_manager) {
+        console.error('Manager verification failed for list:', memberError);
         return new Response(JSON.stringify({ 
           error: 'Only chama managers can view invite codes' 
         }), {
