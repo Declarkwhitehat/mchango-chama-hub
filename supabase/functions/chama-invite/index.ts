@@ -198,64 +198,58 @@ serve(async (req) => {
       });
     }
 
-    // GET /chama-invite/list/:chama_id - List invite codes for a chama
+    // GET requests - List invite codes for a chama
     if (req.method === 'GET') {
-      // Handle both /chama-invite/list/:chamaId and /chama-invite/:chamaId
-      let chamaId;
-      if (pathParts.includes('list')) {
-        const listIndex = pathParts.indexOf('list');
-        chamaId = pathParts[listIndex + 1];
-      } else {
-        chamaId = pathParts[pathParts.length - 1];
-      }
+      const body = await req.json().catch(() => ({}));
+      const { action, chama_id } = body;
 
-      console.log('List invite codes request:', { chamaId, pathParts });
+      console.log('GET request:', { action, chama_id });
 
-      if (!chamaId || chamaId === 'chama-invite') {
-        return new Response(JSON.stringify({ error: 'chama_id is required' }), {
-          status: 400,
+      if (action === 'list' && chama_id) {
+        // Verify user is a manager
+        console.log('Verifying manager status for list:', { userId: user.id, chamaId: chama_id });
+        
+        const { data: membership, error: memberError } = await supabaseClient
+          .from('chama_members')
+          .select('is_manager')
+          .eq('chama_id', chama_id)
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .single();
+
+        console.log('Manager check for list:', { membership, error: memberError });
+
+        if (memberError || !membership || !membership.is_manager) {
+          console.error('Manager verification failed for list:', memberError);
+          return new Response(JSON.stringify({ 
+            error: 'Only chama managers can view invite codes' 
+          }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const { data, error } = await supabaseClient
+          .from('chama_invite_codes')
+          .select('*')
+          .eq('chama_id', chama_id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Failed to list invite codes:', error);
+          return new Response(
+            JSON.stringify({ error: 'Failed to load invite codes' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        return new Response(JSON.stringify({ data }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Verify user is a manager
-      console.log('Verifying manager status for list:', { userId: user.id, chamaId });
-      
-      const { data: membership, error: memberError } = await supabaseClient
-        .from('chama_members')
-        .select('is_manager')
-        .eq('chama_id', chamaId)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
-
-      console.log('Manager check for list:', { membership, error: memberError });
-
-      if (memberError || !membership || !membership.is_manager) {
-        console.error('Manager verification failed for list:', memberError);
-        return new Response(JSON.stringify({ 
-          error: 'Only chama managers can view invite codes' 
-        }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      const { data, error } = await supabaseClient
-        .from('chama_invite_codes')
-        .select('*')
-        .eq('chama_id', chamaId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Failed to list invite codes:', error);
-        return new Response(
-          JSON.stringify({ error: 'Failed to load invite codes' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(JSON.stringify({ data }), {
+      return new Response(JSON.stringify({ error: 'Invalid request' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
