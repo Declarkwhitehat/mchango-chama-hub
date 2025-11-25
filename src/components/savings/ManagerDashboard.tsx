@@ -157,7 +157,7 @@ export default function SavingsGroupManagerDashboard({
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-members/${group.id}/members/${memberId}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-members/groups/${group.id}/members/${memberId}`,
         {
           method: 'PATCH',
           headers: {
