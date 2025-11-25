@@ -261,7 +261,8 @@ const Auth = () => {
             setRateLimitResetTime(resetTime);
             localStorage.setItem('rateLimitResetTime', resetTime.toISOString());
           }
-          toast.error(error.message);
+          // Don't show toast - countdown timer banner is sufficient
+          return;
         } else if (error.message.includes("Invalid login credentials") || error.message.includes("No account found")) {
           toast.error("Invalid credentials. Please check your email/phone and password.");
         } else if (error.message.includes("Email not confirmed")) {
