@@ -34,7 +34,7 @@ export function SavingsGroupPendingRequests({
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-members/${groupId}/members/${memberId}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-members/groups/${groupId}/members/${memberId}`,
         {
           method: 'PATCH',
           headers: {
