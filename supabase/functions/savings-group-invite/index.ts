@@ -14,10 +14,14 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const authHeader = req.headers.get('Authorization')!;
+    const authHeader = req.headers.get('Authorization');
     
+    // Service role client for unauthenticated operations (bypasses RLS)
+    const supabaseService = createClient(supabaseUrl, supabaseKey);
+    
+    // Authenticated client for operations requiring user context
     const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: authHeader || '' } },
     });
 
     const url = new URL(req.url);
@@ -36,7 +40,8 @@ Deno.serve(async (req) => {
     if (method === 'GET' && pathParts[0] === 'validate' && pathParts[1]) {
       const code = pathParts[1].toUpperCase();
 
-      const { data: inviteCode, error: codeError } = await supabase
+      // Use service role client to bypass RLS for public validation
+      const { data: inviteCode, error: codeError } = await supabaseService
         .from('saving_group_invite_codes')
         .select('*, saving_groups(*)')
         .eq('code', code)
