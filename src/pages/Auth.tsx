@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Eye, EyeOff, Check, X, Fingerprint } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Check, X, Fingerprint, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -86,6 +86,41 @@ const Auth = () => {
     hasSpecialChar: false,
     hasMinLength: false,
   });
+  const [rateLimitResetTime, setRateLimitResetTime] = useState<Date | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
+
+  // Check localStorage for rate limit on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('rateLimitResetTime');
+    if (stored) {
+      const resetTime = new Date(stored);
+      if (resetTime > new Date()) {
+        setRateLimitResetTime(resetTime);
+      } else {
+        localStorage.removeItem('rateLimitResetTime');
+      }
+    }
+  }, []);
+
+  // Countdown timer for rate limit
+  useEffect(() => {
+    if (!rateLimitResetTime) return;
+    
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = Math.max(0, Math.floor((rateLimitResetTime.getTime() - now.getTime()) / 1000));
+      
+      setRemainingSeconds(diff);
+      
+      if (diff === 0) {
+        setRateLimitResetTime(null);
+        localStorage.removeItem('rateLimitResetTime');
+        toast.success('You can now try logging in again');
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [rateLimitResetTime]);
 
   // Auto-trigger biometric authentication on page load
   useEffect(() => {
@@ -148,6 +183,16 @@ const Auth = () => {
     attemptAutoLogin();
   }, [isWebAuthnSupported, checkHasCredentials, authenticate, biometricCancelled, navigate]);
 
+  // Format countdown display
+  const formatCountdown = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds} second${seconds !== 1 ? 's' : ''}`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes} minute${minutes !== 1 ? 's' : ''} ${secs} second${secs !== 1 ? 's' : ''}`;
+  };
+
   // Calculate password strength
   const calculatePasswordStrength = (password: string) => {
     const hasUpperCase = /[A-Z]/.test(password);
@@ -209,12 +254,18 @@ const Auth = () => {
       const { error } = await signIn(data.emailOrPhone, data.password);
       
       if (error) {
-        if (error.message.includes("Invalid login credentials") || error.message.includes("No account found")) {
+        // Check for rate limit error and extract reset time
+        if (error.message.includes("Too many") || error.message.includes("rate limit")) {
+          if ((error as any).rateLimitInfo?.resetTime) {
+            const resetTime = new Date((error as any).rateLimitInfo.resetTime);
+            setRateLimitResetTime(resetTime);
+            localStorage.setItem('rateLimitResetTime', resetTime.toISOString());
+          }
+          toast.error(error.message);
+        } else if (error.message.includes("Invalid login credentials") || error.message.includes("No account found")) {
           toast.error("Invalid credentials. Please check your email/phone and password.");
         } else if (error.message.includes("Email not confirmed")) {
           toast.error("Please verify your email address before logging in. Check your inbox.");
-        } else if (error.message.includes("Too many") || error.message.includes("rate limit")) {
-          toast.error(error.message);
         } else {
           toast.error(error.message);
         }
@@ -470,6 +521,20 @@ const Auth = () => {
                     ) : (
                       <Form {...loginForm}>
                         <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+                          {rateLimitResetTime && remainingSeconds > 0 && (
+                            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                              <div className="flex items-start gap-3">
+                                <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-semibold text-destructive mb-1">Too Many Login Attempts</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    Please wait <span className="font-medium text-foreground">{formatCountdown(remainingSeconds)}</span> before trying again
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
                           <FormField
                             control={loginForm.control}
                             name="emailOrPhone"
@@ -522,7 +587,7 @@ const Auth = () => {
                             type="submit"
                             variant="hero"
                             className="w-full"
-                            disabled={isLoading}
+                            disabled={isLoading || (rateLimitResetTime !== null && remainingSeconds > 0)}
                           >
                             {isLoading ? "Logging in..." : "Login"}
                           </Button>
@@ -542,7 +607,7 @@ const Auth = () => {
                                 type="button"
                                 variant="outline"
                                 className="w-full"
-                                disabled={isWebAuthnLoading}
+                                disabled={isWebAuthnLoading || (rateLimitResetTime !== null && remainingSeconds > 0)}
                                 onClick={handleBiometricLogin}
                               >
                                 <Fingerprint className="mr-2 h-4 w-4" />
