@@ -213,8 +213,8 @@ const Auth = () => {
           toast.error("Invalid credentials. Please check your email/phone and password.");
         } else if (error.message.includes("Email not confirmed")) {
           toast.error("Please verify your email address before logging in. Check your inbox.");
-        } else if (error.message.includes("Too many requests")) {
-          toast.error("Too many login attempts. Please wait a few minutes and try again.");
+        } else if (error.message.includes("Too many") || error.message.includes("rate limit")) {
+          toast.error(error.message);
         } else {
           toast.error(error.message);
         }
