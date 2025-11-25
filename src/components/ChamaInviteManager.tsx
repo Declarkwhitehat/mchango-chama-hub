@@ -55,15 +55,23 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
       
-      const { data, error } = await supabase.functions.invoke(`chama-join/pending/${chamaId}`, {
-        method: 'GET'
-      });
-      
-      if (error) {
-        console.error("Error loading pending members:", error);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-join/pending/${chamaId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error("Error loading pending members:", await response.text());
         return;
       }
 
+      const data = await response.json();
       setPendingMembers(data?.data || []);
     } catch (err) {
       console.error("Failed to load pending members:", err);
