@@ -87,14 +87,28 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         throw new Error("Not authenticated");
       }
 
-      const { data, error } = await supabase.functions.invoke('chama-join', {
-        body: { 
-          member_id: memberId,
-          approved: approved
+      // Use direct fetch with Authorization header
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-join`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            member_id: memberId,
+            approved: approved
+          }),
         }
-      });
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process request');
+      }
+
+      const data = await response.json();
 
       if (!data?.success) {
         throw new Error(data?.error || "Failed to process request");
