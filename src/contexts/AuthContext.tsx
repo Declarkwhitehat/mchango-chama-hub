@@ -164,11 +164,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       // Handle other error responses
       if (!response.ok) {
-        // Provide user-friendly error messages
-        if (responseData.error?.includes('Invalid credentials')) {
-          throw new Error('Invalid email/phone or password. Please check your credentials and try again.');
+        const error = new Error(
+          responseData.error?.includes('Invalid credentials')
+            ? 'Invalid email/phone or password. Please check your credentials and try again.'
+            : responseData.error || 'Login failed. Please try again.'
+        );
+        // Include remaining attempts info for all errors
+        if (responseData.remainingAttempts !== undefined) {
+          (error as any).remainingAttempts = responseData.remainingAttempts;
         }
-        throw new Error(responseData.error || 'Login failed. Please try again.');
+        throw error;
       }
 
       // Success - set session

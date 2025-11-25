@@ -114,7 +114,10 @@ Deno.serve(async (req) => {
           errorDetails: profileError?.details
         });
         return new Response(
-          JSON.stringify({ error: 'Invalid credentials - phone number not found' }),
+          JSON.stringify({ 
+            error: 'Invalid credentials - phone number not found',
+            remainingAttempts: Math.min(identifierRateLimit.remainingAttempts, ipRateLimit.remainingAttempts)
+          }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

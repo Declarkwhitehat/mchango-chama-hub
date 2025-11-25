@@ -88,6 +88,7 @@ const Auth = () => {
   });
   const [rateLimitResetTime, setRateLimitResetTime] = useState<Date | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
 
   // Check localStorage for rate limit on mount
   useEffect(() => {
@@ -261,9 +262,17 @@ const Auth = () => {
             setRateLimitResetTime(resetTime);
             localStorage.setItem('rateLimitResetTime', resetTime.toISOString());
           }
+          setRemainingAttempts(null);
           // Don't show toast - countdown timer banner is sufficient
           return;
-        } else if (error.message.includes("Invalid login credentials") || error.message.includes("No account found")) {
+        }
+        
+        // Extract remaining attempts for non-rate-limit errors
+        if ((error as any).remainingAttempts !== undefined) {
+          setRemainingAttempts((error as any).remainingAttempts);
+        }
+        
+        if (error.message.includes("Invalid login credentials") || error.message.includes("No account found") || error.message.includes("Invalid")) {
           toast.error("Invalid credentials. Please check your email/phone and password.");
         } else if (error.message.includes("Email not confirmed")) {
           toast.error("Please verify your email address before logging in. Check your inbox.");
@@ -275,6 +284,9 @@ const Auth = () => {
       
       // Store identifier for next auto-login
       localStorage.setItem('lastLoginIdentifier', data.emailOrPhone);
+      
+      // Clear any remaining attempts indicator
+      setRemainingAttempts(null);
       
       toast.success("Welcome back!");
       
@@ -532,6 +544,38 @@ const Auth = () => {
                                     Please wait <span className="font-medium text-foreground">{formatCountdown(remainingSeconds)}</span> before trying again
                                   </p>
                                 </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {!rateLimitResetTime && remainingAttempts !== null && remainingAttempts < 5 && (
+                            <div className={`${
+                              remainingAttempts === 0 
+                                ? 'bg-destructive/10 border-destructive/30' 
+                                : remainingAttempts <= 2 
+                                  ? 'bg-secondary/10 border-secondary/30' 
+                                  : 'bg-muted/50 border-border/50'
+                            } border rounded-lg p-3`}>
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className={`h-4 w-4 flex-shrink-0 ${
+                                  remainingAttempts === 0 
+                                    ? 'text-destructive' 
+                                    : remainingAttempts <= 2 
+                                      ? 'text-secondary' 
+                                      : 'text-muted-foreground'
+                                }`} />
+                                <p className="text-sm">
+                                  <span className="font-medium">
+                                    {remainingAttempts === 0 
+                                      ? 'Last attempt remaining' 
+                                      : `${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining`}
+                                  </span>
+                                  {remainingAttempts <= 2 && (
+                                    <span className="text-muted-foreground ml-1">
+                                      before temporary lockout
+                                    </span>
+                                  )}
+                                </p>
                               </div>
                             </div>
                           )}
