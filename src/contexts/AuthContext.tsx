@@ -139,30 +139,58 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         body: { identifier: emailOrPhone, password }
       });
 
-      // Check loginData first for rate limit info (even if there's an error)
-      // When edge function returns 429, data contains the response body
-      if (loginData && (loginData.error?.includes('Too many') || loginData.error?.includes('rate limit'))) {
-        const error = new Error(loginData.error);
-        // Extract resetTime from response
-        if (loginData.resetTime) {
-          (error as any).rateLimitInfo = { resetTime: loginData.resetTime };
+      // Handle HTTP errors (like 429 rate limit) - FunctionsHttpError
+      if (loginError) {
+        console.error('Login edge function error:', loginError);
+        console.log('Error object keys:', Object.keys(loginError));
+        console.log('Error context:', (loginError as any).context);
+        
+        // For 429 errors, try to extract rate limit info from error
+        let rateLimitInfo = null;
+        try {
+          // Check if context has the response data
+          if ((loginError as any).context) {
+            const context = (loginError as any).context;
+            console.log('Error context content:', context);
+            if (context.resetTime) {
+              rateLimitInfo = { resetTime: context.resetTime };
+            }
+          }
+          
+          // Also try parsing from message
+          if (!rateLimitInfo && loginError.message) {
+            const resetTimeMatch = loginError.message.match(/resetTime["\s:]+([^"}\s,]+)/);
+            if (resetTimeMatch) {
+              rateLimitInfo = { resetTime: resetTimeMatch[1] };
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse rate limit info:', e);
+        }
+        
+        const errorMessage = loginError.message || 'Login failed. Please try again.';
+        const error = new Error(errorMessage);
+        if (rateLimitInfo) {
+          (error as any).rateLimitInfo = rateLimitInfo;
         }
         throw error;
       }
 
-      // Handle other application-level errors from edge function response
+      // Handle application-level errors from edge function response
       if (loginData?.error) {
+        // Provide user-friendly error messages
         if (loginData.error.includes('Invalid credentials')) {
           throw new Error('Invalid email/phone or password. Please check your credentials and try again.');
         }
+        if (loginData.error.includes('Too many') || loginData.error.includes('rate limit')) {
+          // Extract rate limit info from response
+          const error = new Error(loginData.error);
+          if (loginData.resetTime) {
+            (error as any).rateLimitInfo = { resetTime: loginData.resetTime };
+          }
+          throw error;
+        }
         throw new Error(loginData.error);
-      }
-
-      // Handle HTTP errors (network issues, etc.)
-      if (loginError) {
-        console.error('Login edge function error:', loginError);
-        const errorMessage = loginError.message || 'Login failed. Please try again.';
-        throw new Error(errorMessage);
       }
 
       // Set session from edge function response
@@ -172,7 +200,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       return { error: null };
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      console.error('Sign in error caught:', error);
       return { error };
     }
   };
