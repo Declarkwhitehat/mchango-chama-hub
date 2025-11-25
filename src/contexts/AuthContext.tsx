@@ -139,11 +139,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         body: { identifier: emailOrPhone, password }
       });
 
+      // Handle HTTP errors (like 429 rate limit)
       if (loginError) {
-        throw loginError;
+        console.error('Login edge function error:', loginError);
+        // Extract error message from the error object
+        const errorMessage = loginError.message || 'Login failed. Please try again.';
+        throw new Error(errorMessage);
       }
 
-      if (loginData.error) {
+      // Handle application-level errors from edge function response
+      if (loginData?.error) {
         // Provide user-friendly error messages
         if (loginData.error.includes('Invalid credentials')) {
           throw new Error('Invalid email/phone or password. Please check your credentials and try again.');
@@ -155,7 +160,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
 
       // Set session from edge function response
-      if (loginData.session) {
+      if (loginData?.session) {
         await supabase.auth.setSession(loginData.session);
       }
       
