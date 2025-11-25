@@ -139,52 +139,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         body: { identifier: emailOrPhone, password }
       });
 
-      // Handle HTTP errors (like 429 rate limit)
-      if (loginError) {
-        console.error('Login edge function error:', loginError);
-        // Extract error message and rate limit info from the error object
-        const errorMessage = loginError.message || 'Login failed. Please try again.';
-        
-        // Try to extract rate limit info from 429 response
-        let rateLimitInfo = null;
-        try {
-          // Parse the error message to extract resetTime if present
-          const resetTimeMatch = errorMessage.match(/"resetTime":"([^"]+)"/);
-          if (resetTimeMatch) {
-            rateLimitInfo = { resetTime: resetTimeMatch[1] };
-          }
-        } catch (e) {
-          // Ignore parsing errors
+      // Check loginData first for rate limit info (even if there's an error)
+      // When edge function returns 429, data contains the response body
+      if (loginData && (loginData.error?.includes('Too many') || loginData.error?.includes('rate limit'))) {
+        const error = new Error(loginData.error);
+        // Extract resetTime from response
+        if (loginData.resetTime) {
+          (error as any).rateLimitInfo = { resetTime: loginData.resetTime };
         }
-        
-        const error = new Error(errorMessage);
-        (error as any).rateLimitInfo = rateLimitInfo;
         throw error;
       }
 
-      // Handle application-level errors from edge function response
+      // Handle other application-level errors from edge function response
       if (loginData?.error) {
-        // Provide user-friendly error messages
         if (loginData.error.includes('Invalid credentials')) {
           throw new Error('Invalid email/phone or password. Please check your credentials and try again.');
         }
-        if (loginData.error.includes('Too many') || loginData.error.includes('rate limit')) {
-          // Extract rate limit info from response
-          let rateLimitInfo = null;
-          try {
-            const resetTimeMatch = loginData.error.match(/"resetTime":"([^"]+)"/);
-            if (resetTimeMatch) {
-              rateLimitInfo = { resetTime: resetTimeMatch[1] };
-            }
-          } catch (e) {
-            // Ignore parsing errors
-          }
-          
-          const error = new Error(loginData.error);
-          (error as any).rateLimitInfo = rateLimitInfo;
-          throw error;
-        }
         throw new Error(loginData.error);
+      }
+
+      // Handle HTTP errors (network issues, etc.)
+      if (loginError) {
+        console.error('Login edge function error:', loginError);
+        const errorMessage = loginError.message || 'Login failed. Please try again.';
+        throw new Error(errorMessage);
       }
 
       // Set session from edge function response
