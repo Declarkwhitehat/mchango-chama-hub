@@ -148,7 +148,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (loginData.error.includes('Invalid credentials')) {
           throw new Error('Invalid email/phone or password. Please check your credentials and try again.');
         }
-        if (loginData.error.includes('Too many login attempts')) {
+        if (loginData.error.includes('Too many') || loginData.error.includes('rate limit')) {
           throw new Error(loginData.error);
         }
         throw new Error(loginData.error);
