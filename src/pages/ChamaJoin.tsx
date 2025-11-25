@@ -44,14 +44,18 @@ const ChamaJoin = () => {
     setErrorMessage("");
 
     try {
-      // Call the validate endpoint directly without authentication
+      // Call validate action using POST with body
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-invite/validate/${inviteCode}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-invite`,
         {
-          method: 'GET',
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({ 
+            action: "validate", 
+            code: inviteCode 
+          }),
         }
       );
 
@@ -107,14 +111,26 @@ const ChamaJoin = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("chama-join", {
-        body: { 
-          chama_id: chamaInfo.id,
-          invite_code: inviteCode 
+      // Use direct fetch with Authorization header
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-join`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            chama_id: chamaInfo.id,
+            invite_code: inviteCode 
+          }),
         }
-      });
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to submit join request');
+      }
 
       toast({
         title: "Request Sent Successfully!",
