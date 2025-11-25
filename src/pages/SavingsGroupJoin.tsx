@@ -252,19 +252,24 @@ export default function SavingsGroupJoin() {
       let result;
 
       if (inviteCode) {
-        // Join via invite code
-        const { data, error } = await supabase.functions.invoke(
-          `savings-group-invite/join/${inviteCode}`,
+        // Join via invite code using direct fetch
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/savings-group-invite/join/${inviteCode}`,
           {
             method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
           }
         );
 
-        if (error || !data?.success) {
-          throw new Error(data?.error || error?.message || "Failed to join group");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to join group');
         }
 
-        result = data;
+        result = await response.json();
       } else {
         // Regular join (existing logic)
         const response = await fetch(

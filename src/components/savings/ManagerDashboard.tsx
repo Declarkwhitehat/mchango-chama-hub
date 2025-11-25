@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SavingsGroupInviteManager } from "./InviteManager";
+import { SavingsGroupPendingRequests } from "./PendingRequests";
 
 interface ManagerDashboardProps {
   group: any;
@@ -437,6 +438,16 @@ export default function SavingsGroupManagerDashboard({
             You have {pendingMembers.length} member(s) waiting for approval.
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Pending Join Requests */}
+      {pendingMembers.length > 0 && (
+        <SavingsGroupPendingRequests
+          groupId={group.id}
+          pendingMembers={pendingMembers}
+          isManager={true}
+          onUpdate={fetchDashboardData}
+        />
       )}
 
       {/* Stats Grid */}
