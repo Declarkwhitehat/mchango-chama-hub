@@ -54,12 +54,18 @@ serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const pathParts = url.pathname.split('/').filter(Boolean);
+    let pathParts = url.pathname.split('/').filter(Boolean);
     const method = req.method;
 
+    // Normalize pathParts by removing function name prefix
+    const functionIndex = pathParts.findIndex(part => part === 'savings-group-members');
+    if (functionIndex !== -1) {
+      pathParts = pathParts.slice(functionIndex + 1);
+    }
+
     // POST /groups/:groupId/join - Join group
-    if (method === 'POST' && pathParts.length === 2 && pathParts[1] === 'join') {
-      const groupId = pathParts[0];
+    if (method === 'POST' && pathParts.length === 3 && pathParts[0] === 'groups' && pathParts[2] === 'join') {
+      const groupId = pathParts[1];
 
       // Check if group exists and is active
       const { data: group } = await supabase
@@ -118,9 +124,9 @@ serve(async (req) => {
       );
     }
 
-    // PATCH /groups/:groupId/members/:memberId/approve - Approve member
-    if (method === 'PATCH' && pathParts.length === 4 && pathParts[2] === 'members') {
-      const groupId = pathParts[0];
+    // PATCH /groups/:groupId/members/:memberId - Approve/reject member
+    if (method === 'PATCH' && pathParts.length === 4 && pathParts[0] === 'groups' && pathParts[2] === 'members') {
+      const groupId = pathParts[1];
       const memberId = pathParts[3];
 
       const body = await req.json();
@@ -190,8 +196,8 @@ serve(async (req) => {
     }
 
     // GET /members/:memberId/dashboard - Member dashboard
-    if (method === 'GET' && pathParts.length === 2 && pathParts[1] === 'dashboard') {
-      const memberId = pathParts[0];
+    if (method === 'GET' && pathParts.length === 3 && pathParts[0] === 'members' && pathParts[2] === 'dashboard') {
+      const memberId = pathParts[1];
 
       // Get member details
       const { data: member } = await supabase
