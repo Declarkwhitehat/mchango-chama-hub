@@ -134,73 +134,50 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signIn = async (emailOrPhone: string, password: string) => {
     try {
-      // Call rate-limited login edge function
-      const { data: loginData, error: loginError } = await supabase.functions.invoke('login', {
-        body: { identifier: emailOrPhone, password }
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      // Call login edge function with direct fetch for full response control
+      const response = await fetch(`${supabaseUrl}/functions/v1/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({ 
+          identifier: emailOrPhone, 
+          password 
+        })
       });
 
-      // Handle HTTP errors (like 429 rate limit) - FunctionsHttpError
-      if (loginError) {
-        console.error('Login edge function error:', loginError);
-        console.log('Error object keys:', Object.keys(loginError));
-        console.log('Error context:', (loginError as any).context);
-        
-        // For 429 errors, try to extract rate limit info from error
-        let rateLimitInfo = null;
-        try {
-          // Check if context has the response data
-          if ((loginError as any).context) {
-            const context = (loginError as any).context;
-            console.log('Error context content:', context);
-            if (context.resetTime) {
-              rateLimitInfo = { resetTime: context.resetTime };
-            }
-          }
-          
-          // Also try parsing from message
-          if (!rateLimitInfo && loginError.message) {
-            const resetTimeMatch = loginError.message.match(/resetTime["\s:]+([^"}\s,]+)/);
-            if (resetTimeMatch) {
-              rateLimitInfo = { resetTime: resetTimeMatch[1] };
-            }
-          }
-        } catch (e) {
-          console.error('Failed to parse rate limit info:', e);
-        }
-        
-        const errorMessage = loginError.message || 'Login failed. Please try again.';
-        const error = new Error(errorMessage);
-        if (rateLimitInfo) {
-          (error as any).rateLimitInfo = rateLimitInfo;
-        }
+      const responseData = await response.json();
+
+      // Handle 429 rate limit error
+      if (response.status === 429) {
+        const error = new Error(responseData.error || 'Too many login attempts. Please try again later.');
+        (error as any).rateLimitInfo = {
+          resetTime: responseData.resetTime,
+          remainingAttempts: responseData.remainingAttempts || 0
+        };
         throw error;
       }
 
-      // Handle application-level errors from edge function response
-      if (loginData?.error) {
+      // Handle other error responses
+      if (!response.ok) {
         // Provide user-friendly error messages
-        if (loginData.error.includes('Invalid credentials')) {
+        if (responseData.error?.includes('Invalid credentials')) {
           throw new Error('Invalid email/phone or password. Please check your credentials and try again.');
         }
-        if (loginData.error.includes('Too many') || loginData.error.includes('rate limit')) {
-          // Extract rate limit info from response
-          const error = new Error(loginData.error);
-          if (loginData.resetTime) {
-            (error as any).rateLimitInfo = { resetTime: loginData.resetTime };
-          }
-          throw error;
-        }
-        throw new Error(loginData.error);
+        throw new Error(responseData.error || 'Login failed. Please try again.');
       }
 
-      // Set session from edge function response
-      if (loginData?.session) {
-        await supabase.auth.setSession(loginData.session);
+      // Success - set session
+      if (responseData.session) {
+        await supabase.auth.setSession(responseData.session);
       }
       
       return { error: null };
     } catch (error: any) {
-      console.error('Sign in error caught:', error);
       return { error };
     }
   };
