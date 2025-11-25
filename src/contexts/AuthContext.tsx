@@ -142,9 +142,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // Handle HTTP errors (like 429 rate limit)
       if (loginError) {
         console.error('Login edge function error:', loginError);
-        // Extract error message from the error object
+        // Extract error message and rate limit info from the error object
         const errorMessage = loginError.message || 'Login failed. Please try again.';
-        throw new Error(errorMessage);
+        
+        // Try to extract rate limit info from 429 response
+        let rateLimitInfo = null;
+        try {
+          // Parse the error message to extract resetTime if present
+          const resetTimeMatch = errorMessage.match(/"resetTime":"([^"]+)"/);
+          if (resetTimeMatch) {
+            rateLimitInfo = { resetTime: resetTimeMatch[1] };
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+        
+        const error = new Error(errorMessage);
+        (error as any).rateLimitInfo = rateLimitInfo;
+        throw error;
       }
 
       // Handle application-level errors from edge function response
@@ -154,7 +169,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           throw new Error('Invalid email/phone or password. Please check your credentials and try again.');
         }
         if (loginData.error.includes('Too many') || loginData.error.includes('rate limit')) {
-          throw new Error(loginData.error);
+          // Extract rate limit info from response
+          let rateLimitInfo = null;
+          try {
+            const resetTimeMatch = loginData.error.match(/"resetTime":"([^"]+)"/);
+            if (resetTimeMatch) {
+              rateLimitInfo = { resetTime: resetTimeMatch[1] };
+            }
+          } catch (e) {
+            // Ignore parsing errors
+          }
+          
+          const error = new Error(loginData.error);
+          (error as any).rateLimitInfo = rateLimitInfo;
+          throw error;
         }
         throw new Error(loginData.error);
       }
