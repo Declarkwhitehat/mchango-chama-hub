@@ -2061,6 +2061,10 @@ export type Database = {
         Args: { _chama_id: string; _user_id: string }
         Returns: boolean
       }
+      is_savings_group_manager: {
+        Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
       record_company_earning: {
         Args: {
           p_amount: number
