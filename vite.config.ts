@@ -15,11 +15,13 @@ export default defineConfig(({ mode }) => ({
         name: 'Chama & Mchango - Build Wealth Together',
         short_name: 'Chama',
         description: 'Join thousands building wealth through community savings groups and crowdfunding campaigns',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        theme_color: '#0a0a0a',
+        background_color: '#0a0a0a',
         display: 'standalone',
+        display_override: ['standalone', 'minimal-ui'],
+        orientation: 'portrait',
         scope: '/',
-        start_url: '/',
+        start_url: '/?source=pwa',
         icons: [
           {
             src: 'pwa-192x192.png',
