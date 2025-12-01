@@ -30,6 +30,12 @@ serve(async (req) => {
       }
     );
 
+    // Create admin client for user verification
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
     const lastPart = pathParts[pathParts.length - 1];
@@ -364,7 +370,14 @@ serve(async (req) => {
       }
       
       // Otherwise, this is a create request - require authentication
-      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+      if (!token) {
+        return new Response(
+          JSON.stringify({ error: 'Authentication required' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
       console.log('chama-crud POST create', { hasUser: !!user, userId: user?.id });
 
       if (authError || !user) {
