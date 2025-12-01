@@ -453,11 +453,13 @@ serve(async (req) => {
         });
       }
       const base = (body.slug || body.name).toString().trim();
+      // Generate unique slug by appending random string
+      const randomSuffix = Math.random().toString(36).substring(2, 8);
       const slug = base
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
-        .replace(/-+$/, '');
+        .replace(/-+$/, '') + '-' + randomSuffix;
 
       const { data, error } = await supabaseClient
         .from('chama')
