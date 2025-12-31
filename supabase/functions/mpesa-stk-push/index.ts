@@ -6,10 +6,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Input validation schemas
-const validatePhone = (phone: string): boolean => {
-  // Kenyan phone format: +254XXXXXXXXX (total 13 chars)
-  return /^\+254[17]\d{8}$/.test(phone);
+/**
+ * Normalize phone number to 254XXXXXXXXX format (without + prefix)
+ * Accepts: +254XXXXXXXXX, 0XXXXXXXXX, 254XXXXXXXXX, 7XXXXXXXX
+ * Returns: 254XXXXXXXXX or null if invalid
+ */
+const normalizePhone = (phone: string): string | null => {
+  if (!phone) return null;
+  
+  // Remove all non-digits
+  const digits = phone.replace(/\D/g, '');
+  
+  // Handle different formats
+  if (digits.startsWith('254') && digits.length === 12) {
+    return digits; // Already 254XXXXXXXXX
+  }
+  if (digits.startsWith('0') && digits.length === 10) {
+    return '254' + digits.substring(1); // 0XXXXXXXXX → 254XXXXXXXXX
+  }
+  if (digits.length === 9 && /^[17]/.test(digits)) {
+    return '254' + digits; // 7XXXXXXXX or 1XXXXXXXX → 254XXXXXXXXX
+  }
+  
+  return null; // Invalid format
 };
 
 const validateAmount = (amount: number): boolean => {
@@ -40,13 +59,15 @@ serve(async (req) => {
     const body: STKPushRequest = await req.json();
     console.log('Incoming STK push request:', { ...body, phone_number: body.phone_number?.substring(0, 7) + '****' });
 
-    // Validate inputs
-    if (!validatePhone(body.phone_number)) {
+    // Normalize and validate phone number
+    const normalizedPhone = normalizePhone(body.phone_number);
+    if (!normalizedPhone) {
       return new Response(
-        JSON.stringify({ error: 'Invalid phone number format. Use +254XXXXXXXXX' }),
+        JSON.stringify({ error: 'Invalid phone number format. Accepted formats: +254XXXXXXXXX, 0XXXXXXXXX, 254XXXXXXXXX' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    console.log('Normalized phone:', normalizedPhone.substring(0, 6) + '****');
 
     if (!validateAmount(body.amount)) {
       return new Response(
@@ -96,9 +117,9 @@ serve(async (req) => {
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
       Amount: body.amount,
-      PartyA: body.phone_number,
+      PartyA: normalizedPhone,
       PartyB: shortcode,
-      PhoneNumber: body.phone_number,
+      PhoneNumber: normalizedPhone,
       CallBackURL: callbackUrl,
       AccountReference: body.account_reference || 'Donation',
       TransactionDesc: body.transaction_desc || 'Donation Payment',

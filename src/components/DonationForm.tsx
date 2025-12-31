@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, TrendingDown, Wallet } from "lucide-react";
 import { MCHANGO_COMMISSION_RATE, calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
+import { normalizePhone, isValidKenyanPhone } from "@/utils/phoneUtils";
 
 interface DonationFormProps {
   mchangoId: string;
@@ -43,10 +44,10 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
       return;
     }
 
-    if (!user && !phone) {
+    if (!phone || !isValidKenyanPhone(phone)) {
       toast({
-        title: "Phone Required",
-        description: "Please provide your phone number",
+        title: "Invalid Phone Number",
+        description: "Please enter a valid phone number (e.g., 0707874790, +254707874790)",
         variant: "destructive",
       });
       return;
@@ -91,11 +92,11 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
         return;
       }
 
-      // Initiate M-Pesa STK Push
+      // Initiate M-Pesa STK Push with normalized phone
       const { data: stkResponse, error: stkError } = await supabase.functions.invoke("mpesa-stk-push", {
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
         body: {
-          phone_number: phone,
+          phone_number: normalizePhone(phone),
           amount: parseFloat(amount),
           account_reference: mchangoTitle,
           transaction_desc: `Donation to ${mchangoTitle}`,
@@ -226,11 +227,14 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
                 <Input
                   id="phone"
                   type="tel"
-                  placeholder="254XXXXXXXXX"
+                  placeholder="0707874790 or +254707874790"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  Accepts: 0707874790, +254707874790, 254707874790
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -252,11 +256,14 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
               <Input
                 id="phone_user"
                 type="tel"
-                placeholder="254XXXXXXXXX"
+                placeholder="0707874790 or +254707874790"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Accepts: 0707874790, +254707874790, 254707874790
+              </p>
             </div>
           )}
 
