@@ -67,10 +67,10 @@ serve(async (req) => {
     const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? '174379'; // sandbox default
     const passkey = Deno.env.get('MPESA_PASSKEY') ?? '';
 
-    // --- Step 1: Get Access Token ---
+    // --- Step 1: Get Access Token (PRODUCTION) ---
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
     const tokenResponse = await fetch(
-      'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+      'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
       { headers: { Authorization: `Basic ${auth}` } }
     );
     const tokenData = await tokenResponse.json();
@@ -106,9 +106,9 @@ serve(async (req) => {
 
     console.log('STK Push payload:', { ...payload, Password: '****' });
 
-    // --- Step 3: Send STK Push ---
+    // --- Step 3: Send STK Push (PRODUCTION) ---
     const stkResponse = await fetch(
-      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
       {
         method: 'POST',
         headers: {
