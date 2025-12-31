@@ -109,17 +109,31 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
 
       if (stkError) throw stkError;
 
-      // Update donation with M-Pesa request IDs for tracking
-      if (stkResponse?.mpesa_response) {
-        const { MerchantRequestID, CheckoutRequestID } = stkResponse.mpesa_response;
-        if (CheckoutRequestID) {
-          await supabase
-            .from("mchango_donations")
-            .update({ 
-              payment_reference: CheckoutRequestID  // Store checkout ID for callback matching
-            })
-            .eq("id", donation.id);
-        }
+      // Validate STK push response
+      const checkoutRequestId = stkResponse?.CheckoutRequestID;
+      const responseCode = stkResponse?.ResponseCode;
+
+      if (!checkoutRequestId || (responseCode && responseCode !== "0")) {
+        throw new Error(
+          stkResponse?.CustomerMessage ||
+          stkResponse?.ResponseDescription ||
+          "Failed to initiate M-Pesa payment. Please try again."
+        );
+      }
+
+      // Update donation with CheckoutRequestID for callback matching
+      await supabase
+        .from("mchango_donations")
+        .update({ payment_reference: checkoutRequestId })
+        .eq("id", donation.id);
+
+      // Optional: show the exact message from M-Pesa
+      const customerMessage = stkResponse?.CustomerMessage;
+      if (customerMessage) {
+        toast({
+          title: "M-Pesa",
+          description: customerMessage,
+        });
       }
 
       const donationAmount = parseFloat(amount);
