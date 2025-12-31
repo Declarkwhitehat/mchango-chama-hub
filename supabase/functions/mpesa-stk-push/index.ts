@@ -45,6 +45,8 @@ interface STKPushRequest {
   callback_metadata?: Record<string, any>;
 }
 
+const CHAMA_COMMISSION_RATE = 0.05; // 5% commission for chama
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -259,8 +261,42 @@ serve(async (req) => {
       }
     }
 
-    // --- Step 5: Return result with deposit_id ---
-    return new Response(JSON.stringify({ ...result, deposit_id: depositId }), {
+    // --- Step 5: Create pending contribution if this is a chama contribution ---
+    let contributionId = null;
+    if (body.callback_metadata?.type === 'chama_contribution' && result.CheckoutRequestID) {
+      const checkoutRequestId = result.CheckoutRequestID;
+      
+      console.log('Creating pending chama contribution:', {
+        chamaId: body.callback_metadata.chama_id,
+        memberId: body.callback_metadata.member_id,
+        amount: body.amount,
+        checkoutRequestId
+      });
+
+      const { data: contributionRecord, error: contributionError } = await supabaseClient
+        .from('contributions')
+        .insert({
+          chama_id: body.callback_metadata.chama_id,
+          member_id: body.callback_metadata.member_id,
+          paid_by_member_id: body.callback_metadata.paid_by_member_id,
+          amount: body.amount,
+          payment_reference: checkoutRequestId,
+          status: 'pending',
+          payment_notes: body.callback_metadata.notes || null,
+        })
+        .select()
+        .single();
+
+      if (contributionError) {
+        console.error('Error creating contribution record:', contributionError);
+      } else {
+        contributionId = contributionRecord.id;
+        console.log('Contribution record created:', contributionId);
+      }
+    }
+
+    // --- Step 6: Return result with deposit_id and contribution_id ---
+    return new Response(JSON.stringify({ ...result, deposit_id: depositId, contribution_id: contributionId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

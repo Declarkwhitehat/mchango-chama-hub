@@ -49,13 +49,126 @@ serve(async (req) => {
       console.log('Payment details:', { mpesaReceiptNumber, paidAmount });
     }
 
-    // First, check if this is a donation by looking up mchango_donations table
+    // First, check if this is a chama contribution
+    const { data: contributions } = await supabaseClient
+      .from('contributions')
+      .select('*, chama(commission_rate)')
+      .eq('payment_reference', checkoutRequestId);
+
+    if (contributions && contributions.length > 0) {
+      const contribution = contributions[0];
+      console.log('Found chama contribution record:', contribution.id);
+
+      // Determine commission rate (default 5%)
+      const commissionRate = contribution.chama?.commission_rate || 0.05;
+      const actualAmount = paidAmount || contribution.amount;
+
+      // Update contribution status
+      const { data: updatedContribution, error: contributionError } = await supabaseClient
+        .from('contributions')
+        .update({
+          status: status,
+        })
+        .eq('id', contribution.id)
+        .select()
+        .single();
+
+      if (contributionError) {
+        console.error('Error updating contribution:', contributionError);
+        throw contributionError;
+      }
+
+      console.log('Contribution updated:', updatedContribution);
+
+      // If successful, update member balance and record commission
+      if (status === 'completed') {
+        // Get member info
+        const { data: member } = await supabaseClient
+          .from('chama_members')
+          .select('*, chama(contribution_amount)')
+          .eq('id', contribution.member_id)
+          .single();
+
+        if (member) {
+          const expectedAmount = member.chama?.contribution_amount || 0;
+          let creditDelta = 0;
+          let deficitDelta = 0;
+
+          if (actualAmount > expectedAmount) {
+            creditDelta = actualAmount - expectedAmount;
+          } else if (actualAmount < expectedAmount) {
+            deficitDelta = expectedAmount - actualAmount;
+          }
+
+          // Update member balance
+          const { error: updateError } = await supabaseClient
+            .from('chama_members')
+            .update({
+              balance_credit: (member.balance_credit || 0) + creditDelta,
+              balance_deficit: (member.balance_deficit || 0) + deficitDelta,
+              last_payment_date: new Date().toISOString(),
+            })
+            .eq('id', contribution.member_id);
+
+          if (updateError) {
+            console.error('Error updating member balance:', updateError);
+          } else {
+            console.log('Member balance updated:', { creditDelta, deficitDelta });
+          }
+        }
+
+        // Record commission as company earnings
+        const commissionAmount = actualAmount * commissionRate;
+        await supabaseClient
+          .from('company_earnings')
+          .insert({
+            source: 'chama_contribution',
+            amount: commissionAmount,
+            reference_id: contribution.id,
+            description: `${(commissionRate * 100)}% commission on chama contribution of KES ${actualAmount}`
+          });
+
+        console.log('Commission recorded:', commissionAmount);
+
+        // Send SMS notification
+        const { data: profile } = await supabaseClient
+          .from('profiles')
+          .select('full_name, phone')
+          .eq('id', member?.user_id)
+          .single();
+
+        if (profile?.phone) {
+          try {
+            await supabaseClient.functions.invoke('send-transactional-sms', {
+              body: {
+                phone: profile.phone,
+                message: `Chama contribution confirmed! KES ${actualAmount} received. Receipt: ${mpesaReceiptNumber || 'N/A'}`
+              }
+            });
+            console.log('SMS notification sent');
+          } catch (smsError) {
+            console.error('Error sending SMS:', smsError);
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Chama contribution callback processed',
+          contribution: updatedContribution,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if this is a donation by looking up mchango_donations table
     const { data: donations } = await supabaseClient
       .from('mchango_donations')
       .select('*')
       .eq('payment_reference', checkoutRequestId);
 
-    // First, check if this is a savings group deposit
+    // Check if this is a savings group deposit
     const { data: deposits } = await supabaseClient
       .from('saving_group_deposits')
       .select('*')
