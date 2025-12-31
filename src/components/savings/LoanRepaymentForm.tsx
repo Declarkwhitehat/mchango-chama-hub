@@ -14,13 +14,23 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard, History, CheckCircle2, AlertCircle, DollarSign, Calendar } from "lucide-react";
 
+// Helper to normalize phone for validation
+const normalizePhone = (phone: string): string | null => {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('254') && digits.length === 12) return digits;
+  if (digits.startsWith('0') && digits.length === 10) return '254' + digits.substring(1);
+  if (digits.length === 9 && /^[17]/.test(digits)) return '254' + digits;
+  return null;
+};
+
 const repaymentSchema = z.object({
   amount: z.string()
     .min(1, "Amount is required")
     .refine((val) => !isNaN(Number(val)) && Number(val) > 0, "Must be a valid positive number"),
   phone: z.string()
-    .min(10, "Phone number is required")
-    .regex(/^254\d{9}$/, "Must be in format 254XXXXXXXXX"),
+    .min(1, "Phone number is required")
+    .refine((val) => normalizePhone(val) !== null, "Invalid phone. Use 0707874790, +254707874790, or 254707874790"),
 });
 
 type RepaymentFormData = z.infer<typeof repaymentSchema>;
@@ -96,7 +106,7 @@ export default function LoanRepaymentForm({ loan, onSuccess }: LoanRepaymentForm
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            phone: values.phone,
+            phone_number: normalizePhone(values.phone),
             amount: amount,
             account_reference: `LOAN-${loan.id.substring(0, 8)}`,
             transaction_desc: `Loan Repayment - ${loan.saving_group_id}`,
@@ -266,13 +276,13 @@ export default function LoanRepaymentForm({ loan, onSuccess }: LoanRepaymentForm
                       <FormControl>
                         <Input
                           type="tel"
-                          placeholder="254XXXXXXXXX"
+                          placeholder="0707874790 or +254707874790"
                           {...field}
                           disabled={loading}
                         />
                       </FormControl>
                       <FormDescription>
-                        Enter phone number in format 254XXXXXXXXX
+                        Accepts: 0707874790, +254707874790, 254707874790
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
