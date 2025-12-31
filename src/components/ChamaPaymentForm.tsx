@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, CreditCard, Users, TrendingDown, Wallet } from "lucide-react";
+import { Loader2, CreditCard, Users, TrendingDown, Wallet, Phone } from "lucide-react";
 import { CHAMA_DEFAULT_COMMISSION_RATE, calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
 
 interface ChamaPaymentFormProps {
@@ -32,12 +32,15 @@ export const ChamaPaymentForm = ({
   const [targetMemberId, setTargetMemberId] = useState(currentMemberId);
   const [amount, setAmount] = useState(contributionAmount.toString());
   const [notes, setNotes] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [members, setMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "checking">("idle");
 
   useEffect(() => {
     loadMembers();
+    loadUserPhone();
   }, [chamaId]);
 
   useEffect(() => {
@@ -45,6 +48,25 @@ export const ChamaPaymentForm = ({
       setTargetMemberId(currentMemberId);
     }
   }, [paymentType, currentMemberId]);
+
+  const loadUserPhone = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('phone')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile?.phone) {
+          setPhoneNumber(profile.phone);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading user phone:", error);
+    }
+  };
 
   const loadMembers = async () => {
     try {
@@ -55,6 +77,7 @@ export const ChamaPaymentForm = ({
           id,
           member_code,
           order_index,
+          user_id,
           profiles (
             full_name
           )
@@ -89,7 +112,17 @@ export const ChamaPaymentForm = ({
       return;
     }
 
+    if (!phoneNumber) {
+      toast({
+        title: "Phone Required",
+        description: "Please enter your M-Pesa phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
+    setPaymentStatus("pending");
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -103,61 +136,110 @@ export const ChamaPaymentForm = ({
         return;
       }
 
-      const paymentData = {
-        chama_id: chamaId,
-        member_id: targetMemberId,
-        paid_by_member_id: currentMemberId,
-        amount: parseFloat(amount),
-        payment_reference: `PAY-${Date.now()}`,
-        status: 'completed',
-        payment_notes: notes || null,
-      };
-
-      const { data, error } = await supabase.functions.invoke('contributions-crud', {
-        body: paymentData,
-        method: 'POST'
-      });
-
-      if (error) throw error;
-
+      // Get target member info for account reference
       const targetMember = members.find(m => m.id === targetMemberId);
       const payerMember = members.find(m => m.id === currentMemberId);
       
-      let successMessage = "Payment successful!";
-      if (paymentType === "other" && targetMember && payerMember) {
-        successMessage = `Payment successful! ${payerMember.profiles.full_name} paid for ${targetMember.profiles.full_name}`;
-      }
-
-      // Show balance update info if available
-      if (data.balance_update) {
-        const { credit_added, deficit_added } = data.balance_update;
-        if (credit_added > 0) {
-          successMessage += ` (KES ${credit_added} credit added)`;
-        } else if (deficit_added > 0) {
-          successMessage += ` (KES ${deficit_added} deficit recorded)`;
+      // Trigger M-Pesa STK Push
+      const { data: stkResponse, error: stkError } = await supabase.functions.invoke('mpesa-stk-push', {
+        body: {
+          phone_number: phoneNumber,
+          amount: parseFloat(amount),
+          account_reference: targetMember?.member_code || `CHAMA-${chamaId.substring(0, 8)}`,
+          transaction_desc: `Chama contribution`,
+          chama_id: chamaId,
+          callback_metadata: {
+            type: 'chama_contribution',
+            chama_id: chamaId,
+            member_id: targetMemberId,
+            paid_by_member_id: currentMemberId,
+            payer_user_id: session.user.id,
+            beneficiary_user_id: targetMember?.user_id || session.user.id,
+            notes: notes || null,
+          }
         }
-      }
-
-      toast({
-        title: "Success",
-        description: successMessage,
       });
 
-      // Reset form
-      setAmount(contributionAmount.toString());
-      setNotes("");
-      setPaymentType("self");
-      setTargetMemberId(currentMemberId);
+      if (stkError) throw stkError;
 
-      // Trigger refresh
-      if (onPaymentSuccess) {
-        onPaymentSuccess();
+      console.log('STK Push response:', stkResponse);
+
+      if (stkResponse?.ResponseCode === "0" || stkResponse?.CheckoutRequestID) {
+        toast({
+          title: "Payment Request Sent",
+          description: "Please check your phone and enter your M-Pesa PIN to complete the payment",
+        });
+        
+        setPaymentStatus("checking");
+        
+        // Poll for payment status
+        const checkoutRequestId = stkResponse.CheckoutRequestID;
+        let attempts = 0;
+        const maxAttempts = 12; // Check for 60 seconds (every 5 seconds)
+        
+        const checkPaymentStatus = async () => {
+          attempts++;
+          
+          // Check contribution status
+          const { data: contributions } = await supabase
+            .from('contributions')
+            .select('*')
+            .eq('payment_reference', checkoutRequestId)
+            .single();
+          
+          if (contributions && contributions.status === 'completed') {
+            setPaymentStatus("idle");
+            toast({
+              title: "Payment Successful!",
+              description: `KES ${parseFloat(amount).toLocaleString()} contribution recorded`,
+            });
+            
+            // Reset form
+            setAmount(contributionAmount.toString());
+            setNotes("");
+            setPaymentType("self");
+            setTargetMemberId(currentMemberId);
+            
+            if (onPaymentSuccess) {
+              onPaymentSuccess();
+            }
+            return;
+          }
+          
+          if (contributions && contributions.status === 'failed') {
+            setPaymentStatus("idle");
+            toast({
+              title: "Payment Failed",
+              description: "The M-Pesa payment was not completed. Please try again.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          if (attempts < maxAttempts) {
+            setTimeout(checkPaymentStatus, 5000);
+          } else {
+            setPaymentStatus("idle");
+            toast({
+              title: "Payment Pending",
+              description: "Your payment is being processed. Check back shortly for confirmation.",
+            });
+          }
+        };
+        
+        // Start checking after 10 seconds to give user time to enter PIN
+        setTimeout(checkPaymentStatus, 10000);
+        
+      } else {
+        throw new Error(stkResponse?.ResponseDescription || 'Failed to initiate payment');
       }
+
     } catch (error: any) {
       console.error("Payment error:", error);
+      setPaymentStatus("idle");
       toast({
         title: "Payment Failed",
-        description: error.message || "Failed to process payment",
+        description: error.message || "Failed to initiate M-Pesa payment",
         variant: "destructive",
       });
     } finally {
@@ -170,7 +252,7 @@ export const ChamaPaymentForm = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CreditCard className="h-5 w-5" />
-          Make Payment
+          Make Payment via M-Pesa
         </CardTitle>
         <CardDescription>
           Contribute to your chama (Expected: KES {contributionAmount.toLocaleString()})
@@ -223,18 +305,36 @@ export const ChamaPaymentForm = ({
           )}
 
           <div className="space-y-2">
+            <Label htmlFor="phone" className="flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              M-Pesa Phone Number
+            </Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="e.g., 0712345678"
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              You'll receive an M-Pesa prompt on this number
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="amount">Amount (KES)</Label>
             <Input
               id="amount"
               type="number"
               step="0.01"
-              min="0"
+              min="1"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Enter amount"
               required
             />
-            {parseFloat(amount) !== contributionAmount && (
+            {parseFloat(amount) !== contributionAmount && parseFloat(amount) > 0 && (
               <p className="text-xs text-muted-foreground">
                 {parseFloat(amount) > contributionAmount 
                   ? `Overpayment of KES ${(parseFloat(amount) - contributionAmount).toLocaleString()} will be credited`
@@ -270,7 +370,7 @@ export const ChamaPaymentForm = ({
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground italic">
-                  * Commission is deducted immediately to cover platform costs
+                  * Commission is deducted to cover platform costs
                 </p>
               </CardContent>
             </Card>
@@ -287,16 +387,31 @@ export const ChamaPaymentForm = ({
             />
           </div>
 
-          <Button type="submit" disabled={isLoading} className="w-full">
+          <Button 
+            type="submit" 
+            disabled={isLoading || paymentStatus !== "idle"} 
+            className="w-full"
+          >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing Payment...
+                Sending M-Pesa Request...
+              </>
+            ) : paymentStatus === "checking" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Waiting for Payment...
               </>
             ) : (
-              `Pay KES ${parseFloat(amount).toLocaleString()}`
+              `Pay KES ${parseFloat(amount || "0").toLocaleString()} via M-Pesa`
             )}
           </Button>
+
+          {paymentStatus === "checking" && (
+            <p className="text-xs text-center text-muted-foreground">
+              Check your phone for the M-Pesa prompt and enter your PIN
+            </p>
+          )}
         </form>
       </CardContent>
     </Card>
