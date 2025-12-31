@@ -143,6 +143,23 @@ serve(async (req) => {
     const result = await stkResponse.json();
     console.log('STK Push API Response:', result);
 
+    // --- Step 3.1: If this is a donation, persist CheckoutRequestID immediately (prevents race with callback) ---
+    if (result?.CheckoutRequestID && body.callback_metadata?.donation_id) {
+      const checkoutRequestId = result.CheckoutRequestID as string;
+      const donationId = body.callback_metadata.donation_id as string;
+
+      const { error: donationUpdateError } = await supabaseClient
+        .from('mchango_donations')
+        .update({ payment_reference: checkoutRequestId })
+        .eq('id', donationId);
+
+      if (donationUpdateError) {
+        console.error('Error updating donation with CheckoutRequestID:', donationUpdateError);
+      } else {
+        console.log('Donation updated with CheckoutRequestID:', { donationId, checkoutRequestId });
+      }
+    }
+
     // --- Step 4: Create or update deposit record if this is a savings deposit ---
     let depositId = null;
     if (body.callback_metadata?.type === 'savings_deposit' && result.CheckoutRequestID) {

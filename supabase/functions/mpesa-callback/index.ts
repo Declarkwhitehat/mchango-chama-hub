@@ -208,9 +208,14 @@ serve(async (req) => {
 
     if (!transactions || transactions.length === 0) {
       console.error('Transaction not found for checkout request:', checkoutRequestId);
+      // Return 200 so M-Pesa doesn't keep retrying; we already logged the issue.
       return new Response(
-        JSON.stringify({ error: 'Transaction not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          success: true,
+          message: 'Callback received but no matching record found',
+          checkoutRequestId,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
