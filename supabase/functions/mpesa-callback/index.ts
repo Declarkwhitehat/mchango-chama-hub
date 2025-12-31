@@ -197,30 +197,12 @@ serve(async (req) => {
 
       console.log('Donation updated:', updatedDonation);
 
-      // If payment successful, update mchango current_amount
+      // Note: mchango.current_amount is updated automatically by the 
+      // update_mchango_on_donation trigger when payment_status becomes 'completed'
+
+      // If payment successful, record commission
       if (status === 'completed') {
         const actualAmount = paidAmount || donation.amount;
-        
-        const { data: mchango } = await supabaseClient
-          .from('mchango')
-          .select('current_amount')
-          .eq('id', donation.mchango_id)
-          .single();
-
-        if (mchango) {
-          const newAmount = (mchango.current_amount || 0) + actualAmount;
-          
-          const { error: updateError } = await supabaseClient
-            .from('mchango')
-            .update({ current_amount: newAmount })
-            .eq('id', donation.mchango_id);
-
-          if (updateError) {
-            console.error('Error updating mchango amount:', updateError);
-          } else {
-            console.log(`Mchango current_amount updated: ${mchango.current_amount} -> ${newAmount}`);
-          }
-        }
         
         // Record commission as company earnings (15%)
         const commissionAmount = actualAmount * 0.15;
