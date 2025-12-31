@@ -136,6 +136,25 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
         });
       }
 
+      // Quick status check to surface immediate failures (e.g. non‑M-Pesa line)
+      try {
+        await new Promise((r) => setTimeout(r, 2500));
+
+        const { data: statusData } = await supabase.functions.invoke("mpesa-stk-query", {
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+          body: { checkout_request_id: checkoutRequestId },
+        });
+
+        const resultCode = statusData?.ResultCode;
+        const resultDesc = statusData?.ResultDesc;
+
+        if (typeof resultCode === "number" && resultCode !== 0) {
+          throw new Error(resultDesc || "M-Pesa payment failed. Please try again.");
+        }
+      } catch (statusErr: any) {
+        throw new Error(statusErr?.message || "M-Pesa payment failed. Please try again.");
+      }
+
       const donationAmount = parseFloat(amount);
       const commission = calculateCommission(donationAmount, MCHANGO_COMMISSION_RATE);
       const netAmount = calculateNetBalance(donationAmount, MCHANGO_COMMISSION_RATE);
