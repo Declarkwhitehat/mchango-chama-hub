@@ -31,14 +31,22 @@ serve(async (req) => {
     // Determine transaction status based on result code
     let status = resultCode === 0 ? 'completed' : 'failed';
     let mpesaReceiptNumber = null;
+    let paidAmount = null;
 
     if (resultCode === 0) {
-      // Extract M-PESA receipt number from callback items
+      // Extract M-PESA details from callback items
       const callbackMetadata = stkCallback.CallbackMetadata?.Item || [];
       const receiptItem = callbackMetadata.find((item: any) => item.Name === 'MpesaReceiptNumber');
+      const amountItem = callbackMetadata.find((item: any) => item.Name === 'Amount');
+      
       if (receiptItem) {
         mpesaReceiptNumber = receiptItem.Value;
       }
+      if (amountItem) {
+        paidAmount = amountItem.Value;
+      }
+      
+      console.log('Payment details:', { mpesaReceiptNumber, paidAmount });
     }
 
     // First, check if this is a donation by looking up mchango_donations table
@@ -188,6 +196,45 @@ serve(async (req) => {
       }
 
       console.log('Donation updated:', updatedDonation);
+
+      // If payment successful, update mchango current_amount
+      if (status === 'completed') {
+        const actualAmount = paidAmount || donation.amount;
+        
+        const { data: mchango } = await supabaseClient
+          .from('mchango')
+          .select('current_amount')
+          .eq('id', donation.mchango_id)
+          .single();
+
+        if (mchango) {
+          const newAmount = (mchango.current_amount || 0) + actualAmount;
+          
+          const { error: updateError } = await supabaseClient
+            .from('mchango')
+            .update({ current_amount: newAmount })
+            .eq('id', donation.mchango_id);
+
+          if (updateError) {
+            console.error('Error updating mchango amount:', updateError);
+          } else {
+            console.log(`Mchango current_amount updated: ${mchango.current_amount} -> ${newAmount}`);
+          }
+        }
+        
+        // Record commission as company earnings (15%)
+        const commissionAmount = actualAmount * 0.15;
+        await supabaseClient
+          .from('company_earnings')
+          .insert({
+            source: 'mchango_donation',
+            amount: commissionAmount,
+            reference_id: donation.id,
+            description: `15% commission on donation of KES ${actualAmount}`
+          });
+        
+        console.log('Commission recorded:', commissionAmount);
+      }
 
       return new Response(
         JSON.stringify({
