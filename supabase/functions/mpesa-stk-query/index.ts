@@ -28,7 +28,7 @@ serve(async (req) => {
 
     const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY") ?? "";
     const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET") ?? "";
-    const shortcode = Deno.env.get("MPESA_SHORTCODE") ?? "174379";
+    const shortcode = Deno.env.get("MPESA_SHORTCODE") ?? "3576787";
     const passkey = Deno.env.get("MPESA_PASSKEY") ?? "";
 
     if (!consumerKey || !consumerSecret || !passkey) {

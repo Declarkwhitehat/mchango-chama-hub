@@ -85,8 +85,24 @@ serve(async (req) => {
 
     const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY') ?? '';
     const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? '';
-    const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? '174379'; // sandbox default
+    const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? '3576787';
     const passkey = Deno.env.get('MPESA_PASSKEY') ?? '';
+    const tillNumber = Deno.env.get('MPESA_TILL_NUMBER') ?? '';
+
+    // Validate credentials
+    if (!consumerKey || !consumerSecret || !passkey || !tillNumber) {
+      console.error('Missing M-Pesa credentials:', {
+        hasConsumerKey: !!consumerKey,
+        hasConsumerSecret: !!consumerSecret,
+        hasPasskey: !!passkey,
+        hasShortcode: !!shortcode,
+        hasTillNumber: !!tillNumber
+      });
+      return new Response(
+        JSON.stringify({ error: 'M-Pesa not configured. Please contact support.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // --- Step 1: Get Access Token (PRODUCTION) ---
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
@@ -94,10 +110,21 @@ serve(async (req) => {
       'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
       { headers: { Authorization: `Basic ${auth}` } }
     );
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('OAuth failed:', tokenResponse.status, errorText);
+      return new Response(
+        JSON.stringify({ error: 'Failed to authenticate with M-Pesa. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const tokenData = await tokenResponse.json();
-    console.log('Access Token Response:', tokenData);
+    console.log('Access Token Response:', { hasToken: !!tokenData.access_token });
 
     if (!tokenData.access_token) {
+      console.error('No access token in response:', tokenData);
       throw new Error('Failed to get access token from Safaricom.');
     }
 
@@ -110,22 +137,22 @@ serve(async (req) => {
     const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`;
     console.log('Using Callback URL:', callbackUrl);
 
-    // --- Step 2: Prepare STK Push Payload ---
+    // --- Step 2: Prepare STK Push Payload (Buy Goods for Till Number) ---
     const payload = {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
+      TransactionType: 'CustomerBuyGoodsOnline', // Changed for Till Number
       Amount: body.amount,
       PartyA: normalizedPhone,
-      PartyB: shortcode,
+      PartyB: tillNumber, // Till Number instead of shortcode
       PhoneNumber: normalizedPhone,
       CallBackURL: callbackUrl,
       AccountReference: body.account_reference || 'Donation',
       TransactionDesc: body.transaction_desc || 'Donation Payment',
     };
 
-    console.log('STK Push payload:', { ...payload, Password: '****' });
+    console.log('STK Push payload:', { ...payload, Password: '****', PartyB: tillNumber });
 
     // --- Step 3: Send STK Push (PRODUCTION) ---
     const stkResponse = await fetch(
