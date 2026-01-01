@@ -597,6 +597,8 @@ export type Database = {
           group_code: string | null
           id: string
           image_url: string | null
+          image_url_2: string | null
+          image_url_3: string | null
           is_public: boolean | null
           managers: string[] | null
           slug: string
@@ -605,6 +607,7 @@ export type Database = {
           title: string
           updated_at: string
           whatsapp_link: string | null
+          youtube_url: string | null
         }
         Insert: {
           beneficiary_url?: string | null
@@ -617,6 +620,8 @@ export type Database = {
           group_code?: string | null
           id?: string
           image_url?: string | null
+          image_url_2?: string | null
+          image_url_3?: string | null
           is_public?: boolean | null
           managers?: string[] | null
           slug: string
@@ -625,6 +630,7 @@ export type Database = {
           title: string
           updated_at?: string
           whatsapp_link?: string | null
+          youtube_url?: string | null
         }
         Update: {
           beneficiary_url?: string | null
@@ -637,6 +643,8 @@ export type Database = {
           group_code?: string | null
           id?: string
           image_url?: string | null
+          image_url_2?: string | null
+          image_url_3?: string | null
           is_public?: boolean | null
           managers?: string[] | null
           slug?: string
@@ -645,6 +653,7 @@ export type Database = {
           title?: string
           updated_at?: string
           whatsapp_link?: string | null
+          youtube_url?: string | null
         }
         Relationships: [
           {
