@@ -9,15 +9,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, X, Youtube, ImagePlus } from "lucide-react";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 
 const MchangoCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>("");
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>(["", "", ""]);
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ const MchangoCreate = () => {
     checkKycStatus();
   }, [navigate]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -56,8 +57,29 @@ const MchangoCreate = () => {
       return;
     }
 
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    const newFiles = [...imageFiles];
+    newFiles[index] = file;
+    setImageFiles(newFiles);
+
+    const newPreviews = [...imagePreviews];
+    newPreviews[index] = URL.createObjectURL(file);
+    setImagePreviews(newPreviews);
+  };
+
+  const removeImage = (index: number) => {
+    const newFiles = [...imageFiles];
+    newFiles[index] = null;
+    setImageFiles(newFiles);
+
+    const newPreviews = [...imagePreviews];
+    newPreviews[index] = "";
+    setImagePreviews(newPreviews);
+  };
+
+  const validateYoutubeUrl = (url: string): boolean => {
+    if (!url) return true; // Optional field
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/;
+    return youtubeRegex.test(url);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -65,6 +87,13 @@ const MchangoCreate = () => {
     setIsLoading(true);
 
     try {
+      // Validate YouTube URL
+      if (youtubeUrl && !validateYoutubeUrl(youtubeUrl)) {
+        toast.error("Please enter a valid YouTube URL");
+        setIsLoading(false);
+        return;
+      }
+
       // Ensure session is valid before submitting
       const { data: { session } } = await supabase.auth.getSession();
       const { data: userCheck } = await supabase.auth.getUser();
@@ -74,28 +103,32 @@ const MchangoCreate = () => {
         navigate("/auth");
         return;
       }
-      let imageUrl = null;
 
-      // Upload image if one was selected
-      if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${userCheck.user.id}/campaign-${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('campaign-images')
-          .upload(fileName, imageFile);
+      // Upload images
+      const imageUrls: (string | null)[] = [null, null, null];
+      
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        if (file) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${userCheck.user.id}/campaign-${Date.now()}-${i}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('campaign-images')
+            .upload(fileName, file);
 
-        if (uploadError) {
-          console.error("Image upload error:", uploadError);
-          throw new Error("Failed to upload image");
+          if (uploadError) {
+            console.error(`Image ${i + 1} upload error:`, uploadError);
+            throw new Error(`Failed to upload image ${i + 1}`);
+          }
+
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('campaign-images')
+            .getPublicUrl(fileName);
+
+          imageUrls[i] = urlData.publicUrl;
         }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('campaign-images')
-          .getPublicUrl(fileName);
-
-        imageUrl = urlData.publicUrl;
       }
 
       const form = formRef.current;
@@ -109,7 +142,10 @@ const MchangoCreate = () => {
         description: formData.get("description") as string,
         target_amount: Number(formData.get("goal")),
         category: formData.get("category") as string,
-        image_url: imageUrl,
+        image_url: imageUrls[0],
+        image_url_2: imageUrls[1],
+        image_url_3: imageUrls[2],
+        youtube_url: youtubeUrl || null,
         end_date: new Date(Date.now() + Number(formData.get("duration")) * 24 * 60 * 60 * 1000).toISOString(),
       };
 
@@ -281,42 +317,70 @@ const MchangoCreate = () => {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="image">Campaign Image (optional)</Label>
-                <Input
-                  id="image"
-                  name="image"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  disabled={kycStatus !== "approved"}
-                  className="cursor-pointer"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Recommended: Square image, at least 800x800px, max 5MB
+              <div className="space-y-4">
+                <Label>Campaign Images (up to 3)</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Add photos to tell your story. Recommended: At least 800x800px, max 5MB each
                 </p>
                 
-                {imagePreview && (
-                  <div className="mt-4 border rounded-lg overflow-hidden">
-                    <img 
-                      src={imagePreview} 
-                      alt="Campaign preview" 
-                      className="w-full h-48 object-cover"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setImageFile(null);
-                        setImagePreview("");
-                      }}
-                      className="w-full"
-                    >
-                      Remove Image
-                    </Button>
-                  </div>
-                )}
+                <div className="grid grid-cols-3 gap-4">
+                  {[0, 1, 2].map((index) => (
+                    <div key={index} className="relative">
+                      {imagePreviews[index] ? (
+                        <div className="border rounded-lg overflow-hidden">
+                          <img 
+                            src={imagePreviews[index]} 
+                            alt={`Preview ${index + 1}`} 
+                            className="w-full h-24 object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeImage(index)}
+                            className="absolute top-1 right-1 h-6 w-6 p-0 bg-background/80 hover:bg-background"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors">
+                          <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground mt-1">
+                            {index === 0 ? "Main" : `Photo ${index + 1}`}
+                          </span>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange(index)}
+                            disabled={kycStatus !== "approved"}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="youtube">YouTube Video (optional)</Label>
+                <div className="relative">
+                  <Youtube className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="youtube"
+                    name="youtube"
+                    type="url"
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    disabled={kycStatus !== "approved"}
+                    className="pl-10"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Add a video to share your story with potential donors
+                </p>
               </div>
 
               <div className="pt-4">

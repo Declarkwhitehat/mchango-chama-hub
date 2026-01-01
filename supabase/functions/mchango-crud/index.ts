@@ -211,6 +211,9 @@ serve(async (req) => {
           slug: slug,
           created_by: user.id,
           image_url: body.image_url,
+          image_url_2: body.image_url_2,
+          image_url_3: body.image_url_3,
+          youtube_url: body.youtube_url,
         })
         .select()
         .single();

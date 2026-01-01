@@ -28,10 +28,21 @@ interface Campaign {
   end_date: string;
   created_at: string;
   image_url?: string;
+  image_url_2?: string;
+  image_url_3?: string;
+  youtube_url?: string;
   whatsapp_link?: string;
   created_by: string;
   group_code?: string;
 }
+
+// Helper to convert YouTube URL to embed URL
+const getYoutubeEmbedUrl = (url: string): string => {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  const videoId = match && match[2].length === 11 ? match[2] : null;
+  return videoId ? `https://www.youtube.com/embed/${videoId}` : '';
+};
 
 const MchangoDetail = () => {
   const { id } = useParams(); // This will be the slug
@@ -141,12 +152,48 @@ const MchangoDetail = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {campaign.image_url && (
-              <img 
-                src={campaign.image_url} 
-                alt={campaign.title}
-                className="w-full rounded-lg object-cover max-h-[400px]"
-              />
+            {/* Image Gallery */}
+            {(campaign.image_url || campaign.image_url_2 || campaign.image_url_3) && (
+              <div className="space-y-2">
+                {campaign.image_url && (
+                  <img 
+                    src={campaign.image_url} 
+                    alt={campaign.title}
+                    className="w-full rounded-lg object-cover max-h-[400px]"
+                  />
+                )}
+                {(campaign.image_url_2 || campaign.image_url_3) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {campaign.image_url_2 && (
+                      <img 
+                        src={campaign.image_url_2} 
+                        alt={`${campaign.title} - Photo 2`}
+                        className="w-full rounded-lg object-cover h-48"
+                      />
+                    )}
+                    {campaign.image_url_3 && (
+                      <img 
+                        src={campaign.image_url_3} 
+                        alt={`${campaign.title} - Photo 3`}
+                        className="w-full rounded-lg object-cover h-48"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* YouTube Video */}
+            {campaign.youtube_url && (
+              <div className="aspect-video rounded-lg overflow-hidden">
+                <iframe
+                  src={getYoutubeEmbedUrl(campaign.youtube_url)}
+                  title="Campaign Video"
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
             )}
             
             <p className="text-foreground leading-relaxed whitespace-pre-wrap">
