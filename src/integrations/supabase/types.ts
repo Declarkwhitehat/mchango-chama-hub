@@ -594,6 +594,7 @@ export type Database = {
           current_amount: number
           description: string | null
           end_date: string | null
+          group_code: string | null
           id: string
           image_url: string | null
           is_public: boolean | null
@@ -613,6 +614,7 @@ export type Database = {
           current_amount?: number
           description?: string | null
           end_date?: string | null
+          group_code?: string | null
           id?: string
           image_url?: string | null
           is_public?: boolean | null
@@ -632,6 +634,7 @@ export type Database = {
           current_amount?: number
           description?: string | null
           end_date?: string | null
+          group_code?: string | null
           id?: string
           image_url?: string | null
           is_public?: boolean | null
@@ -2025,6 +2028,7 @@ export type Database = {
       generate_group_code: { Args: never; Returns: string }
       generate_group_invite_code: { Args: never; Returns: string }
       generate_invite_code: { Args: never; Returns: string }
+      generate_mchango_code: { Args: never; Returns: string }
       generate_member_code: {
         Args: { p_chama_id: string; p_order_index: number }
         Returns: string

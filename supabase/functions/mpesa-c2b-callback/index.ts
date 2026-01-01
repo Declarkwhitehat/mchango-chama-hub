@@ -65,14 +65,18 @@ serve(async (req) => {
     const [, groupCode, memberNumber] = match;
     console.log(`Parsed account number - Group: ${groupCode}, Member: ${memberNumber}`);
 
-    // Check for duplicate payment (same M-Pesa receipt number)
-    const { data: existingPayment } = await supabase
-      .from('contributions')
-      .select('id')
-      .eq('payment_reference', mpesaReceiptNumber)
-      .single();
+    // Check for duplicate payment (same M-Pesa receipt number) across all tables
+    const [
+      { data: existingContribution },
+      { data: existingDeposit },
+      { data: existingDonation }
+    ] = await Promise.all([
+      supabase.from('contributions').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
+      supabase.from('saving_deposits').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
+      supabase.from('mchango_donations').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
+    ]);
 
-    if (existingPayment) {
+    if (existingContribution || existingDeposit || existingDonation) {
       console.log('Duplicate payment detected:', mpesaReceiptNumber);
       return new Response(
         JSON.stringify({ 
@@ -220,12 +224,78 @@ serve(async (req) => {
       );
     }
 
-    // Member not found in either table
-    console.error('Member not found for account number:', accountNumber);
+    // Try mchango (fundraising campaign) - matches by group_code directly
+    const { data: mchangoData } = await supabase
+      .from('mchango')
+      .select('id, group_code, title, current_amount')
+      .eq('group_code', accountNumber.toUpperCase())
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (mchangoData) {
+      console.log('Found Mchango campaign:', mchangoData);
+
+      // Calculate commission (15% for mchango)
+      const commissionRate = 0.15;
+      const grossAmount = parseFloat(amount);
+      const commissionAmount = grossAmount * commissionRate;
+      const netAmount = grossAmount - commissionAmount;
+
+      // Create donor display name
+      const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+
+      // Record mchango donation
+      const { error: donationError } = await supabase
+        .from('mchango_donations')
+        .insert({
+          mchango_id: mchangoData.id,
+          amount: grossAmount,
+          display_name: displayName || 'Anonymous',
+          phone: phoneNumber,
+          is_anonymous: false,
+          payment_reference: mpesaReceiptNumber,
+          payment_method: 'mpesa_offline',
+          payment_status: 'completed',
+          completed_at: new Date().toISOString(),
+        });
+
+      if (donationError) {
+        console.error('Error recording mchango donation:', donationError);
+        throw donationError;
+      }
+
+      console.log('Mchango donation recorded successfully');
+
+      // Send SMS notification
+      try {
+        await supabase.functions.invoke('send-transactional-sms', {
+          body: {
+            phone: phoneNumber,
+            message: `Thank you for your donation of KSh ${amount} to "${mchangoData.title}". Receipt: ${mpesaReceiptNumber}`,
+          },
+        });
+      } catch (smsError) {
+        console.error('Error sending SMS:', smsError);
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          ResultCode: 0, 
+          ResultDesc: 'Donation accepted and recorded for Mchango',
+          type: 'mchango'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Not found in any table
+    console.error('Account not found:', accountNumber);
     return new Response(
       JSON.stringify({ 
         ResultCode: 1, 
-        ResultDesc: `Member not found with ID: ${accountNumber}. Please verify your member ID.` 
+        ResultDesc: `Account not found with ID: ${accountNumber}. Please verify your payment code.` 
       }),
       { 
         status: 404,
