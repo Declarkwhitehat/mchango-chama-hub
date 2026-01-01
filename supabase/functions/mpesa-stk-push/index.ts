@@ -89,20 +89,19 @@ serve(async (req) => {
     const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? '';
     const passkey = Deno.env.get('MPESA_PASSKEY') ?? '';
 
-    // This project is configured for "Buy Goods" via a Till Number.
-    // For this flow, Safaricom expects BusinessShortCode + PartyB to be the Till number.
+    // For Buy Goods (Till):
+    // - BusinessShortCode must be the Store/Head Office number (often 6-7 digits)
+    // - PartyB is the actual Till number
+    const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? '';
     const tillNumber = Deno.env.get('MPESA_TILL_NUMBER') ?? '';
-    const shortcode = tillNumber;
-
-    // (Optional) Store/Head Office number if you have it, but not required for Till STK.
-    const storeNumber = Deno.env.get('MPESA_SHORTCODE') ?? '';
 
     // Validate credentials
-    if (!consumerKey || !consumerSecret || !passkey || !tillNumber) {
+    if (!consumerKey || !consumerSecret || !passkey || !shortcode || !tillNumber) {
       console.error('Missing M-Pesa credentials:', {
         hasConsumerKey: !!consumerKey,
         hasConsumerSecret: !!consumerSecret,
         hasPasskey: !!passkey,
+        hasShortcode: !!shortcode,
         hasTillNumber: !!tillNumber,
       });
       return new Response(
@@ -111,7 +110,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('M-Pesa config:', { tillNumber, storeNumber, effectiveShortcode: shortcode });
+    console.log('M-Pesa config:', { shortcode, tillNumber });
 
     // --- Step 1: Get Access Token (PRODUCTION) ---
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
@@ -146,9 +145,9 @@ serve(async (req) => {
     const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`;
     console.log('Using Callback URL:', callbackUrl);
 
-    // --- Step 2: Prepare STK Push Payload ---
-    // NOTE: Safaricom expects PartyB to match BusinessShortCode for STK push.
-    // If these differ, the request may be accepted but later fail (no prompt on phone).
+    // --- Step 2: Prepare STK Push Payload (Buy Goods to Till) ---
+    // BusinessShortCode = Store/Head Office number (shortcode)
+    // PartyB = Till number
     const payload = {
       BusinessShortCode: shortcode,
       Password: password,
@@ -156,7 +155,7 @@ serve(async (req) => {
       TransactionType: 'CustomerBuyGoodsOnline',
       Amount: body.amount,
       PartyA: normalizedPhone,
-      PartyB: shortcode,
+      PartyB: tillNumber,
       PhoneNumber: normalizedPhone,
       CallBackURL: callbackUrl,
       AccountReference: body.account_reference || 'Donation',
