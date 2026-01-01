@@ -15,6 +15,9 @@ import MchangoList from "./pages/MchangoList";
 import MchangoCreate from "./pages/MchangoCreate";
 import MchangoDetail from "./pages/MchangoDetail";
 import MchangoExplore from "./pages/MchangoExplore";
+import OrganizationList from "./pages/OrganizationList";
+import OrganizationCreate from "./pages/OrganizationCreate";
+import OrganizationDetail from "./pages/OrganizationDetail";
 import ChamaCreate from "./pages/ChamaCreate";
 import ChamaDetail from "./pages/ChamaDetail";
 import ChamaJoin from "./pages/ChamaJoin";
@@ -73,6 +76,9 @@ const AppContent = () => {
           <Route path="/mchango/create" element={<ProtectedRoute requireKYC><MchangoCreate /></ProtectedRoute>} />
           <Route path="/mchango/:id" element={<MchangoDetail />} />
           <Route path="/explore/mchango" element={<MchangoExplore />} />
+          <Route path="/organizations" element={<OrganizationList />} />
+          <Route path="/organizations/create" element={<ProtectedRoute requireKYC><OrganizationCreate /></ProtectedRoute>} />
+          <Route path="/organizations/:id" element={<OrganizationDetail />} />
           <Route path="/chama" element={<ChamaList />} />
           <Route path="/chama/create" element={<ProtectedRoute requireKYC><ChamaCreate /></ProtectedRoute>} />
           <Route path="/chama/join/:slug" element={<ChamaJoin />} />
