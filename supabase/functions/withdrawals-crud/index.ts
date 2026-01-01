@@ -400,6 +400,29 @@ serve(async (req) => {
         });
       }
 
+      // Get the withdrawal with payment method details
+      const { data: existingWithdrawal, error: fetchError } = await supabaseClient
+        .from('withdrawals')
+        .select(`
+          *,
+          payment_method:payment_methods(
+            method_type,
+            phone_number,
+            bank_name,
+            account_number
+          )
+        `)
+        .eq('id', withdrawal_id)
+        .single();
+
+      if (fetchError || !existingWithdrawal) {
+        return new Response(JSON.stringify({ error: 'Withdrawal not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Update withdrawal status
       const { data: withdrawal, error } = await supabaseClient
         .from('withdrawals')
         .update({
@@ -416,6 +439,45 @@ serve(async (req) => {
       if (error) throw error;
 
       console.log('Withdrawal updated:', withdrawal);
+
+      // If approved and payment method is M-Pesa, trigger automatic B2C payout
+      if (status === 'approved' && existingWithdrawal.payment_method?.method_type === 'mpesa') {
+        const phoneNumber = existingWithdrawal.payment_method.phone_number;
+        
+        if (phoneNumber) {
+          console.log('Triggering automatic M-Pesa B2C payout for:', withdrawal_id);
+          
+          // Trigger B2C payout asynchronously
+          const supabaseUrl = Deno.env.get('SUPABASE_URL');
+          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+          
+          // Fire and forget - don't wait for B2C to complete
+          fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${serviceRoleKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              withdrawal_id: withdrawal_id,
+              phone_number: phoneNumber,
+              amount: existingWithdrawal.net_amount
+            })
+          }).then(async (res) => {
+            const result = await res.json();
+            console.log('B2C payout triggered:', result);
+          }).catch((err) => {
+            console.error('Failed to trigger B2C payout:', err);
+          });
+
+          return new Response(JSON.stringify({ 
+            data: withdrawal,
+            message: 'Withdrawal approved. M-Pesa B2C payout initiated automatically.'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
 
       return new Response(JSON.stringify({ data: withdrawal }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

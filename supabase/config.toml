@@ -101,3 +101,9 @@ verify_jwt = true
 
 [functions.chama-start-new-cycle]
 verify_jwt = true
+
+[functions.mpesa-b2c-payout]
+verify_jwt = true
+
+[functions.mpesa-b2c-callback]
+verify_jwt = false
