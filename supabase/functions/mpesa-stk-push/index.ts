@@ -88,26 +88,30 @@ serve(async (req) => {
     const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY') ?? '';
     const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? '';
     const passkey = Deno.env.get('MPESA_PASSKEY') ?? '';
+
+    // This project is configured for "Buy Goods" via a Till Number.
+    // For this flow, Safaricom expects BusinessShortCode + PartyB to be the Till number.
     const tillNumber = Deno.env.get('MPESA_TILL_NUMBER') ?? '';
-    // For Buy Goods (Till), BusinessShortCode = Store/Head Office Number, PartyB = Till Number
-    const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? '';
+    const shortcode = tillNumber;
+
+    // (Optional) Store/Head Office number if you have it, but not required for Till STK.
+    const storeNumber = Deno.env.get('MPESA_SHORTCODE') ?? '';
 
     // Validate credentials
-    if (!consumerKey || !consumerSecret || !passkey || !tillNumber || !shortcode) {
+    if (!consumerKey || !consumerSecret || !passkey || !tillNumber) {
       console.error('Missing M-Pesa credentials:', {
         hasConsumerKey: !!consumerKey,
         hasConsumerSecret: !!consumerSecret,
         hasPasskey: !!passkey,
         hasTillNumber: !!tillNumber,
-        hasShortcode: !!shortcode
       });
       return new Response(
         JSON.stringify({ error: 'M-Pesa not configured. Please contact support.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    console.log('M-Pesa config:', { shortcode, tillNumber });
+
+    console.log('M-Pesa config:', { tillNumber, storeNumber, effectiveShortcode: shortcode });
 
     // --- Step 1: Get Access Token (PRODUCTION) ---
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
