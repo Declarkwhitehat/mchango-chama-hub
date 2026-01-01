@@ -13,7 +13,7 @@ import { DonorsList } from "@/components/DonorsList";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
-import { MchangoOfflinePayment } from "@/components/MchangoOfflinePayment";
+
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Campaign {
@@ -40,23 +40,10 @@ const MchangoDetail = () => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
-  const [paybillNumber, setPaybillNumber] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCampaign();
-    fetchPaymentConfig();
   }, [id]);
-
-  const fetchPaymentConfig = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('payment-config');
-      if (!error && data?.shortcode) {
-        setPaybillNumber(data.shortcode);
-      }
-    } catch (error) {
-      console.error('Error fetching payment config:', error);
-    }
-  };
 
   const fetchCampaign = async () => {
     try {
@@ -204,14 +191,6 @@ const MchangoDetail = () => {
         {/* Withdrawal History - Visible to all */}
         <WithdrawalHistory mchangoId={campaign.id} />
 
-        {/* Offline Payment Instructions */}
-        {campaign.group_code && (
-          <MchangoOfflinePayment 
-            groupCode={campaign.group_code} 
-            campaignTitle={campaign.title}
-            paybillNumber={paybillNumber || undefined}
-          />
-        )}
 
         {/* Two Column Layout: Donate Form & Contributors */}
         <div className="grid md:grid-cols-2 gap-6">
