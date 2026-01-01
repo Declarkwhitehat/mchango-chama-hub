@@ -13,6 +13,7 @@ import { DonorsList } from "@/components/DonorsList";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
+import { MchangoOfflinePayment } from "@/components/MchangoOfflinePayment";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Campaign {
@@ -29,6 +30,7 @@ interface Campaign {
   image_url?: string;
   whatsapp_link?: string;
   created_by: string;
+  group_code?: string;
 }
 
 const MchangoDetail = () => {
@@ -188,6 +190,14 @@ const MchangoDetail = () => {
 
         {/* Withdrawal History - Visible to all */}
         <WithdrawalHistory mchangoId={campaign.id} />
+
+        {/* Offline Payment Instructions */}
+        {campaign.group_code && (
+          <MchangoOfflinePayment 
+            groupCode={campaign.group_code} 
+            campaignTitle={campaign.title}
+          />
+        )}
 
         {/* Two Column Layout: Donate Form & Contributors */}
         <div className="grid md:grid-cols-2 gap-6">
