@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, TrendingUp, Calendar, Heart } from "lucide-react";
+import { Search, TrendingUp, Calendar, Heart, Share2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -100,6 +100,16 @@ const MchangoList = () => {
     return diffDays > 0 ? diffDays : 0;
   };
 
+  const handleSharePublicLink = async () => {
+    const publicUrl = `${window.location.origin}/explore/mchango`;
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      toast.success("Public link copied! Share it with anyone.");
+    } catch {
+      toast.error("Failed to copy link");
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -114,11 +124,15 @@ const MchangoList = () => {
     <Layout>
       <div className="container px-4 py-8 max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold">Mchango Campaigns</h1>
           <p className="text-muted-foreground">
             Support meaningful causes and make a difference in people's lives
           </p>
+          <Button variant="outline" onClick={handleSharePublicLink} className="gap-2">
+            <Share2 className="h-4 w-4" />
+            Share Public Link
+          </Button>
         </div>
 
         {/* Search and Filter */}
