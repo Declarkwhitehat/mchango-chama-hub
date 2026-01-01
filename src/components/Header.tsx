@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogIn, UserPlus, Users, Heart, PiggyBank, User, LogOut, Activity, Settings, ChevronDown, LayoutDashboard } from "lucide-react";
+import { Menu, X, LogIn, UserPlus, Users, Heart, PiggyBank, User, LogOut, Activity, Settings, ChevronDown, LayoutDashboard, Building2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -101,7 +101,15 @@ export const Header = () => {
                   className="gap-2"
                 >
                   <Heart className="h-4 w-4" />
-                  Browse Campaigns
+                  Campaigns
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => navigate('/organizations')}
+                  className="gap-2"
+                >
+                  <Building2 className="h-4 w-4" />
+                  Organizations
                 </Button>
                 {user && profile?.kyc_status === 'approved' && (
                   <Button 
@@ -235,7 +243,18 @@ export const Header = () => {
                     className="w-full justify-start gap-2"
                   >
                     <Heart className="h-4 w-4" />
-                    Browse Campaigns
+                    Campaigns
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      navigate('/organizations');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <Building2 className="h-4 w-4" />
+                    Organizations
                   </Button>
                   {user && profile?.kyc_status === 'approved' && (
                     <Button 

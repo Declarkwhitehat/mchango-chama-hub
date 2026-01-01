@@ -781,6 +781,152 @@ export type Database = {
           },
         ]
       }
+      organization_donations: {
+        Row: {
+          amount: number
+          completed_at: string | null
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          is_anonymous: boolean
+          organization_id: string
+          payment_method: string | null
+          payment_reference: string
+          payment_status: string
+          phone: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          completed_at?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          is_anonymous?: boolean
+          organization_id: string
+          payment_method?: string | null
+          payment_reference: string
+          payment_status?: string
+          phone?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          completed_at?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          is_anonymous?: boolean
+          organization_id?: string
+          payment_method?: string | null
+          payment_reference?: string
+          payment_status?: string
+          phone?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_donations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_donations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          about: string | null
+          category: string
+          cover_image_url: string | null
+          created_at: string
+          created_by: string
+          current_amount: number
+          description: string | null
+          email: string | null
+          group_code: string | null
+          id: string
+          is_public: boolean | null
+          is_verified: boolean | null
+          location: string | null
+          logo_url: string | null
+          name: string
+          phone: string | null
+          slug: string
+          status: string
+          updated_at: string
+          website_url: string | null
+          whatsapp_link: string | null
+          youtube_url: string | null
+        }
+        Insert: {
+          about?: string | null
+          category: string
+          cover_image_url?: string | null
+          created_at?: string
+          created_by: string
+          current_amount?: number
+          description?: string | null
+          email?: string | null
+          group_code?: string | null
+          id?: string
+          is_public?: boolean | null
+          is_verified?: boolean | null
+          location?: string | null
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          slug: string
+          status?: string
+          updated_at?: string
+          website_url?: string | null
+          whatsapp_link?: string | null
+          youtube_url?: string | null
+        }
+        Update: {
+          about?: string | null
+          category?: string
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string
+          current_amount?: number
+          description?: string | null
+          email?: string | null
+          group_code?: string | null
+          id?: string
+          is_public?: boolean | null
+          is_verified?: boolean | null
+          location?: string | null
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          slug?: string
+          status?: string
+          updated_at?: string
+          website_url?: string | null
+          whatsapp_link?: string | null
+          youtube_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       otp_verifications: {
         Row: {
           attempts: number | null
@@ -2042,6 +2188,7 @@ export type Database = {
         Args: { p_chama_id: string; p_order_index: number }
         Returns: string
       }
+      generate_org_code: { Args: never; Returns: string }
       generate_short_member_code: {
         Args: { p_group_code: string; p_member_number: number }
         Returns: string
