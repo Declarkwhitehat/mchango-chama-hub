@@ -142,22 +142,24 @@ serve(async (req) => {
     const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`;
     console.log('Using Callback URL:', callbackUrl);
 
-    // --- Step 2: Prepare STK Push Payload (Buy Goods for Till Number) ---
+    // --- Step 2: Prepare STK Push Payload ---
+    // NOTE: Safaricom expects PartyB to match BusinessShortCode for STK push.
+    // If these differ, the request may be accepted but later fail (no prompt on phone).
     const payload = {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
-      TransactionType: 'CustomerBuyGoodsOnline', // Changed for Till Number
+      TransactionType: 'CustomerBuyGoodsOnline',
       Amount: body.amount,
       PartyA: normalizedPhone,
-      PartyB: tillNumber, // Till Number instead of shortcode
+      PartyB: shortcode,
       PhoneNumber: normalizedPhone,
       CallBackURL: callbackUrl,
       AccountReference: body.account_reference || 'Donation',
       TransactionDesc: body.transaction_desc || 'Donation Payment',
     };
 
-    console.log('STK Push payload:', { ...payload, Password: '****', PartyB: tillNumber });
+    console.log('STK Push payload:', { ...payload, Password: '****' });
 
     // --- Step 3: Send STK Push (PRODUCTION) ---
     const stkResponse = await fetch(
