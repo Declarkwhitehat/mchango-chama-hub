@@ -8,13 +8,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 interface MchangoOfflinePaymentProps {
   groupCode: string;
   campaignTitle: string;
-  tillNumber?: string;
+  paybillNumber?: string;
 }
 
 export const MchangoOfflinePayment = ({ 
   groupCode, 
   campaignTitle,
-  tillNumber 
+  paybillNumber 
 }: MchangoOfflinePaymentProps) => {
   
   const copyToClipboard = (text: string, label: string) => {
@@ -67,14 +67,14 @@ export const MchangoOfflinePayment = ({
               <Badge variant="outline" className="h-6 w-6 shrink-0 items-center justify-center rounded-full p-0">3</Badge>
               <div className="flex items-center gap-2 flex-wrap">
                 <span>Enter Business Number:</span>
-                {tillNumber ? (
+                {paybillNumber ? (
                   <>
-                    <code className="bg-muted px-2 py-0.5 rounded font-mono font-bold">{tillNumber}</code>
+                    <code className="bg-muted px-2 py-0.5 rounded font-mono font-bold">{paybillNumber}</code>
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       className="h-6 w-6 p-0"
-                      onClick={() => copyToClipboard(tillNumber, "Business number")}
+                      onClick={() => copyToClipboard(paybillNumber, "Business number")}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>

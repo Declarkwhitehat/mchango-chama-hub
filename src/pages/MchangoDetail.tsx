@@ -40,7 +40,7 @@ const MchangoDetail = () => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
-  const [tillNumber, setTillNumber] = useState<string | null>(null);
+  const [paybillNumber, setPaybillNumber] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCampaign();
@@ -50,8 +50,8 @@ const MchangoDetail = () => {
   const fetchPaymentConfig = async () => {
     try {
       const { data, error } = await supabase.functions.invoke('payment-config');
-      if (!error && data?.tillNumber) {
-        setTillNumber(data.tillNumber);
+      if (!error && data?.shortcode) {
+        setPaybillNumber(data.shortcode);
       }
     } catch (error) {
       console.error('Error fetching payment config:', error);
@@ -209,7 +209,7 @@ const MchangoDetail = () => {
           <MchangoOfflinePayment 
             groupCode={campaign.group_code} 
             campaignTitle={campaign.title}
-            tillNumber={tillNumber || undefined}
+            paybillNumber={paybillNumber || undefined}
           />
         )}
 
