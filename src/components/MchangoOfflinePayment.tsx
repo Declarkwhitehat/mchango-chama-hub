@@ -61,12 +61,12 @@ export const MchangoOfflinePayment = ({
             </li>
             <li className="flex gap-3">
               <Badge variant="outline" className="h-6 w-6 shrink-0 items-center justify-center rounded-full p-0">2</Badge>
-              <span>Select <strong>Buy Goods and Services</strong></span>
+              <span>Select <strong>Paybill</strong></span>
             </li>
             <li className="flex gap-3">
               <Badge variant="outline" className="h-6 w-6 shrink-0 items-center justify-center rounded-full p-0">3</Badge>
               <div className="flex items-center gap-2 flex-wrap">
-                <span>Enter Till Number:</span>
+                <span>Enter Business Number:</span>
                 {tillNumber ? (
                   <>
                     <code className="bg-muted px-2 py-0.5 rounded font-mono font-bold">{tillNumber}</code>
@@ -74,24 +74,20 @@ export const MchangoOfflinePayment = ({
                       variant="ghost" 
                       size="sm" 
                       className="h-6 w-6 p-0"
-                      onClick={() => copyToClipboard(tillNumber, "Till number")}
+                      onClick={() => copyToClipboard(tillNumber, "Business number")}
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
                   </>
                 ) : (
-                  <span className="text-muted-foreground italic">Contact admin for till number</span>
+                  <span className="text-muted-foreground italic">Contact admin for business number</span>
                 )}
               </div>
             </li>
             <li className="flex gap-3">
               <Badge variant="outline" className="h-6 w-6 shrink-0 items-center justify-center rounded-full p-0">4</Badge>
-              <span>Enter the amount you wish to donate</span>
-            </li>
-            <li className="flex gap-3">
-              <Badge variant="outline" className="h-6 w-6 shrink-0 items-center justify-center rounded-full p-0">5</Badge>
               <div>
-                <span>When prompted for <strong>Account Number</strong>, enter:</span>
+                <span>Enter <strong>Account Number</strong>:</span>
                 <div className="flex items-center gap-2 mt-1">
                   <code className="bg-primary/10 text-primary px-3 py-1 rounded font-mono font-bold text-lg">{groupCode}</code>
                   <Button 
@@ -104,6 +100,10 @@ export const MchangoOfflinePayment = ({
                   </Button>
                 </div>
               </div>
+            </li>
+            <li className="flex gap-3">
+              <Badge variant="outline" className="h-6 w-6 shrink-0 items-center justify-center rounded-full p-0">5</Badge>
+              <span>Enter the amount you wish to donate</span>
             </li>
             <li className="flex gap-3">
               <Badge variant="outline" className="h-6 w-6 shrink-0 items-center justify-center rounded-full p-0">6</Badge>
