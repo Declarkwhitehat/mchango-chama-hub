@@ -1,16 +1,21 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Smartphone, Building2 } from "lucide-react";
+import { Copy, Smartphone, Building2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface MchangoOfflinePaymentProps {
   groupCode: string;
   campaignTitle: string;
+  tillNumber?: string;
 }
 
-export const MchangoOfflinePayment = ({ groupCode, campaignTitle }: MchangoOfflinePaymentProps) => {
-  const tillNumber = "5680227"; // Default till number - can be made configurable
+export const MchangoOfflinePayment = ({ 
+  groupCode, 
+  campaignTitle,
+  tillNumber 
+}: MchangoOfflinePaymentProps) => {
   
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -60,17 +65,23 @@ export const MchangoOfflinePayment = ({ groupCode, campaignTitle }: MchangoOffli
             </li>
             <li className="flex gap-3">
               <Badge variant="outline" className="h-6 w-6 shrink-0 items-center justify-center rounded-full p-0">3</Badge>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span>Enter Till Number:</span>
-                <code className="bg-muted px-2 py-0.5 rounded font-mono font-bold">{tillNumber}</code>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 w-6 p-0"
-                  onClick={() => copyToClipboard(tillNumber, "Till number")}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
+                {tillNumber ? (
+                  <>
+                    <code className="bg-muted px-2 py-0.5 rounded font-mono font-bold">{tillNumber}</code>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-6 p-0"
+                      onClick={() => copyToClipboard(tillNumber, "Till number")}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground italic">Contact admin for till number</span>
+                )}
               </div>
             </li>
             <li className="flex gap-3">
