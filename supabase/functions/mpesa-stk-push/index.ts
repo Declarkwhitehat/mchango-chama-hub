@@ -89,16 +89,17 @@ serve(async (req) => {
     const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? '';
     const passkey = Deno.env.get('MPESA_PASSKEY') ?? '';
     const tillNumber = Deno.env.get('MPESA_TILL_NUMBER') ?? '';
-    // For Buy Goods (Till), use the Till Number as both BusinessShortCode and PartyB
-    const shortcode = tillNumber;
+    // For Buy Goods (Till), BusinessShortCode = Store/Head Office Number, PartyB = Till Number
+    const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? '';
 
     // Validate credentials
-    if (!consumerKey || !consumerSecret || !passkey || !tillNumber) {
+    if (!consumerKey || !consumerSecret || !passkey || !tillNumber || !shortcode) {
       console.error('Missing M-Pesa credentials:', {
         hasConsumerKey: !!consumerKey,
         hasConsumerSecret: !!consumerSecret,
         hasPasskey: !!passkey,
-        hasTillNumber: !!tillNumber
+        hasTillNumber: !!tillNumber,
+        hasShortcode: !!shortcode
       });
       return new Response(
         JSON.stringify({ error: 'M-Pesa not configured. Please contact support.' }),
@@ -106,7 +107,7 @@ serve(async (req) => {
       );
     }
     
-    console.log('Using Till Number as BusinessShortCode:', tillNumber);
+    console.log('M-Pesa config:', { shortcode, tillNumber });
 
     // --- Step 1: Get Access Token (PRODUCTION) ---
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
