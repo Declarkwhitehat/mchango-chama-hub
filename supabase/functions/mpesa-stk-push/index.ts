@@ -87,9 +87,10 @@ serve(async (req) => {
 
     const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY') ?? '';
     const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? '';
-    const shortcode = Deno.env.get('MPESA_SHORTCODE') ?? '3576787';
     const passkey = Deno.env.get('MPESA_PASSKEY') ?? '';
     const tillNumber = Deno.env.get('MPESA_TILL_NUMBER') ?? '';
+    // For Buy Goods (Till), use the Till Number as both BusinessShortCode and PartyB
+    const shortcode = tillNumber;
 
     // Validate credentials
     if (!consumerKey || !consumerSecret || !passkey || !tillNumber) {
@@ -97,7 +98,6 @@ serve(async (req) => {
         hasConsumerKey: !!consumerKey,
         hasConsumerSecret: !!consumerSecret,
         hasPasskey: !!passkey,
-        hasShortcode: !!shortcode,
         hasTillNumber: !!tillNumber
       });
       return new Response(
@@ -105,6 +105,8 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log('Using Till Number as BusinessShortCode:', tillNumber);
 
     // --- Step 1: Get Access Token (PRODUCTION) ---
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
