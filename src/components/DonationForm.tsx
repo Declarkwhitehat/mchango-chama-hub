@@ -56,7 +56,11 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
     setLoading(true);
 
     try {
+      // Get session if user is logged in (optional for guest donations)
+      const { data: { session } } = await supabase.auth.getSession();
+      
       // Create pending donation record
+      // For guests, use anon key (no user_id)
       const donationData = {
         mchango_id: mchangoId,
         user_id: user?.id || null,
@@ -77,20 +81,6 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
         .single();
 
       if (donationError) throw donationError;
-
-      // Get session if user is logged in, but don't require it for guest donations
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Only validate session for authenticated users
-      if (user && !session?.access_token) {
-        toast({
-          title: "Session Expired",
-          description: "Please log in again to make a donation",
-          variant: "destructive",
-        });
-        navigate("/auth");
-        return;
-      }
 
       // Initiate M-Pesa STK Push with normalized phone
       const { data: stkResponse, error: stkError } = await supabase.functions.invoke("mpesa-stk-push", {
