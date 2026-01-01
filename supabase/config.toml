@@ -107,3 +107,12 @@ verify_jwt = true
 
 [functions.mpesa-b2c-callback]
 verify_jwt = false
+
+[functions.mpesa-stk-query]
+verify_jwt = false
+
+[functions.withdrawals-crud]
+verify_jwt = true
+
+[functions.payment-methods]
+verify_jwt = true
