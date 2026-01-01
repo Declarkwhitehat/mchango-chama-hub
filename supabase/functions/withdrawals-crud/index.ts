@@ -182,6 +182,8 @@ serve(async (req) => {
       let isCreator = false;
       let isManager = false;
       let totalAvailable = 0;
+      let membershipData: any = null;
+      let hasPaymentIssues = false;
 
       if (chama_id) {
         const { data: chama, error: chamaError } = await supabaseClient
@@ -199,16 +201,37 @@ serve(async (req) => {
 
         isCreator = chama.created_by === user.id;
 
-        // Check if user is a manager
+        // Check if user is a manager and get their membership details
         const { data: membership } = await supabaseClient
           .from('chama_members')
-          .select('is_manager, id, order_index')
+          .select('is_manager, id, order_index, missed_payments_count, balance_deficit')
           .eq('chama_id', chama_id)
           .eq('user_id', user.id)
           .eq('approval_status', 'approved')
           .maybeSingle();
 
+        membershipData = membership;
         isManager = membership?.is_manager || false;
+
+        // Check for payment issues (missed payments or outstanding deficit)
+        if (membership) {
+          const missedPayments = membership.missed_payments_count || 0;
+          const balanceDeficit = Number(membership.balance_deficit) || 0;
+          
+          // Also check for late payments in member_cycle_payments
+          const { data: latePayments } = await supabaseClient
+            .from('member_cycle_payments')
+            .select('id')
+            .eq('member_id', membership.id)
+            .eq('is_late_payment', true)
+            .limit(1);
+
+          hasPaymentIssues = missedPayments > 0 || balanceDeficit > 0 || (latePayments !== null && latePayments.length > 0);
+          
+          if (hasPaymentIssues) {
+            console.log('Member has payment issues:', { missedPayments, balanceDeficit, latePayments: latePayments?.length || 0 });
+          }
+        }
 
         // If not a manager, check if it's their turn
         if (!isManager) {
@@ -304,6 +327,18 @@ serve(async (req) => {
         });
       }
 
+      // Determine if auto-approval is allowed for Chama withdrawals
+      // Auto-approve if: it's a chama withdrawal AND member has no payment issues AND payment method is M-Pesa
+      const canAutoApprove = chama_id && !hasPaymentIssues && defaultPaymentMethod.method_type === 'mpesa';
+      const initialStatus = canAutoApprove ? 'approved' : 'pending';
+
+      console.log('Auto-approval check:', { 
+        chama_id: !!chama_id, 
+        hasPaymentIssues, 
+        paymentMethod: defaultPaymentMethod.method_type,
+        canAutoApprove 
+      });
+
       // Create withdrawal request with payment method details
       const { data: withdrawal, error } = await supabaseClient
         .from('withdrawals')
@@ -316,8 +351,9 @@ serve(async (req) => {
           net_amount: netAmount,
           payment_method_id: defaultPaymentMethod.id,
           payment_method_type: defaultPaymentMethod.method_type,
-          status: 'pending',
-          notes,
+          status: initialStatus,
+          notes: hasPaymentIssues ? (notes || '') + ' [Requires admin review: payment issues detected]' : notes,
+          reviewed_at: canAutoApprove ? new Date().toISOString() : null,
         })
         .select()
         .single();
@@ -326,7 +362,50 @@ serve(async (req) => {
 
       console.log('Withdrawal request created:', withdrawal);
 
-      return new Response(JSON.stringify({ data: withdrawal }), {
+      // If auto-approved and M-Pesa, trigger B2C payout immediately
+      if (canAutoApprove && defaultPaymentMethod.phone_number) {
+        console.log('Auto-approved Chama withdrawal, triggering M-Pesa B2C payout');
+        
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        
+        // Fire and forget - don't wait for B2C to complete
+        fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            withdrawal_id: withdrawal.id,
+            phone_number: defaultPaymentMethod.phone_number,
+            amount: netAmount
+          })
+        }).then(async (res) => {
+          const result = await res.json();
+          console.log('B2C payout triggered for auto-approved withdrawal:', result);
+        }).catch((err) => {
+          console.error('Failed to trigger B2C payout:', err);
+        });
+
+        return new Response(JSON.stringify({ 
+          data: withdrawal,
+          message: 'Withdrawal auto-approved! M-Pesa payout initiated.',
+          auto_approved: true
+        }), {
+          status: 201,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // For pending withdrawals (Mchango or members with payment issues)
+      return new Response(JSON.stringify({ 
+        data: withdrawal,
+        message: hasPaymentIssues 
+          ? 'Withdrawal request submitted. Requires admin approval due to payment history.'
+          : 'Withdrawal request submitted for admin approval.',
+        requires_approval: true
+      }), {
         status: 201,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
