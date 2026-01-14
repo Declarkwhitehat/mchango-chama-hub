@@ -15,6 +15,7 @@ import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
+import { PaymentStatusManager } from "@/components/chama/PaymentStatusManager";
 import { Users, Calendar, TrendingUp, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -483,8 +484,9 @@ const ChamaDetail = () => {
         {/* Tabs - Only visible to approved members and admins */}
         {hasViewAccess && (
           <Tabs defaultValue="dashboard" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className={`grid w-full ${isManager ? 'grid-cols-4' : 'grid-cols-3'}`}>
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              {isManager && <TabsTrigger value="payments">Payments</TabsTrigger>}
               <TabsTrigger value="members">Members</TabsTrigger>
               <TabsTrigger value="details">Details</TabsTrigger>
             </TabsList>
@@ -501,6 +503,17 @@ const ChamaDetail = () => {
                 </Card>
               )}
             </TabsContent>
+
+            {isManager && (
+              <TabsContent value="payments">
+                <PaymentStatusManager
+                  chamaId={chama.id}
+                  chamaName={chama.name}
+                  contributionAmount={chama.contribution_amount}
+                  commissionRate={chama.commission_rate}
+                />
+              </TabsContent>
+            )}
 
             <TabsContent value="members">
               <Card>

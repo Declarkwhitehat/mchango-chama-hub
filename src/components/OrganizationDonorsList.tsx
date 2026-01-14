@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { Users, Heart } from "lucide-react";
+import { ContributionsPDFDownload } from "./ContributionsPDFDownload";
 
 interface Donation {
   id: string;
@@ -18,9 +19,16 @@ interface Donation {
 interface OrganizationDonorsListProps {
   organizationId: string;
   totalAmount: number;
+  organizationName?: string;
 }
 
-export const OrganizationDonorsList = ({ organizationId, totalAmount }: OrganizationDonorsListProps) => {
+const COMMISSION_RATE = 0.15;
+
+export const OrganizationDonorsList = ({ 
+  organizationId, 
+  totalAmount,
+  organizationName = "Organization"
+}: OrganizationDonorsListProps) => {
   const [donations, setDonations] = useState<Donation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,6 +72,15 @@ export const OrganizationDonorsList = ({ organizationId, totalAmount }: Organiza
     });
   };
 
+  // Transform donations for PDF component
+  const contributionsForPdf = donations.map(d => ({
+    id: d.id,
+    display_name: d.is_anonymous || !d.display_name ? 'Anonymous' : d.display_name,
+    amount: d.amount,
+    created_at: d.completed_at || d.created_at,
+    payment_status: d.payment_status,
+  }));
+
   return (
     <Card>
       <CardHeader>
@@ -78,7 +95,15 @@ export const OrganizationDonorsList = ({ organizationId, totalAmount }: Organiza
           </Badge>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* PDF Download Section */}
+        <ContributionsPDFDownload
+          title={organizationName}
+          contributions={contributionsForPdf}
+          currentAmount={totalAmount}
+          commissionRate={COMMISSION_RATE}
+        />
+
         {loading ? (
           <p className="text-center text-muted-foreground py-4">Loading supporters...</p>
         ) : donations.length === 0 ? (

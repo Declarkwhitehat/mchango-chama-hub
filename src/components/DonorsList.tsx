@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
+import { ContributionsPDFDownload } from "./ContributionsPDFDownload";
 
 interface Donation {
   id: string;
@@ -16,11 +17,13 @@ interface Donation {
 interface DonorsListProps {
   mchangoId: string;
   totalAmount: number;
+  targetAmount?: number;
+  mchangoTitle?: string;
 }
 
 const COMMISSION_RATE = 0.15; // 15%
 
-export const DonorsList = ({ mchangoId, totalAmount }: DonorsListProps) => {
+export const DonorsList = ({ mchangoId, totalAmount, targetAmount, mchangoTitle = "Mchango" }: DonorsListProps) => {
   const [donations, setDonations] = useState<Donation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -70,12 +73,30 @@ export const DonorsList = ({ mchangoId, totalAmount }: DonorsListProps) => {
   const netBalance = totalAmount - commission;
   const completedDonations = donations.filter(d => d.payment_status === 'completed');
 
+  // Transform donations for PDF component
+  const contributionsForPdf = donations.map(d => ({
+    id: d.id,
+    display_name: d.display_name || 'Anonymous',
+    amount: d.amount,
+    created_at: d.created_at,
+    payment_status: d.payment_status,
+  }));
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Recent Contributors</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* PDF Download Section */}
+        <ContributionsPDFDownload
+          title={mchangoTitle}
+          contributions={contributionsForPdf}
+          targetAmount={targetAmount}
+          currentAmount={totalAmount}
+          commissionRate={COMMISSION_RATE}
+        />
+
         <div>
           <h3 className="font-semibold mb-3">
             Recent Donations ({completedDonations.length})
