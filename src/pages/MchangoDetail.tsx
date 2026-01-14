@@ -250,6 +250,8 @@ const MchangoDetail = () => {
           <DonorsList 
             mchangoId={campaign.id} 
             totalAmount={campaign.current_amount}
+            targetAmount={campaign.target_amount}
+            mchangoTitle={campaign.title}
           />
         </div>
 
