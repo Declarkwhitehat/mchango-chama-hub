@@ -193,12 +193,20 @@ export const WithdrawalButton = ({
       if (error) throw error;
 
       const commission = parseFloat(amount) * commissionRate;
-      const netAmount = parseFloat(amount) - commission;
+      const netAmountCalc = parseFloat(amount) - commission;
 
-      toast({
-        title: "Withdrawal Requested",
-        description: `You will receive KES ${netAmount.toLocaleString()} (after KES ${commission.toLocaleString()} commission) once approved by admin`,
-      });
+      // Check if auto-approved from response
+      if (data?.auto_approved) {
+        toast({
+          title: "Withdrawal Approved! 🎉",
+          description: `KES ${netAmountCalc.toLocaleString()} is being sent to your M-Pesa now.`,
+        });
+      } else {
+        toast({
+          title: "Withdrawal Submitted",
+          description: `Your request for KES ${netAmountCalc.toLocaleString()} has been submitted for review.`,
+        });
+      }
 
       setAmount("");
       setNotes("");
