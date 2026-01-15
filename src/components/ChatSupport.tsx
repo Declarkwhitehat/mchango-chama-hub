@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Minimize2, Languages } from 'lucide-react';
+import { MessageCircle, X, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChatMessage } from './ChatMessage';
@@ -289,32 +289,16 @@ export function ChatSupport() {
                 <MessageCircle className="h-4 w-4" />
                 <h3 className="font-semibold text-sm">AI Assistant</h3>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsOpen(false)}
-                  className="h-7 w-7 text-primary-foreground hover:bg-primary/80"
-                >
-                  <Minimize2 className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    setIsOpen(false);
-                    setMessages([{
-                      role: 'assistant',
-                      content: LANGUAGE_GREETINGS[language],
-                      timestamp: new Date()
-                    }]);
-                    setShowCallbackForm(false);
-                  }}
-                  className="h-7 w-7 text-primary-foreground hover:bg-primary/80"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-white/20 transition-colors group"
+                aria-label="Close chat"
+              >
+                <span className="text-[10px] text-primary-foreground/70 group-hover:text-primary-foreground transition-colors">
+                  Tap to close
+                </span>
+                <X className="h-4 w-4" />
+              </button>
             </div>
             
             {/* Language Selector */}
