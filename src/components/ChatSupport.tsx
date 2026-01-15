@@ -291,13 +291,13 @@ export function ChatSupport() {
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-white/20 transition-colors group"
+                className="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg bg-white/10 hover:bg-white/25 active:bg-white/30 transition-colors touch-manipulation"
                 aria-label="Close chat"
               >
-                <span className="text-[10px] text-primary-foreground/70 group-hover:text-primary-foreground transition-colors">
-                  Tap to close
+                <span className="text-xs text-primary-foreground/80 font-medium">
+                  Close
                 </span>
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
             
