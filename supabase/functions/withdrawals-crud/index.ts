@@ -327,13 +327,20 @@ serve(async (req) => {
         });
       }
 
-      // Determine if auto-approval is allowed for Chama withdrawals
-      // Auto-approve if: it's a chama withdrawal AND member has no payment issues AND payment method is M-Pesa
-      const canAutoApprove = chama_id && !hasPaymentIssues && defaultPaymentMethod.method_type === 'mpesa';
+      // Determine if auto-approval is allowed
+      // Auto-approve if payment method is M-Pesa AND:
+      // - Chama withdrawal: member has no payment issues
+      // - Mchango withdrawal: user is the creator
+      const canAutoApprove = defaultPaymentMethod.method_type === 'mpesa' && (
+        (chama_id && !hasPaymentIssues) ||
+        (mchango_id && isCreator)
+      );
       const initialStatus = canAutoApprove ? 'approved' : 'pending';
 
       console.log('Auto-approval check:', { 
         chama_id: !!chama_id, 
+        mchango_id: !!mchango_id,
+        isCreator,
         hasPaymentIssues, 
         paymentMethod: defaultPaymentMethod.method_type,
         canAutoApprove 
@@ -364,7 +371,8 @@ serve(async (req) => {
 
       // If auto-approved and M-Pesa, trigger B2C payout immediately
       if (canAutoApprove && defaultPaymentMethod.phone_number) {
-        console.log('Auto-approved Chama withdrawal, triggering M-Pesa B2C payout');
+        const withdrawalType = chama_id ? 'Chama' : 'Mchango';
+        console.log(`Auto-approved ${withdrawalType} withdrawal, triggering M-Pesa B2C payout`);
         
         const supabaseUrl = Deno.env.get('SUPABASE_URL');
         const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -390,7 +398,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({ 
           data: withdrawal,
-          message: 'Withdrawal auto-approved! M-Pesa payout initiated.',
+          message: 'Withdrawal approved! Money is being sent to your M-Pesa now.',
           auto_approved: true
         }), {
           status: 201,
@@ -398,12 +406,12 @@ serve(async (req) => {
         });
       }
 
-      // For pending withdrawals (Mchango or members with payment issues)
+      // For pending withdrawals (members with payment issues or non-M-Pesa)
       return new Response(JSON.stringify({ 
         data: withdrawal,
         message: hasPaymentIssues 
           ? 'Withdrawal request submitted. Requires admin approval due to payment history.'
-          : 'Withdrawal request submitted for admin approval.',
+          : 'Withdrawal request submitted for review.',
         requires_approval: true
       }), {
         status: 201,
