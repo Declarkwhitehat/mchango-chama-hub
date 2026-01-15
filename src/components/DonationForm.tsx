@@ -44,6 +44,16 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
       return;
     }
 
+    // Require name if not anonymous
+    if (!isAnonymous && !displayName.trim()) {
+      toast({
+        title: "Name Required",
+        description: "Please enter your name or select 'Donate anonymously'",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!phone || !isValidKenyanPhone(phone)) {
       toast({
         title: "Invalid Phone Number",
@@ -231,62 +241,54 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
             </Card>
           )}
 
-          {!user && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="display_name">Display Name</Label>
-                <Input
-                  id="display_name"
-                  type="text"
-                  placeholder="Your name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  disabled={isAnonymous}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="0707874790 or +254707874790"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  Accepts: 0707874790, +254707874790, 254707874790
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email (Optional)</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-
-          {user && (
-            <div className="space-y-2">
-              <Label htmlFor="phone_user">Phone Number</Label>
-              <Input
-                id="phone_user"
-                type="tel"
-                placeholder="0707874790 or +254707874790"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
+          {/* Display Name - always show for all users */}
+          <div className="space-y-2">
+            <Label htmlFor="display_name">
+              Your Name {!isAnonymous && <span className="text-destructive">*</span>}
+            </Label>
+            <Input
+              id="display_name"
+              type="text"
+              placeholder={isAnonymous ? "Will show as 'Anonymous'" : "Enter your name"}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              disabled={isAnonymous}
+              required={!isAnonymous}
+            />
+            {isAnonymous && (
               <p className="text-xs text-muted-foreground">
-                Accepts: 0707874790, +254707874790, 254707874790
+                Your donation will appear as "Anonymous"
               </p>
+            )}
+          </div>
+
+          {/* Phone Number - always required */}
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number <span className="text-destructive">*</span></Label>
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="0707874790 or +254707874790"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              For M-Pesa payment. Accepts: 0707874790, +254707874790
+            </p>
+          </div>
+
+          {/* Email - optional, only show for guests */}
+          {!user && (
+            <div className="space-y-2">
+              <Label htmlFor="email">Email (Optional)</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
           )}
 
