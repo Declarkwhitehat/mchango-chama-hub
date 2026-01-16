@@ -26,7 +26,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
   
   // Form state
   const [amount, setAmount] = useState("");
-  const [displayName, setDisplayName] = useState(profile?.full_name || "");
+  const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [email, setEmail] = useState(profile?.email || "");
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -249,12 +249,17 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
             <Input
               id="display_name"
               type="text"
-              placeholder={isAnonymous ? "Will show as 'Anonymous'" : "Enter your name"}
+              placeholder={isAnonymous ? "Will show as 'Anonymous'" : "How should your name appear?"}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               disabled={isAnonymous}
               required={!isAnonymous}
             />
+            {!isAnonymous && (
+              <p className="text-xs text-muted-foreground">
+                This name will be shown in the recent contributions list
+              </p>
+            )}
             {isAnonymous && (
               <p className="text-xs text-muted-foreground">
                 Your donation will appear as "Anonymous"
