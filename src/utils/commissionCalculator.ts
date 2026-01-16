@@ -3,6 +3,7 @@
  */
 export const MCHANGO_COMMISSION_RATE = 0.15; // 15%
 export const CHAMA_DEFAULT_COMMISSION_RATE = 0.05; // 5%
+export const ORGANIZATION_COMMISSION_RATE = 0.05; // 5%
 
 /**
  * Calculate commission amount

@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, TrendingDown, Wallet, Heart } from "lucide-react";
-import { MCHANGO_COMMISSION_RATE, calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
+import { ORGANIZATION_COMMISSION_RATE, calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
 import { normalizePhone, isValidKenyanPhone } from "@/utils/phoneUtils";
 
 interface OrganizationDonationFormProps {
@@ -23,9 +23,9 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
   const [loading, setLoading] = useState(false);
   
   const [amount, setAmount] = useState("");
-  const [displayName, setDisplayName] = useState(profile?.full_name || "");
+  const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState(profile?.phone || "");
-  const [email, setEmail] = useState(profile?.email || "");
+  const [email, setEmail] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
 
   const handleDonate = async (e: React.FormEvent) => {
@@ -35,6 +35,16 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid donation amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Require name if not anonymous
+    if (!isAnonymous && !displayName.trim()) {
+      toast({
+        title: "Name Required",
+        description: "Please enter your name or select 'Donate anonymously'",
         variant: "destructive",
       });
       return;
@@ -137,12 +147,12 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
       }
 
       const donationAmount = parseFloat(amount);
-      const commission = calculateCommission(donationAmount, MCHANGO_COMMISSION_RATE);
-      const netAmount = calculateNetBalance(donationAmount, MCHANGO_COMMISSION_RATE);
+      const commission = calculateCommission(donationAmount, ORGANIZATION_COMMISSION_RATE);
+      const netAmount = calculateNetBalance(donationAmount, ORGANIZATION_COMMISSION_RATE);
 
       toast({
         title: "Payment Initiated",
-        description: `Donating KES ${donationAmount.toLocaleString()}. After ${(MCHANGO_COMMISSION_RATE * 100)}% commission, the organization receives KES ${netAmount.toLocaleString()}`,
+        description: `Donating KES ${donationAmount.toLocaleString()}. After ${(ORGANIZATION_COMMISSION_RATE * 100)}% commission, the organization receives KES ${netAmount.toLocaleString()}`,
       });
 
       // Reset form
@@ -207,10 +217,10 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
                     <TrendingDown className="h-3 w-3" />
-                    Commission (15%)
+                    Commission (5%)
                   </span>
                   <span className="font-medium text-orange-600 dark:text-orange-400">
-                    - KES {calculateCommission(parseFloat(amount), MCHANGO_COMMISSION_RATE).toLocaleString()}
+                    - KES {calculateCommission(parseFloat(amount), ORGANIZATION_COMMISSION_RATE).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-primary/20">
@@ -219,65 +229,54 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
                     Organization Receives
                   </span>
                   <span className="font-bold text-lg text-primary">
-                    KES {calculateNetBalance(parseFloat(amount), MCHANGO_COMMISSION_RATE).toLocaleString()}
+                    KES {calculateNetBalance(parseFloat(amount), ORGANIZATION_COMMISSION_RATE).toLocaleString()}
                   </span>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {!user && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="display_name">Display Name</Label>
-                <Input
-                  id="display_name"
-                  type="text"
-                  placeholder="Your name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  disabled={isAnonymous}
-                />
-              </div>
+          {/* Display Name - always show for all users */}
+          <div className="space-y-2">
+            <Label htmlFor="display_name">
+              Your Name {!isAnonymous && <span className="text-destructive">*</span>}
+            </Label>
+            <Input
+              id="display_name"
+              type="text"
+              placeholder={isAnonymous ? "Will show as 'Anonymous'" : "How should your name appear?"}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              disabled={isAnonymous}
+              required={!isAnonymous}
+            />
+            {!isAnonymous && (
+              <p className="text-xs text-muted-foreground">
+                This name will be shown in the supporters list
+              </p>
+            )}
+            {isAnonymous && (
+              <p className="text-xs text-muted-foreground">
+                Your donation will appear as "Anonymous"
+              </p>
+            )}
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="0707874790 or +254707874790"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email (Optional)</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-
-          {user && (
-            <div className="space-y-2">
-              <Label htmlFor="phone_user">Phone Number</Label>
-              <Input
-                id="phone_user"
-                type="tel"
-                placeholder="0707874790 or +254707874790"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
-            </div>
-          )}
+          {/* Phone Number - always required */}
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number <span className="text-destructive">*</span></Label>
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="0707874790 or +254707874790"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              For M-Pesa payment
+            </p>
+          </div>
 
           <div className="flex items-center space-x-2">
             <Checkbox
