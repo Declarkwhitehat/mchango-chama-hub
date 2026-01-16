@@ -22,7 +22,7 @@ interface OrganizationDonorsListProps {
   organizationName?: string;
 }
 
-const COMMISSION_RATE = 0.15;
+const COMMISSION_RATE = 0.05; // 5% for organizations
 
 export const OrganizationDonorsList = ({ 
   organizationId, 
