@@ -66,7 +66,9 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
       
       const donationData = {
         organization_id: organizationId,
-        user_id: user?.id || null,
+        // Always store as a guest donation to avoid RLS mismatches across clients/sessions.
+        // (We don't display donor identity from account anyway.)
+        user_id: null,
         display_name: isAnonymous ? "Anonymous" : (displayName || "Anonymous"),
         phone: phone,
         email: email || null,
@@ -113,11 +115,9 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
         );
       }
 
-      // Update donation with CheckoutRequestID
-      await supabase
-        .from("organization_donations")
-        .update({ payment_reference: checkoutRequestId })
-        .eq("id", donation.id);
+      // NOTE: We persist the CheckoutRequestID server-side (service role) to avoid client-side RLS issues.
+      // The callback handler will then match the record using the CheckoutRequestID.
+
 
       const customerMessage = stkResponse?.CustomerMessage;
       if (customerMessage) {

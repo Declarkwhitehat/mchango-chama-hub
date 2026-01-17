@@ -341,6 +341,79 @@ serve(async (req) => {
       );
     }
 
+    // Check if this is an organization donation
+    const { data: orgDonations } = await supabaseClient
+      .from('organization_donations')
+      .select('*')
+      .eq('payment_reference', checkoutRequestId);
+
+    if (orgDonations && orgDonations.length > 0) {
+      const orgDonation = orgDonations[0];
+      console.log('Found organization donation record:', orgDonation.id);
+
+      const { data: updatedOrgDonation, error: orgDonationError } = await supabaseClient
+        .from('organization_donations')
+        .update({
+          payment_status: status,
+          completed_at: status === 'completed' ? new Date().toISOString() : null,
+        })
+        .eq('id', orgDonation.id)
+        .select()
+        .single();
+
+      if (orgDonationError) {
+        console.error('Error updating organization donation:', orgDonationError);
+        throw orgDonationError;
+      }
+
+      if (status === 'completed') {
+        const actualAmount = paidAmount || orgDonation.amount;
+        const commissionRate = 0.05;
+        const commissionAmount = actualAmount * commissionRate;
+        const netAmount = actualAmount - commissionAmount;
+
+        // Update organization totals (store net amount after commission)
+        const { data: orgRow, error: orgFetchError } = await supabaseClient
+          .from('organizations')
+          .select('current_amount')
+          .eq('id', orgDonation.organization_id)
+          .single();
+
+        if (orgFetchError) {
+          console.error('Error fetching organization for update:', orgFetchError);
+        } else {
+          const nextAmount = (orgRow?.current_amount || 0) + netAmount;
+          const { error: orgUpdateError } = await supabaseClient
+            .from('organizations')
+            .update({ current_amount: nextAmount })
+            .eq('id', orgDonation.organization_id);
+
+          if (orgUpdateError) {
+            console.error('Error updating organization current_amount:', orgUpdateError);
+          }
+        }
+
+        // Record commission
+        await supabaseClient
+          .from('company_earnings')
+          .insert({
+            source: 'organization_donation',
+            amount: commissionAmount,
+            reference_id: orgDonation.id,
+            description: `${commissionRate * 100}% commission on organization donation of KES ${actualAmount}`
+          });
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Organization donation callback processed successfully',
+          donation: updatedOrgDonation,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Original transaction handling code (for non-donation payments)
     // Find the transaction by checkout request ID
     const { data: transactions } = await supabaseClient

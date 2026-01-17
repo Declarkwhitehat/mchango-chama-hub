@@ -180,20 +180,39 @@ serve(async (req) => {
     const result = await stkResponse.json();
     console.log('STK Push API Response:', result);
 
-    // --- Step 3.1: If this is a donation, persist CheckoutRequestID immediately (prevents race with callback) ---
-    if (result?.CheckoutRequestID && body.callback_metadata?.donation_id) {
+    // --- Step 3.1: Persist CheckoutRequestID immediately (prevents race with callback) ---
+    // Supports:
+    // - mchango donations: callback_metadata.donation_id
+    // - organization donations: callback_metadata.organization_donation_id
+    if (result?.CheckoutRequestID) {
       const checkoutRequestId = result.CheckoutRequestID as string;
-      const donationId = body.callback_metadata.donation_id as string;
 
-      const { error: donationUpdateError } = await supabaseClient
-        .from('mchango_donations')
-        .update({ payment_reference: checkoutRequestId })
-        .eq('id', donationId);
+      const mchangoDonationId = body.callback_metadata?.donation_id as string | undefined;
+      if (mchangoDonationId) {
+        const { error: donationUpdateError } = await supabaseClient
+          .from('mchango_donations')
+          .update({ payment_reference: checkoutRequestId })
+          .eq('id', mchangoDonationId);
 
-      if (donationUpdateError) {
-        console.error('Error updating donation with CheckoutRequestID:', donationUpdateError);
-      } else {
-        console.log('Donation updated with CheckoutRequestID:', { donationId, checkoutRequestId });
+        if (donationUpdateError) {
+          console.error('Error updating mchango donation with CheckoutRequestID:', donationUpdateError);
+        } else {
+          console.log('Mchango donation updated with CheckoutRequestID:', { donationId: mchangoDonationId, checkoutRequestId });
+        }
+      }
+
+      const orgDonationId = body.callback_metadata?.organization_donation_id as string | undefined;
+      if (orgDonationId) {
+        const { error: orgDonationUpdateError } = await supabaseClient
+          .from('organization_donations')
+          .update({ payment_reference: checkoutRequestId })
+          .eq('id', orgDonationId);
+
+        if (orgDonationUpdateError) {
+          console.error('Error updating organization donation with CheckoutRequestID:', orgDonationUpdateError);
+        } else {
+          console.log('Organization donation updated with CheckoutRequestID:', { orgDonationId, checkoutRequestId });
+        }
       }
     }
 
