@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Link, useNavigate } from "react-router-dom";
-import { TrendingUp, Users, Plus, Calendar, CheckCircle, AlertCircle, Clock, User as UserIcon, Mail, Phone, LogOut } from "lucide-react";
+import { TrendingUp, Users, Plus, Calendar, CheckCircle, AlertCircle, Clock, User as UserIcon, Mail, Phone, LogOut, Building } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -45,6 +45,16 @@ interface SavingsGroup {
   status: string;
 }
 
+interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  current_amount: number;
+  created_at: string;
+}
+
 const Home = () => {
   const [activeTab, setActiveTab] = useState("mchango");
   const [mchangoList, setMchangoList] = useState<Mchango[]>([]);
@@ -52,6 +62,7 @@ const Home = () => {
   const [memberChamaList, setMemberChamaList] = useState<Chama[]>([]);
   const [savingsGroupList, setSavingsGroupList] = useState<SavingsGroup[]>([]);
   const [memberSavingsGroupList, setMemberSavingsGroupList] = useState<SavingsGroup[]>([]);
+  const [organizationList, setOrganizationList] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentSetup, setShowPaymentSetup] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -231,6 +242,17 @@ const Home = () => {
         .filter(g => g !== null) as SavingsGroup[] || [];
       
       setMemberSavingsGroupList(memberSavingsGroupsData);
+
+      // Fetch user's organizations
+      const { data: organizations, error: organizationError } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('created_by', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (organizationError) throw organizationError;
+      setOrganizationList(organizations || []);
     } catch (error: any) {
       console.error('Error fetching user data:', error);
       toast.error("Failed to load your data");
@@ -418,18 +440,26 @@ const Home = () => {
           </Card>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
-              <TabsTrigger value="mchango" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Mchango
+            <TabsList className="grid w-full grid-cols-4 mb-4 sm:mb-6">
+              <TabsTrigger value="mchango" className="gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Mchango</span>
+                <span className="sm:hidden">Mchango</span>
               </TabsTrigger>
-              <TabsTrigger value="chama" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Chama
+              <TabsTrigger value="chama" className="gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Chama</span>
+                <span className="sm:hidden">Chama</span>
               </TabsTrigger>
-              <TabsTrigger value="savings" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Savings
+              <TabsTrigger value="savings" className="gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Savings</span>
+                <span className="sm:hidden">Savings</span>
+              </TabsTrigger>
+              <TabsTrigger value="organizations" className="gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                <Building className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Organizations</span>
+                <span className="sm:hidden">Orgs</span>
               </TabsTrigger>
             </TabsList>
 
@@ -774,6 +804,77 @@ const Home = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="organizations" className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground">My Organizations</h2>
+              <Link to="/organizations/create" className="w-full sm:w-auto">
+                <Button variant="hero" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">
+                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                  Register Organization
+                </Button>
+              </Link>
+            </div>
+
+            {loading ? (
+              <Card>
+                <CardContent className="py-6 sm:py-8 text-center">
+                  <p className="text-sm sm:text-base text-muted-foreground">Loading organizations...</p>
+                </CardContent>
+              </Card>
+            ) : organizationList.length === 0 ? (
+              <Card>
+                <CardContent className="py-6 sm:py-8 text-center space-y-3 sm:space-y-4">
+                  <p className="text-sm sm:text-base text-muted-foreground">You haven't registered any organizations yet</p>
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                    <Link to="/organizations/create" className="w-full sm:w-auto">
+                      <Button variant="hero" className="w-full sm:w-auto text-xs sm:text-sm">
+                        <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                        Register Your Organization
+                      </Button>
+                    </Link>
+                    <Link to="/organizations" className="w-full sm:w-auto">
+                      <Button variant="outline" className="w-full sm:w-auto text-xs sm:text-sm">
+                        View All Organizations
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {organizationList.map((org) => (
+                  <Link key={org.id} to={`/organizations/${org.slug}`}>
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-base sm:text-lg break-words">{org.name}</CardTitle>
+                            <CardDescription className="text-xs sm:text-sm break-words">{org.description}</CardDescription>
+                          </div>
+                          <Badge variant="secondary" className="text-xs self-start sm:self-auto flex-shrink-0 capitalize">
+                            {org.category}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2 text-xs sm:text-sm">
+                          <span className="text-muted-foreground">Total Donations Received</span>
+                          <span className="font-semibold text-foreground">
+                            KES {Number(org.current_amount).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground pt-2 border-t border-border">
+                          <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          Created: {new Date(org.created_at).toLocaleDateString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
               </div>
             )}
           </TabsContent>
