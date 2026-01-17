@@ -63,41 +63,28 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      const donationData = {
-        organization_id: organizationId,
-        // Always store as a guest donation to avoid RLS mismatches across clients/sessions.
-        // (We don't display donor identity from account anyway.)
-        user_id: null,
-        display_name: isAnonymous ? "Anonymous" : (displayName || "Anonymous"),
-        phone: phone,
-        email: email || null,
-        amount: parseFloat(amount),
-        is_anonymous: isAnonymous,
-        payment_reference: `ORG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        payment_method: "mpesa",
-        payment_status: "pending",
-      };
 
-      const { data: donation, error: donationError } = await supabase
-        .from("organization_donations")
-        .insert(donationData)
-        .select()
-        .single();
+      const normalized = normalizePhone(phone);
+      if (!normalized) {
+        throw new Error("Please enter a valid phone number");
+      }
 
-      if (donationError) throw donationError;
+      const donorName = isAnonymous ? "Anonymous" : (displayName || "Anonymous");
 
-      // Initiate M-Pesa STK Push
+      // Initiate M-Pesa STK Push (server will create the donation row to avoid RLS issues)
       const { data: stkResponse, error: stkError } = await supabase.functions.invoke("mpesa-stk-push", {
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
         body: {
-          phone_number: normalizePhone(phone),
+          phone_number: normalized,
           amount: parseFloat(amount),
           account_reference: organizationName,
           transaction_desc: `Donation to ${organizationName}`,
           callback_metadata: {
-            organization_donation_id: donation.id,
+            type: "organization_donation",
             organization_id: organizationId,
+            display_name: donorName,
+            is_anonymous: isAnonymous,
+            email: email || null,
           },
         }
       });
