@@ -85,10 +85,58 @@ serve(async (req) => {
       );
     }
 
+    // --- Optional: Create organization donation row up-front (avoids client-side RLS issues) ---
+    let organizationDonationId: string | null = null;
+    if (body.callback_metadata?.type === 'organization_donation') {
+      const orgId = body.callback_metadata.organization_id as string | undefined;
+      if (!orgId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing organization_id' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const donorName = (body.callback_metadata.display_name as string | undefined) || 'Anonymous';
+      const isAnonymous = Boolean(body.callback_metadata.is_anonymous);
+      const donorEmail = (body.callback_metadata.email as string | null | undefined) ?? null;
+
+      const { data: orgDonation, error: orgDonationError } = await supabaseClient
+        .from('organization_donations')
+        .insert({
+          organization_id: orgId,
+          user_id: null,
+          display_name: donorName,
+          phone: body.phone_number,
+          email: donorEmail,
+          amount: body.amount,
+          is_anonymous: isAnonymous,
+          payment_reference: `ORG-PENDING-${Date.now()}`,
+          payment_method: 'mpesa',
+          payment_status: 'pending',
+        })
+        .select('id')
+        .single();
+
+      if (orgDonationError) {
+        console.error('Error creating organization donation record:', orgDonationError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to create donation record. Please try again.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      organizationDonationId = orgDonation.id;
+      body.callback_metadata = {
+        ...(body.callback_metadata ?? {}),
+        organization_donation_id: organizationDonationId,
+      };
+
+      console.log('Organization donation record created:', { organizationDonationId });
+    }
+
     const consumerKey = Deno.env.get('MPESA_CONSUMER_KEY') ?? '';
     const consumerSecret = Deno.env.get('MPESA_CONSUMER_SECRET') ?? '';
     const passkey = Deno.env.get('MPESA_PASSKEY') ?? '';
-
     // For Buy Goods (Till):
     // - BusinessShortCode must be the Store/Head Office number (often 6-7 digits)
     // - PartyB is the actual Till number
