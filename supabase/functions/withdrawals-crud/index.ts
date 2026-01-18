@@ -122,19 +122,10 @@ serve(async (req) => {
 
       const dailyLimit = TRANSACTION_LIMITS[defaultPaymentMethod.method_type];
 
-      // Calculate net amount before validation
-      let commissionRate = 0.05;
-      if (chama_id) {
-        const { data: chama } = await supabaseClient
-          .from('chama')
-          .select('commission_rate')
-          .eq('id', chama_id)
-          .single();
-        commissionRate = chama?.commission_rate || 0.05;
-      }
-      
-      const commissionAmount = amount * commissionRate;
-      const netAmount = amount - commissionAmount;
+      // Commission is already deducted at payment time, so withdrawal is full amount
+      // No commission deduction needed here - user receives full withdrawal amount
+      const commissionAmount = 0;
+      const netAmount = amount;
 
       // Check if net withdrawal amount exceeds single transaction limit
       if (netAmount > dailyLimit) {
