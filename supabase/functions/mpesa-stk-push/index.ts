@@ -106,7 +106,7 @@ serve(async (req) => {
           organization_id: orgId,
           user_id: null,
           display_name: donorName,
-          phone: body.phone_number,
+          phone: normalizedPhone, // Use normalized phone format
           email: donorEmail,
           amount: body.amount,
           is_anonymous: isAnonymous,
