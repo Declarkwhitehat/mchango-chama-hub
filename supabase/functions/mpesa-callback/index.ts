@@ -292,6 +292,12 @@ serve(async (req) => {
     if (donations && donations.length > 0) {
       // This is a donation - update mchango_donations table
       const donation = donations[0];
+      const actualAmount = paidAmount || donation.amount;
+      
+      // Calculate commission immediately (15%)
+      const commissionRate = 0.15;
+      const commissionAmount = actualAmount * commissionRate;
+      const netAmount = actualAmount - commissionAmount;
       
       const { data: updatedDonation, error: donationError } = await supabaseClient
         .from('mchango_donations')
@@ -310,22 +316,33 @@ serve(async (req) => {
 
       console.log('Donation updated:', updatedDonation);
 
-      // Note: mchango.current_amount is updated automatically by the 
-      // update_mchango_on_donation trigger when payment_status becomes 'completed'
-
-      // If payment successful, record commission
+      // If payment successful, credit NET amount to mchango and record commission
       if (status === 'completed') {
-        const actualAmount = paidAmount || donation.amount;
-        
-        // Record commission as company earnings (15%)
-        const commissionAmount = actualAmount * 0.15;
+        // Update mchango with NET amount (after commission deduction)
+        const { data: mchangoRow, error: mchangoFetchError } = await supabaseClient
+          .from('mchango')
+          .select('current_amount')
+          .eq('id', donation.mchango_id)
+          .single();
+
+        if (!mchangoFetchError && mchangoRow) {
+          const nextAmount = (mchangoRow.current_amount || 0) + netAmount;
+          await supabaseClient
+            .from('mchango')
+            .update({ current_amount: nextAmount })
+            .eq('id', donation.mchango_id);
+          
+          console.log('Mchango updated with net amount:', netAmount);
+        }
+
+        // Record commission as company earnings
         await supabaseClient
           .from('company_earnings')
           .insert({
             source: 'mchango_donation',
             amount: commissionAmount,
             reference_id: donation.id,
-            description: `15% commission on donation of KES ${actualAmount}`
+            description: `15% commission on donation of KES ${actualAmount}. Net credited: KES ${netAmount}`
           });
         
         console.log('Commission recorded:', commissionAmount);
