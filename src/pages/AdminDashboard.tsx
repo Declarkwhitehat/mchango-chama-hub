@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { EnhancedAnalytics } from "@/components/admin/EnhancedAnalytics";
 import { PlatformStatistics } from "@/components/admin/PlatformStatistics";
 import { CommissionOverview } from "@/components/admin/CommissionOverview";
+import { AdminFinancialOverview } from "@/components/admin/AdminFinancialOverview";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -247,6 +248,9 @@ const AdminDashboard = () => {
             <span className="text-sm text-muted-foreground">{stats.recentTransactions} today</span>
           </Button>
         </div>
+
+        {/* Financial Overview - Client Funds vs Platform Revenue */}
+        <AdminFinancialOverview />
 
         {/* Platform Statistics */}
         <PlatformStatistics />

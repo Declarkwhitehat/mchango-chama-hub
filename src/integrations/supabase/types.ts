@@ -587,6 +587,7 @@ export type Database = {
       }
       mchango: {
         Row: {
+          available_balance: number | null
           beneficiary_url: string | null
           category: string | null
           created_at: string
@@ -605,11 +606,14 @@ export type Database = {
           status: Database["public"]["Enums"]["mchango_status"]
           target_amount: number
           title: string
+          total_commission_paid: number | null
+          total_gross_collected: number | null
           updated_at: string
           whatsapp_link: string | null
           youtube_url: string | null
         }
         Insert: {
+          available_balance?: number | null
           beneficiary_url?: string | null
           category?: string | null
           created_at?: string
@@ -628,11 +632,14 @@ export type Database = {
           status?: Database["public"]["Enums"]["mchango_status"]
           target_amount: number
           title: string
+          total_commission_paid?: number | null
+          total_gross_collected?: number | null
           updated_at?: string
           whatsapp_link?: string | null
           youtube_url?: string | null
         }
         Update: {
+          available_balance?: number | null
           beneficiary_url?: string | null
           category?: string | null
           created_at?: string
@@ -651,6 +658,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["mchango_status"]
           target_amount?: number
           title?: string
+          total_commission_paid?: number | null
+          total_gross_collected?: number | null
           updated_at?: string
           whatsapp_link?: string | null
           youtube_url?: string | null
@@ -668,13 +677,16 @@ export type Database = {
       mchango_donations: {
         Row: {
           amount: number
+          commission_amount: number | null
           completed_at: string | null
           created_at: string
           display_name: string | null
           email: string | null
+          gross_amount: number | null
           id: string
           is_anonymous: boolean
           mchango_id: string
+          net_amount: number | null
           payment_method: string | null
           payment_reference: string
           payment_status: string
@@ -683,13 +695,16 @@ export type Database = {
         }
         Insert: {
           amount: number
+          commission_amount?: number | null
           completed_at?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          gross_amount?: number | null
           id?: string
           is_anonymous?: boolean
           mchango_id: string
+          net_amount?: number | null
           payment_method?: string | null
           payment_reference: string
           payment_status?: string
@@ -698,13 +713,16 @@ export type Database = {
         }
         Update: {
           amount?: number
+          commission_amount?: number | null
           completed_at?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          gross_amount?: number | null
           id?: string
           is_anonymous?: boolean
           mchango_id?: string
+          net_amount?: number | null
           payment_method?: string | null
           payment_reference?: string
           payment_status?: string
@@ -784,12 +802,15 @@ export type Database = {
       organization_donations: {
         Row: {
           amount: number
+          commission_amount: number | null
           completed_at: string | null
           created_at: string
           display_name: string | null
           email: string | null
+          gross_amount: number | null
           id: string
           is_anonymous: boolean
+          net_amount: number | null
           organization_id: string
           payment_method: string | null
           payment_reference: string
@@ -799,12 +820,15 @@ export type Database = {
         }
         Insert: {
           amount: number
+          commission_amount?: number | null
           completed_at?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          gross_amount?: number | null
           id?: string
           is_anonymous?: boolean
+          net_amount?: number | null
           organization_id: string
           payment_method?: string | null
           payment_reference: string
@@ -814,12 +838,15 @@ export type Database = {
         }
         Update: {
           amount?: number
+          commission_amount?: number | null
           completed_at?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          gross_amount?: number | null
           id?: string
           is_anonymous?: boolean
+          net_amount?: number | null
           organization_id?: string
           payment_method?: string | null
           payment_reference?: string
@@ -847,6 +874,7 @@ export type Database = {
       organizations: {
         Row: {
           about: string | null
+          available_balance: number | null
           category: string
           cover_image_url: string | null
           created_at: string
@@ -864,6 +892,8 @@ export type Database = {
           phone: string | null
           slug: string
           status: string
+          total_commission_paid: number | null
+          total_gross_collected: number | null
           updated_at: string
           website_url: string | null
           whatsapp_link: string | null
@@ -871,6 +901,7 @@ export type Database = {
         }
         Insert: {
           about?: string | null
+          available_balance?: number | null
           category: string
           cover_image_url?: string | null
           created_at?: string
@@ -888,6 +919,8 @@ export type Database = {
           phone?: string | null
           slug: string
           status?: string
+          total_commission_paid?: number | null
+          total_gross_collected?: number | null
           updated_at?: string
           website_url?: string | null
           whatsapp_link?: string | null
@@ -895,6 +928,7 @@ export type Database = {
         }
         Update: {
           about?: string | null
+          available_balance?: number | null
           category?: string
           cover_image_url?: string | null
           created_at?: string
@@ -912,6 +946,8 @@ export type Database = {
           phone?: string | null
           slug?: string
           status?: string
+          total_commission_paid?: number | null
+          total_gross_collected?: number | null
           updated_at?: string
           website_url?: string | null
           whatsapp_link?: string | null
@@ -1059,6 +1095,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_financial_summary: {
+        Row: {
+          chama_client_funds: number | null
+          chama_commission: number | null
+          chama_gross: number | null
+          created_at: string | null
+          id: string
+          mchango_client_funds: number | null
+          mchango_commission: number | null
+          mchango_gross: number | null
+          org_client_funds: number | null
+          org_commission: number | null
+          org_gross: number | null
+          pending_withdrawals: number | null
+          savings_client_funds: number | null
+          savings_commission: number | null
+          savings_gross: number | null
+          summary_date: string
+          total_client_funds: number | null
+          total_commission: number | null
+          total_gross: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          chama_client_funds?: number | null
+          chama_commission?: number | null
+          chama_gross?: number | null
+          created_at?: string | null
+          id?: string
+          mchango_client_funds?: number | null
+          mchango_commission?: number | null
+          mchango_gross?: number | null
+          org_client_funds?: number | null
+          org_commission?: number | null
+          org_gross?: number | null
+          pending_withdrawals?: number | null
+          savings_client_funds?: number | null
+          savings_commission?: number | null
+          savings_gross?: number | null
+          summary_date?: string
+          total_client_funds?: number | null
+          total_commission?: number | null
+          total_gross?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          chama_client_funds?: number | null
+          chama_commission?: number | null
+          chama_gross?: number | null
+          created_at?: string | null
+          id?: string
+          mchango_client_funds?: number | null
+          mchango_commission?: number | null
+          mchango_gross?: number | null
+          org_client_funds?: number | null
+          org_commission?: number | null
+          org_gross?: number | null
+          pending_withdrawals?: number | null
+          savings_client_funds?: number | null
+          savings_commission?: number | null
+          savings_gross?: number | null
+          summary_date?: string
+          total_client_funds?: number | null
+          total_commission?: number | null
+          total_gross?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
