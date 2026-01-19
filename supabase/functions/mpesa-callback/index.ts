@@ -292,17 +292,21 @@ serve(async (req) => {
     if (donations && donations.length > 0) {
       // This is a donation - update mchango_donations table
       const donation = donations[0];
-      const actualAmount = paidAmount || donation.amount;
+      const grossAmount = paidAmount || donation.amount;
       
       // Calculate commission immediately (15%)
       const commissionRate = 0.15;
-      const commissionAmount = actualAmount * commissionRate;
-      const netAmount = actualAmount - commissionAmount;
+      const commissionAmount = grossAmount * commissionRate;
+      const netAmount = grossAmount - commissionAmount;
       
+      // Update donation with gross/commission/net breakdown
       const { data: updatedDonation, error: donationError } = await supabaseClient
         .from('mchango_donations')
         .update({
           payment_status: status,
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
           completed_at: status === 'completed' ? new Date().toISOString() : null,
         })
         .eq('id', donation.id)
@@ -314,25 +318,29 @@ serve(async (req) => {
         throw donationError;
       }
 
-      console.log('Donation updated:', updatedDonation);
+      console.log('Donation updated with breakdown:', { grossAmount, commissionAmount, netAmount });
 
       // If payment successful, credit NET amount to mchango and record commission
       if (status === 'completed') {
-        // Update mchango with NET amount (after commission deduction)
+        // Update mchango with NET amount and financial tracking
         const { data: mchangoRow, error: mchangoFetchError } = await supabaseClient
           .from('mchango')
-          .select('current_amount')
+          .select('current_amount, total_gross_collected, total_commission_paid, available_balance')
           .eq('id', donation.mchango_id)
           .single();
 
         if (!mchangoFetchError && mchangoRow) {
-          const nextAmount = (mchangoRow.current_amount || 0) + netAmount;
           await supabaseClient
             .from('mchango')
-            .update({ current_amount: nextAmount })
+            .update({ 
+              current_amount: (mchangoRow.current_amount || 0) + netAmount,
+              total_gross_collected: (mchangoRow.total_gross_collected || 0) + grossAmount,
+              total_commission_paid: (mchangoRow.total_commission_paid || 0) + commissionAmount,
+              available_balance: (mchangoRow.available_balance || 0) + netAmount
+            })
             .eq('id', donation.mchango_id);
           
-          console.log('Mchango updated with net amount:', netAmount);
+          console.log('Mchango financial tracking updated:', { grossAmount, commissionAmount, netAmount });
         }
 
         // Record commission as company earnings
@@ -342,7 +350,7 @@ serve(async (req) => {
             source: 'mchango_donation',
             amount: commissionAmount,
             reference_id: donation.id,
-            description: `15% commission on donation of KES ${actualAmount}. Net credited: KES ${netAmount}`
+            description: `15% commission on donation of KES ${grossAmount}. Net credited: KES ${netAmount}`
           });
         
         console.log('Commission recorded:', commissionAmount);
@@ -368,10 +376,19 @@ serve(async (req) => {
       const orgDonation = orgDonations[0];
       console.log('Found organization donation record:', orgDonation.id);
 
+      const grossAmount = paidAmount || orgDonation.amount;
+      const commissionRate = 0.05;
+      const commissionAmount = grossAmount * commissionRate;
+      const netAmount = grossAmount - commissionAmount;
+
+      // Update donation with gross/commission/net breakdown
       const { data: updatedOrgDonation, error: orgDonationError } = await supabaseClient
         .from('organization_donations')
         .update({
           payment_status: status,
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
           completed_at: status === 'completed' ? new Date().toISOString() : null,
         })
         .eq('id', orgDonation.id)
@@ -383,31 +400,30 @@ serve(async (req) => {
         throw orgDonationError;
       }
 
-      if (status === 'completed') {
-        const actualAmount = paidAmount || orgDonation.amount;
-        const commissionRate = 0.05;
-        const commissionAmount = actualAmount * commissionRate;
-        const netAmount = actualAmount - commissionAmount;
+      console.log('Organization donation updated with breakdown:', { grossAmount, commissionAmount, netAmount });
 
-        // Update organization totals (store net amount after commission)
+      if (status === 'completed') {
+        // Update organization totals with financial tracking
         const { data: orgRow, error: orgFetchError } = await supabaseClient
           .from('organizations')
-          .select('current_amount')
+          .select('current_amount, total_gross_collected, total_commission_paid, available_balance')
           .eq('id', orgDonation.organization_id)
           .single();
 
         if (orgFetchError) {
           console.error('Error fetching organization for update:', orgFetchError);
         } else {
-          const nextAmount = (orgRow?.current_amount || 0) + netAmount;
-          const { error: orgUpdateError } = await supabaseClient
+          await supabaseClient
             .from('organizations')
-            .update({ current_amount: nextAmount })
+            .update({ 
+              current_amount: (orgRow?.current_amount || 0) + netAmount,
+              total_gross_collected: (orgRow?.total_gross_collected || 0) + grossAmount,
+              total_commission_paid: (orgRow?.total_commission_paid || 0) + commissionAmount,
+              available_balance: (orgRow?.available_balance || 0) + netAmount
+            })
             .eq('id', orgDonation.organization_id);
 
-          if (orgUpdateError) {
-            console.error('Error updating organization current_amount:', orgUpdateError);
-          }
+          console.log('Organization financial tracking updated');
         }
 
         // Record commission
@@ -417,7 +433,7 @@ serve(async (req) => {
             source: 'organization_donation',
             amount: commissionAmount,
             reference_id: orgDonation.id,
-            description: `${commissionRate * 100}% commission on organization donation of KES ${actualAmount}`
+            description: `${commissionRate * 100}% commission on organization donation of KES ${grossAmount}. Net: KES ${netAmount}`
           });
       }
 
