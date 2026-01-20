@@ -4,10 +4,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { AdjustMemberLimitDialog } from "@/components/admin/AdjustMemberLimitDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Ban, PlayCircle, Loader2, ExternalLink, Users } from "lucide-react";
+import { Search, Ban, PlayCircle, Loader2, ExternalLink, Users, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -91,6 +102,100 @@ export const ChamaManagement = () => {
       toast({
         title: "Error",
         description: "Failed to update chama status",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const deleteChama = async (chamaId: string, chamaName: string) => {
+    setProcessing(chamaId);
+    try {
+      // Delete related records in correct order to avoid foreign key constraints
+      
+      // 1. Get contribution cycles for this chama
+      const { data: cycles } = await supabase
+        .from("contribution_cycles")
+        .select("id")
+        .eq("chama_id", chamaId);
+      
+      if (cycles && cycles.length > 0) {
+        const cycleIds = cycles.map(c => c.id);
+        // Delete member cycle payments
+        await supabase
+          .from("member_cycle_payments")
+          .delete()
+          .in("cycle_id", cycleIds);
+      }
+
+      // 2. Delete contribution cycles
+      await supabase
+        .from("contribution_cycles")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 3. Delete contributions
+      await supabase
+        .from("contributions")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 4. Delete invite codes
+      await supabase
+        .from("chama_invite_codes")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 5. Delete rejoin requests
+      await supabase
+        .from("chama_rejoin_requests")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 6. Delete cycle history
+      await supabase
+        .from("chama_cycle_history")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 7. Delete payouts
+      await supabase
+        .from("payouts")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 8. Delete transactions
+      await supabase
+        .from("transactions")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 9. Delete members
+      await supabase
+        .from("chama_members")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 10. Finally, delete the chama
+      const { error } = await supabase
+        .from("chama")
+        .delete()
+        .eq("id", chamaId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Chama Deleted",
+        description: `"${chamaName}" has been permanently deleted`,
+      });
+
+      await fetchChamas();
+    } catch (error: any) {
+      console.error("Error deleting chama:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete chama. Some related records may need manual cleanup.",
         variant: "destructive",
       });
     } finally {
@@ -277,6 +382,42 @@ export const ChamaManagement = () => {
                         )}
                       </Button>
                     )}
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          disabled={processing === chama.id}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Chama Permanently</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to permanently delete <strong>"{chama.name}"</strong>? 
+                            This action cannot be undone and will remove all associated members, 
+                            contributions, cycles, and transaction records.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteChama(chama.id, chama.name)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {processing === chama.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            ) : null}
+                            Delete Permanently
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               );
