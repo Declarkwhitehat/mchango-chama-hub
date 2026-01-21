@@ -313,6 +313,8 @@ export type Database = {
           next_cycle_credit: number | null
           next_due_date: string | null
           order_index: number | null
+          original_order_index: number | null
+          position_swapped_at: string | null
           removal_reason: string | null
           removed_at: string | null
           requires_admin_verification: boolean | null
@@ -320,6 +322,7 @@ export type Database = {
           skip_reason: string | null
           skipped_at: string | null
           status: Database["public"]["Enums"]["member_status"]
+          swapped_with_member_id: string | null
           total_contributed: number | null
           user_id: string | null
           was_skipped: boolean | null
@@ -343,6 +346,8 @@ export type Database = {
           next_cycle_credit?: number | null
           next_due_date?: string | null
           order_index?: number | null
+          original_order_index?: number | null
+          position_swapped_at?: string | null
           removal_reason?: string | null
           removed_at?: string | null
           requires_admin_verification?: boolean | null
@@ -350,6 +355,7 @@ export type Database = {
           skip_reason?: string | null
           skipped_at?: string | null
           status?: Database["public"]["Enums"]["member_status"]
+          swapped_with_member_id?: string | null
           total_contributed?: number | null
           user_id?: string | null
           was_skipped?: boolean | null
@@ -373,6 +379,8 @@ export type Database = {
           next_cycle_credit?: number | null
           next_due_date?: string | null
           order_index?: number | null
+          original_order_index?: number | null
+          position_swapped_at?: string | null
           removal_reason?: string | null
           removed_at?: string | null
           requires_admin_verification?: boolean | null
@@ -380,6 +388,7 @@ export type Database = {
           skip_reason?: string | null
           skipped_at?: string | null
           status?: Database["public"]["Enums"]["member_status"]
+          swapped_with_member_id?: string | null
           total_contributed?: number | null
           user_id?: string | null
           was_skipped?: boolean | null
@@ -390,6 +399,13 @@ export type Database = {
             columns: ["chama_id"]
             isOneToOne: false
             referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_members_swapped_with_member_id_fkey"
+            columns: ["swapped_with_member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
             referencedColumns: ["id"]
           },
           {
@@ -1161,9 +1177,13 @@ export type Database = {
           id: string
           member_id: string
           new_position: number | null
+          new_withdrawal_id: string | null
           notification_sent: boolean | null
           original_position: number
+          original_withdrawal_id: string | null
           skip_reason: string
+          swap_performed: boolean | null
+          swapped_with_member_id: string | null
         }
         Insert: {
           amount_owed: number
@@ -1174,9 +1194,13 @@ export type Database = {
           id?: string
           member_id: string
           new_position?: number | null
+          new_withdrawal_id?: string | null
           notification_sent?: boolean | null
           original_position: number
+          original_withdrawal_id?: string | null
           skip_reason: string
+          swap_performed?: boolean | null
+          swapped_with_member_id?: string | null
         }
         Update: {
           amount_owed?: number
@@ -1187,9 +1211,13 @@ export type Database = {
           id?: string
           member_id?: string
           new_position?: number | null
+          new_withdrawal_id?: string | null
           notification_sent?: boolean | null
           original_position?: number
+          original_withdrawal_id?: string | null
           skip_reason?: string
+          swap_performed?: boolean | null
+          swapped_with_member_id?: string | null
         }
         Relationships: [
           {
@@ -1209,6 +1237,27 @@ export type Database = {
           {
             foreignKeyName: "payout_skips_member_id_fkey"
             columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_skips_new_withdrawal_id_fkey"
+            columns: ["new_withdrawal_id"]
+            isOneToOne: false
+            referencedRelation: "withdrawals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_skips_original_withdrawal_id_fkey"
+            columns: ["original_withdrawal_id"]
+            isOneToOne: false
+            referencedRelation: "withdrawals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_skips_swapped_with_member_id_fkey"
+            columns: ["swapped_with_member_id"]
             isOneToOne: false
             referencedRelation: "chama_members"
             referencedColumns: ["id"]
