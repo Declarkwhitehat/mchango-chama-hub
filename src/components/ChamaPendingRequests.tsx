@@ -59,7 +59,11 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         console.error("Error loading pending members:", error);
         setPendingMembers([]);
       } else {
-        setPendingMembers(data || []);
+        // Deduplicate by member ID to prevent duplicate display
+        const uniqueMembers = Array.from(
+          new Map((data || []).map((m: PendingMember) => [m.id, m])).values()
+        );
+        setPendingMembers(uniqueMembers);
       }
     } catch (error: any) {
       console.error("Error loading pending members:", error);
