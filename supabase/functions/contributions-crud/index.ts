@@ -6,6 +6,169 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface PaymentAllocation {
+  cycle_id: string;
+  cycle_number: number;
+  amount_applied: number;
+  type: 'missed_period' | 'current_period' | 'carry_forward';
+  was_fully_paid: boolean;
+}
+
+interface AllocationResult {
+  allocations: PaymentAllocation[];
+  carry_forward: number;
+  total_applied: number;
+  periods_cleared: number;
+}
+
+/**
+ * Allocates payment to missed periods first (oldest to newest),
+ * then current period, with any excess stored as carry-forward.
+ * 
+ * STRICT RULES:
+ * - No period may receive more than its contribution amount
+ * - Oldest unpaid periods are cleared first
+ * - Overpayment becomes carry-forward credit
+ */
+async function allocatePayment(
+  supabase: any,
+  memberId: string,
+  chamaId: string,
+  paymentAmount: number,
+  contributionAmount: number
+): Promise<AllocationResult> {
+  const allocations: PaymentAllocation[] = [];
+  let periodsClosed = 0;
+
+  // 1. Get member's current carry-forward credit
+  const { data: member } = await supabase
+    .from('chama_members')
+    .select('carry_forward_credit')
+    .eq('id', memberId)
+    .single();
+  
+  const existingCarryForward = member?.carry_forward_credit || 0;
+  let remainingAmount = paymentAmount + existingCarryForward;
+
+  console.log('Payment allocation starting:', {
+    paymentAmount,
+    existingCarryForward,
+    totalAvailable: remainingAmount,
+    contributionAmount
+  });
+
+  // 2. Get ALL unpaid/partially-paid cycles (oldest first)
+  const { data: unpaidCycles, error: cyclesError } = await supabase
+    .from('member_cycle_payments')
+    .select(`
+      id,
+      cycle_id,
+      amount_due,
+      amount_paid,
+      amount_remaining,
+      fully_paid,
+      payment_allocations,
+      contribution_cycles!inner(cycle_number, start_date, end_date)
+    `)
+    .eq('member_id', memberId)
+    .eq('fully_paid', false)
+    .order('contribution_cycles(start_date)', { ascending: true });
+
+  if (cyclesError) {
+    console.error('Error fetching unpaid cycles:', cyclesError);
+  }
+
+  // 3. Allocate to each unpaid period (oldest first)
+  for (const cycle of (unpaidCycles || [])) {
+    if (remainingAmount <= 0) break;
+
+    const amountOwed = Math.min(
+      contributionAmount, // Cap at contribution amount
+      (cycle.amount_due || contributionAmount) - (cycle.amount_paid || 0)
+    );
+    
+    if (amountOwed <= 0) continue;
+    
+    const applied = Math.min(amountOwed, remainingAmount);
+    remainingAmount -= applied;
+
+    const newAmountPaid = (cycle.amount_paid || 0) + applied;
+    const isFullyPaid = newAmountPaid >= (cycle.amount_due || contributionAmount);
+
+    // Update cycle payment record
+    const existingAllocations = cycle.payment_allocations || [];
+    const newAllocation = {
+      amount: applied,
+      timestamp: new Date().toISOString(),
+      source: 'contribution'
+    };
+
+    const { error: updateError } = await supabase
+      .from('member_cycle_payments')
+      .update({
+        amount_paid: newAmountPaid,
+        amount_remaining: Math.max(0, (cycle.amount_due || contributionAmount) - newAmountPaid),
+        fully_paid: isFullyPaid,
+        is_paid: isFullyPaid,
+        paid_at: isFullyPaid ? new Date().toISOString() : cycle.paid_at,
+        payment_allocations: [...existingAllocations, newAllocation]
+      })
+      .eq('id', cycle.id);
+
+    if (updateError) {
+      console.error('Error updating cycle payment:', updateError);
+    }
+
+    if (isFullyPaid) periodsClosed++;
+
+    allocations.push({
+      cycle_id: cycle.cycle_id,
+      cycle_number: cycle.contribution_cycles?.cycle_number || 0,
+      amount_applied: applied,
+      type: 'missed_period',
+      was_fully_paid: isFullyPaid
+    });
+
+    console.log('Allocated to period:', {
+      cycleNumber: cycle.contribution_cycles?.cycle_number,
+      amountOwed,
+      applied,
+      remainingAmount,
+      isFullyPaid
+    });
+  }
+
+  // 4. Any remaining becomes carry-forward credit
+  const carryForward = remainingAmount;
+
+  // 5. Update member carry-forward
+  const { error: memberUpdateError } = await supabase
+    .from('chama_members')
+    .update({
+      carry_forward_credit: carryForward,
+      last_payment_date: new Date().toISOString()
+    })
+    .eq('id', memberId);
+
+  if (memberUpdateError) {
+    console.error('Error updating member carry-forward:', memberUpdateError);
+  }
+
+  console.log('Payment allocation complete:', {
+    totalAllocations: allocations.length,
+    periodsClosed,
+    carryForward,
+    totalApplied: paymentAmount + existingCarryForward - carryForward
+  });
+
+  return {
+    allocations,
+    carry_forward: carryForward,
+    total_applied: paymentAmount + existingCarryForward - carryForward,
+    periods_cleared: periodsClosed
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -147,22 +310,7 @@ serve(async (req) => {
         });
       }
 
-      const expectedAmount = member.chama.contribution_amount;
-      const paidAmount = body.amount;
-
-      // Calculate overpayment or underpayment
-      let creditDelta = 0;
-      let deficitDelta = 0;
-
-      if (paidAmount > expectedAmount) {
-        // Overpayment - add to credit
-        creditDelta = paidAmount - expectedAmount;
-        console.log('Overpayment detected:', { paidAmount, expectedAmount, creditDelta });
-      } else if (paidAmount < expectedAmount) {
-        // Underpayment - add to deficit
-        deficitDelta = expectedAmount - paidAmount;
-        console.log('Underpayment detected:', { paidAmount, expectedAmount, deficitDelta });
-      }
+      const contributionAmount = member.chama.contribution_amount;
 
       // ============================================
       // FIRST PAYMENT ACTIVATION LOGIC
@@ -253,7 +401,23 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      // Check for active cycle and handle cycle payment tracking
+      // ============================================
+      // SCHEDULED CONTRIBUTIONS PAYMENT ALLOCATION
+      // ============================================
+      // Apply strict payment rules:
+      // 1. Clear missed periods first (oldest to newest)
+      // 2. Apply to current period (capped at contribution amount)
+      // 3. Store excess as carry-forward
+      
+      const allocationResult = await allocatePayment(
+        supabaseClient,
+        body.member_id,
+        body.chama_id,
+        body.amount,
+        contributionAmount
+      );
+
+      // Check for active cycle and handle current cycle tracking
       const now = new Date();
       const today = now.toISOString().split('T')[0];
       
@@ -277,92 +441,97 @@ serve(async (req) => {
         isLatePayment = now > cutoffTime;
 
         if (isLatePayment) {
-          // Credit to next cycle
-          const { error: creditError } = await supabaseClient
-            .from('chama_members')
-            .update({
-              next_cycle_credit: member.next_cycle_credit + body.amount
-            })
-            .eq('id', body.member_id);
+          // Late payment - any carry-forward already handled by allocatePayment
+          // Send late payment notification
+          const { data: memberProfile } = await supabaseClient
+            .from('profiles')
+            .select('phone')
+            .eq('id', member.user_id)
+            .single();
 
-          if (!creditError) {
-            // Send late payment notification
-            const { data: profile } = await supabaseClient
-              .from('profiles')
-              .select('phone')
-              .eq('id', member.user_id)
-              .single();
-
-            if (profile?.phone) {
-              const nextCycleDate = new Date(cycle.end_date);
-              nextCycleDate.setDate(nextCycleDate.getDate() + 1);
-              
-              await supabaseClient.functions.invoke('send-transactional-sms', {
-                body: {
-                  phone: profile.phone,
-                  message: `Your payment of KES ${body.amount} was received after 8 PM. It has been credited to your next cycle contribution on ${nextCycleDate.toISOString().split('T')[0]}.`,
-                  eventType: 'late_payment_credit'
-                }
-              });
-            }
+          if (memberProfile?.phone) {
+            const nextCycleDate = new Date(cycle.end_date);
+            nextCycleDate.setDate(nextCycleDate.getDate() + 1);
+            
+            await supabaseClient.functions.invoke('send-transactional-sms', {
+              body: {
+                phone: memberProfile.phone,
+                message: `Your payment of KES ${body.amount} was received after 8 PM. Any excess has been credited for future cycles. Carry-forward: KES ${allocationResult.carry_forward}.`,
+                eventType: 'late_payment_credit'
+              }
+            });
           }
         } else {
-          // Record in member_cycle_payments
-          const { error: paymentError } = await supabaseClient
+          // Ensure current cycle has a payment record (create if not exists)
+          const { data: existingPayment } = await supabaseClient
             .from('member_cycle_payments')
-            .upsert({
-              member_id: body.member_id,
-              cycle_id: cycle.id,
-              amount_paid: body.amount,
-              amount_due: cycle.due_amount,
-              is_paid: true,
-              paid_at: now.toISOString(),
-              payment_time: now.toISOString(),
-              is_late_payment: false
-            }, {
-              onConflict: 'member_id,cycle_id'
-            });
+            .select('id')
+            .eq('member_id', body.member_id)
+            .eq('cycle_id', cycle.id)
+            .maybeSingle();
 
-          if (paymentError) {
-            console.error('Error recording cycle payment:', paymentError);
-          }
-
-          // Reset missed payment count if this resolves it
-          if (member.missed_payments_count > 0) {
+          if (!existingPayment) {
+            // Create new payment record for this cycle - allocation will handle it
             await supabaseClient
-              .from('chama_members')
-              .update({
-                missed_payments_count: Math.max(0, member.missed_payments_count - 1),
-                requires_admin_verification: member.missed_payments_count - 1 >= 1
-              })
-              .eq('id', body.member_id);
+              .from('member_cycle_payments')
+              .insert({
+                member_id: body.member_id,
+                cycle_id: cycle.id,
+                amount_paid: 0,
+                amount_due: cycle.due_amount || contributionAmount,
+                amount_remaining: cycle.due_amount || contributionAmount,
+                is_paid: false,
+                fully_paid: false,
+                is_late_payment: false,
+                payment_allocations: []
+              });
           }
+        }
+
+        // Reset missed payment count if clearing periods
+        if (allocationResult.periods_cleared > 0 && member.missed_payments_count > 0) {
+          await supabaseClient
+            .from('chama_members')
+            .update({
+              missed_payments_count: Math.max(0, member.missed_payments_count - allocationResult.periods_cleared),
+              requires_admin_verification: member.missed_payments_count - allocationResult.periods_cleared >= 1
+            })
+            .eq('id', body.member_id);
         }
       }
 
-      // Update member balance
-      if (creditDelta > 0 || deficitDelta > 0) {
-        const { error: updateError } = await supabaseClient
-          .from('chama_members')
-          .update({
-            balance_credit: member.balance_credit + creditDelta,
-            balance_deficit: member.balance_deficit + deficitDelta,
-            last_payment_date: new Date().toISOString(),
-          })
-          .eq('id', body.member_id);
+      // Build allocation summary message
+      let allocationSummary = '';
+      if (allocationResult.allocations.length > 0) {
+        const periodsSummary = allocationResult.allocations
+          .map(a => `Cycle #${a.cycle_number}: KES ${a.amount_applied}${a.was_fully_paid ? ' ✓' : ''}`)
+          .join(', ');
+        allocationSummary = periodsSummary;
+      }
 
-        if (updateError) {
-          console.error('Error updating member balance:', updateError);
-        } else {
-          console.log('Member balance updated:', { creditDelta, deficitDelta });
+      // Send allocation SMS if cleared multiple periods
+      if (allocationResult.periods_cleared > 0 && profile?.phone) {
+        try {
+          await supabaseClient.functions.invoke('send-transactional-sms', {
+            body: {
+              phone: profile.phone,
+              message: `Payment of KES ${body.amount} received. ✅ Cleared: ${allocationResult.periods_cleared} period(s). ${allocationResult.carry_forward > 0 ? `Carry-forward: KES ${allocationResult.carry_forward}` : 'All periods paid!'}`,
+              eventType: 'payment_allocation'
+            }
+          });
+        } catch (smsError) {
+          console.error('Failed to send allocation SMS:', smsError);
         }
       }
 
       return new Response(JSON.stringify({ 
         data,
-        balance_update: {
-          credit_added: creditDelta,
-          deficit_added: deficitDelta,
+        payment_allocation: {
+          allocations: allocationResult.allocations,
+          carry_forward: allocationResult.carry_forward,
+          total_applied: allocationResult.total_applied,
+          periods_cleared: allocationResult.periods_cleared,
+          summary: allocationSummary
         },
         first_payment: isFirstPayment ? {
           activated: true,

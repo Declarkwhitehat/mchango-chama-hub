@@ -298,6 +298,7 @@ export type Database = {
           approval_status: string | null
           balance_credit: number | null
           balance_deficit: number | null
+          carry_forward_credit: number | null
           chama_id: string
           contribution_status: string | null
           expected_contributions: number | null
@@ -327,6 +328,7 @@ export type Database = {
           approval_status?: string | null
           balance_credit?: number | null
           balance_deficit?: number | null
+          carry_forward_credit?: number | null
           chama_id: string
           contribution_status?: string | null
           expected_contributions?: number | null
@@ -356,6 +358,7 @@ export type Database = {
           approval_status?: string | null
           balance_credit?: number | null
           balance_deficit?: number | null
+          carry_forward_credit?: number | null
           chama_id?: string
           contribution_status?: string | null
           expected_contributions?: number | null
@@ -844,42 +847,51 @@ export type Database = {
         Row: {
           amount_due: number
           amount_paid: number | null
+          amount_remaining: number | null
           created_at: string | null
           credited_to_next_cycle: boolean | null
           cycle_id: string
+          fully_paid: boolean | null
           id: string
           is_late_payment: boolean | null
           is_paid: boolean | null
           member_id: string
           paid_at: string | null
+          payment_allocations: Json | null
           payment_time: string | null
           reminder_sent_at: string | null
         }
         Insert: {
           amount_due: number
           amount_paid?: number | null
+          amount_remaining?: number | null
           created_at?: string | null
           credited_to_next_cycle?: boolean | null
           cycle_id: string
+          fully_paid?: boolean | null
           id?: string
           is_late_payment?: boolean | null
           is_paid?: boolean | null
           member_id: string
           paid_at?: string | null
+          payment_allocations?: Json | null
           payment_time?: string | null
           reminder_sent_at?: string | null
         }
         Update: {
           amount_due?: number
           amount_paid?: number | null
+          amount_remaining?: number | null
           created_at?: string | null
           credited_to_next_cycle?: boolean | null
           cycle_id?: string
+          fully_paid?: boolean | null
           id?: string
           is_late_payment?: boolean | null
           is_paid?: boolean | null
           member_id?: string
           paid_at?: string | null
+          payment_allocations?: Json | null
           payment_time?: string | null
           reminder_sent_at?: string | null
         }
@@ -2458,6 +2470,15 @@ export type Database = {
           is_eligible: boolean
           required_amount: number
           shortfall: number
+        }[]
+      }
+      check_member_schedule_eligibility: {
+        Args: { p_chama_id: string; p_member_id: string }
+        Returns: {
+          carry_forward: number
+          is_eligible: boolean
+          total_amount_owed: number
+          total_periods_owed: number
         }[]
       }
       cleanup_expired_otps: { Args: never; Returns: undefined }

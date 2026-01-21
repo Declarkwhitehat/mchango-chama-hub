@@ -56,10 +56,10 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Get approved members
+      // Get approved members with their credit balances
       const { data: members } = await supabase
         .from('chama_members')
-        .select('*')
+        .select('*, carry_forward_credit, next_cycle_credit')
         .eq('chama_id', chamaId)
         .eq('approval_status', 'approved')
         .eq('status', 'active')
@@ -136,12 +136,31 @@ Deno.serve(async (req) => {
       }
 
       // Create payment records for all members
-      const paymentRecords = members.map(member => ({
-        member_id: member.id,
-        cycle_id: newCycle.id,
-        amount_due: chama.contribution_amount - (member.next_cycle_credit || 0),
-        is_paid: false
-      }));
+      // Apply carry-forward credit to reduce amount due
+      const paymentRecords = members.map(member => {
+        const carryForward = member.carry_forward_credit || 0;
+        const nextCycleCredit = member.next_cycle_credit || 0;
+        const totalCredit = carryForward + nextCycleCredit;
+        const amountDue = Math.max(0, chama.contribution_amount - totalCredit);
+        const amountApplied = Math.min(totalCredit, chama.contribution_amount);
+        const isFullyPaid = amountDue <= 0;
+        
+        return {
+          member_id: member.id,
+          cycle_id: newCycle.id,
+          amount_due: chama.contribution_amount,
+          amount_paid: amountApplied,
+          amount_remaining: amountDue,
+          is_paid: isFullyPaid,
+          fully_paid: isFullyPaid,
+          is_late_payment: false,
+          payment_allocations: amountApplied > 0 ? [{
+            amount: amountApplied,
+            timestamp: new Date().toISOString(),
+            source: 'carry_forward'
+          }] : []
+        };
+      });
 
       const { error: paymentError } = await supabase
         .from('member_cycle_payments')
@@ -149,6 +168,26 @@ Deno.serve(async (req) => {
 
       if (paymentError) {
         console.error('Error creating payment records:', paymentError);
+      }
+
+      // Reset carry-forward and next_cycle_credit for members where it was applied
+      for (const member of members) {
+        const carryForward = member.carry_forward_credit || 0;
+        const nextCycleCredit = member.next_cycle_credit || 0;
+        const totalCredit = carryForward + nextCycleCredit;
+        
+        if (totalCredit > 0) {
+          const appliedAmount = Math.min(totalCredit, chama.contribution_amount);
+          const remainingCarryForward = Math.max(0, totalCredit - chama.contribution_amount);
+          
+          await supabase
+            .from('chama_members')
+            .update({
+              carry_forward_credit: remainingCarryForward,
+              next_cycle_credit: 0
+            })
+            .eq('id', member.id);
+        }
       }
 
       return new Response(JSON.stringify({ cycle: newCycle, beneficiary }), {
