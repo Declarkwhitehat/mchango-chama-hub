@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { DollarSign, TrendingUp, Loader2, Users, Heart, Percent, ArrowUpRight, ArrowDownRight, Calendar, BarChart3 } from "lucide-react";
+import { DollarSign, TrendingUp, Loader2, Users, Heart, Percent, ArrowUpRight, ArrowDownRight, Calendar, BarChart3, Building2 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from "date-fns";
 import { 
@@ -14,11 +14,15 @@ import {
   formatCommissionPercentage 
 } from "@/utils/commissionCalculator";
 
+const ORGANIZATION_COMMISSION_RATE = 0.05; // 5% for organizations
+
 interface CommissionData {
   mchangoCommission: number;
   mchangoDonations: number;
   chamaCommission: number;
   chamaContributions: number;
+  organizationCommission: number;
+  organizationDonations: number;
   totalCommission: number;
 }
 
@@ -26,6 +30,7 @@ interface TrendData {
   date: string;
   mchango: number;
   chama: number;
+  organizations: number;
   total: number;
 }
 
@@ -44,6 +49,8 @@ export const CommissionOverview = () => {
     mchangoDonations: 0,
     chamaCommission: 0,
     chamaContributions: 0,
+    organizationCommission: 0,
+    organizationDonations: 0,
     totalCommission: 0,
   });
   const [trendData, setTrendData] = useState<TrendData[]>([]);
@@ -61,36 +68,48 @@ export const CommissionOverview = () => {
 
   const fetchCommissionData = async () => {
     try {
-      // Fetch Mchango donations (completed only)
-      const { data: donations, error: donationsError } = await supabase
-        .from('mchango_donations')
-        .select('amount')
-        .eq('payment_status', 'completed');
+      // Fetch all data in parallel
+      const [donationsResult, contributionsResult, orgDonationsResult] = await Promise.all([
+        // Mchango donations (completed only)
+        supabase
+          .from('mchango_donations')
+          .select('amount')
+          .eq('payment_status', 'completed'),
+        // Chama contributions (completed only)
+        supabase
+          .from('contributions')
+          .select('amount')
+          .eq('status', 'completed'),
+        // Organization donations (completed only)
+        supabase
+          .from('organization_donations')
+          .select('gross_amount, commission_amount')
+          .eq('payment_status', 'completed'),
+      ]);
 
-      if (donationsError) throw donationsError;
+      if (donationsResult.error) throw donationsResult.error;
+      if (contributionsResult.error) throw contributionsResult.error;
+      if (orgDonationsResult.error) throw orgDonationsResult.error;
 
-      const mchangoDonations = donations?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
+      const mchangoDonations = donationsResult.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
       const mchangoCommission = mchangoDonations * MCHANGO_COMMISSION_RATE;
 
-      // Fetch Chama contributions (completed only)
-      const { data: contributions, error: contributionsError } = await supabase
-        .from('contributions')
-        .select('amount')
-        .eq('status', 'completed');
-
-      if (contributionsError) throw contributionsError;
-
-      const chamaContributions = contributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+      const chamaContributions = contributionsResult.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
       const chamaCommission = chamaContributions * CHAMA_DEFAULT_COMMISSION_RATE;
 
+      const organizationDonations = orgDonationsResult.data?.reduce((sum, d) => sum + Number(d.gross_amount || 0), 0) || 0;
+      const organizationCommission = orgDonationsResult.data?.reduce((sum, d) => sum + Number(d.commission_amount || 0), 0) || 0;
+
       // Calculate totals
-      const totalCommission = mchangoCommission + chamaCommission;
+      const totalCommission = mchangoCommission + chamaCommission + organizationCommission;
 
       setData({
         mchangoCommission,
         mchangoDonations,
         chamaCommission,
         chamaContributions,
+        organizationCommission,
+        organizationDonations,
         totalCommission,
       });
     } catch (error: any) {
@@ -124,21 +143,25 @@ export const CommissionOverview = () => {
           const dayStart = startOfDay(date);
           const dayEnd = endOfDay(date);
 
-          const [mchangoData, chamaData] = await Promise.all([
+          const [mchangoData, chamaData, orgData] = await Promise.all([
             supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
               .gte('completed_at', dayStart.toISOString()).lte('completed_at', dayEnd.toISOString()),
             supabase.from('contributions').select('amount').eq('status', 'completed')
               .gte('contribution_date', dayStart.toISOString()).lte('contribution_date', dayEnd.toISOString()),
+            supabase.from('organization_donations').select('commission_amount').eq('payment_status', 'completed')
+              .gte('completed_at', dayStart.toISOString()).lte('completed_at', dayEnd.toISOString()),
           ]);
 
           const mchango = (mchangoData.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE;
           const chama = (chamaData.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
+          const organizations = orgData.data?.reduce((sum, d) => sum + Number(d.commission_amount || 0), 0) || 0;
 
           dataPoints.push({
             date: format(date, 'MMM dd'),
             mchango,
             chama,
-            total: mchango + chama,
+            organizations,
+            total: mchango + chama + organizations,
           });
         }
       } else if (period === 'weekly') {
@@ -147,21 +170,25 @@ export const CommissionOverview = () => {
           const weekStart = startOfWeek(subWeeks(now, i));
           const weekEnd = endOfWeek(subWeeks(now, i));
 
-          const [mchangoData, chamaData] = await Promise.all([
+          const [mchangoData, chamaData, orgData] = await Promise.all([
             supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
               .gte('completed_at', weekStart.toISOString()).lte('completed_at', weekEnd.toISOString()),
             supabase.from('contributions').select('amount').eq('status', 'completed')
               .gte('contribution_date', weekStart.toISOString()).lte('contribution_date', weekEnd.toISOString()),
+            supabase.from('organization_donations').select('commission_amount').eq('payment_status', 'completed')
+              .gte('completed_at', weekStart.toISOString()).lte('completed_at', weekEnd.toISOString()),
           ]);
 
           const mchango = (mchangoData.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE;
           const chama = (chamaData.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
+          const organizations = orgData.data?.reduce((sum, d) => sum + Number(d.commission_amount || 0), 0) || 0;
 
           dataPoints.push({
             date: format(weekStart, 'MMM dd'),
             mchango,
             chama,
-            total: mchango + chama,
+            organizations,
+            total: mchango + chama + organizations,
           });
         }
 
@@ -175,21 +202,25 @@ export const CommissionOverview = () => {
           const monthStart = startOfMonth(subMonths(now, i));
           const monthEnd = endOfMonth(subMonths(now, i));
 
-          const [mchangoData, chamaData] = await Promise.all([
+          const [mchangoData, chamaData, orgData] = await Promise.all([
             supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
               .gte('completed_at', monthStart.toISOString()).lte('completed_at', monthEnd.toISOString()),
             supabase.from('contributions').select('amount').eq('status', 'completed')
               .gte('contribution_date', monthStart.toISOString()).lte('contribution_date', monthEnd.toISOString()),
+            supabase.from('organization_donations').select('commission_amount').eq('payment_status', 'completed')
+              .gte('completed_at', monthStart.toISOString()).lte('completed_at', monthEnd.toISOString()),
           ]);
 
           const mchango = (mchangoData.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE;
           const chama = (chamaData.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
+          const organizations = orgData.data?.reduce((sum, d) => sum + Number(d.commission_amount || 0), 0) || 0;
 
           dataPoints.push({
             date: format(monthStart, 'MMM yyyy'),
             mchango,
             chama,
-            total: mchango + chama,
+            organizations,
+            total: mchango + chama + organizations,
           });
         }
 
@@ -202,27 +233,33 @@ export const CommissionOverview = () => {
       setTrendData(dataPoints);
 
       // Calculate growth
-      const [currentMchango, currentChama] = await Promise.all([
+      const [currentMchango, currentChama, currentOrg] = await Promise.all([
         supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
           .gte('completed_at', currentStart.toISOString()).lte('completed_at', currentEnd.toISOString()),
         supabase.from('contributions').select('amount').eq('status', 'completed')
           .gte('contribution_date', currentStart.toISOString()).lte('contribution_date', currentEnd.toISOString()),
+        supabase.from('organization_donations').select('commission_amount').eq('payment_status', 'completed')
+          .gte('completed_at', currentStart.toISOString()).lte('completed_at', currentEnd.toISOString()),
       ]);
 
-      const [previousMchango, previousChama] = await Promise.all([
+      const [previousMchango, previousChama, previousOrg] = await Promise.all([
         supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
           .gte('completed_at', previousStart.toISOString()).lte('completed_at', previousEnd.toISOString()),
         supabase.from('contributions').select('amount').eq('status', 'completed')
           .gte('contribution_date', previousStart.toISOString()).lte('contribution_date', previousEnd.toISOString()),
+        supabase.from('organization_donations').select('commission_amount').eq('payment_status', 'completed')
+          .gte('completed_at', previousStart.toISOString()).lte('completed_at', previousEnd.toISOString()),
       ]);
 
       const currentTotal = 
         (currentMchango.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE +
-        (currentChama.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
+        (currentChama.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE +
+        (currentOrg.data?.reduce((sum, d) => sum + Number(d.commission_amount || 0), 0) || 0);
 
       const previousTotal = 
         (previousMchango.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE +
-        (previousChama.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
+        (previousChama.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE +
+        (previousOrg.data?.reduce((sum, d) => sum + Number(d.commission_amount || 0), 0) || 0);
 
       const growthPercentage = previousTotal > 0 
         ? ((currentTotal - previousTotal) / previousTotal) * 100 
@@ -297,7 +334,7 @@ export const CommissionOverview = () => {
           </div>
 
           {/* Quick Stats Grid */}
-          <div className="grid grid-cols-2 gap-4 pt-6 border-t">
+          <div className="grid grid-cols-3 gap-4 pt-6 border-t">
             <div className="text-center">
               <p className="text-2xl font-bold text-pink-600">
                 {formatCommissionPercentage(MCHANGO_COMMISSION_RATE)}
@@ -309,6 +346,12 @@ export const CommissionOverview = () => {
                 {formatCommissionPercentage(CHAMA_DEFAULT_COMMISSION_RATE)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">Chama Rate</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-purple-600">
+                {formatCommissionPercentage(ORGANIZATION_COMMISSION_RATE)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Organizations Rate</p>
             </div>
           </div>
         </CardContent>
@@ -375,6 +418,10 @@ export const CommissionOverview = () => {
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                     </linearGradient>
+                    <linearGradient id="colorOrganizations" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="date" className="text-xs" />
@@ -404,6 +451,15 @@ export const CommissionOverview = () => {
                     fillOpacity={1} 
                     fill="url(#colorChama)" 
                     name="Chama"
+                    stackId="1"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="organizations" 
+                    stroke="#a855f7" 
+                    fillOpacity={1} 
+                    fill="url(#colorOrganizations)" 
+                    name="Organizations"
                     stackId="1"
                   />
                 </AreaChart>
@@ -449,6 +505,14 @@ export const CommissionOverview = () => {
                     name="Chama"
                     dot={{ r: 3 }}
                   />
+                  <Line 
+                    type="monotone" 
+                    dataKey="organizations" 
+                    stroke="#a855f7" 
+                    strokeWidth={2}
+                    name="Organizations"
+                    dot={{ r: 3 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </TabsContent>
@@ -470,13 +534,14 @@ export const CommissionOverview = () => {
                   <Legend />
                   <Bar dataKey="mchango" fill="#ec4899" name="Mchango" stackId="a" />
                   <Bar dataKey="chama" fill="#3b82f6" name="Chama" stackId="a" />
+                  <Bar dataKey="organizations" fill="#a855f7" name="Organizations" stackId="a" />
                 </BarChart>
               </ResponsiveContainer>
             </TabsContent>
           </Tabs>
 
           {/* Period Summary */}
-          <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t">
+          <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
             <div className="text-center p-4 bg-pink-50 dark:bg-pink-950/20 rounded-lg">
               <p className="text-sm text-muted-foreground mb-1">Mchango (Period Avg)</p>
               <p className="text-2xl font-bold text-pink-600">
@@ -489,12 +554,18 @@ export const CommissionOverview = () => {
                 KES {(trendData.reduce((sum, d) => sum + d.chama, 0) / (trendData.length || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </div>
+            <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-1">Organizations (Period Avg)</p>
+              <p className="text-2xl font-bold text-purple-600">
+                KES {(trendData.reduce((sum, d) => sum + d.organizations, 0) / (trendData.length || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Breakdown by Source - Enhanced Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         {/* Mchango Commission */}
         <Card className="relative overflow-hidden border-2 border-pink-200 bg-gradient-to-br from-pink-50 to-white dark:from-pink-950/20 dark:to-background">
           <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full -translate-y-16 translate-x-16" />
@@ -602,6 +673,60 @@ export const CommissionOverview = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Organizations Commission */}
+        <Card className="relative overflow-hidden border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/20 dark:to-background">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full -translate-y-16 translate-x-16" />
+          <CardHeader className="pb-3 relative">
+            <div className="flex items-center justify-between">
+              <div className="h-12 w-12 rounded-full bg-purple-500/10 flex items-center justify-center">
+                <Building2 className="h-6 w-6 text-purple-500" />
+              </div>
+              <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                <Percent className="h-3 w-3 mr-1" />
+                {formatCommissionPercentage(ORGANIZATION_COMMISSION_RATE)}
+              </Badge>
+            </div>
+            <CardTitle className="text-lg mt-3">Organizations (NGOs)</CardTitle>
+            <CardDescription>
+              {formatCommissionPercentage(ORGANIZATION_COMMISSION_RATE)} commission per donation
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 relative">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Total Donations Received</p>
+              <p className="text-xl font-bold">
+                KES {data.organizationDonations.toLocaleString()}
+              </p>
+            </div>
+            <div className="pt-3 border-t border-purple-200">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Your Commission</p>
+              <p className="text-3xl font-bold text-purple-600">
+                KES {data.organizationCommission.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="pt-2">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-muted-foreground">Share of Total</span>
+                <span className="font-medium">
+                  {data.totalCommission > 0 
+                    ? ((data.organizationCommission / data.totalCommission) * 100).toFixed(1)
+                    : 0}%
+                </span>
+              </div>
+              <div className="h-2 bg-purple-100 dark:bg-purple-900/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-400 to-purple-600 transition-all duration-500"
+                  style={{ 
+                    width: `${data.totalCommission > 0 
+                      ? (data.organizationCommission / data.totalCommission) * 100 
+                      : 0}%` 
+                  }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Detailed Breakdown Table */}
@@ -677,6 +802,32 @@ export const CommissionOverview = () => {
                   <td className="text-right py-4 px-4 font-semibold">
                     {data.totalCommission > 0 
                       ? ((data.chamaCommission / data.totalCommission) * 100).toFixed(1)
+                      : 0}%
+                  </td>
+                </tr>
+                <tr className="border-b hover:bg-purple-50/50 dark:hover:bg-purple-950/20">
+                  <td className="py-4 px-4">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                        <Building2 className="h-4 w-4 text-purple-500" />
+                      </div>
+                      <span className="font-medium">Organization Donations</span>
+                    </div>
+                  </td>
+                  <td className="text-right py-4 px-4">
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30">
+                      {formatCommissionPercentage(ORGANIZATION_COMMISSION_RATE)}
+                    </Badge>
+                  </td>
+                  <td className="text-right py-4 px-4 font-medium">
+                    KES {data.organizationDonations.toLocaleString()}
+                  </td>
+                  <td className="text-right py-4 px-4 font-bold text-purple-600">
+                    KES {data.organizationCommission.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="text-right py-4 px-4 font-semibold">
+                    {data.totalCommission > 0 
+                      ? ((data.organizationCommission / data.totalCommission) * 100).toFixed(1)
                       : 0}%
                   </td>
                 </tr>
