@@ -15,13 +15,14 @@ import {
   Heart,
   ArrowUpRight,
   ArrowDownLeft,
-  Calendar
+  Calendar,
+  Building2
 } from "lucide-react";
 import { format } from "date-fns";
 
 interface Transaction {
   id: string;
-  type: 'chama' | 'mchango' | 'withdrawal';
+  type: 'chama' | 'mchango' | 'withdrawal' | 'organization';
   amount: number;
   status: string;
   created_at: string;
@@ -35,9 +36,11 @@ export default function Activity() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [chamaTransactions, setChamaTransactions] = useState<any[]>([]);
   const [mchangoTransactions, setMchangoTransactions] = useState<any[]>([]);
+  const [organizationTransactions, setOrganizationTransactions] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [chamaNames, setChamaNames] = useState<Map<string, string>>(new Map());
   const [mchangoNames, setMchangoNames] = useState<Map<string, string>>(new Map());
+  const [organizationNames, setOrganizationNames] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     fetchAllTransactions();
@@ -91,6 +94,21 @@ export default function Activity() {
         if (m.mchango) mchangoNameMap.set(m.mchango_id, m.mchango.title);
       });
 
+      // Fetch organization donations with joined name
+      const { data: orgData, error: orgError } = await supabase
+        .from("organization_donations")
+        .select("*, organization:organization_id(name)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (orgError) throw orgError;
+
+      // Build organization name map from joined data
+      const orgNameMap = new Map<string, string>();
+      (orgData || []).forEach((o: any) => {
+        if (o.organization) orgNameMap.set(o.organization_id, o.organization.name);
+      });
+
       // Fetch withdrawals
       const { data: withdrawalData, error: withdrawalError } = await supabase
         .from("withdrawals")
@@ -102,8 +120,10 @@ export default function Activity() {
 
       setChamaNames(chamaNameMap);
       setMchangoNames(mchangoNameMap);
+      setOrganizationNames(orgNameMap);
       setChamaTransactions(chamaData || []);
       setMchangoTransactions(mchangoData || []);
+      setOrganizationTransactions(orgData || []);
       setWithdrawals(withdrawalData || []);
 
       // Combine all transactions
@@ -121,10 +141,19 @@ export default function Activity() {
           id: t.id,
           type: 'mchango' as const,
           amount: t.amount,
-          status: 'completed',
+          status: t.payment_status || 'completed',
           created_at: t.created_at,
           description: `Campaign Donation - ${mchangoNameMap.get(t.mchango_id) || 'Unknown'}`,
           reference: t.payment_reference
+        })),
+        ...(orgData || []).map((t: any) => ({
+          id: t.id,
+          type: 'organization' as const,
+          amount: t.amount,
+          status: t.payment_status || 'completed',
+          created_at: t.created_at,
+          description: `Organization Donation - ${orgNameMap.get(t.organization_id) || 'Unknown'}`,
+          reference: t.mpesa_receipt_number
         })),
         ...(withdrawalData || []).map((t: any) => ({
           id: t.id,
@@ -154,6 +183,7 @@ export default function Activity() {
     switch (type) {
       case 'chama': return <Users className="h-4 w-4" />;
       case 'mchango': return <Heart className="h-4 w-4" />;
+      case 'organization': return <Building2 className="h-4 w-4" />;
       case 'withdrawal': return <ArrowDownLeft className="h-4 w-4" />;
       default: return <DollarSign className="h-4 w-4" />;
     }
@@ -163,11 +193,18 @@ export default function Activity() {
     const variants: Record<string, string> = {
       chama: 'bg-primary/10 text-primary border-primary/20',
       mchango: 'bg-secondary/10 text-secondary border-secondary/20',
+      organization: 'bg-accent/10 text-accent-foreground border-accent/20',
       withdrawal: 'bg-muted text-muted-foreground border-border'
+    };
+    const labels: Record<string, string> = {
+      chama: 'Chama',
+      mchango: 'Campaign',
+      organization: 'Organization',
+      withdrawal: 'Withdrawal'
     };
     return (
       <Badge variant="outline" className={variants[type]}>
-        {type.charAt(0).toUpperCase() + type.slice(1)}
+        {labels[type] || type.charAt(0).toUpperCase() + type.slice(1)}
       </Badge>
     );
   };
@@ -275,7 +312,7 @@ export default function Activity() {
 
         {/* Transactions Tabs */}
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="flex w-full overflow-x-auto scrollbar-hide gap-1 justify-start sm:grid sm:grid-cols-4">
+          <TabsList className="flex w-full overflow-x-auto scrollbar-hide gap-1 justify-start sm:grid sm:grid-cols-5">
             <TabsTrigger value="all" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
               All ({transactions.length})
             </TabsTrigger>
@@ -285,6 +322,10 @@ export default function Activity() {
             <TabsTrigger value="mchango" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
               <span className="hidden sm:inline">Campaigns</span>
               <span className="sm:hidden">Camp.</span> ({mchangoTransactions.length})
+            </TabsTrigger>
+            <TabsTrigger value="organizations" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              <span className="hidden sm:inline">Organizations</span>
+              <span className="sm:hidden">Orgs</span> ({organizationTransactions.length})
             </TabsTrigger>
             <TabsTrigger value="withdrawals" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
               <span className="hidden sm:inline">Withdrawals</span>
@@ -441,6 +482,57 @@ export default function Activity() {
                             <TableCell className="font-semibold">KSh {transaction.amount.toLocaleString()}</TableCell>
                             <TableCell className="text-muted-foreground text-sm">
                               {transaction.payment_reference || '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="organizations">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Organization Donations
+                  </CardTitle>
+                  <CardDescription>All your donations to organizations (churches, schools, NGOs)</CardDescription>
+                </div>
+                <ActivityPDFDownload 
+                  data={organizationTransactions} 
+                  type="organizations" 
+                  organizationNames={organizationNames}
+                />
+              </CardHeader>
+              <CardContent>
+                {organizationTransactions.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No organization donations found</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Organization</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Receipt</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {organizationTransactions.map((transaction: any) => (
+                          <TableRow key={transaction.id}>
+                            <TableCell>{format(new Date(transaction.created_at), 'MMM dd, yyyy HH:mm')}</TableCell>
+                            <TableCell>{organizationNames.get(transaction.organization_id) || 'Unknown'}</TableCell>
+                            <TableCell className="font-semibold">KSh {transaction.amount.toLocaleString()}</TableCell>
+                            <TableCell>{getStatusBadge(transaction.payment_status)}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {transaction.mpesa_receipt_number || '-'}
                             </TableCell>
                           </TableRow>
                         ))}
