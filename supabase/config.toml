@@ -112,7 +112,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.withdrawals-crud]
-verify_jwt = true
+verify_jwt = false
 
 [functions.payment-methods]
 verify_jwt = true
