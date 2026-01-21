@@ -5,10 +5,8 @@ import {
   DollarSign, 
   TrendingUp, 
   Activity, 
-  PiggyBank,
   PhoneCall,
   FileText,
-  Settings,
   Search,
   Download
 } from "lucide-react";
@@ -75,7 +73,6 @@ export function AdminSidebar() {
 
   const groupsItems = [
     { title: "Chama Groups", url: "/admin/chamas", icon: Activity },
-    { title: "Savings Groups", url: "/admin/savings-groups", icon: PiggyBank },
     { title: "Campaigns", url: "/admin/campaigns", icon: TrendingUp },
   ];
 

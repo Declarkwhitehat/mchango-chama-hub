@@ -2493,7 +2493,6 @@ export type Database = {
       cleanup_expired_otps: { Args: never; Returns: undefined }
       cleanup_old_chat_messages: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
-      generate_group_code: { Args: never; Returns: string }
       generate_group_invite_code: { Args: never; Returns: string }
       generate_invite_code: { Args: never; Returns: string }
       generate_mchango_code: { Args: never; Returns: string }

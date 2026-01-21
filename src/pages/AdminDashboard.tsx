@@ -32,7 +32,6 @@ const AdminDashboard = () => {
     pendingKyc: 0,
     activeCampaigns: 0,
     activeChamas: 0,
-    activeSavingsGroups: 0,
     totalRevenue: 0,
     pendingWithdrawals: 0,
     pendingCallbacks: 0,
@@ -54,7 +53,6 @@ const AdminDashboard = () => {
         pendingKycResult,
         campaignsResult,
         chamasResult,
-        savingsGroupsResult,
         revenueResult,
         withdrawalsResult,
         callbacksResult,
@@ -65,7 +63,6 @@ const AdminDashboard = () => {
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'pending').not('kyc_submitted_at', 'is', null),
         supabase.from('mchango').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('chama').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('saving_groups').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('company_earnings').select('amount'),
         supabase.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('customer_callbacks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -80,7 +77,6 @@ const AdminDashboard = () => {
         pendingKyc: pendingKycResult.count || 0,
         activeCampaigns: campaignsResult.count || 0,
         activeChamas: chamasResult.count || 0,
-        activeSavingsGroups: savingsGroupsResult.count || 0,
         totalRevenue,
         pendingWithdrawals: withdrawalsResult.count || 0,
         pendingCallbacks: callbacksResult.count || 0,
@@ -174,10 +170,10 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {(stats.activeChamas + stats.activeSavingsGroups).toLocaleString()}
+                {stats.activeChamas.toLocaleString()}
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                {stats.activeChamas} Chamas, {stats.activeSavingsGroups} Savings
+                {stats.activeChamas} Chamas
               </p>
             </CardContent>
           </Card>
@@ -285,27 +281,6 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Savings Groups Overview */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <PiggyBank className="h-5 w-5" />
-                    Savings Groups
-                  </CardTitle>
-                  <CardDescription className="mt-1">Active savings groups</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => navigate("/admin/savings-groups")}>
-                  View All
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold mb-2">{stats.activeSavingsGroups}</div>
-              <p className="text-sm text-muted-foreground">Active groups</p>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Alerts Section */}

@@ -23,10 +23,6 @@ import ChamaDetail from "./pages/ChamaDetail";
 import ChamaJoin from "./pages/ChamaJoin";
 import ChamaList from "./pages/ChamaList";
 import Profile from "./pages/Profile";
-import SavingsGroupList from "./pages/SavingsGroupList";
-import SavingsGroupCreate from "./pages/SavingsGroupCreate";
-import SavingsGroupJoin from "./pages/SavingsGroupJoin";
-import SavingsGroupDetail from "./pages/SavingsGroupDetail";
 import MemberActivity from "./pages/MemberActivity";
 import Activity from "./pages/Activity";
 import AdminKYC from "./pages/AdminKYC";
@@ -36,7 +32,6 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminTransactions from "./pages/AdminTransactions";
 import AdminWithdrawals from "./pages/AdminWithdrawals";
 import AdminChamas from "./pages/AdminChamas";
-import AdminSavingsGroups from "./pages/AdminSavingsGroups";
 import AdminCampaigns from "./pages/AdminCampaigns";
 import AdminCallbacks from "./pages/AdminCallbacks";
 import AdminAudit from "./pages/AdminAudit";
@@ -86,13 +81,6 @@ const AppContent = () => {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
           
-          {/* Savings Group Routes */}
-          <Route path="/savings-groups" element={<ProtectedRoute><SavingsGroupList /></ProtectedRoute>} />
-          <Route path="/savings-groups/create" element={<ProtectedRoute requireKYC><SavingsGroupCreate /></ProtectedRoute>} />
-          <Route path="/savings-groups/join" element={<SavingsGroupJoin />} />
-          <Route path="/savings-groups/:id" element={<ProtectedRoute><SavingsGroupDetail /></ProtectedRoute>} />
-          <Route path="/savings-groups/:groupId/activity" element={<ProtectedRoute><MemberActivity /></ProtectedRoute>} />
-          
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
           <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />
@@ -101,7 +89,6 @@ const AppContent = () => {
           <Route path="/admin/transactions" element={<AdminProtectedRoute><AdminTransactions /></AdminProtectedRoute>} />
           <Route path="/admin/withdrawals" element={<AdminProtectedRoute><AdminWithdrawals /></AdminProtectedRoute>} />
           <Route path="/admin/chamas" element={<AdminProtectedRoute><AdminChamas /></AdminProtectedRoute>} />
-          <Route path="/admin/savings-groups" element={<AdminProtectedRoute><AdminSavingsGroups /></AdminProtectedRoute>} />
           <Route path="/admin/campaigns" element={<AdminProtectedRoute><AdminCampaigns /></AdminProtectedRoute>} />
           <Route path="/admin/callbacks" element={<AdminProtectedRoute><AdminCallbacks /></AdminProtectedRoute>} />
           <Route path="/admin/audit" element={<AdminProtectedRoute><AdminAudit /></AdminProtectedRoute>} />

@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
-import { PayoutQueue } from "@/components/savings/PayoutQueue";
 import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
 import { CheckCircle2, TrendingUp, Calendar, CreditCard, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -188,9 +187,6 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
         type="chama"
         showBreakdown={true}
       />
-
-      {/* Payout Queue Position */}
-      <PayoutQueue memberId={member.id} chamaId={chamaId} />
 
       {/* Member Info Card */}
       <Card>

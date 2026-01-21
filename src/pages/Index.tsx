@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Users, TrendingUp, Heart, Shield, PiggyBank, ChevronDown } from "lucide-react";
+import { Users, TrendingUp, Heart, Shield, Building2, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import {
   Accordion,
@@ -68,10 +68,10 @@ const Index = () => {
                   variant="heroSecondary" 
                   size="xl"
                   className="w-full sm:w-auto min-w-[200px]"
-                  onClick={() => window.location.href = '/savings-groups'}
+                  onClick={() => window.location.href = '/organizations'}
                 >
-                  <PiggyBank className="mr-2 h-5 w-5" />
-                  Savings Groups
+                  <Building2 className="mr-2 h-5 w-5" />
+                  Organizations
                 </Button>
               </div>
             </div>
@@ -198,20 +198,20 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Savings Group */}
+            {/* Organizations */}
             <div className="space-y-4 sm:space-y-6">
               <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-accent to-accent/80 rounded-full">
-                <span className="text-accent-foreground font-semibold text-sm sm:text-base">Savings Group</span>
+                <span className="text-accent-foreground font-semibold text-sm sm:text-base">Organizations</span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Build Together</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Support Causes</h3>
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex gap-3 sm:gap-4">
                   <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">
                     1
                   </div>
                   <div>
-                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Start Saving</h4>
-                    <p className="text-muted-foreground text-sm">Create or join a structured savings group</p>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Register Organization</h4>
+                    <p className="text-muted-foreground text-sm">Create a verified organization profile</p>
                   </div>
                 </div>
                 <div className="flex gap-3 sm:gap-4">
@@ -219,8 +219,8 @@ const Index = () => {
                     2
                   </div>
                   <div>
-                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Access Loans</h4>
-                    <p className="text-muted-foreground text-sm">Get loans based on your savings balance</p>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Receive Donations</h4>
+                    <p className="text-muted-foreground text-sm">Accept contributions from supporters</p>
                   </div>
                 </div>
                 <div className="flex gap-3 sm:gap-4">
@@ -228,8 +228,8 @@ const Index = () => {
                     3
                   </div>
                   <div>
-                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Share Profits</h4>
-                    <p className="text-muted-foreground text-sm">Earn returns from group investment activities</p>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Make Impact</h4>
+                    <p className="text-muted-foreground text-sm">Use funds to drive your mission forward</p>
                   </div>
                 </div>
               </div>
@@ -314,10 +314,10 @@ const Index = () => {
 
               <AccordionItem value="item-3" className="border rounded-lg px-4 py-1 bg-card">
                 <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  What are Savings Groups?
+                  What are Organizations?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  Savings Groups are long-term (6-24 months) collective savings with profit-sharing. Members save monthly, can take loans from the group pool, and share profits at the end.
+                  Organizations are verified entities (NGOs, churches, schools, etc.) that can receive donations through our platform. They provide transparency and accountability for their supporters.
                 </AccordionContent>
               </AccordionItem>
 
