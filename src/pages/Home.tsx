@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { PaymentDetailsSetup } from "@/components/PaymentDetailsSetup";
+import { JoinByCodeForm } from "@/components/chama/JoinByCodeForm";
 
 interface Mchango {
   id: string;
@@ -396,6 +397,9 @@ const Home = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Join Chama by Code - Mobile-first PWA feature */}
+          <JoinByCodeForm onJoinSuccess={fetchUserData} />
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">

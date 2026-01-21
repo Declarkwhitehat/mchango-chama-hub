@@ -379,6 +379,67 @@ serve(async (req) => {
 
       console.log('New member created:', newMember);
 
+      // Get the requester's profile for SMS notification
+      const { data: requesterProfile } = await supabaseClient
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+
+      // Notify the chama manager via SMS
+      try {
+        // Get manager(s) of this chama
+        const { data: managers } = await supabaseClient
+          .from('chama_members')
+          .select('user_id')
+          .eq('chama_id', chama_id)
+          .eq('is_manager', true);
+
+        if (managers && managers.length > 0) {
+          // Get manager profiles with phone numbers
+          const managerUserIds = managers.map(m => m.user_id);
+          const { data: managerProfiles } = await supabaseClient
+            .from('profiles')
+            .select('phone, full_name')
+            .in('id', managerUserIds);
+
+          if (managerProfiles && managerProfiles.length > 0) {
+            const requesterName = requesterProfile?.full_name || 'Someone';
+            const chamaName = chama.name;
+            
+            // Send SMS to each manager
+            for (const manager of managerProfiles) {
+              if (manager.phone) {
+                try {
+                  await fetch(
+                    `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-sms`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                      },
+                      body: JSON.stringify({
+                        phone: manager.phone,
+                        message: `New join request for ${chamaName}! ${requesterName} wants to join. Open the app to approve or reject.`,
+                        eventType: 'chama_join_request',
+                      }),
+                    }
+                  );
+                  console.log(`SMS notification sent to manager: ${manager.full_name}`);
+                } catch (smsError) {
+                  console.error('Failed to send SMS to manager:', smsError);
+                  // Don't fail the join request if SMS fails
+                }
+              }
+            }
+          }
+        }
+      } catch (notifyError) {
+        console.error('Error notifying managers:', notifyError);
+        // Don't fail the join request if notification fails
+      }
+
       return new Response(JSON.stringify({ 
         success: true, 
         message: 'Join request submitted successfully',
