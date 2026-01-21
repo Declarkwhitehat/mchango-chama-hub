@@ -56,8 +56,8 @@ export const FloatingActionMenu = () => {
         />
       )}
 
-      {/* FAB Container */}
-      <div className="fixed bottom-[152px] right-4 z-50 flex flex-col-reverse items-end gap-3">
+      {/* FAB Container - positioned above chat button (nav offset + 16px gap + 56px chat button + 12px spacing) */}
+      <div className="fixed bottom-[calc(var(--bottom-nav-offset)+84px)] right-4 z-50 flex flex-col-reverse items-end gap-3">
         {/* Action Buttons */}
         {isOpen && (
           <div className="flex flex-col-reverse gap-2 mb-2 animate-in fade-in slide-in-from-bottom-4 duration-200">

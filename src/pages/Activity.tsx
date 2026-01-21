@@ -275,11 +275,21 @@ export default function Activity() {
 
         {/* Transactions Tabs */}
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="all">All ({transactions.length})</TabsTrigger>
-            <TabsTrigger value="chama">Chama ({chamaTransactions.length})</TabsTrigger>
-            <TabsTrigger value="mchango">Campaigns ({mchangoTransactions.length})</TabsTrigger>
-            <TabsTrigger value="withdrawals">Withdrawals ({withdrawals.length})</TabsTrigger>
+          <TabsList className="flex w-full overflow-x-auto scrollbar-hide gap-1 justify-start sm:grid sm:grid-cols-4">
+            <TabsTrigger value="all" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              All ({transactions.length})
+            </TabsTrigger>
+            <TabsTrigger value="chama" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              Chama ({chamaTransactions.length})
+            </TabsTrigger>
+            <TabsTrigger value="mchango" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              <span className="hidden sm:inline">Campaigns</span>
+              <span className="sm:hidden">Camp.</span> ({mchangoTransactions.length})
+            </TabsTrigger>
+            <TabsTrigger value="withdrawals" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              <span className="hidden sm:inline">Withdrawals</span>
+              <span className="sm:hidden">W/D</span> ({withdrawals.length})
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="all">
