@@ -434,8 +434,8 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Withdrawal Button - Only for member whose turn it is and chama is active */}
-        {isMember && isMyTurn && isActive && (
+        {/* Withdrawal Button - Visible to managers always, or to member whose turn it is */}
+        {isMember && isActive && (isManager || isMyTurn) && (
           <WithdrawalButton
             chamaId={chama.id}
             totalAvailable={totalContributions}
