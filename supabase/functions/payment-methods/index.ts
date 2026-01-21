@@ -7,7 +7,7 @@ const corsHeaders = {
 
 interface PaymentMethod {
   id?: string;
-  method_type: 'mpesa' | 'airtel_money' | 'bank_account';
+  method_type: 'mpesa' | 'bank_account';
   phone_number?: string;
   bank_name?: string;
   account_number?: string;
@@ -15,6 +15,14 @@ interface PaymentMethod {
   is_default?: boolean;
   is_verified?: boolean;
 }
+
+// Safaricom prefixes for validation
+const SAFARICOM_PREFIXES = ['70', '71', '72', '74', '75', '76', '79', '110', '111'];
+
+const isSafaricomNumber = (phone: string): boolean => {
+  const numberPart = phone.replace('+254', '');
+  return SAFARICOM_PREFIXES.some(prefix => numberPart.startsWith(prefix));
+};
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -77,10 +85,17 @@ Deno.serve(async (req) => {
       }
 
       // Validate based on method type
-      if (body.method_type === 'mpesa' || body.method_type === 'airtel_money') {
+      if (body.method_type === 'mpesa') {
         if (!body.phone_number || !body.phone_number.match(/^\+254\d{9}$/)) {
           return new Response(
             JSON.stringify({ error: 'Invalid phone number format. Use +254XXXXXXXXX' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        // Validate Safaricom number
+        if (!isSafaricomNumber(body.phone_number)) {
+          return new Response(
+            JSON.stringify({ error: 'Only Safaricom numbers are accepted for M-Pesa' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }

@@ -12,12 +12,13 @@ import { Loader2 } from "lucide-react";
 
 interface PaymentMethod {
   id: string;
-  method_type: 'mpesa' | 'airtel_money' | 'bank_account';
+  method_type: 'mpesa' | 'bank_account';
   phone_number?: string;
   bank_name?: string;
   account_number?: string;
   account_name?: string;
   is_default: boolean;
+  is_primary?: boolean;
 }
 
 const KENYAN_BANKS = [
@@ -45,7 +46,7 @@ const KENYAN_BANKS = [
 export const PaymentDetailsSetup = ({ open, onComplete }: { open: boolean; onComplete: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  const [activeTab, setActiveTab] = useState<'mpesa' | 'airtel_money' | 'bank_account'>('mpesa');
+  const [activeTab, setActiveTab] = useState<'mpesa' | 'bank_account'>('mpesa');
   const { toast } = useToast();
 
   // Form states
@@ -78,11 +79,11 @@ export const PaymentDetailsSetup = ({ open, onComplete }: { open: boolean; onCom
         is_default: methods.length === 0, // First method is default
       };
 
-      if (activeTab === 'mpesa' || activeTab === 'airtel_money') {
-        if (!phoneNumber || !phoneNumber.match(/^\+254\d{9}$/)) {
+      if (activeTab === 'mpesa') {
+        if (!phoneNumber || !phoneNumber.match(/^\+254(7[0-9]|11[0-1])\d{7}$/)) {
           toast({
             title: "Invalid Phone Number",
-            description: "Please enter a valid phone number in format +254XXXXXXXXX",
+            description: "Please enter a valid Safaricom number in format +254XXXXXXXXX",
             variant: "destructive",
           });
           return;
@@ -233,16 +234,15 @@ export const PaymentDetailsSetup = ({ open, onComplete }: { open: boolean; onCom
                 {methods.length === 0 ? 'Add Your First Payment Method' : 'Add Another Payment Method'}
               </h3>
 
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-                <TabsList className="grid w-full grid-cols-3">
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'mpesa' | 'bank_account')}>
+                <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
-                  <TabsTrigger value="airtel_money">Airtel Money</TabsTrigger>
                   <TabsTrigger value="bank_account">Bank Account</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="mpesa" className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
+                    <Label htmlFor="mpesa-phone">M-Pesa Phone Number (Safaricom Only)</Label>
                     <Input
                       id="mpesa-phone"
                       placeholder="+254712345678"
@@ -250,22 +250,7 @@ export const PaymentDetailsSetup = ({ open, onComplete }: { open: boolean; onCom
                       onChange={(e) => setPhoneNumber(e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Enter M-Pesa registered number (format: +254XXXXXXXXX)
-                    </p>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="airtel_money" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="airtel-phone">Airtel Money Phone Number</Label>
-                    <Input
-                      id="airtel-phone"
-                      placeholder="+254712345678"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Enter Airtel Money registered number (format: +254XXXXXXXXX)
+                      Enter Safaricom M-Pesa number (format: +254XXXXXXXXX)
                     </p>
                   </div>
                 </TabsContent>
