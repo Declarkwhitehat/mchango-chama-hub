@@ -17,7 +17,8 @@ interface WithdrawalButtonProps {
   chamaId?: string;
   mchangoId?: string;
   totalAvailable: number;
-  commissionRate: number;
+  // Commission rate is no longer used for chamas - commission is deducted at contribution time
+  commissionRate?: number;
   onSuccess?: () => void;
 }
 
@@ -25,7 +26,7 @@ export const WithdrawalButton = ({
   chamaId, 
   mchangoId, 
   totalAvailable, 
-  commissionRate,
+  commissionRate = 0, // Default to 0 - commission already deducted at payment time
   onSuccess 
 }: WithdrawalButtonProps) => {
   const navigate = useNavigate();
@@ -192,19 +193,18 @@ export const WithdrawalButton = ({
 
       if (error) throw error;
 
-      const commission = parseFloat(amount) * commissionRate;
-      const netAmountCalc = parseFloat(amount) - commission;
+      const withdrawAmount = parseFloat(amount);
 
       // Check if auto-approved from response
       if (data?.auto_approved) {
         toast({
           title: "Withdrawal Approved! 🎉",
-          description: `KES ${netAmountCalc.toLocaleString()} is being sent to your M-Pesa now.`,
+          description: `KES ${withdrawAmount.toLocaleString()} is being sent to your M-Pesa now.`,
         });
       } else {
         toast({
           title: "Withdrawal Submitted",
-          description: `Your request for KES ${netAmountCalc.toLocaleString()} has been submitted for review.`,
+          description: `Your request for KES ${withdrawAmount.toLocaleString()} has been submitted for review.`,
         });
       }
 
@@ -231,8 +231,8 @@ export const WithdrawalButton = ({
     }
   };
 
-  const commissionAmount = parseFloat(amount || "0") * commissionRate;
-  const netAmount = parseFloat(amount || "0") - commissionAmount;
+    // No commission deduction at withdrawal - commission was already deducted at contribution time
+  const withdrawAmount = parseFloat(amount || "0");
 
   const dailyLimit = defaultPaymentMethod 
     ? PAYMENT_METHOD_LIMITS[defaultPaymentMethod.method_type as PaymentMethodType]?.daily_limit || 0
@@ -282,7 +282,7 @@ export const WithdrawalButton = ({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5 text-yellow-500" />
+                <Clock className="h-5 w-5 text-warning" />
                 Withdrawal Pending
               </CardTitle>
               <CardDescription>
@@ -297,8 +297,8 @@ export const WithdrawalButton = ({
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">You'll Receive (after commission)</p>
-                <p className="text-xl font-semibold text-green-600">
+                <p className="text-sm text-muted-foreground">You'll Receive</p>
+                <p className="text-xl font-semibold text-primary">
                   KES {Number(pendingWithdrawal.net_amount).toLocaleString()}
                 </p>
               </div>
@@ -340,7 +340,7 @@ export const WithdrawalButton = ({
                     </div>
                     <div className="flex justify-between text-xs font-semibold">
                       <span>Available Today</span>
-                      <span className="text-green-600">KES {remainingLimit.toLocaleString()}</span>
+                      <span className="text-primary">KES {remainingLimit.toLocaleString()}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -371,19 +371,16 @@ export const WithdrawalButton = ({
 
             {parseFloat(amount || "0") > 0 && (
               <Card className="bg-muted/50">
-                <CardContent className="pt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Commission ({(commissionRate * 100).toFixed(1)}%)</span>
-                    <span className="font-medium text-destructive">
-                      - KES {commissionAmount.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-lg font-bold border-t pt-2">
+                <CardContent className="pt-4">
+                  <div className="flex justify-between text-lg font-bold">
                     <span>You'll Receive</span>
-                    <span className="text-green-600">
-                      KES {netAmount.toLocaleString()}
+                    <span className="text-primary">
+                      KES {withdrawAmount.toLocaleString()}
                     </span>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Commission was already deducted when payments were received
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -399,7 +396,7 @@ export const WithdrawalButton = ({
               />
             </div>
 
-            {netAmount > remainingLimit && remainingLimit > 0 && (
+            {withdrawAmount > remainingLimit && remainingLimit > 0 && (
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
@@ -410,7 +407,7 @@ export const WithdrawalButton = ({
 
             <Button 
               type="submit" 
-              disabled={isLoading || !defaultPaymentMethod || netAmount > remainingLimit} 
+              disabled={isLoading || !defaultPaymentMethod || withdrawAmount > remainingLimit} 
               className="w-full"
             >
               {isLoading ? (
