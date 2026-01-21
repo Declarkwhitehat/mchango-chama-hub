@@ -102,7 +102,7 @@ export const OfflinePaymentInstructions = ({
           <ul className="text-xs text-muted-foreground space-y-1 pl-4">
             <li>• Always use your unique Member ID ({memberCode}) as the account number</li>
             <li>• Keep your M-Pesa receipt (e.g., QCH7... ) for your records</li>
-            <li>• Payment will appear in your {groupType === "chama" ? "Chama" : "Savings Group"} dashboard immediately</li>
+            <li>• Payment will appear in your Chama dashboard immediately</li>
             <li>• For payment issues, contact support with your M-Pesa receipt number</li>
           </ul>
         </div>

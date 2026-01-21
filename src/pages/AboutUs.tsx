@@ -35,7 +35,7 @@ export default function AboutUs() {
             <p className="text-muted-foreground">
               Today, we serve thousands of members across Kenya, helping them achieve 
               their financial goals through Chama groups, Mchango campaigns, and 
-              structured Savings Groups with lending capabilities.
+              verified Organizations (NGOs, Churches, Schools, and more).
             </p>
           </div>
         </div>

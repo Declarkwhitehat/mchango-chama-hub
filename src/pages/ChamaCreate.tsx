@@ -183,7 +183,7 @@ const ChamaCreate = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Start a Savings Group</CardTitle>
+            <CardTitle>Start a Chama Group</CardTitle>
             <CardDescription>
               Create a chama to save and grow wealth together. Commission: 5% on total pool before payout.
             </CardDescription>

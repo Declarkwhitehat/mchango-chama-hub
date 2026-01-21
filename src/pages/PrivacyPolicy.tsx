@@ -50,7 +50,7 @@ const PrivacyPolicy = () => {
               <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
                 <li>Payment amounts, dates, and transaction references</li>
                 <li>M-Pesa receipt numbers and transaction history</li>
-                <li>Contribution records in Chamas and Savings Groups</li>
+                <li>Contribution records in Chamas and Organizations</li>
                 <li>Donation history in Mchango campaigns</li>
                 <li>Withdrawal requests and payout records</li>
               </ul>
@@ -80,7 +80,7 @@ const PrivacyPolicy = () => {
               <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
                 <li>Creating and managing your account</li>
                 <li>Processing transactions and payments via M-Pesa</li>
-                <li>Facilitating Chama rotations, Mchango fundraising, and Savings Group operations</li>
+                <li>Facilitating Chama rotations, Mchango fundraising, and Organization donations</li>
                 <li>Sending transaction confirmations and receipts via SMS and email</li>
                 <li>Processing withdrawal requests and payouts</li>
               </ul>

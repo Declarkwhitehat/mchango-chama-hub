@@ -133,10 +133,10 @@ export const EnhancedAnalytics = () => {
           .eq("status", "active")
           .limit(10),
         supabase
-          .from("saving_groups")
-          .select("id, name, total_savings")
+          .from("organizations")
+          .select("id, name, current_amount")
           .eq("status", "active")
-          .order("total_savings", { ascending: false })
+          .order("current_amount", { ascending: false })
           .limit(5),
         supabase
           .from("mchango")
@@ -147,11 +147,6 @@ export const EnhancedAnalytics = () => {
       ]);
 
       const topGroups = [
-        ...(savingsData.data?.map((g) => ({
-          name: g.name,
-          revenue: g.total_savings || 0,
-          type: "Savings Group",
-        })) || []),
         ...(mchangoData.data?.map((m) => ({
           name: m.title,
           revenue: m.current_amount || 0,
@@ -461,7 +456,7 @@ export const EnhancedAnalytics = () => {
       <Card>
         <CardHeader>
           <CardTitle>Top Performing Groups</CardTitle>
-          <CardDescription>Highest revenue generating campaigns and savings groups</CardDescription>
+          <CardDescription>Highest revenue generating campaigns and organizations</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
