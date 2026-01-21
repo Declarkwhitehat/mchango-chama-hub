@@ -33,6 +33,12 @@ serve(async (req) => {
       }
     );
 
+    // Admin client to bypass RLS for lookups (chama may be in pending status)
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     // Verify authentication for all requests
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     if (authError || !user) {
@@ -235,8 +241,8 @@ serve(async (req) => {
         });
       }
 
-      // Get chama details
-      const { data: chama, error: chamaError } = await supabaseClient
+      // Get chama details using admin client to bypass RLS (chama may be pending)
+      const { data: chama, error: chamaError } = await adminClient
         .from('chama')
         .select('*')
         .eq('id', chama_id)
@@ -253,11 +259,11 @@ serve(async (req) => {
         });
       }
 
-      // Verify chama is accepting members
-      if (chama.status !== 'active') {
+      // Allow joining chamas that are 'pending' or 'active' (not 'completed' or 'deleted')
+      if (chama.status === 'completed' || chama.status === 'deleted') {
         return new Response(JSON.stringify({ 
           error: 'Chama not active',
-          details: 'This chama is not currently accepting new members'
+          details: 'This chama is no longer accepting new members'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
