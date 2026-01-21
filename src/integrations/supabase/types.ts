@@ -78,6 +78,7 @@ export type Database = {
           name: string
           payout_order: string | null
           slug: string
+          start_date: string | null
           status: Database["public"]["Enums"]["chama_status"]
           updated_at: string
           whatsapp_link: string | null
@@ -101,6 +102,7 @@ export type Database = {
           name: string
           payout_order?: string | null
           slug: string
+          start_date?: string | null
           status?: Database["public"]["Enums"]["chama_status"]
           updated_at?: string
           whatsapp_link?: string | null
@@ -124,6 +126,7 @@ export type Database = {
           name?: string
           payout_order?: string | null
           slug?: string
+          start_date?: string | null
           status?: Database["public"]["Enums"]["chama_status"]
           updated_at?: string
           whatsapp_link?: string | null
@@ -237,6 +240,59 @@ export type Database = {
           },
         ]
       }
+      chama_member_removals: {
+        Row: {
+          chama_id: string
+          chama_name: string | null
+          created_at: string | null
+          id: string
+          member_id: string
+          member_name: string | null
+          member_phone: string | null
+          notification_sent: boolean | null
+          removal_reason: string
+          removed_at: string | null
+          user_id: string
+          was_manager: boolean | null
+        }
+        Insert: {
+          chama_id: string
+          chama_name?: string | null
+          created_at?: string | null
+          id?: string
+          member_id: string
+          member_name?: string | null
+          member_phone?: string | null
+          notification_sent?: boolean | null
+          removal_reason: string
+          removed_at?: string | null
+          user_id: string
+          was_manager?: boolean | null
+        }
+        Update: {
+          chama_id?: string
+          chama_name?: string | null
+          created_at?: string | null
+          id?: string
+          member_id?: string
+          member_name?: string | null
+          member_phone?: string | null
+          notification_sent?: boolean | null
+          removal_reason?: string
+          removed_at?: string | null
+          user_id?: string
+          was_manager?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_member_removals_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chama_members: {
         Row: {
           approval_status: string | null
@@ -245,6 +301,8 @@ export type Database = {
           chama_id: string
           contribution_status: string | null
           expected_contributions: number | null
+          first_payment_at: string | null
+          first_payment_completed: boolean | null
           id: string
           is_manager: boolean
           joined_at: string
@@ -254,6 +312,8 @@ export type Database = {
           next_cycle_credit: number | null
           next_due_date: string | null
           order_index: number | null
+          removal_reason: string | null
+          removed_at: string | null
           requires_admin_verification: boolean | null
           rescheduled_to_position: number | null
           skip_reason: string | null
@@ -270,6 +330,8 @@ export type Database = {
           chama_id: string
           contribution_status?: string | null
           expected_contributions?: number | null
+          first_payment_at?: string | null
+          first_payment_completed?: boolean | null
           id?: string
           is_manager?: boolean
           joined_at?: string
@@ -279,6 +341,8 @@ export type Database = {
           next_cycle_credit?: number | null
           next_due_date?: string | null
           order_index?: number | null
+          removal_reason?: string | null
+          removed_at?: string | null
           requires_admin_verification?: boolean | null
           rescheduled_to_position?: number | null
           skip_reason?: string | null
@@ -295,6 +359,8 @@ export type Database = {
           chama_id?: string
           contribution_status?: string | null
           expected_contributions?: number | null
+          first_payment_at?: string | null
+          first_payment_completed?: boolean | null
           id?: string
           is_manager?: boolean
           joined_at?: string
@@ -304,6 +370,8 @@ export type Database = {
           next_cycle_credit?: number | null
           next_due_date?: string | null
           order_index?: number | null
+          removal_reason?: string | null
+          removed_at?: string | null
           requires_admin_verification?: boolean | null
           rescheduled_to_position?: number | null
           skip_reason?: string | null
@@ -2421,6 +2489,7 @@ export type Database = {
           position_in_queue: number
         }[]
       }
+      get_next_order_index: { Args: { p_chama_id: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2450,6 +2519,10 @@ export type Database = {
         }
         Returns: string
       }
+      resequence_member_order: {
+        Args: { p_chama_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user"
@@ -2462,7 +2535,7 @@ export type Database = {
       contribution_frequency: "daily" | "weekly" | "monthly" | "every_n_days"
       kyc_status: "pending" | "approved" | "rejected"
       mchango_status: "active" | "completed" | "cancelled"
-      member_status: "active" | "inactive" | "left"
+      member_status: "active" | "inactive" | "left" | "removed"
       payment_method_type: "mpesa" | "airtel_money" | "bank_account"
       payout_status: "pending" | "processing" | "completed" | "failed"
       rate_limit_type: "ip" | "phone" | "email"
@@ -2606,7 +2679,7 @@ export const Constants = {
       contribution_frequency: ["daily", "weekly", "monthly", "every_n_days"],
       kyc_status: ["pending", "approved", "rejected"],
       mchango_status: ["active", "completed", "cancelled"],
-      member_status: ["active", "inactive", "left"],
+      member_status: ["active", "inactive", "left", "removed"],
       payment_method_type: ["mpesa", "airtel_money", "bank_account"],
       payout_status: ["pending", "processing", "completed", "failed"],
       rate_limit_type: ["ip", "phone", "email"],

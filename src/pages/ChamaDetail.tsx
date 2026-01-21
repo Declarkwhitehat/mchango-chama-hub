@@ -18,6 +18,8 @@ import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
 import { PaymentStatusManager } from "@/components/chama/PaymentStatusManager";
 import { PaymentTransparency } from "@/components/chama/PaymentTransparency";
 import { SkippedMemberAlert } from "@/components/chama/SkippedMemberAlert";
+import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
+import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
 import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -48,11 +50,16 @@ interface ChamaData {
     order_index: number;
     is_manager: boolean;
     approval_status: string;
+    status: string;
     joined_at: string;
     user_id?: string;
+    first_payment_completed?: boolean;
+    first_payment_at?: string;
+    removal_reason?: string;
     profiles: {
       full_name: string;
       email: string;
+      phone?: string;
     };
   }>;
 }
@@ -254,18 +261,38 @@ const ChamaDetail = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Chama Started!",
-        description: `${data.notificationsSent} members have been notified via SMS.`,
-      });
+      // Handle the new response format with summary
+      const summary = data?.summary;
+      
+      if (summary) {
+        toast({
+          title: "Chama Started!",
+          description: `${summary.activeMembers} active members. ${summary.removedMembers > 0 ? `${summary.removedMembers} member(s) removed for not paying.` : ''} First payout: ${summary.firstBeneficiary}.`,
+        });
+      } else {
+        toast({
+          title: "Chama Started!",
+          description: `${data.notificationsSent} members have been notified via SMS.`,
+        });
+      }
 
       // Reload chama data to reflect new status
       await loadChama();
     } catch (error: any) {
       console.error("Error starting chama:", error);
+      
+      // Parse error details if available
+      let errorMessage = error.message || "Could not start the chama";
+      if (error.context?.body) {
+        try {
+          const errorBody = JSON.parse(error.context.body);
+          errorMessage = errorBody.details?.message || errorBody.error || errorMessage;
+        } catch {}
+      }
+      
       toast({
         title: "Failed to Start Chama",
-        description: error.message || "Could not start the chama",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -355,53 +382,44 @@ const ChamaDetail = () => {
           </CardContent>
         </Card>
 
-        {/* Start Chama Button - Only visible to manager when status is pending */}
+        {/* Pre-Start Dashboard - Manager view when pending */}
         {isManager && isPendingStatus && (
-          <Card className="border-primary">
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="text-center space-y-2">
-                  <h3 className="text-lg font-semibold">Ready to Start Your Chama?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Once started, all {approvedMembers.length} approved members will be notified via SMS with their contribution details and payout schedule.
-                  </p>
-                </div>
-                <Button 
-                  onClick={handleStartChama} 
-                  disabled={isStarting || approvedMembers.length === 0}
-                  className="w-full"
-                  size="lg"
-                >
-                  {isStarting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Starting Chama...
-                    </>
-                  ) : (
-                    'Start Chama'
-                  )}
-                </Button>
-                {approvedMembers.length === 0 && (
-                  <p className="text-xs text-center text-muted-foreground">
-                    You need at least one approved member to start the chama
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <PreStartDashboard
+            chamaId={chama.id}
+            chamaName={chama.name}
+            contributionAmount={chama.contribution_amount}
+            minMembers={chama.min_members || 5}
+            members={chama.chama_members.filter(m => m.approval_status === 'approved').map(m => ({
+              id: m.id,
+              user_id: m.user_id || '',
+              order_index: m.order_index,
+              member_code: m.member_code,
+              first_payment_completed: m.first_payment_completed || false,
+              first_payment_at: m.first_payment_at || null,
+              approval_status: m.approval_status,
+              is_manager: m.is_manager,
+              profiles: m.profiles ? { full_name: m.profiles.full_name, phone: m.profiles.phone } : null
+            }))}
+            isManager={isManager}
+            onStart={handleStartChama}
+            isStarting={isStarting}
+          />
         )}
 
-        {/* Pending Status Message - Visible to all members */}
-        {isMember && isPendingStatus && !isManager && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center space-y-2">
-                <p className="text-muted-foreground">
-                  This Chama hasn't started yet. The manager will notify all members when it begins.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* First Payment Status - Non-manager members when pending */}
+        {isMember && isPendingStatus && !isManager && currentUserMembership && (
+          <FirstPaymentStatus
+            memberStatus={{
+              first_payment_completed: currentUserMembership.first_payment_completed || false,
+              first_payment_at: currentUserMembership.first_payment_at,
+              order_index: currentUserMembership.order_index,
+              member_code: currentUserMembership.member_code,
+              approval_status: currentUserMembership.approval_status
+            }}
+            contributionAmount={chama.contribution_amount}
+            chamaName={chama.name}
+            chamaStatus={chama.status}
+          />
         )}
 
         {/* Cycle Complete Banner - Visible to members */}
