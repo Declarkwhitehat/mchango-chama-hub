@@ -41,7 +41,7 @@ const Index = () => {
                 </span>
               </h1>
               <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto px-4">
-                Join thousands building wealth through community savings groups and crowdfunding campaigns
+                Join thousands building wealth through community chamas, crowdfunding campaigns, and organizations
               </p>
               
               {/* CTA Buttons */}
@@ -166,7 +166,7 @@ const Index = () => {
               <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-primary to-primary-glow rounded-full">
                 <span className="text-primary-foreground font-semibold text-sm sm:text-base">Chama</span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Join Savings Group</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Join a Chama</h3>
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex gap-3 sm:gap-4">
                   <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-sm sm:text-base">

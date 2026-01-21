@@ -29,7 +29,7 @@ const TermsAndConditions = () => {
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-3">1. Introduction</h2>
               <p className="text-muted-foreground">
-                Welcome to our platform. By accessing or using our services (Chama, Mchango, and Savings Groups), 
+                Welcome to our platform. By accessing or using our services (Chama, Mchango, and Organizations), 
                 you agree to be bound by these Terms and Conditions. If you disagree with any part of these terms, 
                 you may not access our services.
               </p>
@@ -83,10 +83,10 @@ const TermsAndConditions = () => {
                 responsible for the accuracy of their campaigns and the proper use of funds received.
               </p>
 
-              <h3 className="text-lg font-medium text-foreground mt-4 mb-2">5.3 Savings Groups</h3>
+              <h3 className="text-lg font-medium text-foreground mt-4 mb-2">5.3 Organizations</h3>
               <p className="text-muted-foreground">
-                Savings Groups allow members to pool savings, earn returns, and access loans. Group managers are 
-                responsible for group administration and member coordination.
+                Organizations (NGOs, Churches, Schools, etc.) can register on our platform to receive donations 
+                from supporters. Organization administrators are responsible for proper use of funds.
               </p>
             </section>
 

@@ -14,9 +14,9 @@ interface Message {
 }
 
 const LANGUAGE_GREETINGS = {
-  english: 'Hello! 👋 I\'m here to help you with any questions about Chama Groups, Mchango Campaigns, and Savings Groups. How can I assist you today?\n\n💡 Need to speak with someone? Just ask and I can arrange a callback!',
-  swahili: 'Habari! 👋 Niko hapa kukusaidia na maswali yoyote kuhusu Vikundi vya Chama, Kampeni za Mchango, na Vikundi vya Akiba. Naweza kukusaidia vipi leo?\n\n💡 Unahitaji kuongea na mtu? Niambie tu na nitaandaa kupigwa simu!',
-  sheng: 'Vipi! 👋 Niko hapa ku-help na maswali zote za Chama Groups, Mchango Campaigns, na Savings Groups. Naweza ku-help aje leo?\n\n💡 Unataka kuongelesha na mse? Niambie tu nita-arrange callback!',
+  english: 'Hello! 👋 I\'m here to help you with any questions about Chama Groups, Mchango Campaigns, and Organizations. How can I assist you today?\n\n💡 Need to speak with someone? Just ask and I can arrange a callback!',
+  swahili: 'Habari! 👋 Niko hapa kukusaidia na maswali yoyote kuhusu Vikundi vya Chama, Kampeni za Mchango, na Mashirika. Naweza kukusaidia vipi leo?\n\n💡 Unahitaji kuongea na mtu? Niambie tu na nitaandaa kupigwa simu!',
+  sheng: 'Vipi! 👋 Niko hapa ku-help na maswali zote za Chama Groups, Mchango Campaigns, na Organizations. Naweza ku-help aje leo?\n\n💡 Unataka kuongelesha na mse? Niambie tu nita-arrange callback!',
 };
 
 export function ChatSupport() {
