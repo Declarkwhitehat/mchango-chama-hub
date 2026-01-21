@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { ActivityPDFDownload } from "@/components/activity/ActivityPDFDownload";
 import { 
   Loader2, 
   DollarSign, 
@@ -283,9 +284,17 @@ export default function Activity() {
 
           <TabsContent value="all">
             <Card>
-              <CardHeader>
-                <CardTitle>All Transactions</CardTitle>
-                <CardDescription>Complete history of all your financial activities</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle>All Transactions</CardTitle>
+                  <CardDescription>Complete history of all your financial activities</CardDescription>
+                </div>
+                <ActivityPDFDownload 
+                  data={transactions} 
+                  type="all" 
+                  chamaNames={chamaNames}
+                  mchangoNames={mchangoNames}
+                />
               </CardHeader>
               <CardContent>
                 {transactions.length === 0 ? (
@@ -335,12 +344,19 @@ export default function Activity() {
 
           <TabsContent value="chama">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Chama Contributions
-                </CardTitle>
-                <CardDescription>All your chama group contributions</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Chama Contributions
+                  </CardTitle>
+                  <CardDescription>All your chama group contributions</CardDescription>
+                </div>
+                <ActivityPDFDownload 
+                  data={chamaTransactions} 
+                  type="chama" 
+                  chamaNames={chamaNames}
+                />
               </CardHeader>
               <CardContent>
                 {chamaTransactions.length === 0 ? (
@@ -379,12 +395,19 @@ export default function Activity() {
 
           <TabsContent value="mchango">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-5 w-5" />
-                  Campaign Donations
-                </CardTitle>
-                <CardDescription>All your campaign donations and contributions</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Heart className="h-5 w-5" />
+                    Campaign Donations
+                  </CardTitle>
+                  <CardDescription>All your campaign donations and contributions</CardDescription>
+                </div>
+                <ActivityPDFDownload 
+                  data={mchangoTransactions} 
+                  type="mchango" 
+                  mchangoNames={mchangoNames}
+                />
               </CardHeader>
               <CardContent>
                 {mchangoTransactions.length === 0 ? (
@@ -421,12 +444,18 @@ export default function Activity() {
 
           <TabsContent value="withdrawals">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ArrowDownLeft className="h-5 w-5" />
-                  Withdrawal History
-                </CardTitle>
-                <CardDescription>All your withdrawal requests and transactions</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <ArrowDownLeft className="h-5 w-5" />
+                    Withdrawal History
+                  </CardTitle>
+                  <CardDescription>All your withdrawal requests and transactions</CardDescription>
+                </div>
+                <ActivityPDFDownload 
+                  data={withdrawals} 
+                  type="withdrawals"
+                />
               </CardHeader>
               <CardContent>
                 {withdrawals.length === 0 ? (
