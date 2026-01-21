@@ -79,7 +79,6 @@ const ChamaCreate = () => {
         min_members: Number(formData.get("min_members")) || 5,
         max_members: Number(formData.get("max_members")),
         is_public: formData.get("is_public") === "true",
-        payout_order: formData.get("payout_order") as string || "join_date",
         whatsapp_link: formData.get("whatsapp_link") as string || null,
       };
 
@@ -314,22 +313,6 @@ const ChamaCreate = () => {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="payout_order">Payout Order *</Label>
-                <Select
-                  name="payout_order"
-                  defaultValue="join_date"
-                  disabled={kycStatus !== "approved"}
-                >
-                  <SelectTrigger id="payout_order">
-                    <SelectValue placeholder="Select payout order" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="join_date">Auto by Join Date</SelectItem>
-                    <SelectItem value="manager_override">Manager Override</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="whatsapp_link">WhatsApp Group Link (Optional)</Label>
