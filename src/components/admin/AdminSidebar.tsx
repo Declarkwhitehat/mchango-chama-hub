@@ -12,7 +12,8 @@ import {
   Settings,
   Home,
   ChevronLeft,
-  Shield
+  Shield,
+  Building2
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +97,7 @@ export function AdminSidebar() {
   const groupsItems: MenuItem[] = [
     { title: "Chama Groups", url: "/admin/chamas", icon: Activity },
     { title: "Campaigns", url: "/admin/campaigns", icon: TrendingUp },
+    { title: "Organizations", url: "/admin/organizations", icon: Building2 },
   ];
 
   const financialItems: MenuItem[] = [

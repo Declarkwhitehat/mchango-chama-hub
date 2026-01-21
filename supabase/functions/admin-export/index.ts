@@ -49,10 +49,10 @@ serve(async (req) => {
     const { type, limit = 1000, offset = 0 } = await req.json();
     console.log('Admin export:', { type, limit, offset });
 
-    if (!['transactions', 'members'].includes(type)) {
+    if (!['transactions', 'members', 'organizations', 'organization_donations'].includes(type)) {
       return new Response(JSON.stringify({ 
         error: 'Invalid export type',
-        details: 'Type must be "transactions" or "members"'
+        details: 'Type must be "transactions", "members", "organizations", or "organization_donations"'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -60,11 +60,9 @@ serve(async (req) => {
     }
 
     let csv = '';
-    let transactions: any[] = [];
-    let members: any[] = [];
+    let totalRecords = 0;
 
     if (type === 'transactions') {
-      // Paginate to prevent timeouts
       const { data: txData, error: txError } = await supabaseClient
         .from('transactions')
         .select(`
@@ -79,12 +77,10 @@ serve(async (req) => {
         throw txError;
       }
 
-      transactions = txData || [];
+      const transactions = txData || [];
+      totalRecords = transactions.length;
 
-      // CSV Header
       csv = 'ID,Date,User Name,Email,Amount,Type,Payment Method,Reference,Status\n';
-
-      // CSV Rows
       transactions.forEach((tx: any) => {
         csv += `${tx.id},`;
         csv += `${new Date(tx.created_at).toISOString()},`;
@@ -97,7 +93,6 @@ serve(async (req) => {
         csv += `${tx.status}\n`;
       });
     } else if (type === 'members') {
-      // Paginate to prevent timeouts
       const { data: memberData, error: memberError } = await supabaseClient
         .from('chama_members')
         .select(`
@@ -113,12 +108,10 @@ serve(async (req) => {
         throw memberError;
       }
 
-      members = memberData || [];
+      const members = memberData || [];
+      totalRecords = members.length;
 
-      // CSV Header
       csv = 'Member Code,Name,Email,Phone,Chama,Joined Date,Order Index,Status,Is Manager\n';
-
-      // CSV Rows
       members.forEach((member: any) => {
         csv += `${member.member_code},`;
         csv += `"${member.profiles?.full_name || 'Unknown'}",`;
@@ -130,13 +123,80 @@ serve(async (req) => {
         csv += `${member.approval_status},`;
         csv += `${member.is_manager}\n`;
       });
+    } else if (type === 'organizations') {
+      const { data: orgData, error: orgError } = await supabaseClient
+        .from('organizations')
+        .select(`
+          *,
+          profiles:created_by (full_name, email)
+        `)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (orgError) {
+        console.error('Organization export error:', orgError);
+        throw orgError;
+      }
+
+      const organizations = orgData || [];
+      totalRecords = organizations.length;
+
+      csv = 'ID,Name,Slug,Category,Status,Verified,Creator,Email,Total Raised,Balance,Commission Paid,Created At\n';
+      organizations.forEach((org: any) => {
+        csv += `${org.id},`;
+        csv += `"${org.name}",`;
+        csv += `${org.slug},`;
+        csv += `${org.category},`;
+        csv += `${org.status},`;
+        csv += `${org.is_verified},`;
+        csv += `"${org.profiles?.full_name || 'Unknown'}",`;
+        csv += `${org.profiles?.email || 'N/A'},`;
+        csv += `${org.total_gross_collected || 0},`;
+        csv += `${org.available_balance || 0},`;
+        csv += `${org.total_commission_paid || 0},`;
+        csv += `${new Date(org.created_at).toISOString()}\n`;
+      });
+    } else if (type === 'organization_donations') {
+      const { data: donationData, error: donationError } = await supabaseClient
+        .from('organization_donations')
+        .select(`
+          *,
+          organizations (name, slug, category)
+        `)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (donationError) {
+        console.error('Organization donations export error:', donationError);
+        throw donationError;
+      }
+
+      const donations = donationData || [];
+      totalRecords = donations.length;
+
+      csv = 'ID,Date,Organization,Category,Donor Name,Phone,Email,Gross Amount,Commission,Net Amount,Payment Method,Reference,Status\n';
+      donations.forEach((d: any) => {
+        csv += `${d.id},`;
+        csv += `${new Date(d.created_at).toISOString()},`;
+        csv += `"${d.organizations?.name || 'Unknown'}",`;
+        csv += `${d.organizations?.category || 'N/A'},`;
+        csv += `"${d.display_name || (d.is_anonymous ? 'Anonymous' : 'Unknown')}",`;
+        csv += `${d.phone || 'N/A'},`;
+        csv += `${d.email || 'N/A'},`;
+        csv += `${d.gross_amount || d.amount},`;
+        csv += `${d.commission_amount || 0},`;
+        csv += `${d.net_amount || d.amount},`;
+        csv += `${d.payment_method || 'N/A'},`;
+        csv += `${d.payment_reference},`;
+        csv += `${d.payment_status}\n`;
+      });
     }
 
     return new Response(JSON.stringify({ 
       success: true,
       message: 'Export complete',
       csv,
-      total_records: type === 'transactions' ? transactions.length : members.length,
+      total: totalRecords,
       offset,
       limit
     }), {

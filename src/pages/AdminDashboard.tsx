@@ -10,7 +10,8 @@ import {
   ArrowRight,
   AlertCircle,
   PhoneCall,
-  CreditCard
+  CreditCard,
+  Building2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -32,6 +33,7 @@ const AdminDashboard = () => {
     pendingKyc: 0,
     activeCampaigns: 0,
     activeChamas: 0,
+    activeOrganizations: 0,
     totalRevenue: 0,
     pendingWithdrawals: 0,
     pendingCallbacks: 0,
@@ -53,6 +55,7 @@ const AdminDashboard = () => {
         pendingKycResult,
         campaignsResult,
         chamasResult,
+        organizationsResult,
         revenueResult,
         withdrawalsResult,
         callbacksResult,
@@ -63,6 +66,7 @@ const AdminDashboard = () => {
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'pending').not('kyc_submitted_at', 'is', null),
         supabase.from('mchango').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('chama').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('organizations').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('company_earnings').select('amount'),
         supabase.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('customer_callbacks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -77,6 +81,7 @@ const AdminDashboard = () => {
         pendingKyc: pendingKycResult.count || 0,
         activeCampaigns: campaignsResult.count || 0,
         activeChamas: chamasResult.count || 0,
+        activeOrganizations: organizationsResult.count || 0,
         totalRevenue,
         pendingWithdrawals: withdrawalsResult.count || 0,
         pendingCallbacks: callbacksResult.count || 0,
@@ -170,10 +175,10 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {stats.activeChamas.toLocaleString()}
+                {(stats.activeChamas + stats.activeOrganizations).toLocaleString()}
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                {stats.activeChamas} Chamas
+                {stats.activeChamas} Chamas, {stats.activeOrganizations} Orgs
               </p>
             </CardContent>
           </Card>
@@ -284,6 +289,27 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Organizations Overview */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Organizations
+                  </CardTitle>
+                  <CardDescription className="mt-1">NGOs, Churches, Schools</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate("/admin/organizations")}>
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold mb-2">{stats.activeOrganizations}</div>
+              <p className="text-sm text-muted-foreground">Active organizations</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Alerts Section */}
