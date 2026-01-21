@@ -344,7 +344,7 @@ serve(async (req) => {
         }
 
         // Record commission as company earnings
-        await supabaseClient
+        const { error: mchangoEarningsError } = await supabaseClient
           .from('company_earnings')
           .insert({
             source: 'mchango_donation',
@@ -352,6 +352,31 @@ serve(async (req) => {
             reference_id: donation.id,
             description: `15% commission on donation of KES ${grossAmount}. Net credited: KES ${netAmount}`
           });
+        
+        if (mchangoEarningsError) {
+          console.error('Error recording mchango company earnings:', mchangoEarningsError);
+        }
+
+        // Record in financial ledger for detailed tracking
+        const { error: mchangoLedgerError } = await supabaseClient
+          .from('financial_ledger')
+          .insert({
+            transaction_type: 'donation',
+            source_type: 'mchango',
+            source_id: donation.mchango_id,
+            reference_id: donation.id,
+            gross_amount: grossAmount,
+            commission_amount: commissionAmount,
+            net_amount: netAmount,
+            commission_rate: commissionRate,
+            payer_name: donation.display_name || 'Anonymous',
+            payer_phone: donation.phone,
+            description: `Donation to mchango campaign`
+          });
+
+        if (mchangoLedgerError) {
+          console.error('Error recording mchango in financial ledger:', mchangoLedgerError);
+        }
         
         console.log('Commission recorded:', commissionAmount);
       }
@@ -426,8 +451,8 @@ serve(async (req) => {
           console.log('Organization financial tracking updated');
         }
 
-        // Record commission
-        await supabaseClient
+        // Record commission in company_earnings
+        const { error: earningsError } = await supabaseClient
           .from('company_earnings')
           .insert({
             source: 'organization_donation',
@@ -435,6 +460,31 @@ serve(async (req) => {
             reference_id: orgDonation.id,
             description: `${commissionRate * 100}% commission on organization donation of KES ${grossAmount}. Net: KES ${netAmount}`
           });
+
+        if (earningsError) {
+          console.error('Error recording company earnings:', earningsError);
+        }
+
+        // Record in financial ledger for detailed tracking
+        const { error: ledgerError } = await supabaseClient
+          .from('financial_ledger')
+          .insert({
+            transaction_type: 'donation',
+            source_type: 'organization',
+            source_id: orgDonation.organization_id,
+            reference_id: orgDonation.id,
+            gross_amount: grossAmount,
+            commission_amount: commissionAmount,
+            net_amount: netAmount,
+            commission_rate: commissionRate,
+            payer_name: orgDonation.display_name || 'Anonymous',
+            payer_phone: orgDonation.phone,
+            description: `Donation to organization`
+          });
+
+        if (ledgerError) {
+          console.error('Error recording in financial ledger:', ledgerError);
+        }
       }
 
       return new Response(
