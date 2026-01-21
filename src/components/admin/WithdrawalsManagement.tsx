@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Wallet, Clock, CheckCircle, XCircle, Loader2, ArrowRightLeft } from "lucide-react";
+import { Wallet, Clock, CheckCircle, XCircle, Loader2, ArrowRightLeft, Send, Banknote } from "lucide-react";
 import { WithdrawalMemberAnalytics } from "./WithdrawalMemberAnalytics";
 
 interface MemberAnalytics {
@@ -110,11 +110,66 @@ export const WithdrawalsManagement = () => {
     }
   };
 
-  const handleApprove = async () => {
+  const closeDialog = () => {
+    setSelectedWithdrawal(null);
+    setPaymentReference("");
+    setRejectionReason("");
+    setSkipToNext(true);
+    setMemberAnalytics(null);
+    setNextEligible(null);
+    setActiveTab("details");
+  };
+
+  // Send via M-Pesa (triggers B2C payout)
+  const handleSendViaMpesa = async () => {
+    setIsProcessing(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in as admin",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('withdrawals-crud', {
+        method: 'PATCH',
+        body: {
+          withdrawal_id: selectedWithdrawal.id,
+          status: 'approved',
+          // No payment_reference - signals B2C payout
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "M-Pesa Payout Initiated",
+        description: "Money is being sent to the member's M-Pesa. The withdrawal will be marked complete automatically.",
+      });
+
+      closeDialog();
+    } catch (error: any) {
+      console.error("Error sending via M-Pesa:", error);
+      toast({
+        title: "Error",
+        description: "Failed to initiate M-Pesa payout",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Mark as manually paid (requires payment reference)
+  const handleMarkAsManuallyPaid = async () => {
     if (!paymentReference) {
       toast({
         title: "Error",
-        description: "Please enter payment reference",
+        description: "Please enter the payment reference",
         variant: "destructive",
       });
       return;
@@ -145,17 +200,16 @@ export const WithdrawalsManagement = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Withdrawal approved and completed",
+        title: "Withdrawal Completed",
+        description: "Withdrawal marked as manually paid",
       });
 
-      setSelectedWithdrawal(null);
-      setPaymentReference("");
+      closeDialog();
     } catch (error: any) {
-      console.error("Error approving withdrawal:", error);
+      console.error("Error marking as paid:", error);
       toast({
         title: "Error",
-        description: "Failed to approve withdrawal",
+        description: "Failed to complete withdrawal",
         variant: "destructive",
       });
     } finally {
@@ -199,17 +253,13 @@ export const WithdrawalsManagement = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
+        title: "Withdrawal Rejected",
         description: data?.swapped 
-          ? "Withdrawal rejected. Positions swapped and next member notified."
+          ? "Positions swapped and next eligible member will receive payout."
           : "Withdrawal rejected",
       });
 
-      setSelectedWithdrawal(null);
-      setRejectionReason("");
-      setSkipToNext(true);
-      setMemberAnalytics(null);
-      setNextEligible(null);
+      closeDialog();
     } catch (error: any) {
       console.error("Error rejecting withdrawal:", error);
       toast({
@@ -227,15 +277,6 @@ export const WithdrawalsManagement = () => {
     
     setIsLoadingAnalytics(true);
     try {
-      const { data, error } = await supabase.functions.invoke('withdrawal-member-analytics', {
-        method: 'GET',
-        body: {},
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      // Use query params approach
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
@@ -281,15 +322,21 @@ export const WithdrawalsManagement = () => {
       case 'pending':
         return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Pending</Badge>;
       case 'approved':
-        return <Badge className="gap-1 bg-primary text-primary-foreground"><CheckCircle className="h-3 w-3" />Approved</Badge>;
+        return <Badge className="gap-1 bg-primary text-primary-foreground"><Loader2 className="h-3 w-3 animate-spin" />Processing</Badge>;
       case 'completed':
         return <Badge className="gap-1 bg-accent text-accent-foreground"><CheckCircle className="h-3 w-3" />Completed</Badge>;
       case 'rejected':
         return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Rejected</Badge>;
+      case 'failed':
+        return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Failed</Badge>;
+      case 'pending_retry':
+        return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Retrying</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
   };
+
+  const isMpesaPayment = selectedWithdrawal?.payment_method?.method_type === 'mpesa';
 
   if (isLoading) {
     return (
@@ -368,11 +415,7 @@ export const WithdrawalsManagement = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={!!selectedWithdrawal} onOpenChange={() => {
-        setSelectedWithdrawal(null);
-        setMemberAnalytics(null);
-        setNextEligible(null);
-      }}>
+      <Dialog open={!!selectedWithdrawal} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Review Withdrawal Request</DialogTitle>
@@ -438,77 +481,109 @@ export const WithdrawalsManagement = () => {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="payment-ref">Payment Reference</Label>
-                  <Input
-                    id="payment-ref"
-                    value={paymentReference}
-                    onChange={(e) => setPaymentReference(e.target.value)}
-                    placeholder="Enter payment reference (M-PESA, Bank Ref, etc.)"
-                  />
-                </div>
+                {/* Approval Section */}
+                <div className="space-y-4 border-t pt-4">
+                  <h4 className="font-semibold">Approve Withdrawal</h4>
+                  
+                  {/* M-Pesa Option */}
+                  {isMpesaPayment && (
+                    <Button
+                      onClick={handleSendViaMpesa}
+                      disabled={isProcessing}
+                      className="w-full"
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send via M-Pesa
+                        </>
+                      )}
+                    </Button>
+                  )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="rejection">Rejection Reason (if rejecting)</Label>
-                  <Textarea
-                    id="rejection"
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    placeholder="Enter reason for rejection..."
-                    rows={2}
-                  />
-                </div>
-
-                {/* Skip to next option - only for Chama */}
-                {selectedWithdrawal.chama_id && (
-                  <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
-                    <Checkbox
-                      id="skip-to-next"
-                      checked={skipToNext}
-                      onCheckedChange={(checked) => setSkipToNext(checked as boolean)}
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <label
-                        htmlFor="skip-to-next"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+                  {/* Manual Payment Option */}
+                  <div className="space-y-2">
+                    <Label htmlFor="payment-ref">
+                      {isMpesaPayment ? 'Or mark as manually paid:' : 'Payment Reference'}
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="payment-ref"
+                        value={paymentReference}
+                        onChange={(e) => setPaymentReference(e.target.value)}
+                        placeholder="Enter payment reference (Bank Ref, Check #, etc.)"
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={handleMarkAsManuallyPaid}
+                        disabled={isProcessing || !paymentReference}
+                        variant="outline"
                       >
-                        <ArrowRightLeft className="h-4 w-4" />
-                        Swap positions & pay next eligible member
-                      </label>
-                      <p className="text-xs text-muted-foreground">
-                        The rejected member will be moved down and the next eligible member will receive payout
-                      </p>
+                        {isProcessing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Banknote className="h-4 w-4 mr-2" />
+                            Mark Paid
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
-                )}
+                </div>
 
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    onClick={handleApprove}
-                    disabled={isProcessing || !paymentReference}
-                    className="flex-1"
-                  >
-                    {isProcessing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Approve & Complete
-                      </>
-                    )}
-                  </Button>
+                {/* Rejection Section */}
+                <div className="space-y-4 border-t pt-4">
+                  <h4 className="font-semibold text-destructive">Reject Withdrawal</h4>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="rejection">Rejection Reason</Label>
+                    <Textarea
+                      id="rejection"
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Enter reason for rejection..."
+                      rows={2}
+                    />
+                  </div>
+
+                  {/* Skip to next option - only for Chama */}
+                  {selectedWithdrawal.chama_id && (
+                    <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
+                      <Checkbox
+                        id="skip-to-next"
+                        checked={skipToNext}
+                        onCheckedChange={(checked) => setSkipToNext(checked as boolean)}
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <label
+                          htmlFor="skip-to-next"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+                        >
+                          <ArrowRightLeft className="h-4 w-4" />
+                          Swap positions & pay next eligible member
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          The rejected member will be moved down and the next eligible member will receive payout
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <Button
                     variant="destructive"
                     onClick={handleReject}
                     disabled={isProcessing || !rejectionReason}
-                    className="flex-1"
+                    className="w-full"
                   >
                     {isProcessing ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <>
                         <XCircle className="h-4 w-4 mr-2" />
-                        {skipToNext && selectedWithdrawal.chama_id ? 'Reject & Skip' : 'Reject'}
+                        {skipToNext && selectedWithdrawal.chama_id ? 'Reject & Skip to Next' : 'Reject'}
                       </>
                     )}
                   </Button>
