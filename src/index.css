@@ -112,6 +112,31 @@ All colors MUST be HSL.
   }
 }
 
+/* Smooth theme transitions */
+html {
+  color-scheme: light dark;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Theme transition styles - applied after initial load */
+html:not(.no-transitions),
+html:not(.no-transitions) *,
+html:not(.no-transitions) *::before,
+html:not(.no-transitions) *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease !important;
+}
+
+/* Disable all transitions initially to prevent flash */
+html.no-transitions,
+html.no-transitions *,
+html.no-transitions *::before,
+html.no-transitions *::after {
+  transition: none !important;
+}
+
 /* Utility to hide scrollbars while keeping scroll functionality */
 .scrollbar-hide {
   -ms-overflow-style: none;
