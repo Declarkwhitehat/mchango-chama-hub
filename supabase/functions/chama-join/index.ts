@@ -378,21 +378,31 @@ serve(async (req) => {
         });
       }
 
-      // IMPORTANT: Do NOT assign order_index on join - it's assigned after first payment
-      // Members start as inactive until they make their first payment
+      // Get the next available order_index for this chama
+      const { data: highestOrderMember } = await adminClient
+        .from('chama_members')
+        .select('order_index')
+        .eq('chama_id', chama_id)
+        .not('order_index', 'is', null)
+        .order('order_index', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      const nextOrderIndex = (highestOrderMember?.order_index || 0) + 1;
+      console.log('Assigning order_index:', nextOrderIndex);
       
       // Generate a unique member code
       const memberCode = await generateMemberCode(adminClient, chama_id);
       console.log('Generated member code:', memberCode);
       
-      // Create pending membership WITHOUT order_index using admin client to bypass RLS
+      // Create pending membership WITH order_index using admin client to bypass RLS
       const { data: newMember, error: memberError } = await adminClient
         .from('chama_members')
         .insert({
           chama_id: chama_id,
           user_id: user.id,
           member_code: memberCode, // Generated unique code
-          order_index: null, // Will be assigned after first payment
+          order_index: nextOrderIndex, // Assigned at join time per user preference
           is_manager: false,
           status: 'inactive', // Inactive until first payment
           approval_status: 'pending',
