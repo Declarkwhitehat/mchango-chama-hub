@@ -60,8 +60,6 @@ const Home = () => {
   const [mchangoList, setMchangoList] = useState<Mchango[]>([]);
   const [chamaList, setChamaList] = useState<Chama[]>([]);
   const [memberChamaList, setMemberChamaList] = useState<Chama[]>([]);
-  const [savingsGroupList, setSavingsGroupList] = useState<SavingsGroup[]>([]);
-  const [memberSavingsGroupList, setMemberSavingsGroupList] = useState<SavingsGroup[]>([]);
   const [organizationList, setOrganizationList] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentSetup, setShowPaymentSetup] = useState(false);
@@ -205,44 +203,6 @@ const Home = () => {
       
       setMemberChamaList(memberChamasData);
 
-      // Fetch user's savings groups (created by user)
-      const { data: savingsGroups, error: savingsGroupError } = await supabase
-        .from('saving_groups')
-        .select('*')
-        .eq('created_by', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (savingsGroupError) throw savingsGroupError;
-      setSavingsGroupList(savingsGroups || []);
-
-      // Fetch savings groups where user is a member
-      const { data: memberSavingsGroups, error: memberSavingsGroupError } = await supabase
-        .from('saving_group_members')
-        .select(`
-          saving_groups:group_id (
-            id,
-            name,
-            slug,
-            description,
-            created_at,
-            saving_goal,
-            total_savings,
-            status
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('is_approved', true);
-
-      if (memberSavingsGroupError) throw memberSavingsGroupError;
-      
-      // Filter out nulls and extract savings group data
-      const memberSavingsGroupsData = memberSavingsGroups
-        ?.map(m => m.saving_groups)
-        .filter(g => g !== null) as SavingsGroup[] || [];
-      
-      setMemberSavingsGroupList(memberSavingsGroupsData);
-
       // Fetch user's organizations
       const { data: organizations, error: organizationError } = await supabase
         .from('organizations')
@@ -289,14 +249,13 @@ const Home = () => {
 
   // Calculate dashboard statistics
   const dashboardStats = {
-    totalSavings: savingsGroupList.reduce((sum, g) => sum + Number(g.total_savings), 0) +
-                  memberSavingsGroupList.reduce((sum, g) => sum + Number(g.total_savings), 0),
     totalContributions: chamaList.reduce((sum, c) => sum + Number(c.contribution_amount), 0) +
                         memberChamaList.reduce((sum, c) => sum + Number(c.contribution_amount), 0),
     totalMchangoRaised: mchangoList.reduce((sum, m) => sum + Number(m.current_amount), 0),
-    activeMemberships: memberChamaList.length + memberSavingsGroupList.length,
-    groupsCreated: chamaList.length + savingsGroupList.length,
+    activeMemberships: memberChamaList.length,
+    groupsCreated: chamaList.length,
     activeCampaigns: mchangoList.length,
+    organizationsCount: organizationList.length,
   };
 
   return (
@@ -388,7 +347,6 @@ const Home = () => {
             </Card>
           )}
 
-          {/* Dashboard Statistics Summary */}
           <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
             <CardHeader>
               <CardTitle className="text-base sm:text-lg flex items-center gap-2">
@@ -399,12 +357,6 @@ const Home = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="p-4 bg-background rounded-lg border border-border">
-                  <p className="text-xs text-muted-foreground mb-1">Total Savings</p>
-                  <p className="text-lg sm:text-xl font-bold text-primary">
-                    KES {dashboardStats.totalSavings.toLocaleString()}
-                  </p>
-                </div>
                 <div className="p-4 bg-background rounded-lg border border-border">
                   <p className="text-xs text-muted-foreground mb-1">Chama Contributions</p>
                   <p className="text-lg sm:text-xl font-bold text-foreground">
@@ -435,12 +387,18 @@ const Home = () => {
                     {dashboardStats.activeCampaigns}
                   </p>
                 </div>
+                <div className="p-4 bg-background rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">Organizations</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">
+                    {dashboardStats.organizationsCount}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4 sm:mb-6">
+            <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
               <TabsTrigger value="mchango" className="gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
                 <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Mchango</span>
@@ -450,11 +408,6 @@ const Home = () => {
                 <Users className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Chama</span>
                 <span className="sm:hidden">Chama</span>
-              </TabsTrigger>
-              <TabsTrigger value="savings" className="gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
-                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Savings</span>
-                <span className="sm:hidden">Savings</span>
               </TabsTrigger>
               <TabsTrigger value="organizations" className="gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
                 <Building className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -656,151 +609,6 @@ const Home = () => {
                           </Card>
                         </Link>
                       ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="savings" className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-              <h2 className="text-lg sm:text-xl font-semibold text-foreground">Savings Groups</h2>
-              <Link to="/savings-groups/create" className="w-full sm:w-auto">
-                <Button variant="hero" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">
-                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                  Create Savings Group
-                </Button>
-              </Link>
-            </div>
-
-            {loading ? (
-              <Card>
-                <CardContent className="py-6 sm:py-8 text-center">
-                  <p className="text-sm sm:text-base text-muted-foreground">Loading savings groups...</p>
-                </CardContent>
-              </Card>
-            ) : savingsGroupList.length === 0 && memberSavingsGroupList.length === 0 ? (
-              <Card>
-                <CardContent className="py-6 sm:py-8 text-center space-y-3 sm:space-y-4">
-                  <p className="text-sm sm:text-base text-muted-foreground">You haven't joined any savings groups yet</p>
-                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Link to="/savings-groups/create" className="w-full sm:w-auto">
-                      <Button variant="hero" className="w-full sm:w-auto text-xs sm:text-sm">
-                        <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                        Create Savings Group
-                      </Button>
-                    </Link>
-                    <Link to="/savings-groups/join" className="w-full sm:w-auto">
-                      <Button variant="outline" className="w-full sm:w-auto text-xs sm:text-sm">
-                        Join Existing Group
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                {/* Created Savings Groups */}
-                {savingsGroupList.length > 0 && (
-                  <div className="space-y-3 sm:space-y-4">
-                    <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                      Created by You
-                    </h3>
-                    <div className="space-y-4">
-                      {savingsGroupList.map((group) => {
-                        const progress = (Number(group.total_savings) / Number(group.saving_goal)) * 100;
-                        
-                        return (
-                          <Link key={group.id} to={`/savings-groups/${group.id}`}>
-                            <Card className="hover:shadow-md transition-shadow">
-                              <CardHeader>
-                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <CardTitle className="text-base sm:text-lg break-words">{group.name}</CardTitle>
-                                    <CardDescription className="text-xs sm:text-sm break-words">{group.description}</CardDescription>
-                                  </div>
-                                  <Badge variant="default" className="text-xs self-start sm:self-auto flex-shrink-0">Manager</Badge>
-                                </div>
-                              </CardHeader>
-                              <CardContent className="space-y-3">
-                                <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
-                                  <div>
-                                    <p className="text-xs sm:text-sm text-muted-foreground">Total Savings</p>
-                                    <p className="text-lg sm:text-xl font-bold text-primary">
-                                      KES {Number(group.total_savings).toLocaleString()}
-                                    </p>
-                                  </div>
-                                  <div className="sm:text-right">
-                                    <p className="text-xs sm:text-sm text-muted-foreground">Target Goal</p>
-                                    <p className="text-base sm:text-lg font-semibold text-foreground">
-                                      KES {Number(group.saving_goal).toLocaleString()}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <Progress value={progress} />
-                                  <p className="text-xs text-muted-foreground">{progress.toFixed(1)}% of goal</p>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground pt-2 border-t border-border">
-                                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                  Created: {new Date(group.created_at).toLocaleDateString()}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Member Savings Groups */}
-                {memberSavingsGroupList.length > 0 && (
-                  <div className="space-y-3 sm:space-y-4">
-                    <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                      Member Groups
-                    </h3>
-                    <div className="space-y-4">
-                      {memberSavingsGroupList.map((group) => {
-                        const progress = (Number(group.total_savings) / Number(group.saving_goal)) * 100;
-                        
-                        return (
-                          <Link key={group.id} to={`/savings-groups/${group.id}`}>
-                            <Card className="hover:shadow-md transition-shadow">
-                              <CardHeader>
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <CardTitle className="text-lg">{group.name}</CardTitle>
-                                    <CardDescription>{group.description}</CardDescription>
-                                  </div>
-                                  <Badge variant="secondary">Member</Badge>
-                                </div>
-                              </CardHeader>
-                              <CardContent className="space-y-3">
-                                <div className="flex justify-between">
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Total Savings</p>
-                                    <p className="text-xl font-bold text-primary">
-                                      KES {Number(group.total_savings).toLocaleString()}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-sm text-muted-foreground">Target Goal</p>
-                                    <p className="text-lg font-semibold text-foreground">
-                                      KES {Number(group.saving_goal).toLocaleString()}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <Progress value={progress} />
-                                  <p className="text-xs text-muted-foreground">{progress.toFixed(1)}% of goal</p>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </Link>
-                        );
-                      })}
                     </div>
                   </div>
                 )}
