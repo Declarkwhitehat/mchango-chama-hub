@@ -6,7 +6,6 @@ import {
   FileCheck, 
   TrendingUp, 
   Activity, 
-  PiggyBank, 
   DollarSign,
   ArrowRight,
   AlertCircle,
