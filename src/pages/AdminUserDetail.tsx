@@ -365,9 +365,12 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
                     <div>
                       <p className="text-sm text-muted-foreground flex items-center gap-2">
                         <Phone className="h-4 w-4" />
-                        Phone Number
+                        Phone Number (Payout Method)
                       </p>
                       <p className="font-medium">{user.phone}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        To change: Customer must submit request via Profile → Payment Dashboard
+                      </p>
                     </div>
 
                     <div>
