@@ -6,16 +6,18 @@ import { format } from "date-fns";
 
 interface ActivityPDFDownloadProps {
   data: any[];
-  type: "chama" | "mchango" | "withdrawals" | "all";
+  type: "chama" | "mchango" | "withdrawals" | "all" | "organizations";
   chamaNames?: Map<string, string>;
   mchangoNames?: Map<string, string>;
+  organizationNames?: Map<string, string>;
 }
 
 export const ActivityPDFDownload = ({ 
   data, 
   type, 
   chamaNames = new Map(), 
-  mchangoNames = new Map() 
+  mchangoNames = new Map(),
+  organizationNames = new Map()
 }: ActivityPDFDownloadProps) => {
   const { toast } = useToast();
 
@@ -37,6 +39,7 @@ export const ActivityPDFDownload = ({
       const titles: Record<string, string> = {
         chama: "Chama Contributions Report",
         mchango: "Campaign Donations Report",
+        organizations: "Organization Donations Report",
         withdrawals: "Withdrawals Report",
         all: "All Transactions Report",
       };
@@ -107,6 +110,33 @@ export const ActivityPDFDownload = ({
           doc.text(campaignName.substring(0, 25), margin + 35, startY);
           doc.text(item.amount?.toLocaleString() || "0", margin + 100, startY);
           doc.text((item.payment_reference || "-").substring(0, 20), margin + 145, startY);
+          
+          startY += lineHeight;
+        });
+      } else if (type === "organizations") {
+        // Headers
+        doc.text("Date", margin, startY);
+        doc.text("Organization", margin + 35, startY);
+        doc.text("Amount (KSh)", margin + 100, startY);
+        doc.text("Status", margin + 140, startY);
+        doc.text("Receipt", margin + 170, startY);
+        
+        startY += lineHeight;
+        doc.setFont("helvetica", "normal");
+        
+        data.forEach((item: any) => {
+          if (startY > 270) {
+            doc.addPage();
+            startY = 20;
+          }
+          
+          const orgName = item.organization?.name || organizationNames.get(item.organization_id) || "Unknown";
+          
+          doc.text(format(new Date(item.created_at), "MMM dd, yyyy"), margin, startY);
+          doc.text(orgName.substring(0, 25), margin + 35, startY);
+          doc.text(item.amount?.toLocaleString() || "0", margin + 100, startY);
+          doc.text((item.payment_status || "N/A").substring(0, 10), margin + 140, startY);
+          doc.text((item.mpesa_receipt_number || "-").substring(0, 12), margin + 170, startY);
           
           startY += lineHeight;
         });
