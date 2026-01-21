@@ -171,7 +171,7 @@ const Home = () => {
         .from('chama')
         .select('*')
         .eq('created_by', user.id)
-        .eq('status', 'active')
+        .in('status', ['pending', 'active'])
         .order('created_at', { ascending: false });
 
       if (chamaError) throw chamaError;
