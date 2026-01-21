@@ -118,30 +118,7 @@ export default function AdminSearch() {
         console.error('Error fetching chama memberships:', chamaError);
       }
 
-      // Fetch all savings group memberships
-      const { data: savingsMemberships, error: savingsError } = await supabase
-        .from('saving_group_members')
-        .select(`
-          *,
-          saving_groups (
-            name,
-            slug,
-            group_code,
-            monthly_target,
-            saving_goal,
-            status
-          )
-        `)
-        .eq('user_id', userId);
-
-      if (savingsError) {
-        console.error('Error fetching savings memberships:', savingsError);
-      }
-
-      const allGroups = [
-        ...(chamaMemberships || []).map(m => ({ ...m, groupType: 'chama' })),
-        ...(savingsMemberships || []).map(m => ({ ...m, groupType: 'savings' }))
-      ];
+      const allGroups = (chamaMemberships || []).map(m => ({ ...m, groupType: 'chama' }));
 
       if (allGroups.length > 0) {
         // Enhance each membership with user profile
@@ -278,12 +255,10 @@ export default function AdminSearch() {
                   >
                     <div className="text-left">
                       <div className="font-semibold">
-                        {membership.groupType === 'chama' 
-                          ? membership.chama?.name 
-                          : membership.saving_groups?.name}
+                        {membership.chama?.name}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {membership.groupType === 'chama' ? 'Chama' : 'Savings Group'} - {membership.member_code || membership.unique_member_id}
+                        Chama - {membership.member_code}
                       </div>
                     </div>
                   </Button>
@@ -305,7 +280,7 @@ export default function AdminSearch() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {memberData.member_code || memberData.unique_member_id || 'N/A'}
+                    {memberData.member_code || 'N/A'}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {memberData.profiles?.full_name || 'N/A'}
@@ -329,7 +304,7 @@ export default function AdminSearch() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {memberData.groupType === 'chama' ? 'Chama' : 'Savings Group'}
+                    Chama
                   </p>
                 </CardContent>
               </Card>
@@ -341,14 +316,10 @@ export default function AdminSearch() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-bold truncate">
-                    {memberData.groupType === 'chama' 
-                      ? memberData.chama?.name 
-                      : memberData.saving_groups?.name || 'N/A'}
+                    {memberData.chama?.name || 'N/A'}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Code: {memberData.groupType === 'chama' 
-                      ? memberData.chama?.group_code 
-                      : memberData.saving_groups?.group_code || 'N/A'}
+                    Code: {memberData.chama?.group_code || 'N/A'}
                   </p>
                 </CardContent>
               </Card>
@@ -360,11 +331,7 @@ export default function AdminSearch() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(
-                      memberData.groupType === 'chama' 
-                        ? (memberData.balance_credit || 0)
-                        : (memberData.current_savings || 0)
-                    )}
+                    {formatCurrency(memberData.balance_credit || 0)}
                   </div>
                   {memberData.balance_deficit > 0 && (
                     <p className="text-xs text-destructive">
@@ -433,101 +400,38 @@ export default function AdminSearch() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5" />
-                      {memberData.groupType === 'chama' ? 'Chama' : 'Savings'} Group Details
+                      Chama Group Details
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {memberData.groupType === 'chama' ? (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Group Name</p>
-                          <p className="text-base">{memberData.chama?.name || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Group Code</p>
-                          <p className="text-base font-mono">{memberData.chama?.group_code || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Contribution Amount</p>
-                          <p className="text-base">
-                            {memberData.chama?.contribution_amount 
-                              ? formatCurrency(memberData.chama.contribution_amount) 
-                              : 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Frequency</p>
-                          <p className="text-base capitalize">
-                            {memberData.chama?.contribution_frequency?.replace('_', ' ') || 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Group Status</p>
-                          <Badge variant={memberData.chama?.status === 'active' ? 'default' : 'secondary'}>
-                            {memberData.chama?.status || 'N/A'}
-                          </Badge>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Order Index</p>
-                          <p className="text-base">#{memberData.order_index || 'N/A'}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Group Name</p>
-                          <p className="text-base">{memberData.saving_groups?.name || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Group Code</p>
-                          <p className="text-base font-mono">{memberData.saving_groups?.group_code || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Monthly Target</p>
-                          <p className="text-base">
-                            {memberData.saving_groups?.monthly_target 
-                              ? formatCurrency(memberData.saving_groups.monthly_target) 
-                              : 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Saving Goal</p>
-                          <p className="text-base">
-                            {memberData.saving_groups?.saving_goal 
-                              ? formatCurrency(memberData.saving_groups.saving_goal) 
-                              : 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Current Savings</p>
-                          <p className="text-base">{formatCurrency(memberData.current_savings || 0)}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Lifetime Deposits</p>
-                          <p className="text-base">{formatCurrency(memberData.lifetime_deposits || 0)}</p>
-                        </div>
-                      </div>
-                    )}
-                    <Separator />
-                    {memberData.groupType === 'chama' && (
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-2">Member Balance</p>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="rounded-lg border p-3">
-                            <p className="text-xs text-muted-foreground">Credit Balance</p>
-                            <p className="text-lg font-semibold text-green-600">
-                              {formatCurrency(memberData.balance_credit || 0)}
-                            </p>
-                          </div>
-                          <div className="rounded-lg border p-3">
-                            <p className="text-xs text-muted-foreground">Deficit Balance</p>
-                            <p className="text-lg font-semibold text-destructive">
-                              {formatCurrency(memberData.balance_deficit || 0)}
-                            </p>
-                          </div>
-                        </div>
+                        <p className="text-sm font-medium text-muted-foreground">Group Name</p>
+                        <p className="text-base">{memberData.chama?.name || 'N/A'}</p>
                       </div>
-                    )}
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Group Code</p>
+                        <p className="text-base font-mono">{memberData.chama?.group_code || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Contribution Amount</p>
+                        <p className="text-base">{formatCurrency(memberData.chama?.contribution_amount || 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Frequency</p>
+                        <p className="text-base capitalize">{memberData.chama?.contribution_frequency || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Group Status</p>
+                        <Badge variant={memberData.chama?.status === 'active' ? 'default' : 'secondary'}>
+                          {memberData.chama?.status || 'N/A'}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Max Members</p>
+                        <p className="text-base">{memberData.chama?.max_members || 'N/A'}</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -537,43 +441,31 @@ export default function AdminSearch() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />
-                      Payment History
+                      Payment Information
                     </CardTitle>
-                    <CardDescription>Recent payment activity and contribution records</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {memberData.groupType === 'chama' && (
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="rounded-lg border p-3">
-                            <p className="text-xs text-muted-foreground">Last Payment</p>
-                            <p className="text-sm font-medium">
-                              {memberData.last_payment_date 
-                                ? format(new Date(memberData.last_payment_date), 'PPP')
-                                : 'No payments yet'}
-                            </p>
-                          </div>
-                          <div className="rounded-lg border p-3">
-                            <p className="text-xs text-muted-foreground">Next Due Date</p>
-                            <p className="text-sm font-medium">
-                              {memberData.next_due_date 
-                                ? format(new Date(memberData.next_due_date), 'PPP')
-                                : 'N/A'}
-                            </p>
-                          </div>
-                          <div className="rounded-lg border p-3">
-                            <p className="text-xs text-muted-foreground">Missed Payments</p>
-                            <p className="text-sm font-medium text-destructive">
-                              {memberData.missed_payments_count || 0}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      <Separator />
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">
-                          Detailed payment records and transaction history can be viewed by querying 
-                          the member_cycle_payments, contributions, and saving_deposits tables.
+                        <p className="text-sm font-medium text-muted-foreground">Payout Order</p>
+                        <p className="text-2xl font-bold">{memberData.payout_order || 'Not set'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Payment Details</p>
+                        <Badge variant={memberData.profiles?.payment_details_completed ? 'default' : 'secondary'}>
+                          {memberData.profiles?.payment_details_completed ? 'Completed' : 'Pending'}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Balance Credit</p>
+                        <p className="text-xl font-bold text-green-600">
+                          {formatCurrency(memberData.balance_credit || 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Balance Deficit</p>
+                        <p className="text-xl font-bold text-destructive">
+                          {formatCurrency(memberData.balance_deficit || 0)}
                         </p>
                       </div>
                     </div>
@@ -586,15 +478,17 @@ export default function AdminSearch() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <FileText className="h-5 w-5" />
-                      Transaction History
+                      Recent Transactions
                     </CardTitle>
-                    <CardDescription>All financial transactions and activity</CardDescription>
+                    <CardDescription>
+                      Transaction history will be displayed here
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Complete transaction history including deposits, withdrawals, transfers, and loans 
-                      can be retrieved from the transactions, withdrawals, and saving_group_loans tables.
-                    </p>
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Transaction history coming soon</p>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -608,20 +502,14 @@ export default function AdminSearch() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Email Address</p>
-                        <p className="text-base">{memberData.profiles?.email || 'Not provided'}</p>
-                      </div>
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Phone Number</p>
-                        <p className="text-base">{memberData.profiles?.phone || 'Not provided'}</p>
+                        <p className="text-base">{memberData.profiles?.phone || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Account Status</p>
-                        <Badge variant={memberData.approval_status === 'approved' ? 'default' : 'secondary'}>
-                          {memberData.approval_status || memberData.status || 'Active'}
-                        </Badge>
+                        <p className="text-sm font-medium text-muted-foreground">Email Address</p>
+                        <p className="text-base">{memberData.profiles?.email || 'N/A'}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -631,44 +519,52 @@ export default function AdminSearch() {
           </div>
         )}
 
-        {/* User Found But No Memberships */}
+        {/* User with no memberships */}
         {!loading && memberData?.noMemberships && (
-          <Card className="text-center py-12">
-            <CardContent className="space-y-4">
-              <AlertCircle className="h-16 w-16 mx-auto text-muted-foreground" />
-              <div>
-                <p className="text-lg font-medium mb-2">User Found</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  This user exists but has no active group memberships
-                </p>
-                <div className="inline-block text-left bg-muted p-4 rounded-lg">
-                  <p className="text-sm font-medium mb-2">User Details:</p>
-                  <div className="space-y-1 text-sm">
-                    <p><span className="text-muted-foreground">Name:</span> {memberData.profiles?.full_name || 'N/A'}</p>
-                    <p><span className="text-muted-foreground">Email:</span> {memberData.profiles?.email || 'N/A'}</p>
-                    <p><span className="text-muted-foreground">Phone:</span> {memberData.profiles?.phone || 'N/A'}</p>
-                    <p><span className="text-muted-foreground">ID:</span> {memberData.profiles?.id_number || 'N/A'}</p>
-                    <p>
-                      <span className="text-muted-foreground">KYC:</span>{' '}
-                      <Badge variant={memberData.profiles?.kyc_status === 'approved' ? 'default' : 'secondary'}>
-                        {memberData.profiles?.kyc_status || 'N/A'}
-                      </Badge>
-                    </p>
-                  </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-yellow-500" />
+                User Found - No Memberships
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Full Name</p>
+                  <p className="text-base">{memberData.profiles?.full_name || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Email</p>
+                  <p className="text-base">{memberData.profiles?.email || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Phone</p>
+                  <p className="text-base">{memberData.profiles?.phone || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">KYC Status</p>
+                  <Badge variant={memberData.profiles?.kyc_status === 'approved' ? 'default' : 'secondary'}>
+                    {memberData.profiles?.kyc_status || 'N/A'}
+                  </Badge>
                 </div>
               </div>
+              <Separator className="my-4" />
+              <p className="text-muted-foreground text-sm">
+                This user is registered but has not joined any Chama groups yet.
+              </p>
             </CardContent>
           </Card>
         )}
 
-        {/* No Search Results */}
-        {!memberData && !loading && (
+        {/* No results state */}
+        {!loading && !memberData && (
           <Card className="text-center py-12">
             <CardContent>
-              <Search className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-lg font-medium mb-2">No Results</p>
-              <p className="text-sm text-muted-foreground">
-                Use the search bar above to find members by code, phone, email, name, or ID number
+              <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-lg font-semibold mb-2">Search for Members</h3>
+              <p className="text-muted-foreground">
+                Enter a member code, phone number, email, name, or ID number to search
               </p>
             </CardContent>
           </Card>

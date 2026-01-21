@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { DollarSign, TrendingUp, Loader2, PiggyBank, Users, Heart, Percent, ArrowUpRight, ArrowDownRight, Calendar, BarChart3 } from "lucide-react";
+import { DollarSign, TrendingUp, Loader2, Users, Heart, Percent, ArrowUpRight, ArrowDownRight, Calendar, BarChart3 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from "date-fns";
 import { 
@@ -19,8 +19,6 @@ interface CommissionData {
   mchangoDonations: number;
   chamaCommission: number;
   chamaContributions: number;
-  savingsCommission: number;
-  savingsDeposits: number;
   totalCommission: number;
 }
 
@@ -28,7 +26,6 @@ interface TrendData {
   date: string;
   mchango: number;
   chama: number;
-  savings: number;
   total: number;
 }
 
@@ -47,8 +44,6 @@ export const CommissionOverview = () => {
     mchangoDonations: 0,
     chamaCommission: 0,
     chamaContributions: 0,
-    savingsCommission: 0,
-    savingsDeposits: 0,
     totalCommission: 0,
   });
   const [trendData, setTrendData] = useState<TrendData[]>([]);
@@ -88,26 +83,14 @@ export const CommissionOverview = () => {
       const chamaContributions = contributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
       const chamaCommission = chamaContributions * CHAMA_DEFAULT_COMMISSION_RATE;
 
-      // Fetch Savings Group deposits with commission
-      const { data: deposits, error: depositsError } = await supabase
-        .from('saving_group_deposits')
-        .select('net_amount, commission_amount');
-
-      if (depositsError) throw depositsError;
-
-      const savingsDeposits = deposits?.reduce((sum, d) => sum + Number(d.net_amount), 0) || 0;
-      const savingsCommission = deposits?.reduce((sum, d) => sum + Number(d.commission_amount), 0) || 0;
-
       // Calculate totals
-      const totalCommission = mchangoCommission + chamaCommission + savingsCommission;
+      const totalCommission = mchangoCommission + chamaCommission;
 
       setData({
         mchangoCommission,
         mchangoDonations,
         chamaCommission,
         chamaContributions,
-        savingsCommission,
-        savingsDeposits,
         totalCommission,
       });
     } catch (error: any) {
@@ -141,25 +124,21 @@ export const CommissionOverview = () => {
           const dayStart = startOfDay(date);
           const dayEnd = endOfDay(date);
 
-          const [mchangoData, chamaData, savingsData] = await Promise.all([
+          const [mchangoData, chamaData] = await Promise.all([
             supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
               .gte('completed_at', dayStart.toISOString()).lte('completed_at', dayEnd.toISOString()),
             supabase.from('contributions').select('amount').eq('status', 'completed')
               .gte('contribution_date', dayStart.toISOString()).lte('contribution_date', dayEnd.toISOString()),
-            supabase.from('saving_group_deposits').select('commission_amount')
-              .gte('created_at', dayStart.toISOString()).lte('created_at', dayEnd.toISOString()),
           ]);
 
           const mchango = (mchangoData.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE;
           const chama = (chamaData.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
-          const savings = savingsData.data?.reduce((sum, d) => sum + Number(d.commission_amount), 0) || 0;
 
           dataPoints.push({
             date: format(date, 'MMM dd'),
             mchango,
             chama,
-            savings,
-            total: mchango + chama + savings,
+            total: mchango + chama,
           });
         }
       } else if (period === 'weekly') {
@@ -168,25 +147,21 @@ export const CommissionOverview = () => {
           const weekStart = startOfWeek(subWeeks(now, i));
           const weekEnd = endOfWeek(subWeeks(now, i));
 
-          const [mchangoData, chamaData, savingsData] = await Promise.all([
+          const [mchangoData, chamaData] = await Promise.all([
             supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
               .gte('completed_at', weekStart.toISOString()).lte('completed_at', weekEnd.toISOString()),
             supabase.from('contributions').select('amount').eq('status', 'completed')
               .gte('contribution_date', weekStart.toISOString()).lte('contribution_date', weekEnd.toISOString()),
-            supabase.from('saving_group_deposits').select('commission_amount')
-              .gte('created_at', weekStart.toISOString()).lte('created_at', weekEnd.toISOString()),
           ]);
 
           const mchango = (mchangoData.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE;
           const chama = (chamaData.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
-          const savings = savingsData.data?.reduce((sum, d) => sum + Number(d.commission_amount), 0) || 0;
 
           dataPoints.push({
             date: format(weekStart, 'MMM dd'),
             mchango,
             chama,
-            savings,
-            total: mchango + chama + savings,
+            total: mchango + chama,
           });
         }
 
@@ -200,25 +175,21 @@ export const CommissionOverview = () => {
           const monthStart = startOfMonth(subMonths(now, i));
           const monthEnd = endOfMonth(subMonths(now, i));
 
-          const [mchangoData, chamaData, savingsData] = await Promise.all([
+          const [mchangoData, chamaData] = await Promise.all([
             supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
               .gte('completed_at', monthStart.toISOString()).lte('completed_at', monthEnd.toISOString()),
             supabase.from('contributions').select('amount').eq('status', 'completed')
               .gte('contribution_date', monthStart.toISOString()).lte('contribution_date', monthEnd.toISOString()),
-            supabase.from('saving_group_deposits').select('commission_amount')
-              .gte('created_at', monthStart.toISOString()).lte('created_at', monthEnd.toISOString()),
           ]);
 
           const mchango = (mchangoData.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE;
           const chama = (chamaData.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
-          const savings = savingsData.data?.reduce((sum, d) => sum + Number(d.commission_amount), 0) || 0;
 
           dataPoints.push({
             date: format(monthStart, 'MMM yyyy'),
             mchango,
             chama,
-            savings,
-            total: mchango + chama + savings,
+            total: mchango + chama,
           });
         }
 
@@ -231,33 +202,27 @@ export const CommissionOverview = () => {
       setTrendData(dataPoints);
 
       // Calculate growth
-      const [currentMchango, currentChama, currentSavings] = await Promise.all([
+      const [currentMchango, currentChama] = await Promise.all([
         supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
           .gte('completed_at', currentStart.toISOString()).lte('completed_at', currentEnd.toISOString()),
         supabase.from('contributions').select('amount').eq('status', 'completed')
           .gte('contribution_date', currentStart.toISOString()).lte('contribution_date', currentEnd.toISOString()),
-        supabase.from('saving_group_deposits').select('commission_amount')
-          .gte('created_at', currentStart.toISOString()).lte('created_at', currentEnd.toISOString()),
       ]);
 
-      const [previousMchango, previousChama, previousSavings] = await Promise.all([
+      const [previousMchango, previousChama] = await Promise.all([
         supabase.from('mchango_donations').select('amount').eq('payment_status', 'completed')
           .gte('completed_at', previousStart.toISOString()).lte('completed_at', previousEnd.toISOString()),
         supabase.from('contributions').select('amount').eq('status', 'completed')
           .gte('contribution_date', previousStart.toISOString()).lte('contribution_date', previousEnd.toISOString()),
-        supabase.from('saving_group_deposits').select('commission_amount')
-          .gte('created_at', previousStart.toISOString()).lte('created_at', previousEnd.toISOString()),
       ]);
 
       const currentTotal = 
         (currentMchango.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE +
-        (currentChama.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE +
-        (currentSavings.data?.reduce((sum, d) => sum + Number(d.commission_amount), 0) || 0);
+        (currentChama.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
 
       const previousTotal = 
         (previousMchango.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0) * MCHANGO_COMMISSION_RATE +
-        (previousChama.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE +
-        (previousSavings.data?.reduce((sum, d) => sum + Number(d.commission_amount), 0) || 0);
+        (previousChama.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0) * CHAMA_DEFAULT_COMMISSION_RATE;
 
       const growthPercentage = previousTotal > 0 
         ? ((currentTotal - previousTotal) / previousTotal) * 100 
@@ -332,7 +297,7 @@ export const CommissionOverview = () => {
           </div>
 
           {/* Quick Stats Grid */}
-          <div className="grid grid-cols-3 gap-4 pt-6 border-t">
+          <div className="grid grid-cols-2 gap-4 pt-6 border-t">
             <div className="text-center">
               <p className="text-2xl font-bold text-pink-600">
                 {formatCommissionPercentage(MCHANGO_COMMISSION_RATE)}
@@ -344,12 +309,6 @@ export const CommissionOverview = () => {
                 {formatCommissionPercentage(CHAMA_DEFAULT_COMMISSION_RATE)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">Chama Rate</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">
-                Variable
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Savings Rate</p>
             </div>
           </div>
         </CardContent>
@@ -416,10 +375,6 @@ export const CommissionOverview = () => {
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                     </linearGradient>
-                    <linearGradient id="colorSavings" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="date" className="text-xs" />
@@ -449,15 +404,6 @@ export const CommissionOverview = () => {
                     fillOpacity={1} 
                     fill="url(#colorChama)" 
                     name="Chama"
-                    stackId="1"
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="savings" 
-                    stroke="#22c55e" 
-                    fillOpacity={1} 
-                    fill="url(#colorSavings)" 
-                    name="Savings"
                     stackId="1"
                   />
                 </AreaChart>
@@ -503,14 +449,6 @@ export const CommissionOverview = () => {
                     name="Chama"
                     dot={{ r: 3 }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="savings" 
-                    stroke="#22c55e" 
-                    strokeWidth={2}
-                    name="Savings"
-                    dot={{ r: 3 }}
-                  />
                 </LineChart>
               </ResponsiveContainer>
             </TabsContent>
@@ -532,14 +470,13 @@ export const CommissionOverview = () => {
                   <Legend />
                   <Bar dataKey="mchango" fill="#ec4899" name="Mchango" stackId="a" />
                   <Bar dataKey="chama" fill="#3b82f6" name="Chama" stackId="a" />
-                  <Bar dataKey="savings" fill="#22c55e" name="Savings" stackId="a" />
                 </BarChart>
               </ResponsiveContainer>
             </TabsContent>
           </Tabs>
 
           {/* Period Summary */}
-          <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
+          <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t">
             <div className="text-center p-4 bg-pink-50 dark:bg-pink-950/20 rounded-lg">
               <p className="text-sm text-muted-foreground mb-1">Mchango (Period Avg)</p>
               <p className="text-2xl font-bold text-pink-600">
@@ -552,18 +489,12 @@ export const CommissionOverview = () => {
                 KES {(trendData.reduce((sum, d) => sum + d.chama, 0) / (trendData.length || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </div>
-            <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
-              <p className="text-sm text-muted-foreground mb-1">Savings (Period Avg)</p>
-              <p className="text-2xl font-bold text-green-600">
-                KES {(trendData.reduce((sum, d) => sum + d.savings, 0) / (trendData.length || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </p>
-            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Breakdown by Source - Enhanced Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {/* Mchango Commission */}
         <Card className="relative overflow-hidden border-2 border-pink-200 bg-gradient-to-br from-pink-50 to-white dark:from-pink-950/20 dark:to-background">
           <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full -translate-y-16 translate-x-16" />
@@ -671,60 +602,6 @@ export const CommissionOverview = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Savings Group Commission */}
-        <Card className="relative overflow-hidden border-2 border-green-200 bg-gradient-to-br from-green-50 to-white dark:from-green-950/20 dark:to-background">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full -translate-y-16 translate-x-16" />
-          <CardHeader className="pb-3 relative">
-            <div className="flex items-center justify-between">
-              <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                <PiggyBank className="h-6 w-6 text-green-500" />
-              </div>
-              <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                <Percent className="h-3 w-3 mr-1" />
-                Variable
-              </Badge>
-            </div>
-            <CardTitle className="text-lg mt-3">Savings Groups</CardTitle>
-            <CardDescription>
-              Variable commission rate per deposit
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 relative">
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Total Deposits Made</p>
-              <p className="text-xl font-bold">
-                KES {data.savingsDeposits.toLocaleString()}
-              </p>
-            </div>
-            <div className="pt-3 border-t border-green-200">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Your Commission</p>
-              <p className="text-3xl font-bold text-green-600">
-                KES {data.savingsCommission.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div className="pt-2">
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-muted-foreground">Share of Total</span>
-                <span className="font-medium">
-                  {data.totalCommission > 0 
-                    ? ((data.savingsCommission / data.totalCommission) * 100).toFixed(1)
-                    : 0}%
-                </span>
-              </div>
-              <div className="h-2 bg-green-100 dark:bg-green-900/30 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-500"
-                  style={{ 
-                    width: `${data.totalCommission > 0 
-                      ? (data.savingsCommission / data.totalCommission) * 100 
-                      : 0}%` 
-                  }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Detailed Breakdown Table */}
@@ -800,32 +677,6 @@ export const CommissionOverview = () => {
                   <td className="text-right py-4 px-4 font-semibold">
                     {data.totalCommission > 0 
                       ? ((data.chamaCommission / data.totalCommission) * 100).toFixed(1)
-                      : 0}%
-                  </td>
-                </tr>
-                <tr className="border-b hover:bg-green-50/50 dark:hover:bg-green-950/20">
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                        <PiggyBank className="h-4 w-4 text-green-500" />
-                      </div>
-                      <span className="font-medium">Savings Deposits</span>
-                    </div>
-                  </td>
-                  <td className="text-right py-4 px-4">
-                    <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30">
-                      Variable
-                    </Badge>
-                  </td>
-                  <td className="text-right py-4 px-4 font-medium">
-                    KES {data.savingsDeposits.toLocaleString()}
-                  </td>
-                  <td className="text-right py-4 px-4 font-bold text-green-600">
-                    KES {data.savingsCommission.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                  <td className="text-right py-4 px-4 font-semibold">
-                    {data.totalCommission > 0 
-                      ? ((data.savingsCommission / data.totalCommission) * 100).toFixed(1)
                       : 0}%
                   </td>
                 </tr>

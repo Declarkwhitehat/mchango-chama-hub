@@ -8,9 +8,6 @@ import {
   TrendingUp, 
   Wallet, 
   Clock, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  PiggyBank,
   Users,
   Building2,
   Coins
@@ -24,11 +21,6 @@ interface FinancialData {
     pendingWithdrawals: number;
   };
   chama: {
-    grossCollected: number;
-    commission: number;
-    clientFunds: number;
-  };
-  savings: {
     grossCollected: number;
     commission: number;
     clientFunds: number;
@@ -64,7 +56,6 @@ export const AdminFinancialOverview = () => {
         mchangoResult,
         mchangoDonationsResult,
         chamaContributionsResult,
-        savingsDepositsResult,
         organizationsResult,
         orgDonationsResult,
         pendingWithdrawalsResult,
@@ -76,8 +67,6 @@ export const AdminFinancialOverview = () => {
         supabase.from('mchango_donations').select('gross_amount, commission_amount, net_amount').eq('payment_status', 'completed'),
         // Chama contributions
         supabase.from('contributions').select('amount').eq('status', 'completed'),
-        // Savings deposits
-        supabase.from('saving_group_deposits').select('amount, commission_amount, net_amount').eq('status', 'completed'),
         // Organizations totals
         supabase.from('organizations').select('total_gross_collected, total_commission_paid, available_balance'),
         // Organization donations for accurate totals
@@ -99,11 +88,6 @@ export const AdminFinancialOverview = () => {
       const chamaCommission = companyEarningsResult.data?.filter(e => e.source === 'chama_contribution').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
       const chamaClient = chamaGross - chamaCommission;
 
-      // Calculate Savings totals
-      const savingsGross = savingsDepositsResult.data?.reduce((sum, d) => sum + (d.amount || 0), 0) || 0;
-      const savingsCommission = savingsDepositsResult.data?.reduce((sum, d) => sum + (d.commission_amount || 0), 0) || 0;
-      const savingsClient = savingsGross - savingsCommission;
-
       // Calculate Organizations totals
       const orgGross = orgDonationsResult.data?.reduce((sum, d) => sum + (d.gross_amount || d.net_amount || 0), 0) || 0;
       const orgCommission = orgDonationsResult.data?.reduce((sum, d) => sum + (d.commission_amount || 0), 0) || 0;
@@ -111,9 +95,9 @@ export const AdminFinancialOverview = () => {
       const orgPendingWithdrawals = 0; // Organizations don't have withdrawal tracking yet
 
       // Calculate totals
-      const totalGross = mchangoGross + chamaGross + savingsGross + orgGross;
-      const totalCommission = mchangoCommission + chamaCommission + savingsCommission + orgCommission;
-      const totalClient = mchangoClient + chamaClient + savingsClient + orgClient;
+      const totalGross = mchangoGross + chamaGross + orgGross;
+      const totalCommission = mchangoCommission + chamaCommission + orgCommission;
+      const totalClient = mchangoClient + chamaClient + orgClient;
       const totalPending = mchangoPendingWithdrawals + orgPendingWithdrawals + 
         (pendingWithdrawalsResult.data?.filter(w => w.chama_id).reduce((sum, w) => sum + (w.net_amount || 0), 0) || 0);
 
@@ -128,11 +112,6 @@ export const AdminFinancialOverview = () => {
           grossCollected: chamaGross,
           commission: chamaCommission,
           clientFunds: chamaClient,
-        },
-        savings: {
-          grossCollected: savingsGross,
-          commission: savingsCommission,
-          clientFunds: savingsClient,
         },
         organizations: {
           grossCollected: orgGross,
@@ -345,34 +324,6 @@ export const AdminFinancialOverview = () => {
                   </td>
                 </tr>
 
-                {/* Savings */}
-                <tr className="hover:bg-muted/30">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-secondary/10">
-                        <PiggyBank className="h-4 w-4 text-secondary" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Savings Groups</p>
-                        <p className="text-xs text-muted-foreground">Group savings & loans</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="text-right py-3 px-4 font-mono">
-                    {formatCurrency(data.savings.grossCollected)}
-                  </td>
-                  <td className="text-right py-3 px-4">
-                    <div className="font-mono">{formatCurrency(data.savings.commission)}</div>
-                    <Badge variant="secondary" className="text-xs">1%</Badge>
-                  </td>
-                  <td className="text-right py-3 px-4 font-mono text-green-600 dark:text-green-400">
-                    {formatCurrency(data.savings.clientFunds)}
-                  </td>
-                  <td className="text-right py-3 px-4 font-mono text-muted-foreground">
-                    —
-                  </td>
-                </tr>
-
                 {/* Organizations */}
                 <tr className="hover:bg-muted/30">
                   <td className="py-3 px-4">
@@ -420,24 +371,28 @@ export const AdminFinancialOverview = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Legend */}
+          <div className="mt-6 pt-4 border-t grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <span>Gross = Total collected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <span>Commission = Your revenue</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-orange-500" />
+              <span>Client = Owed to owners</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500" />
+              <span>Pending = Awaiting payout</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <ArrowUpRight className="h-4 w-4 text-green-500" />
-          <span>Platform Revenue = Yours to keep</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <ArrowDownRight className="h-4 w-4 text-orange-500" />
-          <span>Client Funds = Owed to users</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-red-500" />
-          <span>Pending = Awaiting payout</span>
-        </div>
-      </div>
     </div>
   );
 };
