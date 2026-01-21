@@ -185,7 +185,7 @@ export const WithdrawalButton = ({
           chama_id: chamaId,
           mchango_id: mchangoId,
           amount: parseFloat(amount),
-          notes: notes || null,
+          notes: notes.trim() ? notes.trim() : undefined,
         },
         method: 'POST'
       });
