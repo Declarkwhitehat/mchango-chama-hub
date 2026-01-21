@@ -119,7 +119,24 @@ export function CustomerCallbacks() {
 
   const handleApprovePaymentChange = async (callback: Callback) => {
     const parsed = parsePaymentRequest(callback);
-    if (!parsed) return;
+    if (!parsed) {
+      toast({
+        title: "Invalid Request",
+        description: "This is not a valid payment method change request.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Verify this is a legitimate customer request (not admin-initiated)
+    if (!callback.question.includes('Payment Method Change Request')) {
+      toast({
+        title: "Cannot Process",
+        description: "Payment changes can only be made through customer requests.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setProcessingAction('approve');
     try {
