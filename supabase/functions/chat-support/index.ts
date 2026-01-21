@@ -39,7 +39,7 @@ serve(async (req) => {
 
 COMPLETE PLATFORM KNOWLEDGE:
 
-**1. CHAMA GROUPS (Rotating Savings & Credit Associations)**
+**1. CHAMA GROUPS (Rotating Savings & Credit Associations - ROSCA)**
 - Members contribute fixed amounts on regular schedules (daily, weekly, monthly, or custom every N days)
 - Members take turns receiving payouts in predetermined order (payout_order)
 - Requirements: minimum 2 members, maximum set by manager (default 50, adjustable by admin)
@@ -77,38 +77,33 @@ COMPLETE PLATFORM KNOWLEDGE:
 - Beneficiary URLs can link to more info about who's being helped
 - Withdrawal requests require admin approval
 
-**3. SAVINGS GROUPS (Long-term Savings & Micro-Loans)**
-- Period options: 6, 9, 12, 15, 18, 21, or 24 months
-- Set monthly targets and overall saving goals per group
-- Monthly threshold tracker: KSh 2,000 minimum to stay eligible for loans
-- After 3 consecutive months meeting threshold, members become loan-eligible
-- **Member Identification & Offline Payments:**
-  * Each group gets unique 3-character code (e.g., "XYZ")
-  * Each member gets composite ID: GroupCode + MemberNumber (e.g., "XYZ1", "XYZ2")
-  * Member ID displayed prominently in dashboard
-  * For offline M-Pesa payments: member uses their composite ID as account number
-  * System automatically reconciles M-Pesa C2B callbacks using member ID
-  * Deposits credited automatically within 1 minute
-- Deposit Features:
-  * Members deposit anytime, not just monthly
-  * Commission deducted from deposits
-  * Current savings balance tracked per member
-  * Lifetime deposits tracked
-- Loan System:
-  * Borrow from group's loan pool (total savings - outstanding loans)
-  * Interest rate: 6.5% on principal
-  * Insurance fee: 2% for default protection
-  * Requires guarantor(s) from group members
-  * Manager approves/rejects loan requests
-  * Repayment tracking, can default if not paid
-  * Defaulted loans trigger guarantor liability
-- Profit Distribution:
-  * Loan interest creates profit pool
-  * Distributed to members proportional to their savings
-  * Happens at cycle end or periodically
-- Manager dashboard shows: total savings, loans, profits, member activity
-- WhatsApp group link required for coordination
-- Maximum members configurable
+**3. ORGANIZATIONS (NGOs, Churches, Schools, Community Groups)**
+- Register organizations to receive donations from the public
+- Categories: NGO, Church, School, Community, Hospital, Other
+- Features:
+  * Public profile with name, description, logo, cover image
+  * Location and contact information (phone, email, website)
+  * YouTube video embed for promotional content
+  * WhatsApp link for direct communication
+  * Verification badge (admin-verified organizations get trust badge)
+- Donation Features:
+  * Accept donations from registered users and anonymous donors
+  * Real-time tracking: current_amount shows total raised
+  * Commission deducted from donations (5% platform fee)
+  * Available balance shows withdrawable amount
+- Organization Management:
+  * Creators become organization managers
+  * View donation history and donor details
+  * Request withdrawals to receive funds
+  * Update organization profile and images
+- Public Visibility:
+  * Organizations can be public (listed in explore) or private (link-only)
+  * Verified organizations displayed with trust badge
+  * Searchable by name and category
+- Admin Controls:
+  * Verify/unverify organizations
+  * Activate/deactivate organizations
+  * View donation statistics and commission earned
 
 **4. ACCOUNT & VERIFICATION PROCESS**
 - Registration requires: full name, email, phone number, national ID number
@@ -136,14 +131,14 @@ COMPLETE PLATFORM KNOWLEDGE:
 - Making Payments:
   * Chama contributions use M-Pesa STK push
   * Mchango donations via M-Pesa
-  * Savings deposits via M-Pesa
+  * Organization donations via M-Pesa
   * Payment references tracked (M-Pesa receipt numbers)
 - Commissions:
   * Platform deducts commission from all transactions
   * Rates vary by transaction type
   * Net amount calculated automatically
 - Withdrawal Process:
-  1. Request withdrawal from your Chama or Mchango balance
+  1. Request withdrawal from your Chama, Mchango, or Organization balance
   2. Select amount (must meet minimum, respect daily limits)
   3. Commission automatically deducted (net amount shown)
   4. Goes to admin approval queue
@@ -169,11 +164,11 @@ COMPLETE PLATFORM KNOWLEDGE:
   * Oversee all campaigns
   * Review campaign details and progress
   * Approve/reject withdrawal requests
-- Savings Group Management:
-  * View all savings groups
-  * Check member savings and loan eligibility
-  * Review loan requests and approvals
-  * Monitor profit distributions
+- Organization Management:
+  * View all registered organizations
+  * Verify/unverify organizations (verified badge)
+  * Activate/deactivate organizations
+  * View donation statistics and commission earned
 - Withdrawal Management:
   * Approve or reject all withdrawal requests
   * Add rejection reasons if denying
