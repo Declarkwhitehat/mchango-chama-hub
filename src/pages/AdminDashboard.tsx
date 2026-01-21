@@ -22,6 +22,7 @@ import { EnhancedAnalytics } from "@/components/admin/EnhancedAnalytics";
 import { PlatformStatistics } from "@/components/admin/PlatformStatistics";
 import { CommissionOverview } from "@/components/admin/CommissionOverview";
 import { AdminFinancialOverview } from "@/components/admin/AdminFinancialOverview";
+import { CleanupJobStatus } from "@/components/admin/CleanupJobStatus";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -256,6 +257,9 @@ const AdminDashboard = () => {
 
         {/* Enhanced Analytics */}
         <EnhancedAnalytics />
+
+        {/* Cleanup Job Status */}
+        <CleanupJobStatus />
 
         {/* Platform Overview */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
