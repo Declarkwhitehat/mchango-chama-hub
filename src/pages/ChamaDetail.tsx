@@ -16,7 +16,9 @@ import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
 import { PaymentStatusManager } from "@/components/chama/PaymentStatusManager";
-import { Users, Calendar, TrendingUp, Loader2 } from "lucide-react";
+import { PaymentTransparency } from "@/components/chama/PaymentTransparency";
+import { SkippedMemberAlert } from "@/components/chama/SkippedMemberAlert";
+import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -434,33 +436,142 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Withdrawal Button - Only for member whose turn it is and chama is active */}
-        {isMember && isMyTurn && isActive && (
-          <WithdrawalButton
+        {/* Withdrawal Status Section */}
+        {isMember && isActive && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Withdrawal Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isMyTurn ? (
+                <>
+                  <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-primary p-2 rounded-full">
+                        <TrendingUp className="h-5 w-5 text-primary-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-primary">It's Your Turn!</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          You can now request a withdrawal from the chama pool.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <WithdrawalButton
+                    chamaId={chama.id}
+                    totalAvailable={totalContributions}
+                    commissionRate={chama.commission_rate || 0.05}
+                    onSuccess={loadChama}
+                  />
+                </>
+              ) : currentTurnMemberId ? (
+                <div className="p-4 bg-muted border rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium">
+                        It's {approvedMembers.find(m => m.id === currentTurnMemberId)?.profiles.full_name}'s turn
+                      </p>
+                      {nextTurnDates[currentUserMembership.id] && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Your estimated turn: <span className="font-medium text-primary">
+                            {nextTurnDates[currentUserMembership.id].toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Payouts follow the order members joined. Make sure you complete your contributions 
+                        before your turn to remain eligible.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Skipped Member Alert - Show if current user was skipped */}
+        {isMember && isActive && currentUserMembership && (
+          <SkippedMemberAlert
             chamaId={chama.id}
-            totalAvailable={totalContributions}
-            commissionRate={chama.commission_rate || 0.05}
-            onSuccess={loadChama}
+            memberId={currentUserMembership.id}
+            contributionAmount={chama.contribution_amount}
           />
         )}
 
-        {/* Show turn information to all members (only when active) */}
-        {isMember && !isMyTurn && currentTurnMemberId && isActive && (
+        {/* Status Messages for Non-Active States */}
+        {isMember && isPending && (
           <Card>
             <CardContent className="pt-6">
-              <div className="text-center space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  {approvedMembers.find(m => m.id === currentTurnMemberId)?.profiles.full_name}'s turn to withdraw
-                </p>
-                {nextTurnDates[currentUserMembership.id] && (
-                  <p className="text-lg font-semibold text-primary">
-                    Your turn: {nextTurnDates[currentUserMembership.id].toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="font-medium">Chama Not Started Yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Withdrawals will be available once the manager starts the Chama. 
+                    The chama needs at least {chama.min_members || 5} members to begin.
                   </p>
-                )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {isMember && isCycleComplete && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                <div>
+                  <p className="font-medium text-yellow-700 dark:text-yellow-400">Cycle Complete</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    The current cycle has completed. Withdrawals will resume when a new cycle begins.
+                    Check the rejoin request section above if you'd like to participate in the next cycle.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!currentUserMembership && !isAdmin && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Users className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="font-medium">Not a Member</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    You are not a member of this Chama. Request to join to participate in 
+                    contributions and withdrawals.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {currentUserMembership && currentUserMembership.approval_status === 'pending' && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-yellow-600 mt-0.5" />
+                <div>
+                  <p className="font-medium text-yellow-700 dark:text-yellow-400">Pending Approval</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Your membership request is pending approval by the manager. 
+                    Once approved, you'll be added to the payout queue.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -484,8 +595,9 @@ const ChamaDetail = () => {
         {/* Tabs - Only visible to approved members and admins */}
         {hasViewAccess && (
           <Tabs defaultValue="dashboard" className="w-full">
-            <TabsList className={`grid w-full ${isManager ? 'grid-cols-4' : 'grid-cols-3'}`}>
+            <TabsList className={`grid w-full ${isManager ? 'grid-cols-5' : 'grid-cols-4'}`}>
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="transparency">Transparency</TabsTrigger>
               {isManager && <TabsTrigger value="payments">Payments</TabsTrigger>}
               <TabsTrigger value="members">Members</TabsTrigger>
               <TabsTrigger value="details">Details</TabsTrigger>
@@ -502,6 +614,13 @@ const ChamaDetail = () => {
                   </CardContent>
                 </Card>
               )}
+            </TabsContent>
+
+            <TabsContent value="transparency">
+              <PaymentTransparency
+                chamaId={chama.id}
+                contributionAmount={chama.contribution_amount}
+              />
             </TabsContent>
 
             {isManager && (
