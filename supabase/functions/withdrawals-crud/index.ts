@@ -456,7 +456,7 @@ serve(async (req) => {
     // PATCH / - Admin approval/rejection
     if (req.method === 'PATCH') {
       const body = await req.json();
-      const { withdrawal_id, status, rejection_reason, payment_reference } = body;
+      const { withdrawal_id, status, rejection_reason, payment_reference, skip_to_next } = body;
 
       if (!withdrawal_id) {
         return new Response(JSON.stringify({ 
@@ -468,7 +468,7 @@ serve(async (req) => {
         });
       }
 
-      console.log('Updating withdrawal status:', { withdrawal_id, status });
+      console.log('Updating withdrawal status:', { withdrawal_id, status, skip_to_next });
 
       // Verify admin role
       const { data: adminRole } = await supabaseClient
@@ -486,7 +486,7 @@ serve(async (req) => {
       }
 
       // Get the withdrawal with payment method details
-      const { data: existingWithdrawal, error: fetchError } = await supabaseClient
+      const { data: existingWithdrawal, error: fetchError } = await supabaseAdmin
         .from('withdrawals')
         .select(`
           *,
@@ -507,8 +507,267 @@ serve(async (req) => {
         });
       }
 
-      // Update withdrawal status
-      const { data: withdrawal, error } = await supabaseClient
+      // Handle rejection with skip-to-next logic
+      if (status === 'rejected' && skip_to_next && existingWithdrawal.chama_id) {
+        console.log('Processing rejection with skip-to-next for chama:', existingWithdrawal.chama_id);
+        
+        // Get the rejected member
+        const { data: rejectedMember } = await supabaseAdmin
+          .from('chama_members')
+          .select('id, order_index, user_id')
+          .eq('chama_id', existingWithdrawal.chama_id)
+          .eq('user_id', existingWithdrawal.requested_by)
+          .single();
+
+        if (rejectedMember) {
+          // Find next eligible member
+          const { data: nextMembers } = await supabaseAdmin
+            .from('chama_members')
+            .select(`
+              id, 
+              order_index, 
+              user_id, 
+              missed_payments_count, 
+              balance_deficit,
+              first_payment_completed,
+              profiles:user_id(full_name, phone)
+            `)
+            .eq('chama_id', existingWithdrawal.chama_id)
+            .eq('approval_status', 'approved')
+            .eq('status', 'active')
+            .eq('first_payment_completed', true)
+            .gt('order_index', rejectedMember.order_index)
+            .order('order_index', { ascending: true });
+
+          let nextEligibleMember = null;
+          
+          // Find first member with no payment issues
+          for (const member of nextMembers || []) {
+            if ((member.missed_payments_count || 0) === 0 && (Number(member.balance_deficit) || 0) === 0) {
+              nextEligibleMember = member;
+              break;
+            }
+          }
+
+          // If no eligible found after, wrap around
+          if (!nextEligibleMember) {
+            const { data: firstMembers } = await supabaseAdmin
+              .from('chama_members')
+              .select(`
+                id, 
+                order_index, 
+                user_id, 
+                missed_payments_count, 
+                balance_deficit,
+                first_payment_completed,
+                profiles:user_id(full_name, phone)
+              `)
+              .eq('chama_id', existingWithdrawal.chama_id)
+              .eq('approval_status', 'approved')
+              .eq('status', 'active')
+              .eq('first_payment_completed', true)
+              .lt('order_index', rejectedMember.order_index)
+              .order('order_index', { ascending: true });
+
+            for (const member of firstMembers || []) {
+              if ((member.missed_payments_count || 0) === 0 && (Number(member.balance_deficit) || 0) === 0) {
+                nextEligibleMember = member;
+                break;
+              }
+            }
+          }
+
+          if (nextEligibleMember) {
+            const originalRejectedIndex = rejectedMember.order_index;
+            const originalNextIndex = nextEligibleMember.order_index;
+
+            // Swap positions
+            await supabaseAdmin
+              .from('chama_members')
+              .update({
+                order_index: originalNextIndex,
+                original_order_index: originalRejectedIndex,
+                position_swapped_at: new Date().toISOString(),
+                swapped_with_member_id: nextEligibleMember.id,
+                was_skipped: true,
+                skipped_at: new Date().toISOString(),
+                skip_reason: rejection_reason || 'Payment issues detected'
+              })
+              .eq('id', rejectedMember.id);
+
+            await supabaseAdmin
+              .from('chama_members')
+              .update({
+                order_index: originalRejectedIndex,
+                original_order_index: originalNextIndex,
+                position_swapped_at: new Date().toISOString(),
+                swapped_with_member_id: rejectedMember.id
+              })
+              .eq('id', nextEligibleMember.id);
+
+            // Record in payout_skips
+            await supabaseAdmin
+              .from('payout_skips')
+              .insert({
+                chama_id: existingWithdrawal.chama_id,
+                member_id: rejectedMember.id,
+                skip_reason: rejection_reason || 'Admin rejected withdrawal',
+                rescheduled_to_position: originalNextIndex,
+                swap_performed: true,
+                swapped_with_member_id: nextEligibleMember.id,
+                original_withdrawal_id: withdrawal_id
+              });
+
+            // Get next member's payment method
+            const { data: nextPaymentMethod } = await supabaseAdmin
+              .from('payment_methods')
+              .select('*')
+              .eq('user_id', nextEligibleMember.user_id)
+              .eq('is_default', true)
+              .maybeSingle();
+
+            // Create new withdrawal for next member
+            const { data: newWithdrawal, error: newWdError } = await supabaseAdmin
+              .from('withdrawals')
+              .insert({
+                chama_id: existingWithdrawal.chama_id,
+                requested_by: nextEligibleMember.user_id,
+                amount: existingWithdrawal.amount,
+                commission_amount: 0,
+                net_amount: existingWithdrawal.amount,
+                payment_method_id: nextPaymentMethod?.id,
+                payment_method_type: nextPaymentMethod?.method_type,
+                status: nextPaymentMethod?.method_type === 'mpesa' ? 'approved' : 'pending',
+                notes: `Auto-created after rejection of previous member. Original position #${originalRejectedIndex}`
+              })
+              .select()
+              .single();
+
+            // Update original payout_skips with new withdrawal id
+            if (newWithdrawal) {
+              await supabaseAdmin
+                .from('payout_skips')
+                .update({ new_withdrawal_id: newWithdrawal.id })
+                .eq('original_withdrawal_id', withdrawal_id)
+                .eq('member_id', rejectedMember.id);
+
+              // If M-Pesa and auto-approved, trigger B2C payout
+              if (nextPaymentMethod?.method_type === 'mpesa' && nextPaymentMethod.phone_number) {
+                console.log('Triggering B2C payout for next eligible member');
+                
+                const supabaseUrl = Deno.env.get('SUPABASE_URL');
+                const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+                
+                fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${serviceRoleKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    withdrawal_id: newWithdrawal.id,
+                    phone_number: nextPaymentMethod.phone_number,
+                    amount: existingWithdrawal.amount
+                  })
+                }).then(async (res) => {
+                  const result = await res.json();
+                  console.log('B2C payout triggered for next member:', result);
+                }).catch((err) => {
+                  console.error('Failed to trigger B2C payout for next member:', err);
+                });
+              }
+
+              // Send SMS notifications
+              const supabaseUrl = Deno.env.get('SUPABASE_URL');
+              const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+              // Notify rejected member
+              const rejectedProfile = await supabaseAdmin
+                .from('profiles')
+                .select('phone, full_name')
+                .eq('id', rejectedMember.user_id)
+                .single();
+
+              if (rejectedProfile?.data?.phone) {
+                fetch(`${supabaseUrl}/functions/v1/send-transactional-sms`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${serviceRoleKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    phone: rejectedProfile.data.phone,
+                    message: `Your withdrawal request has been declined due to payment issues. You have been moved to position #${originalNextIndex}. Please clear any outstanding payments.`,
+                    event_type: 'withdrawal_rejected'
+                  })
+                }).catch(err => console.error('Failed to send rejection SMS:', err));
+              }
+
+              // Notify next member
+              const nextProfile = nextEligibleMember.profiles as any;
+              if (nextProfile?.phone) {
+                fetch(`${supabaseUrl}/functions/v1/send-transactional-sms`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${serviceRoleKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    phone: nextProfile.phone,
+                    message: `Good news! You are now eligible for payout. Your withdrawal of KES ${existingWithdrawal.amount.toLocaleString()} is being processed.`,
+                    event_type: 'withdrawal_next_in_line'
+                  })
+                }).catch(err => console.error('Failed to send next-in-line SMS:', err));
+              }
+            }
+
+            // Log audit trail
+            await supabaseAdmin
+              .from('audit_logs')
+              .insert({
+                user_id: user.id,
+                action: 'withdrawal_rejected_with_swap',
+                table_name: 'withdrawals',
+                record_id: withdrawal_id,
+                old_values: { 
+                  rejected_member_position: originalRejectedIndex,
+                  next_member_position: originalNextIndex
+                },
+                new_values: { 
+                  rejected_member_new_position: originalNextIndex,
+                  next_member_new_position: originalRejectedIndex,
+                  new_withdrawal_id: newWithdrawal?.id
+                }
+              });
+          }
+        }
+
+        // Update original withdrawal as rejected
+        const { data: withdrawal, error } = await supabaseAdmin
+          .from('withdrawals')
+          .update({
+            status: 'rejected',
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: user.id,
+            rejection_reason: rejection_reason || 'Payment issues detected'
+          })
+          .eq('id', withdrawal_id)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return new Response(JSON.stringify({ 
+          data: withdrawal,
+          message: 'Withdrawal rejected. Positions swapped and next eligible member notified.',
+          swapped: true
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Standard update (approval or rejection without swap)
+      const { data: withdrawal, error } = await supabaseAdmin
         .from('withdrawals')
         .update({
           status,
@@ -516,10 +775,11 @@ serve(async (req) => {
           reviewed_by: user.id,
           rejection_reason: status === 'rejected' ? rejection_reason : null,
           payment_reference: status === 'completed' ? payment_reference : null,
+          completed_at: status === 'completed' ? new Date().toISOString() : null
         })
         .eq('id', withdrawal_id)
         .select()
-        .maybeSingle();
+        .single();
 
       if (error) throw error;
 
@@ -532,11 +792,9 @@ serve(async (req) => {
         if (phoneNumber) {
           console.log('Triggering automatic M-Pesa B2C payout for:', withdrawal_id);
           
-          // Trigger B2C payout asynchronously
           const supabaseUrl = Deno.env.get('SUPABASE_URL');
           const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
           
-          // Fire and forget - don't wait for B2C to complete
           fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
             method: 'POST',
             headers: {
@@ -554,6 +812,28 @@ serve(async (req) => {
           }).catch((err) => {
             console.error('Failed to trigger B2C payout:', err);
           });
+
+          // Send approval SMS
+          const { data: requesterProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('phone')
+            .eq('id', existingWithdrawal.requested_by)
+            .single();
+
+          if (requesterProfile?.phone) {
+            fetch(`${supabaseUrl}/functions/v1/send-transactional-sms`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${serviceRoleKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                phone: requesterProfile.phone,
+                message: `Your withdrawal of KES ${existingWithdrawal.net_amount.toLocaleString()} has been approved and is being sent to your M-Pesa.`,
+                event_type: 'withdrawal_approved'
+              })
+            }).catch(err => console.error('Failed to send approval SMS:', err));
+          }
 
           return new Response(JSON.stringify({ 
             data: withdrawal,
