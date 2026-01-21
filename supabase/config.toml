@@ -119,3 +119,6 @@ verify_jwt = true
 
 [functions.payment-config]
 verify_jwt = false
+
+[functions.retry-failed-payouts]
+verify_jwt = false

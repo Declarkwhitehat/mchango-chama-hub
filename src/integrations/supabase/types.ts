@@ -2295,11 +2295,14 @@ export type Database = {
       withdrawals: {
         Row: {
           amount: number
+          b2c_attempt_count: number | null
+          b2c_error_details: Json | null
           chama_id: string | null
           commission_amount: number
           completed_at: string | null
           created_at: string
           id: string
+          last_b2c_attempt_at: string | null
           mchango_id: string | null
           net_amount: number
           notes: string | null
@@ -2318,11 +2321,14 @@ export type Database = {
         }
         Insert: {
           amount: number
+          b2c_attempt_count?: number | null
+          b2c_error_details?: Json | null
           chama_id?: string | null
           commission_amount?: number
           completed_at?: string | null
           created_at?: string
           id?: string
+          last_b2c_attempt_at?: string | null
           mchango_id?: string | null
           net_amount: number
           notes?: string | null
@@ -2341,11 +2347,14 @@ export type Database = {
         }
         Update: {
           amount?: number
+          b2c_attempt_count?: number | null
+          b2c_error_details?: Json | null
           chama_id?: string | null
           commission_amount?: number
           completed_at?: string | null
           created_at?: string
           id?: string
+          last_b2c_attempt_at?: string | null
           mchango_id?: string | null
           net_amount?: number
           notes?: string | null

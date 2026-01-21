@@ -320,13 +320,18 @@ Deno.serve(async (req) => {
 
       // Create withdrawal request
       if (payoutAmount > 0) {
-        const withdrawalStatus = actualBeneficiary.requires_admin_verification ? 'pending' : 'approved';
+        // Auto-approve if M-Pesa and no admin verification required
+        const canAutoApprove = paymentMethod?.method_type === 'mpesa' && 
+                               !actualBeneficiary.requires_admin_verification &&
+                               (actualBeneficiary.missed_payments_count || 0) === 0;
+        
+        const withdrawalStatus = canAutoApprove ? 'approved' : 'pending';
         
         const withdrawalNotes = wasSkipped 
           ? `Redirected payout - Original recipient (${scheduledBeneficiary.member_code}) skipped due to incomplete contributions. ${payoutType} (${paidCount}/${totalMembers} members paid)`
           : `Daily payout - ${payoutType} (${paidCount}/${totalMembers} members paid)`;
 
-        const { error: withdrawalError } = await supabase
+        const { data: newWithdrawal, error: withdrawalError } = await supabase
           .from('withdrawals')
           .insert({
             chama_id: chama.id,
@@ -339,8 +344,11 @@ Deno.serve(async (req) => {
             payment_method_type: paymentMethod?.method_type,
             notes: withdrawalNotes,
             requested_at: new Date().toISOString(),
+            b2c_attempt_count: 0,
             ...(withdrawalStatus === 'approved' ? { reviewed_at: new Date().toISOString() } : {})
-          });
+          })
+          .select('id')
+          .single();
 
         if (withdrawalError) {
           console.error('Error creating withdrawal:', withdrawalError);
@@ -355,6 +363,64 @@ Deno.serve(async (req) => {
           p_group_id: chama.id,
           p_description: `Daily payout commission - ${chama.name}`
         });
+
+        // ========== TRIGGER AUTOMATIC B2C PAYOUT ==========
+        if (canAutoApprove && newWithdrawal && paymentMethod?.phone_number) {
+          console.log(`🚀 Triggering automatic B2C payout for ${actualBeneficiary.member_code}`);
+          
+          // Send processing SMS
+          const beneficiaryPhone = actualBeneficiary.profiles?.phone || paymentMethod.phone_number;
+          if (beneficiaryPhone) {
+            await sendSMS(beneficiaryPhone, 
+              `💰 Your chama "${chama.name}" payout of KES ${payoutAmount.toFixed(2)} is being processed. You should receive it within 2 minutes.`
+            );
+          }
+
+          // Trigger B2C payout
+          try {
+            const b2cResponse = await fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                withdrawal_id: newWithdrawal.id,
+                phone_number: paymentMethod.phone_number,
+                amount: payoutAmount
+              })
+            });
+
+            const b2cResult = await b2cResponse.json();
+            
+            if (b2cResponse.ok && b2cResult.success) {
+              console.log(`✅ B2C initiated: ${b2cResult.conversation_id}`);
+            } else {
+              console.error(`⚠️ B2C failed, will be retried:`, b2cResult);
+              // Update withdrawal status for retry
+              await supabase
+                .from('withdrawals')
+                .update({
+                  status: 'pending_retry',
+                  b2c_attempt_count: 1,
+                  last_b2c_attempt_at: new Date().toISOString(),
+                  b2c_error_details: { error: b2cResult.error || 'B2C initiation failed' }
+                })
+                .eq('id', newWithdrawal.id);
+            }
+          } catch (b2cError: any) {
+            console.error(`⚠️ B2C request error:`, b2cError);
+            await supabase
+              .from('withdrawals')
+              .update({
+                status: 'pending_retry',
+                b2c_attempt_count: 1,
+                last_b2c_attempt_at: new Date().toISOString(),
+                b2c_error_details: { error: b2cError.message }
+              })
+              .eq('id', newWithdrawal.id);
+          }
+        }
       }
 
       // Update cycle
