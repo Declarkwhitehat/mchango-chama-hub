@@ -49,7 +49,7 @@ const ChamaList = () => {
           profiles!chama_created_by_fkey(full_name),
           chama_members(approval_status)
         `)
-        .eq('status', 'active')
+        .in('status', ['pending', 'active'])
         .eq('is_public', true);
 
       // Apply sorting
@@ -172,6 +172,9 @@ const ChamaList = () => {
                       <Badge>
                         <Users className="h-3 w-3 mr-1" />
                         {approvedMembers}/{chama.max_members}
+                      </Badge>
+                      <Badge variant={chama.status === 'pending' ? 'secondary' : 'default'}>
+                        {chama.status === 'pending' ? 'Forming' : 'Active'}
                       </Badge>
                     </div>
                     <CardTitle className="line-clamp-1">{chama.name}</CardTitle>
