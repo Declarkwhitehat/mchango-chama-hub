@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import * as React from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -29,13 +30,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -45,35 +46,49 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+  const fetchProfile = async (userId: string): Promise<void> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (!error && data) {
-      setProfile(data);
+      if (!error && data) {
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err);
     }
   };
 
-  const refreshProfile = async () => {
+  const refreshProfile = async (): Promise<void> => {
     if (user) {
       await fetchProfile(user.id);
     }
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener first
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
+      
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+      
+      if (newSession?.user) {
+        // Defer profile fetch to avoid blocking
+        setTimeout(() => {
+          if (mounted) {
+            fetchProfile(newSession.user.id);
+          }
+        }, 0);
       } else {
         setProfile(null);
       }
@@ -81,16 +96,22 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     });
 
     // Then get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      if (!mounted) return;
+      
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+      
+      if (initialSession?.user) {
+        fetchProfile(initialSession.user.id);
       }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Session Timeout Protection
@@ -123,7 +144,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     return () => clearInterval(checkSessionExpiry);
   }, [session]);
 
-  const signIn = async (emailOrPhone: string, password: string) => {
+  const signIn = async (emailOrPhone: string, password: string): Promise<{ error: any }> => {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -178,7 +199,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     }
   };
 
-  const signUp = async (email: string, password: string, userData: any) => {
+  const signUp = async (email: string, password: string, userData: any): Promise<{ error: any }> => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -189,7 +210,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     return { error };
   };
 
-  const signOut = async () => {
+  const signOut = async (): Promise<{ error: any }> => {
     const { error } = await supabase.auth.signOut();
     return { error };
   };
@@ -205,5 +226,9 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     refreshProfile,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
