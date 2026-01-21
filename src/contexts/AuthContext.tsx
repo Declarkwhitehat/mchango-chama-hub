@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -27,20 +27,11 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  session: null,
-  profile: null,
-  loading: true,
-  signIn: async () => ({ error: null }),
-  signUp: async () => ({ error: null }),
-  signOut: async () => ({ error: null }),
-  refreshProfile: async () => {},
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
@@ -50,7 +41,7 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-export const AuthProvider = ({ children }: AuthProviderProps) => {
+export function AuthProvider({ children }: AuthProviderProps): React.ReactElement {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -75,17 +66,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth changes
+    // Set up auth state listener first
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -99,10 +80,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setLoading(false);
     });
 
+    // Then get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
+      setLoading(false);
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
-  // Phase 2: Session Timeout Protection
+  // Session Timeout Protection
   useEffect(() => {
     if (!session) return;
 
@@ -203,7 +194,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return { error };
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     session,
     profile,
@@ -215,4 +206,4 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+}
