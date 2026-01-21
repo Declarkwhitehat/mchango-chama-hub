@@ -54,7 +54,16 @@ serve(async (req) => {
         });
       }
 
-      const { data, error } = await supabaseClient
+      // Use service role to bypass RLS - invite validation is public
+      // but chama table has RLS policies that may block access to pending/private chamas
+      const adminClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      console.log('Validating invite code:', code.toUpperCase());
+
+      const { data, error } = await adminClient
         .from('chama_invite_codes')
         .select(`
           *,
@@ -64,13 +73,22 @@ serve(async (req) => {
             slug,
             description,
             contribution_amount,
-            contribution_frequency
+            contribution_frequency,
+            max_members,
+            status
           )
         `)
         .eq('code', code.toUpperCase())
         .eq('is_active', true)
         .is('used_by', null)
         .single();
+
+      console.log('Validate code query result:', { 
+        hasData: !!data, 
+        hasChama: !!data?.chama,
+        chamaStatus: data?.chama?.status,
+        error: error?.message 
+      });
 
       if (error || !data) {
         return new Response(JSON.stringify({ 
@@ -79,6 +97,18 @@ serve(async (req) => {
           message: 'This invite code is not valid. Please check with the chama manager.'
         }), {
           status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Check if chama is accepting new members
+      if (data.chama?.status === 'completed' || data.chama?.status === 'deleted') {
+        return new Response(JSON.stringify({ 
+          error: 'This Chama is no longer accepting new members',
+          valid: false,
+          message: 'This Chama has been completed or removed and is no longer accepting new members.'
+        }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
