@@ -2,13 +2,16 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info } from "lucide-react";
+import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity } from "lucide-react";
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { FloatingActionMenu } from "@/components/FloatingActionMenu";
+import { cn } from "@/lib/utils";
 
 interface LayoutProps {
   children: ReactNode;
@@ -40,6 +43,19 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
     setIsAdmin(!!data);
   };
 
+  const navItems = [
+    { href: "/home", icon: Home, label: "Home" },
+    { href: "/mchango", icon: Heart, label: "Campaigns" },
+    { href: "/chama", icon: Users, label: "Chamas" },
+    { href: "/activity", icon: Activity, label: "Activity" },
+    { href: "/profile", icon: User, label: "Profile" },
+  ];
+
+  const isActiveRoute = (path: string) => {
+    if (path === "/home") return location.pathname === "/home";
+    return location.pathname.startsWith(path);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -61,7 +77,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center">
                   <span className="text-primary-foreground font-bold text-sm">C</span>
                 </div>
-                <span className="font-bold text-foreground">Chama & Mchango</span>
+                <span className="font-bold text-foreground hidden sm:inline">Chama & Mchango</span>
               </div>
             </Link>
           </div>
@@ -75,45 +91,66 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-64">
-              <nav className="flex flex-col gap-4 mt-8">
+            <SheetContent side="right" className="w-72">
+              <nav className="flex flex-col gap-2 mt-8">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2">Navigation</p>
                 <Link to="/home">
-                  <Button variant="ghost" className="w-full justify-start">
+                  <Button variant={isActiveRoute("/home") ? "secondary" : "ghost"} className="w-full justify-start">
                     <Home className="mr-2 h-4 w-4" />
-                    Home
+                    Dashboard
                   </Button>
                 </Link>
                 <Link to="/mchango">
-                  <Button variant="ghost" className="w-full justify-start">
+                  <Button variant={isActiveRoute("/mchango") ? "secondary" : "ghost"} className="w-full justify-start">
                     <Heart className="mr-2 h-4 w-4" />
                     Browse Campaigns
                   </Button>
                 </Link>
                 <Link to="/chama">
-                  <Button variant="ghost" className="w-full justify-start">
+                  <Button variant={isActiveRoute("/chama") ? "secondary" : "ghost"} className="w-full justify-start">
                     <Users className="mr-2 h-4 w-4" />
                     Browse Chamas
                   </Button>
                 </Link>
+                <Link to="/organizations">
+                  <Button variant={isActiveRoute("/organizations") ? "secondary" : "ghost"} className="w-full justify-start">
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Organizations
+                  </Button>
+                </Link>
+                <Link to="/activity">
+                  <Button variant={isActiveRoute("/activity") ? "secondary" : "ghost"} className="w-full justify-start">
+                    <Activity className="mr-2 h-4 w-4" />
+                    Activity
+                  </Button>
+                </Link>
+                
+                <div className="border-t border-border my-3" />
+                <p className="text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2">Account</p>
+                
                 <Link to="/profile">
-                  <Button variant="ghost" className="w-full justify-start">
+                  <Button variant={isActiveRoute("/profile") ? "secondary" : "ghost"} className="w-full justify-start">
                     <User className="mr-2 h-4 w-4" />
                     Profile
                   </Button>
                 </Link>
                 <Link to="/about">
-                  <Button variant="ghost" className="w-full justify-start">
+                  <Button variant={isActiveRoute("/about") ? "secondary" : "ghost"} className="w-full justify-start">
                     <Info className="mr-2 h-4 w-4" />
                     About Us
                   </Button>
                 </Link>
                 {isAdmin && (
-                  <Link to="/admin">
-                    <Button variant="ghost" className="w-full justify-start">
-                      <Shield className="mr-2 h-4 w-4" />
-                      Admin Panel
-                    </Button>
-                  </Link>
+                  <>
+                    <div className="border-t border-border my-3" />
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2">Admin</p>
+                    <Link to="/admin">
+                      <Button variant={isActiveRoute("/admin") ? "secondary" : "ghost"} className="w-full justify-start">
+                        <Shield className="mr-2 h-4 w-4" />
+                        Admin Panel
+                      </Button>
+                    </Link>
+                  </>
                 )}
               </nav>
             </SheetContent>
@@ -121,23 +158,39 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
         </div>
       </header>
 
+      {/* Breadcrumbs */}
+      <Breadcrumbs />
+
       {/* Main Content */}
-      <main className="flex-1">
+      <main className="flex-1 pb-20">
         {children}
       </main>
 
-      {/* Bottom Navigation (only on home) */}
-      {isHomePage && (
-        <nav className="sticky bottom-0 border-t border-border bg-card/95 backdrop-blur">
-          <div className="container flex h-16 items-center justify-around px-4">
-            <Link to="/home" className="flex flex-col items-center gap-1">
-              <Home className="h-5 w-5 text-primary" />
-              <span className="text-xs text-primary font-medium">Home</span>
-            </Link>
-            <Link to="/profile" className="flex flex-col items-center gap-1">
-              <User className="h-5 w-5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Profile</span>
-            </Link>
+      {/* Floating Action Menu */}
+      <FloatingActionMenu />
+
+      {/* Bottom Navigation - Always visible for authenticated users */}
+      {user && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+          <div className="container flex h-16 items-center justify-around px-2 max-w-lg mx-auto">
+            {navItems.map((item) => {
+              const isActive = isActiveRoute(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg transition-colors min-w-[60px]",
+                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                  <span className={cn("text-[10px]", isActive ? "font-medium" : "font-normal")}>
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </nav>
       )}

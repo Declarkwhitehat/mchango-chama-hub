@@ -125,6 +125,10 @@ const MchangoList = () => {
       <div className="container px-4 py-8 max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-4">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 rounded-full mb-2">
+            <Heart className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-primary">Campaigns</span>
+          </div>
           <h1 className="text-4xl font-bold">Mchango Campaigns</h1>
           <p className="text-muted-foreground">
             Support meaningful causes and make a difference in people's lives

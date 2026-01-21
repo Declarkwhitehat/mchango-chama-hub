@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Header } from "@/components/Header";
+import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,7 +12,6 @@ import {
   TrendingUp,
   Users,
   Heart,
-  PiggyBank,
   ArrowUpRight,
   ArrowDownLeft,
   Calendar
@@ -21,7 +20,7 @@ import { format } from "date-fns";
 
 interface Transaction {
   id: string;
-  type: 'chama' | 'mchango' | 'savings' | 'withdrawal';
+  type: 'chama' | 'mchango' | 'withdrawal';
   amount: number;
   status: string;
   created_at: string;
@@ -35,11 +34,9 @@ export default function Activity() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [chamaTransactions, setChamaTransactions] = useState<any[]>([]);
   const [mchangoTransactions, setMchangoTransactions] = useState<any[]>([]);
-  const [savingsTransactions, setSavingsTransactions] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [chamaNames, setChamaNames] = useState<Map<string, string>>(new Map());
   const [mchangoNames, setMchangoNames] = useState<Map<string, string>>(new Map());
-  const [savingsGroupNames, setSavingsGroupNames] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     fetchAllTransactions();
@@ -68,30 +65,6 @@ export default function Activity() {
 
       if (mchangoError) throw mchangoError;
 
-      // Fetch savings group member info
-      const { data: memberData, error: memberError } = await supabase
-        .from("saving_group_members")
-        .select("id, group_id")
-        .eq("user_id", user.id);
-
-      if (memberError) throw memberError;
-
-      const memberIds = memberData?.map(m => m.id) || [];
-      const groupIds = memberData?.map(m => m.group_id) || [];
-
-      // Fetch savings deposits
-      let savingsData: any[] = [];
-      if (memberIds.length > 0) {
-        const { data, error: savingsError } = await (supabase as any)
-          .from("saving_group_deposits")
-          .select("*")
-          .in("saved_for_member_id", memberIds)
-          .order("created_at", { ascending: false });
-
-        if (savingsError) throw savingsError;
-        savingsData = data || [];
-      }
-
       // Fetch withdrawals
       const { data: withdrawalData, error: withdrawalError } = await (supabase as any)
         .from("withdrawals")
@@ -107,7 +80,6 @@ export default function Activity() {
 
       const chamaNameMap = new Map<string, string>();
       const mchangoNameMap = new Map<string, string>();
-      const savingsNameMap = new Map<string, string>();
 
       if (chamaIds.length > 0) {
         const { data: chamasData } = await (supabase as any)
@@ -125,27 +97,10 @@ export default function Activity() {
         mchangosData?.forEach((m: any) => mchangoNameMap.set(m.id, m.title));
       }
 
-      if (groupIds.length > 0) {
-        const { data: groupsData } = await (supabase as any)
-          .from("saving_groups")
-          .select("id, name")
-          .in("id", groupIds);
-        groupsData?.forEach((g: any) => savingsNameMap.set(g.id, g.name));
-      }
-
-      // Map member IDs to group names for savings deposits
-      const memberToGroupName = new Map<string, string>();
-      memberData?.forEach(m => {
-        const groupName = savingsNameMap.get(m.group_id);
-        if (groupName) memberToGroupName.set(m.id, groupName);
-      });
-
       setChamaNames(chamaNameMap);
       setMchangoNames(mchangoNameMap);
-      setSavingsGroupNames(memberToGroupName);
       setChamaTransactions(chamaData || []);
       setMchangoTransactions(mchangoData || []);
-      setSavingsTransactions(savingsData);
       setWithdrawals(withdrawalData || []);
 
       // Combine all transactions
@@ -167,15 +122,6 @@ export default function Activity() {
           created_at: t.created_at,
           description: `Campaign Donation - ${mchangoNameMap.get(t.mchango_id) || 'Unknown'}`,
           reference: t.payment_reference
-        })),
-        ...savingsData.map((t: any) => ({
-          id: t.id,
-          type: 'savings' as const,
-          amount: t.net_amount,
-          status: 'completed',
-          created_at: t.created_at,
-          description: `Savings Deposit - ${memberToGroupName.get(t.saved_for_member_id) || 'Unknown'}`,
-          reference: t.mpesa_receipt_number || 'N/A'
         })),
         ...(withdrawalData || []).map((t: any) => ({
           id: t.id,
@@ -205,7 +151,6 @@ export default function Activity() {
     switch (type) {
       case 'chama': return <Users className="h-4 w-4" />;
       case 'mchango': return <Heart className="h-4 w-4" />;
-      case 'savings': return <PiggyBank className="h-4 w-4" />;
       case 'withdrawal': return <ArrowDownLeft className="h-4 w-4" />;
       default: return <DollarSign className="h-4 w-4" />;
     }
@@ -213,10 +158,9 @@ export default function Activity() {
 
   const getTypeBadge = (type: string) => {
     const variants: Record<string, string> = {
-      chama: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-      mchango: 'bg-pink-500/10 text-pink-500 border-pink-500/20',
-      savings: 'bg-green-500/10 text-green-500 border-green-500/20',
-      withdrawal: 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+      chama: 'bg-primary/10 text-primary border-primary/20',
+      mchango: 'bg-secondary/10 text-secondary border-secondary/20',
+      withdrawal: 'bg-muted text-muted-foreground border-border'
     };
     return (
       <Badge variant="outline" className={variants[type]}>
@@ -227,12 +171,12 @@ export default function Activity() {
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, string> = {
-      CONFIRMED: 'bg-green-500/10 text-green-500 border-green-500/20',
-      completed: 'bg-green-500/10 text-green-500 border-green-500/20',
-      PENDING: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-      pending: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-      FAILED: 'bg-red-500/10 text-red-500 border-red-500/20',
-      failed: 'bg-red-500/10 text-red-500 border-red-500/20'
+      CONFIRMED: 'bg-primary/10 text-primary border-primary/20',
+      completed: 'bg-primary/10 text-primary border-primary/20',
+      PENDING: 'bg-secondary/10 text-secondary border-secondary/20',
+      pending: 'bg-secondary/10 text-secondary border-secondary/20',
+      FAILED: 'bg-destructive/10 text-destructive border-destructive/20',
+      failed: 'bg-destructive/10 text-destructive border-destructive/20'
     };
     return (
       <Badge variant="outline" className={variants[status] || ''}>
@@ -254,19 +198,17 @@ export default function Activity() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="flex items-center justify-center py-12 mt-16">
+      <Layout>
+        <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <div className="container mx-auto px-4 py-8 mt-16 max-w-7xl">
+    <Layout>
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -330,11 +272,10 @@ export default function Activity() {
 
         {/* Transactions Tabs */}
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all">All ({transactions.length})</TabsTrigger>
             <TabsTrigger value="chama">Chama ({chamaTransactions.length})</TabsTrigger>
             <TabsTrigger value="mchango">Campaigns ({mchangoTransactions.length})</TabsTrigger>
-            <TabsTrigger value="savings">Savings ({savingsTransactions.length})</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals ({withdrawals.length})</TabsTrigger>
           </TabsList>
 
@@ -476,50 +417,6 @@ export default function Activity() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="savings">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PiggyBank className="h-5 w-5" />
-                  Savings Deposits
-                </CardTitle>
-                <CardDescription>All your savings group deposits</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {savingsTransactions.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No savings deposits found</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Savings Group</TableHead>
-                          <TableHead>Gross Amount</TableHead>
-                          <TableHead>Net Amount</TableHead>
-                          <TableHead>Receipt</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {savingsTransactions.map((transaction: any) => (
-                          <TableRow key={transaction.id}>
-                            <TableCell>{format(new Date(transaction.created_at), 'MMM dd, yyyy HH:mm')}</TableCell>
-                            <TableCell>{savingsGroupNames.get(transaction.saved_for_member_id) || 'Unknown'}</TableCell>
-                            <TableCell>KSh {(transaction.gross_amount || 0).toLocaleString()}</TableCell>
-                            <TableCell className="font-semibold">KSh {transaction.net_amount.toLocaleString()}</TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {transaction.mpesa_receipt_number || 'N/A'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="withdrawals">
             <Card>
               <CardHeader>
@@ -567,6 +464,6 @@ export default function Activity() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </Layout>
   );
 }
