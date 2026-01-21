@@ -15,13 +15,14 @@ import { PAYMENT_METHOD_LIMITS, formatPaymentMethodLabel } from "@/utils/payment
 
 interface PaymentMethod {
   id: string;
-  method_type: 'mpesa' | 'airtel_money' | 'bank_account';
+  method_type: 'mpesa' | 'bank_account';
   phone_number?: string;
   bank_name?: string;
   account_number?: string;
   account_name?: string;
   is_default: boolean;
   is_verified: boolean;
+  is_primary?: boolean;
 }
 
 const KENYAN_BANKS = [
@@ -46,7 +47,7 @@ export const PaymentMethodsManager = ({
   const [otpCode, setOtpCode] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
-  const [activeTab, setActiveTab] = useState<'mpesa' | 'airtel_money' | 'bank_account'>('mpesa');
+  const [activeTab, setActiveTab] = useState<'mpesa' | 'bank_account'>('mpesa');
 
   // Form states
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -114,9 +115,9 @@ export const PaymentMethodsManager = ({
         is_default: methods.length === 0,
       };
 
-      if (activeTab === 'mpesa' || activeTab === 'airtel_money') {
-        if (!phoneNumber.match(/^\+254\d{9}$/)) {
-          toast.error("Invalid phone number format. Use +254XXXXXXXXX");
+      if (activeTab === 'mpesa') {
+        if (!phoneNumber.match(/^\+254(7[0-9]|11[0-1])\d{7}$/)) {
+          toast.error("Invalid phone number. Only Safaricom numbers accepted.");
           return;
         }
 
@@ -166,7 +167,7 @@ export const PaymentMethodsManager = ({
   };
 
   const handleDeleteMethod = async (method: PaymentMethod) => {
-    if (method.method_type === 'mpesa' || method.method_type === 'airtel_money') {
+    if (method.method_type === 'mpesa') {
       // Send OTP to current number for verification
       const otpSent = await requestOTP(method.phone_number!, 'delete');
       if (!otpSent) return;
@@ -268,7 +269,7 @@ export const PaymentMethodsManager = ({
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription className="text-sm">
-          <strong>Daily Transaction Limits:</strong> M-Pesa & Airtel Money: KES 150,000 | Bank Account: KES 500,000
+          <strong>Daily Transaction Limits:</strong> M-Pesa: KES 150,000 | Bank Account: KES 500,000
         </AlertDescription>
       </Alert>
 
@@ -367,9 +368,8 @@ export const PaymentMethodsManager = ({
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
-              <TabsTrigger value="airtel_money">Airtel Money</TabsTrigger>
               <TabsTrigger value="bank_account">Bank</TabsTrigger>
             </TabsList>
 
@@ -377,30 +377,13 @@ export const PaymentMethodsManager = ({
               <Alert>
                 <Shield className="h-4 w-4" />
                 <AlertDescription className="text-xs">
-                  OTP will be sent to verify this number
+                  Only Safaricom numbers accepted. OTP will be sent to verify.
                 </AlertDescription>
               </Alert>
               <div className="space-y-2">
-                <Label>M-Pesa Phone Number</Label>
+                <Label>M-Pesa Phone Number (Safaricom Only)</Label>
                 <Input
-                  placeholder="+254XXXXXXXXX"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="airtel_money" className="space-y-4">
-              <Alert>
-                <Shield className="h-4 w-4" />
-                <AlertDescription className="text-xs">
-                  OTP will be sent to verify this number
-                </AlertDescription>
-              </Alert>
-              <div className="space-y-2">
-                <Label>Airtel Money Phone Number</Label>
-                <Input
-                  placeholder="+254XXXXXXXXX"
+                  placeholder="+254712345678"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                 />

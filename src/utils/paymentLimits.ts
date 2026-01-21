@@ -4,11 +4,6 @@ export const PAYMENT_METHOD_LIMITS = {
     label: 'M-Pesa',
     currency: 'KES'
   },
-  airtel_money: {
-    daily_limit: 150000,
-    label: 'Airtel Money',
-    currency: 'KES'
-  },
   bank_account: {
     daily_limit: 500000,
     label: 'Bank Account',

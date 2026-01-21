@@ -37,10 +37,20 @@ const loginSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
+// Safaricom prefixes
+const SAFARICOM_PREFIXES = ['70', '71', '72', '74', '75', '76', '79', '110', '111'];
+
+const isSafaricomNumber = (phone: string): boolean => {
+  const numberPart = phone.replace('+254', '');
+  return SAFARICOM_PREFIXES.some(prefix => numberPart.startsWith(prefix));
+};
+
 const signupSchema = z.object({
   full_name: z.string().min(2, "Full name is required").max(100),
   id_number: z.string().min(5, "Valid ID number is required").max(50),
-  phone: z.string().regex(/^\+\d{10,15}$/, "Phone must be in international format (e.g., +254712345678)"),
+  phone: z.string()
+    .regex(/^\+254\d{9}$/, "Phone must be in format +254XXXXXXXXX")
+    .refine(isSafaricomNumber, "Only Safaricom numbers are accepted for M-Pesa payouts"),
   email: z.string().email("Invalid email address").max(255),
   password: z
     .string()
