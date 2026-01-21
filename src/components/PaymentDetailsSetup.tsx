@@ -1,130 +1,80 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { PaymentMethodCard } from "./PaymentMethodCard";
-import { Loader2 } from "lucide-react";
-
-interface PaymentMethod {
-  id: string;
-  method_type: 'mpesa' | 'bank_account';
-  phone_number?: string;
-  bank_name?: string;
-  account_number?: string;
-  account_name?: string;
-  is_default: boolean;
-  is_primary?: boolean;
-}
-
-const KENYAN_BANKS = [
-  "KCB Bank",
-  "Equity Bank",
-  "Co-operative Bank",
-  "NCBA Bank",
-  "Absa Bank Kenya",
-  "Stanbic Bank",
-  "Standard Chartered",
-  "DTB (Diamond Trust Bank)",
-  "I&M Bank",
-  "Family Bank",
-  "CBA (Commercial Bank of Africa)",
-  "NIC Bank",
-  "Sidian Bank",
-  "Prime Bank",
-  "Gulf African Bank",
-  "First Community Bank",
-  "HFC (Housing Finance Company)",
-  "Consolidated Bank",
-  "Credit Bank",
-];
+import { Loader2, CheckCircle, Smartphone, Shield } from "lucide-react";
+import { PAYMENT_METHOD_LIMITS } from "@/utils/paymentLimits";
 
 export const PaymentDetailsSetup = ({ open, onComplete }: { open: boolean; onComplete: () => void }) => {
   const [loading, setLoading] = useState(false);
-  const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  const [activeTab, setActiveTab] = useState<'mpesa' | 'bank_account'>('mpesa');
+  const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
   const { toast } = useToast();
-
-  // Form states
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [accountName, setAccountName] = useState('');
 
   useEffect(() => {
     if (open) {
-      fetchMethods();
+      fetchUserProfile();
     }
   }, [open]);
 
-  const fetchMethods = async () => {
+  const fetchUserProfile = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('payment-methods/list');
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('phone, full_name')
+        .eq('id', user.id)
+        .single();
+
       if (error) throw error;
-      setMethods(data.methods || []);
+      setUserPhone(profile?.phone || null);
+      setUserName(profile?.full_name || "");
     } catch (error: any) {
-      console.error('Error fetching methods:', error);
+      console.error('Error fetching profile:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const addMethod = async () => {
-    setLoading(true);
-    try {
-      const methodData: any = {
-        method_type: activeTab,
-        is_default: methods.length === 0, // First method is default
-      };
-
-      if (activeTab === 'mpesa') {
-        if (!phoneNumber || !phoneNumber.match(/^\+254(7[0-9]|11[0-1])\d{7}$/)) {
-          toast({
-            title: "Invalid Phone Number",
-            description: "Please enter a valid Safaricom number in format +254XXXXXXXXX",
-            variant: "destructive",
-          });
-          return;
-        }
-        methodData.phone_number = phoneNumber;
-      } else {
-        if (!bankName || !accountNumber || !accountName) {
-          toast({
-            title: "Missing Information",
-            description: "Please fill in all bank account fields",
-            variant: "destructive",
-          });
-          return;
-        }
-        methodData.bank_name = bankName;
-        methodData.account_number = accountNumber;
-        methodData.account_name = accountName;
-      }
-
-      const { data, error } = await supabase.functions.invoke('payment-methods/create', {
-        body: methodData,
+  const handleComplete = async () => {
+    if (!userPhone) {
+      toast({
+        title: "Phone Number Required",
+        description: "Your profile is missing a phone number. Please update your profile first.",
+        variant: "destructive",
       });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Mark payment details as completed
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ payment_details_completed: true })
+        .eq('id', user.id);
 
       if (error) throw error;
 
       toast({
-        title: "Payment Method Added",
-        description: "Your payment method has been saved successfully.",
+        title: "Payment Setup Complete",
+        description: "Your M-Pesa number has been set as your payout method.",
       });
 
-      // Reset form
-      setPhoneNumber('');
-      setBankName('');
-      setAccountNumber('');
-      setAccountName('');
-
-      await fetchMethods();
+      onComplete();
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to add payment method",
+        description: error.message || "Failed to complete setup",
         variant: "destructive",
       });
     } finally {
@@ -132,183 +82,70 @@ export const PaymentDetailsSetup = ({ open, onComplete }: { open: boolean; onCom
     }
   };
 
-  const setDefault = async (id: string) => {
-    try {
-      const { error } = await supabase.functions.invoke(`payment-methods/set-default/${id}`, {
-        method: 'POST',
-      });
-      if (error) throw error;
-
-      toast({
-        title: "Default Updated",
-        description: "Default payment method updated successfully.",
-      });
-
-      await fetchMethods();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to set default",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteMethod = async (id: string) => {
-    try {
-      const { error } = await supabase.functions.invoke(`payment-methods/delete/${id}`, {
-        method: 'DELETE',
-      });
-      if (error) throw error;
-
-      toast({
-        title: "Payment Method Deleted",
-        description: "Payment method removed successfully.",
-      });
-
-      await fetchMethods();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete payment method",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleComplete = () => {
-    if (methods.length === 0) {
-      toast({
-        title: "Add Payment Method",
-        description: "Please add at least one payment method to continue.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const hasDefault = methods.some(m => m.is_default);
-    if (!hasDefault) {
-      toast({
-        title: "Set Default Method",
-        description: "Please set one payment method as default.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    onComplete();
-  };
-
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>Complete Your Profile - Payment Setup</DialogTitle>
+          <DialogTitle>Confirm Payment Details</DialogTitle>
           <DialogDescription>
-            Add up to 3 payout methods. This is where you'll receive payments.
+            Your registered phone number will be used for all payouts.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Saved Methods */}
-          {methods.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">Saved Payment Methods ({methods.length}/3)</h3>
-              <div className="space-y-2">
-                {methods.map((method) => (
-                  <PaymentMethodCard
-                    key={method.id}
-                    method={method}
-                    onSetDefault={setDefault}
-                    onDelete={deleteMethod}
-                  />
-                ))}
-              </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
             </div>
-          )}
-
-          {/* Add New Method */}
-          {methods.length < 3 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">
-                {methods.length === 0 ? 'Add Your First Payment Method' : 'Add Another Payment Method'}
-              </h3>
-
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'mpesa' | 'bank_account')}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
-                  <TabsTrigger value="bank_account">Bank Account</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="mpesa" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="mpesa-phone">M-Pesa Phone Number (Safaricom Only)</Label>
-                    <Input
-                      id="mpesa-phone"
-                      placeholder="+254712345678"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                    />
+          ) : (
+            <>
+              {/* Payment Method Display */}
+              <div className="p-4 rounded-lg border-2 border-primary/30 bg-primary/5">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                    <Smartphone className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">M-Pesa (Safaricom)</p>
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    </div>
+                    <p className="text-lg font-medium text-primary">
+                      {userPhone || "No phone number"}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      Enter Safaricom M-Pesa number (format: +254XXXXXXXXX)
+                      Daily Limit: KES {PAYMENT_METHOD_LIMITS.mpesa.daily_limit.toLocaleString()}
                     </p>
                   </div>
-                </TabsContent>
+                </div>
+              </div>
 
-                <TabsContent value="bank_account" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-name">Bank Name</Label>
-                    <Select value={bankName} onValueChange={setBankName}>
-                      <SelectTrigger id="bank-name">
-                        <SelectValue placeholder="Select your bank" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {KENYAN_BANKS.map((bank) => (
-                          <SelectItem key={bank} value={bank}>
-                            {bank}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {/* Account holder */}
+              <div className="text-center text-sm text-muted-foreground">
+                <p>Account holder: <strong>{userName}</strong></p>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="account-number">Account Number</Label>
-                    <Input
-                      id="account-number"
-                      placeholder="1234567890"
-                      value={accountNumber}
-                      onChange={(e) => setAccountNumber(e.target.value)}
-                    />
-                  </div>
+              {/* Security note */}
+              <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+                <Shield className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                  For your security, payouts are only sent to your registered phone number. 
+                  Contact customer support if you need to change it.
+                </AlertDescription>
+              </Alert>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="account-name">Account Name</Label>
-                    <Input
-                      id="account-name"
-                      placeholder="John Doe"
-                      value={accountName}
-                      onChange={(e) => setAccountName(e.target.value)}
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
-
-              <Button onClick={addMethod} disabled={loading} className="w-full">
+              {/* Confirm Button */}
+              <Button 
+                onClick={handleComplete} 
+                disabled={loading || !userPhone} 
+                className="w-full"
+                size="lg"
+              >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Add Payment Method
+                Confirm & Continue
               </Button>
-            </div>
+            </>
           )}
-
-          {/* Complete Button */}
-          <div className="flex gap-2 pt-4 border-t">
-            {methods.length > 0 && (
-              <Button onClick={handleComplete} className="flex-1">
-                Complete Setup
-              </Button>
-            )}
-          </div>
         </div>
       </DialogContent>
     </Dialog>
