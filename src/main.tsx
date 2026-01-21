@@ -13,10 +13,26 @@ if (!container) throw new Error("Root element not found");
 
 const root = createRoot(container);
 
+// Remove no-transitions class after initial render to enable smooth theme switching
+const enableTransitions = () => {
+  requestAnimationFrame(() => {
+    document.documentElement.classList.remove('no-transitions');
+  });
+};
+
 root.render(
   <StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+    <ThemeProvider 
+      attribute="class" 
+      defaultTheme="dark" 
+      enableSystem
+      storageKey="theme"
+      disableTransitionOnChange={false}
+    >
       <App />
     </ThemeProvider>
   </StrictMode>
 );
+
+// Enable transitions after app is mounted
+enableTransitions();

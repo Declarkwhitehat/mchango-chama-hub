@@ -25,6 +25,32 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- Prevent theme flash - apply theme before React hydrates -->
+    <script>
+      (function() {
+        try {
+          var theme = localStorage.getItem('theme');
+          var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          
+          // Determine which theme to apply
+          var isDark = theme === 'dark' || (!theme && systemDark) || (theme === 'system' && systemDark);
+          
+          // Apply theme class immediately to prevent flash
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+          
+          // Add class to disable transitions on initial load
+          document.documentElement.classList.add('no-transitions');
+        } catch (e) {
+          // Fallback to dark theme
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
 
   <body>
