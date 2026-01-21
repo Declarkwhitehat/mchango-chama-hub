@@ -13,6 +13,35 @@ const isValidUUID = (uuid: string): boolean => {
   return uuidRegex.test(uuid);
 };
 
+// Generate a unique 8-character alphanumeric member code
+const generateMemberCode = async (client: any, chamaId: string, maxRetries = 10): Promise<string> => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluding confusing chars like 0,O,I,1
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Check if code already exists in this chama
+    const { data: existing } = await client
+      .from('chama_members')
+      .select('id')
+      .eq('chama_id', chamaId)
+      .eq('member_code', code)
+      .maybeSingle();
+    
+    if (!existing) {
+      return code;
+    }
+    console.log(`Member code collision on attempt ${attempt + 1}, retrying...`);
+  }
+  
+  // Fallback: use timestamp-based code
+  const timestamp = Date.now().toString(36).toUpperCase().slice(-8);
+  return timestamp.padStart(8, 'X');
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -309,8 +338,8 @@ serve(async (req) => {
           });
         }
         
-        // Reopen rejected/inactive request
-        const { data: updatedMember, error: updateError } = await supabaseClient
+        // Reopen rejected/inactive request using admin client to bypass RLS
+        const { data: updatedMember, error: updateError } = await adminClient
           .from('chama_members')
           .update({ approval_status: 'pending' })
           .eq('chama_id', chama_id)
@@ -329,8 +358,8 @@ serve(async (req) => {
           });
         }
 
-        // Mark invite code as used
-        await supabaseClient
+        // Mark invite code as used using admin client
+        await adminClient
           .from('chama_invite_codes')
           .update({
             used_by: user.id,
@@ -352,13 +381,17 @@ serve(async (req) => {
       // IMPORTANT: Do NOT assign order_index on join - it's assigned after first payment
       // Members start as inactive until they make their first payment
       
+      // Generate a unique member code
+      const memberCode = await generateMemberCode(adminClient, chama_id);
+      console.log('Generated member code:', memberCode);
+      
       // Create pending membership WITHOUT order_index using admin client to bypass RLS
       const { data: newMember, error: memberError } = await adminClient
         .from('chama_members')
         .insert({
           chama_id: chama_id,
           user_id: user.id,
-          member_code: null, // Will be assigned after first payment
+          member_code: memberCode, // Generated unique code
           order_index: null, // Will be assigned after first payment
           is_manager: false,
           status: 'inactive', // Inactive until first payment
@@ -369,7 +402,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (memberError) {
-        console.error('Error creating member:', memberError);
+        console.error('Error creating member:', memberError, { code: memberError.code, details: memberError.details });
         throw memberError;
       }
 
