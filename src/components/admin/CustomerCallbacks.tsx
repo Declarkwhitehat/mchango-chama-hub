@@ -140,8 +140,22 @@ export function CustomerCallbacks() {
 
     setProcessingAction('approve');
     try {
-      // Step 1: Find the user by phone (with flexible matching for format variations)
-      // Try exact match first, then fall back to last 9 digits matching
+      // Step 1: Check if the new phone number is already registered to another user
+      const { data: existingUser, error: existingError } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone')
+        .eq('phone', parsed.newPhone)
+        .maybeSingle();
+
+      if (existingError) {
+        throw new Error(`Failed to check phone availability: ${existingError.message}`);
+      }
+
+      if (existingUser) {
+        throw new Error(`Phone number ${parsed.newPhone} is already registered to another user (${existingUser.full_name}). Cannot approve this request.`);
+      }
+
+      // Step 2: Find the user by their current phone (with flexible matching)
       const normalizedPhone = parsed.currentPhone.replace(/\D/g, '').slice(-9);
       
       let { data: profiles, error: findError } = await supabase
@@ -170,20 +184,24 @@ export function CustomerCallbacks() {
       const profile = profiles[0];
       const userId = profile.id;
 
-      // Step 2: Update profile phone number
-      const { error: profileError } = await supabase
+      // Step 3: Update profile phone number
+      const { error: profileError, count: profileCount } = await supabase
         .from('profiles')
         .update({ 
           phone: parsed.newPhone,
           updated_at: new Date().toISOString()
         })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select();
 
       if (profileError) {
+        if (profileError.message.includes('duplicate') || profileError.code === '23505') {
+          throw new Error(`Phone number ${parsed.newPhone} is already registered to another user.`);
+        }
         throw new Error(`Failed to update profile phone: ${profileError.message}`);
       }
 
-      // Step 3: Update M-Pesa payment method
+      // Step 4: Update M-Pesa payment method
       const { error: paymentError } = await supabase
         .from('payment_methods')
         .update({ 
@@ -199,7 +217,7 @@ export function CustomerCallbacks() {
         throw new Error(`Failed to update payment method: ${paymentError.message}`);
       }
 
-      // Step 4: Verify the changes were applied
+      // Step 5: Verify the changes were applied
       const { data: verifiedProfile, error: verifyError } = await supabase
         .from('profiles')
         .select('phone')
@@ -207,7 +225,7 @@ export function CustomerCallbacks() {
         .single();
 
       if (verifyError || verifiedProfile?.phone !== parsed.newPhone) {
-        throw new Error('Phone number update could not be verified. Please check admin permissions.');
+        throw new Error('Phone number update could not be verified. The new number may already be in use or there may be a permissions issue.');
       }
 
       // Step 5: Mark callback as resolved with detailed notes
