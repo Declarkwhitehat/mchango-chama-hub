@@ -4,7 +4,7 @@ import { TrendingDown, Wallet, DollarSign } from "lucide-react";
 interface CommissionDisplayProps {
   totalCollected: number;
   commissionRate: number;
-  type: 'mchango' | 'chama';
+  type: 'mchango' | 'chama' | 'organization';
   showBreakdown?: boolean;
 }
 
@@ -26,7 +26,7 @@ export const CommissionDisplay = ({
           Balance & Commission
         </CardTitle>
         <CardDescription>
-          {type === 'mchango' ? '15%' : '5%'} commission deducted at payout
+          {type === 'mchango' ? '15%' : '5%'} commission deducted at payment
         </CardDescription>
       </CardHeader>
       <CardContent>

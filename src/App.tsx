@@ -39,6 +39,7 @@ import AdminExport from "./pages/AdminExport";
 import AdminSearch from "./pages/AdminSearch";
 import AdminPaymentConfig from "./pages/AdminPaymentConfig";
 import AdminOrganizations from "./pages/AdminOrganizations";
+import AdminLedger from "./pages/AdminLedger";
 import KYCUpload from "./pages/KYCUpload";
 import NotFound from "./pages/NotFound";
 import AboutUs from "./pages/AboutUs";
@@ -98,6 +99,7 @@ const AppContent = () => {
           <Route path="/admin/search" element={<AdminProtectedRoute><AdminSearch /></AdminProtectedRoute>} />
           <Route path="/admin/export" element={<AdminProtectedRoute><AdminExport /></AdminProtectedRoute>} />
           <Route path="/admin/payment-config" element={<AdminProtectedRoute><AdminPaymentConfig /></AdminProtectedRoute>} />
+          <Route path="/admin/ledger" element={<AdminProtectedRoute><AdminLedger /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

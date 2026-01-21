@@ -13,7 +13,8 @@ import {
   Home,
   ChevronLeft,
   Shield,
-  Building2
+  Building2,
+  Landmark
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +109,7 @@ export function AdminSidebar() {
       icon: DollarSign,
       badge: pendingWithdrawals > 0 ? pendingWithdrawals : null
     },
+    { title: "Financial Ledger", url: "/admin/ledger", icon: Landmark },
     { title: "Payment Config", url: "/admin/payment-config", icon: Settings },
   ];
 

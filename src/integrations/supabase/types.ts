@@ -705,6 +705,57 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_ledger: {
+        Row: {
+          commission_amount: number
+          commission_rate: number
+          created_at: string
+          description: string | null
+          gross_amount: number
+          id: string
+          metadata: Json | null
+          net_amount: number
+          payer_name: string | null
+          payer_phone: string | null
+          reference_id: string | null
+          source_id: string
+          source_type: string
+          transaction_type: string
+        }
+        Insert: {
+          commission_amount?: number
+          commission_rate: number
+          created_at?: string
+          description?: string | null
+          gross_amount?: number
+          id?: string
+          metadata?: Json | null
+          net_amount?: number
+          payer_name?: string | null
+          payer_phone?: string | null
+          reference_id?: string | null
+          source_id: string
+          source_type: string
+          transaction_type: string
+        }
+        Update: {
+          commission_amount?: number
+          commission_rate?: number
+          created_at?: string
+          description?: string | null
+          gross_amount?: number
+          id?: string
+          metadata?: Json | null
+          net_amount?: number
+          payer_name?: string | null
+          payer_phone?: string | null
+          reference_id?: string | null
+          source_id?: string
+          source_type?: string
+          transaction_type?: string
+        }
+        Relationships: []
+      }
       mchango: {
         Row: {
           available_balance: number | null

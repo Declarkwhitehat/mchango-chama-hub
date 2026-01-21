@@ -30,6 +30,7 @@ interface Organization {
   whatsapp_link?: string;
   youtube_url?: string;
   current_amount: number;
+  available_balance: number;
   is_verified: boolean;
   is_public: boolean;
   status: string;
@@ -199,9 +200,9 @@ const OrganizationDetail = () => {
 
               {/* Stats */}
               <div className="text-center p-6 bg-primary/5 rounded-xl border">
-                <p className="text-sm text-muted-foreground mb-1">Total Contributions</p>
+                <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
                 <p className="text-3xl font-bold text-primary">
-                  KES {Number(organization.current_amount).toLocaleString()}
+                  KES {Number(organization.available_balance || 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
                   Since {new Date(organization.created_at).toLocaleDateString('en-US', { 
@@ -288,8 +289,8 @@ const OrganizationDetail = () => {
             {/* Commission Display */}
             <CommissionDisplay 
               totalCollected={organization.current_amount}
-              commissionRate={0.15}
-              type="mchango"
+              commissionRate={0.05}
+              type="organization"
               showBreakdown={true}
             />
 
@@ -297,8 +298,8 @@ const OrganizationDetail = () => {
             {isCreator && (
               <WithdrawalButton
                 mchangoId={organization.id}
-                totalAvailable={organization.current_amount}
-                commissionRate={0.15}
+                totalAvailable={organization.available_balance || 0}
+                commissionRate={0.05}
                 onSuccess={fetchOrganization}
               />
             )}
@@ -315,7 +316,8 @@ const OrganizationDetail = () => {
           <TabsContent value="donors">
             <OrganizationDonorsList 
               organizationId={organization.id} 
-              totalAmount={organization.current_amount}
+              totalAmount={organization.available_balance || 0}
+              organizationName={organization.name}
             />
           </TabsContent>
         </Tabs>
