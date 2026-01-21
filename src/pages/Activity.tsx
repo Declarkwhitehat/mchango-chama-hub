@@ -47,55 +47,57 @@ export default function Activity() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Fetch chama contributions
-      const { data: chamaData, error: chamaError } = await (supabase as any)
-        .from("chama_contributions")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      // First get the user's chama member IDs
+      const { data: memberData } = await supabase
+        .from("chama_members")
+        .select("id, chama_id")
+        .eq("user_id", user.id);
 
-      if (chamaError) throw chamaError;
+      const memberIds = memberData?.map(m => m.id) || [];
 
-      // Fetch mchango donations
-      const { data: mchangoData, error: mchangoError } = await (supabase as any)
+      // Fetch chama contributions through member IDs
+      let chamaData: any[] = [];
+      const chamaNameMap = new Map<string, string>();
+      
+      if (memberIds.length > 0) {
+        const { data, error: chamaError } = await supabase
+          .from("contributions")
+          .select("*, chama:chama_id(name)")
+          .in("member_id", memberIds)
+          .order("created_at", { ascending: false });
+          
+        if (chamaError) throw chamaError;
+        chamaData = data || [];
+        
+        // Build chama name map from joined data
+        chamaData.forEach((c: any) => {
+          if (c.chama) chamaNameMap.set(c.chama_id, c.chama.name);
+        });
+      }
+
+      // Fetch mchango donations with joined title
+      const { data: mchangoData, error: mchangoError } = await supabase
         .from("mchango_donations")
-        .select("*")
+        .select("*, mchango:mchango_id(title)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (mchangoError) throw mchangoError;
 
+      // Build mchango name map from joined data
+      const mchangoNameMap = new Map<string, string>();
+      (mchangoData || []).forEach((m: any) => {
+        if (m.mchango) mchangoNameMap.set(m.mchango_id, m.mchango.title);
+      });
+
       // Fetch withdrawals
-      const { data: withdrawalData, error: withdrawalError } = await (supabase as any)
+      const { data: withdrawalData, error: withdrawalError } = await supabase
         .from("withdrawals")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("requested_by", user.id)
         .order("created_at", { ascending: false });
 
       if (withdrawalError) throw withdrawalError;
-
-      // Fetch entity names
-      const chamaIds = [...new Set((chamaData || []).map((c: any) => c.chama_id).filter(Boolean))];
-      const mchangoIds = [...new Set((mchangoData || []).map((m: any) => m.mchango_id).filter(Boolean))];
-
-      const chamaNameMap = new Map<string, string>();
-      const mchangoNameMap = new Map<string, string>();
-
-      if (chamaIds.length > 0) {
-        const { data: chamasData } = await (supabase as any)
-          .from("chamas")
-          .select("id, name")
-          .in("id", chamaIds);
-        chamasData?.forEach((c: any) => chamaNameMap.set(c.id, c.name));
-      }
-
-      if (mchangoIds.length > 0) {
-        const { data: mchangosData } = await (supabase as any)
-          .from("mchangos")
-          .select("id, title")
-          .in("id", mchangoIds);
-        mchangosData?.forEach((m: any) => mchangoNameMap.set(m.id, m.title));
-      }
 
       setChamaNames(chamaNameMap);
       setMchangoNames(mchangoNameMap);
