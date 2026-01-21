@@ -791,16 +791,23 @@ serve(async (req) => {
         });
       }
 
+      // Handle "Send via M-Pesa" (status=approved, no payment_reference)
+      // vs "Mark as Manually Paid" (status=completed, with payment_reference)
+      const isMpesaApproval = status === 'approved' && !payment_reference && 
+        existingWithdrawal.payment_method?.method_type === 'mpesa';
+      
+      const isManualCompletion = status === 'completed' && payment_reference;
+
       // Standard update (approval or rejection without swap)
       const { data: withdrawal, error } = await supabaseAdmin
         .from('withdrawals')
         .update({
-          status,
+          status: isMpesaApproval ? 'approved' : status,
           reviewed_at: new Date().toISOString(),
           reviewed_by: user.id,
           rejection_reason: status === 'rejected' ? rejection_reason : null,
-          payment_reference: status === 'completed' ? payment_reference : null,
-          completed_at: status === 'completed' ? new Date().toISOString() : null
+          payment_reference: isManualCompletion ? payment_reference : null,
+          completed_at: isManualCompletion ? new Date().toISOString() : null
         })
         .eq('id', withdrawal_id)
         .select()
@@ -810,12 +817,36 @@ serve(async (req) => {
 
       console.log('Withdrawal updated:', withdrawal);
 
-      // If approved and payment method is M-Pesa, trigger automatic B2C payout
-      if (status === 'approved' && existingWithdrawal.payment_method?.method_type === 'mpesa') {
+      // If manually completed, update chama total_withdrawn
+      if (isManualCompletion && existingWithdrawal.chama_id) {
+        const { data: chama } = await supabaseAdmin
+          .from('chama')
+          .select('total_withdrawn')
+          .eq('id', existingWithdrawal.chama_id)
+          .single();
+        
+        if (chama) {
+          const newTotal = Number(chama.total_withdrawn || 0) + Number(existingWithdrawal.net_amount);
+          await supabaseAdmin
+            .from('chama')
+            .update({ total_withdrawn: newTotal })
+            .eq('id', existingWithdrawal.chama_id);
+          
+          console.log('Updated chama total_withdrawn:', { 
+            chama_id: existingWithdrawal.chama_id,
+            previous: chama.total_withdrawn,
+            added: existingWithdrawal.net_amount,
+            new_total: newTotal
+          });
+        }
+      }
+
+      // If M-Pesa approval (Send via M-Pesa button), trigger B2C payout
+      if (isMpesaApproval) {
         const phoneNumber = existingWithdrawal.payment_method.phone_number;
         
         if (phoneNumber) {
-          console.log('Triggering automatic M-Pesa B2C payout for:', withdrawal_id);
+          console.log('Triggering M-Pesa B2C payout for:', withdrawal_id);
           
           const supabaseUrl = Deno.env.get('SUPABASE_URL');
           const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -862,7 +893,7 @@ serve(async (req) => {
 
           return new Response(JSON.stringify({ 
             data: withdrawal,
-            message: 'Withdrawal approved. M-Pesa B2C payout initiated automatically.'
+            message: 'M-Pesa B2C payout initiated. Withdrawal will be marked complete automatically.'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });

@@ -132,6 +132,30 @@ serve(async (req) => {
         console.error('Failed to update withdrawal:', updateError);
       }
 
+      // Update chama total_withdrawn if this is a chama withdrawal
+      if (withdrawal.chama_id) {
+        const { data: chama } = await supabaseAdmin
+          .from('chama')
+          .select('total_withdrawn')
+          .eq('id', withdrawal.chama_id)
+          .single();
+        
+        if (chama) {
+          const newTotalWithdrawn = Number(chama.total_withdrawn || 0) + transactionAmount;
+          await supabaseAdmin
+            .from('chama')
+            .update({ total_withdrawn: newTotalWithdrawn })
+            .eq('id', withdrawal.chama_id);
+          
+          console.log('Updated chama total_withdrawn:', { 
+            chama_id: withdrawal.chama_id, 
+            previous: chama.total_withdrawn,
+            added: transactionAmount,
+            new_total: newTotalWithdrawn
+          });
+        }
+      }
+
       // Send success SMS
       if (recipientPhone) {
         const successMessage = `🎉 Your ${groupName} payout of KES ${transactionAmount.toFixed(2)} has been sent to your M-Pesa. Transaction: ${transactionId}. Thank you for being a valued member!`;

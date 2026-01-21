@@ -80,6 +80,7 @@ export type Database = {
           slug: string
           start_date: string | null
           status: Database["public"]["Enums"]["chama_status"]
+          total_withdrawn: number | null
           updated_at: string
           whatsapp_link: string | null
         }
@@ -104,6 +105,7 @@ export type Database = {
           slug: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["chama_status"]
+          total_withdrawn?: number | null
           updated_at?: string
           whatsapp_link?: string | null
         }
@@ -128,6 +130,7 @@ export type Database = {
           slug?: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["chama_status"]
+          total_withdrawn?: number | null
           updated_at?: string
           whatsapp_link?: string | null
         }
