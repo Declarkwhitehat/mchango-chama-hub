@@ -352,8 +352,8 @@ serve(async (req) => {
       // IMPORTANT: Do NOT assign order_index on join - it's assigned after first payment
       // Members start as inactive until they make their first payment
       
-      // Create pending membership WITHOUT order_index
-      const { data: newMember, error: memberError } = await supabaseClient
+      // Create pending membership WITHOUT order_index using admin client to bypass RLS
+      const { data: newMember, error: memberError } = await adminClient
         .from('chama_members')
         .insert({
           chama_id: chama_id,
@@ -373,8 +373,8 @@ serve(async (req) => {
         throw memberError;
       }
 
-      // Mark invite code as used
-      await supabaseClient
+      // Mark invite code as used using admin client
+      await adminClient
         .from('chama_invite_codes')
         .update({
           used_by: user.id,
