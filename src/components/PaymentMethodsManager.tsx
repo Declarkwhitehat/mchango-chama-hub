@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Smartphone, AlertCircle, CheckCircle, Loader2, Lock, Phone } from "lucide-react";
+import { Smartphone, AlertCircle, CheckCircle, Loader2, Lock, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PAYMENT_METHOD_LIMITS } from "@/utils/paymentLimits";
+import { PaymentChangeRequestForm } from "./PaymentChangeRequestForm";
 
 interface PaymentMethodsManagerProps {
   userName: string;
@@ -14,27 +16,39 @@ interface PaymentMethodsManagerProps {
 export const PaymentMethodsManager = ({ userName, onUpdate }: PaymentMethodsManagerProps) => {
   const [loading, setLoading] = useState(true);
   const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [showChangeRequest, setShowChangeRequest] = useState(false);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
 
   useEffect(() => {
-    fetchUserPhone();
+    fetchUserData();
   }, []);
 
-  const fetchUserPhone = async () => {
+  const fetchUserData = async () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: profile, error } = await supabase
+      // Fetch user phone
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('phone')
         .eq('id', user.id)
         .single();
 
-      if (error) throw error;
+      if (profileError) throw profileError;
       setUserPhone(profile?.phone || null);
+
+      // Check for pending payment change requests
+      const { data: pendingRequests } = await supabase
+        .from('customer_callbacks')
+        .select('id')
+        .ilike('question', '%Payment Method Change Request%')
+        .eq('status', 'pending');
+
+      setHasPendingRequest((pendingRequests?.length || 0) > 0);
     } catch (error: any) {
-      console.error("Failed to load user phone:", error);
+      console.error("Failed to load user data:", error);
     } finally {
       setLoading(false);
     }
@@ -90,22 +104,46 @@ export const PaymentMethodsManager = ({ userName, onUpdate }: PaymentMethodsMana
         </CardContent>
       </Card>
 
-      {/* Info about changing payment method */}
-      <Alert variant="default" className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
-        <Phone className="h-4 w-4 text-amber-600" />
-        <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
-          <strong>Need to change your payment number?</strong>
-          <br />
-          Your payout number is linked to your registration phone for security. 
-          To change it, please contact our customer support team.
-        </AlertDescription>
-      </Alert>
+      {/* Pending request notice */}
+      {hasPendingRequest && (
+        <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+          <MessageSquare className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+            <strong>Change request pending</strong>
+            <br />
+            You have a pending payment method change request. Our team will contact you soon.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Request change button */}
+      {!hasPendingRequest && (
+        <Button 
+          variant="outline" 
+          className="w-full"
+          onClick={() => setShowChangeRequest(true)}
+        >
+          <MessageSquare className="h-4 w-4 mr-2" />
+          Request Payment Number Change
+        </Button>
+      )}
 
       {/* Account holder info */}
       <div className="text-xs text-muted-foreground text-center pt-2">
         <p>Account holder: <strong>{userName}</strong></p>
         <p className="mt-1">All payouts will be sent to your registered M-Pesa number.</p>
       </div>
+
+      {/* Change request form dialog */}
+      <PaymentChangeRequestForm
+        open={showChangeRequest}
+        onClose={() => {
+          setShowChangeRequest(false);
+          fetchUserData(); // Refresh to check for new pending request
+        }}
+        currentPhone={userPhone}
+        userName={userName}
+      />
     </div>
   );
 };
