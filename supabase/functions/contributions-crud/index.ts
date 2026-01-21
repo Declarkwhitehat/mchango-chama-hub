@@ -103,7 +103,7 @@ serve(async (req) => {
       // Verify KYC status
       const { data: profile } = await supabaseClient
         .from('profiles')
-        .select('kyc_status')
+        .select('kyc_status, phone, full_name')
         .eq('id', user.id)
         .single();
 
@@ -120,7 +120,7 @@ serve(async (req) => {
       // Validate member exists
       const { data: member, error: memberError } = await supabaseClient
         .from('chama_members')
-        .select('*, chama(contribution_amount)')
+        .select('*, chama(contribution_amount, slug, name)')
         .eq('id', body.member_id)
         .maybeSingle();
 
@@ -162,6 +162,86 @@ serve(async (req) => {
         // Underpayment - add to deficit
         deficitDelta = expectedAmount - paidAmount;
         console.log('Underpayment detected:', { paidAmount, expectedAmount, deficitDelta });
+      }
+
+      // ============================================
+      // FIRST PAYMENT ACTIVATION LOGIC
+      // ============================================
+      let isFirstPayment = false;
+      let assignedOrderIndex: number | null = null;
+      let assignedMemberCode: string | null = null;
+
+      if (!member.first_payment_completed) {
+        isFirstPayment = true;
+        console.log('Processing FIRST PAYMENT for member:', member.id);
+
+        // Get next available order_index using database function
+        const { data: nextIndex, error: indexError } = await supabaseClient
+          .rpc('get_next_order_index', { p_chama_id: member.chama_id });
+
+        if (indexError) {
+          console.error('Error getting next order index:', indexError);
+          // Fallback: calculate manually
+          const { data: existingMembers } = await supabaseClient
+            .from('chama_members')
+            .select('order_index')
+            .eq('chama_id', member.chama_id)
+            .not('order_index', 'is', null)
+            .order('order_index', { ascending: false })
+            .limit(1);
+          
+          assignedOrderIndex = existingMembers && existingMembers.length > 0
+            ? (existingMembers[0].order_index || 0) + 1
+            : 1;
+        } else {
+          assignedOrderIndex = nextIndex || 1;
+        }
+
+        // Generate member code
+        const { data: memberCode } = await supabaseClient
+          .rpc('generate_member_code', {
+            p_chama_id: member.chama_id,
+            p_order_index: assignedOrderIndex
+          });
+
+        assignedMemberCode = memberCode || `${member.chama.slug}-M${assignedOrderIndex}`;
+
+        // Update member with first payment activation
+        const { error: activationError } = await supabaseClient
+          .from('chama_members')
+          .update({
+            first_payment_completed: true,
+            first_payment_at: new Date().toISOString(),
+            order_index: assignedOrderIndex,
+            member_code: assignedMemberCode,
+            status: 'active',
+          })
+          .eq('id', member.id);
+
+        if (activationError) {
+          console.error('Error activating member:', activationError);
+        } else {
+          console.log('Member activated with first payment:', {
+            memberId: member.id,
+            orderIndex: assignedOrderIndex,
+            memberCode: assignedMemberCode
+          });
+
+          // Send SMS notification for first payment
+          if (profile?.phone) {
+            try {
+              await supabaseClient.functions.invoke('send-transactional-sms', {
+                body: {
+                  phone: profile.phone,
+                  message: `Payment received! You are now Member #${assignedOrderIndex} in "${member.chama.name}". Your member code is ${assignedMemberCode}. Your payout position is secured.`,
+                  eventType: 'first_payment_received'
+                }
+              });
+            } catch (smsError) {
+              console.error('Failed to send first payment SMS:', smsError);
+            }
+          }
+        }
       }
 
       // Create contribution record
@@ -283,7 +363,12 @@ serve(async (req) => {
         balance_update: {
           credit_added: creditDelta,
           deficit_added: deficitDelta,
-        }
+        },
+        first_payment: isFirstPayment ? {
+          activated: true,
+          order_index: assignedOrderIndex,
+          member_code: assignedMemberCode
+        } : null
       }), {
         status: 201,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

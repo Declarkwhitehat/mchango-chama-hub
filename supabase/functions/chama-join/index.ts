@@ -122,11 +122,13 @@ serve(async (req) => {
         }
 
         // Update membership status
+        // IMPORTANT: Keep status as 'inactive' until first payment is made
         const { data: updatedMember, error: updateError } = await supabaseClient
           .from('chama_members')
           .update({
             approval_status: isApproved ? 'approved' : 'rejected',
-            status: isApproved ? 'active' : 'inactive',
+            // Keep status inactive - member becomes active only after first payment
+            status: isApproved ? 'inactive' : 'inactive',
           })
           .eq('id', memberId)
           .select()
@@ -341,37 +343,21 @@ serve(async (req) => {
         });
       }
 
-      // Get next order_index
-      const { data: members } = await supabaseClient
-        .from('chama_members')
-        .select('order_index')
-        .eq('chama_id', chama_id)
-        .not('order_index', 'is', null)
-        .order('order_index', { ascending: false })
-        .limit(1);
-
-      const nextOrderIndex = members && members.length > 0 
-        ? (members[0].order_index || 0) + 1 
-        : 2;
-
-      // Generate member code
-      const { data: memberCodeData } = await supabaseClient
-        .rpc('generate_member_code', { 
-          p_chama_id: chama_id,
-          p_order_index: nextOrderIndex 
-        });
-
-      // Create pending membership
+      // IMPORTANT: Do NOT assign order_index on join - it's assigned after first payment
+      // Members start as inactive until they make their first payment
+      
+      // Create pending membership WITHOUT order_index
       const { data: newMember, error: memberError } = await supabaseClient
         .from('chama_members')
         .insert({
           chama_id: chama_id,
           user_id: user.id,
-          member_code: memberCodeData,
-          order_index: nextOrderIndex,
+          member_code: null, // Will be assigned after first payment
+          order_index: null, // Will be assigned after first payment
           is_manager: false,
-          status: 'active',
+          status: 'inactive', // Inactive until first payment
           approval_status: 'pending',
+          first_payment_completed: false,
         })
         .select()
         .maybeSingle();
@@ -471,16 +457,18 @@ serve(async (req) => {
         });
       }
 
-      // Update membership status
-      const { data: updatedMember, error: updateError } = await supabaseClient
-        .from('chama_members')
-        .update({
-          approval_status: isApproved ? 'approved' : 'rejected',
-          status: isApproved ? 'active' : 'inactive',
-        })
-        .eq('id', memberId)
-        .select()
-        .maybeSingle();
+        // Update membership status
+        // IMPORTANT: Keep status as 'inactive' until first payment is made
+        const { data: updatedMember, error: updateError } = await supabaseClient
+          .from('chama_members')
+          .update({
+            approval_status: isApproved ? 'approved' : 'rejected',
+            // Keep status inactive - member becomes active only after first payment
+            status: isApproved ? 'inactive' : 'inactive',
+          })
+          .eq('id', memberId)
+          .select()
+          .maybeSingle();
 
       if (updateError) {
         console.error('Update failed:', updateError);
