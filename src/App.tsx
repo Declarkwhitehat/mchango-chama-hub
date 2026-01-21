@@ -37,6 +37,7 @@ import AdminCallbacks from "./pages/AdminCallbacks";
 import AdminAudit from "./pages/AdminAudit";
 import AdminExport from "./pages/AdminExport";
 import AdminSearch from "./pages/AdminSearch";
+import AdminPaymentConfig from "./pages/AdminPaymentConfig";
 import KYCUpload from "./pages/KYCUpload";
 import NotFound from "./pages/NotFound";
 import AboutUs from "./pages/AboutUs";
@@ -94,6 +95,7 @@ const AppContent = () => {
           <Route path="/admin/audit" element={<AdminProtectedRoute><AdminAudit /></AdminProtectedRoute>} />
           <Route path="/admin/search" element={<AdminProtectedRoute><AdminSearch /></AdminProtectedRoute>} />
           <Route path="/admin/export" element={<AdminProtectedRoute><AdminExport /></AdminProtectedRoute>} />
+          <Route path="/admin/payment-config" element={<AdminProtectedRoute><AdminPaymentConfig /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
