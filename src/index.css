@@ -91,6 +91,12 @@ All colors MUST be HSL.
 }
 
 @layer base {
+  :root {
+    --bottom-nav-height: 64px;
+    --bottom-safe: env(safe-area-inset-bottom, 0px);
+    --bottom-nav-offset: calc(var(--bottom-nav-height) + var(--bottom-safe));
+  }
+
   * {
     @apply border-border;
   }
@@ -104,4 +110,13 @@ All colors MUST be HSL.
     overflow-x: hidden;
     scroll-behavior: smooth;
   }
+}
+
+/* Utility to hide scrollbars while keeping scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

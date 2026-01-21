@@ -396,12 +396,25 @@ export default function MemberActivity() {
 
         {/* Tabs for Different Activity Types */}
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="deposits">Deposits ({filteredDeposits.length})</TabsTrigger>
-            <TabsTrigger value="loans">Loans ({filteredLoans.length})</TabsTrigger>
-            <TabsTrigger value="profits">Profits ({filteredProfitShares.length})</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions ({filteredTransactions.length})</TabsTrigger>
+          <TabsList className="flex w-full overflow-x-auto scrollbar-hide gap-1 justify-start sm:grid sm:grid-cols-5">
+            <TabsTrigger value="all" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              All
+            </TabsTrigger>
+            <TabsTrigger value="deposits" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              <span className="hidden sm:inline">Deposits</span>
+              <span className="sm:hidden">Dep.</span> ({filteredDeposits.length})
+            </TabsTrigger>
+            <TabsTrigger value="loans" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              Loans ({filteredLoans.length})
+            </TabsTrigger>
+            <TabsTrigger value="profits" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              <span className="hidden sm:inline">Profits</span>
+              <span className="sm:hidden">Prof.</span> ({filteredProfitShares.length})
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3">
+              <span className="hidden sm:inline">Transactions</span>
+              <span className="sm:hidden">Txns</span> ({filteredTransactions.length})
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-4">

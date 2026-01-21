@@ -162,7 +162,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
       <Breadcrumbs />
 
       {/* Main Content */}
-      <main className="flex-1 pb-20">
+      <main className="flex-1 pb-[calc(var(--bottom-nav-offset)+24px)]">
         {children}
       </main>
 
@@ -171,7 +171,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
 
       {/* Bottom Navigation - Always visible for authenticated users */}
       {user && (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 pb-[env(safe-area-inset-bottom)]">
           <div className="container flex h-16 items-center justify-around px-2 max-w-lg mx-auto">
             {navItems.map((item) => {
               const isActive = isActiveRoute(item.href);
