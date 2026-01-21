@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Smartphone, AlertCircle, CheckCircle, Loader2, Lock, MessageSquare } from "lucide-react";
+import { Smartphone, AlertCircle, CheckCircle, Loader2, Lock, MessageSquare, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PAYMENT_METHOD_LIMITS } from "@/utils/paymentLimits";
 import { PaymentChangeRequestForm } from "./PaymentChangeRequestForm";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface PaymentMethodsManagerProps {
   userName: string;
@@ -18,12 +19,10 @@ export const PaymentMethodsManager = ({ userName, onUpdate }: PaymentMethodsMana
   const [userPhone, setUserPhone] = useState<string | null>(null);
   const [showChangeRequest, setShowChangeRequest] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const { refreshProfile } = useAuth();
 
-  useEffect(() => {
-    fetchUserData();
-  }, []);
+  const fetchUserData = useCallback(async () => {
 
-  const fetchUserData = async () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -52,6 +51,19 @@ export const PaymentMethodsManager = ({ userName, onUpdate }: PaymentMethodsMana
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchUserData();
+  }, [fetchUserData]);
+
+  // Refresh data when a change request is closed (might have been approved)
+  const handleCloseChangeRequest = async () => {
+    setShowChangeRequest(false);
+    await fetchUserData();
+    // Also refresh the auth profile to update any parent components
+    await refreshProfile();
+    onUpdate?.();
   };
 
   if (loading) {
@@ -137,10 +149,7 @@ export const PaymentMethodsManager = ({ userName, onUpdate }: PaymentMethodsMana
       {/* Change request form dialog */}
       <PaymentChangeRequestForm
         open={showChangeRequest}
-        onClose={() => {
-          setShowChangeRequest(false);
-          fetchUserData(); // Refresh to check for new pending request
-        }}
+        onClose={handleCloseChangeRequest}
         currentPhone={userPhone}
         userName={userName}
       />

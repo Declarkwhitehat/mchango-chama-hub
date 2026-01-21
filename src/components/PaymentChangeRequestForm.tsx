@@ -69,6 +69,7 @@ export const PaymentChangeRequestForm = ({
       if (!user) throw new Error("Not authenticated");
 
       // Create callback request for payment method change
+      // Store user_id in conversation_history for reliable admin lookup
       const { error } = await supabase
         .from('customer_callbacks')
         .insert({
@@ -76,7 +77,13 @@ export const PaymentChangeRequestForm = ({
           phone_number: currentPhone || newPhone,
           question: `Payment Method Change Request: Current M-Pesa: ${currentPhone}, New M-Pesa: ${newPhone}`,
           notes: `Reason: ${reason}`,
-          status: 'pending'
+          status: 'pending',
+          conversation_history: [{ 
+            user_id: user.id, 
+            requested_at: new Date().toISOString(),
+            current_phone: currentPhone,
+            new_phone: newPhone
+          }]
         });
       if (error) throw error;
 

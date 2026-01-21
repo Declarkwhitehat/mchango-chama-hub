@@ -155,34 +155,64 @@ export function CustomerCallbacks() {
         throw new Error(`Phone number ${parsed.newPhone} is already registered to another user (${existingUser.full_name}). Cannot approve this request.`);
       }
 
-      // Step 2: Find the user by their current phone (with flexible matching)
-      const normalizedPhone = parsed.currentPhone.replace(/\D/g, '').slice(-9);
-      
-      let { data: profiles, error: findError } = await supabase
-        .from('profiles')
-        .select('id, phone, full_name')
-        .eq('phone', parsed.currentPhone)
-        .limit(1);
+      // Step 2: Try to get user_id from conversation_history first (most reliable)
+      let userId: string | null = null;
+      let profilePhone: string | null = null;
+      let profileName: string | null = null;
 
-      // If exact match fails, try matching last 9 digits
-      if ((!profiles || profiles.length === 0) && normalizedPhone.length === 9) {
-        const { data: fuzzyProfiles, error: fuzzyError } = await supabase
-          .from('profiles')
-          .select('id, phone, full_name')
-          .ilike('phone', `%${normalizedPhone}`)
-          .limit(1);
+      // Check if conversation_history contains the user_id (new format)
+      const conversationHistory = callback.conversation_history as Array<{ user_id?: string; current_phone?: string }> | null;
+      if (conversationHistory && conversationHistory.length > 0 && conversationHistory[0]?.user_id) {
+        userId = conversationHistory[0].user_id;
+        console.log('Found user_id from conversation_history:', userId);
         
-        if (!fuzzyError && fuzzyProfiles && fuzzyProfiles.length > 0) {
-          profiles = fuzzyProfiles;
+        // Fetch the profile to get current phone for verification
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('phone, full_name')
+          .eq('id', userId)
+          .single();
+        
+        if (profile) {
+          profilePhone = profile.phone;
+          profileName = profile.full_name;
         }
       }
 
-      if (findError || !profiles || profiles.length === 0) {
-        throw new Error(`Could not find user with phone number: ${parsed.currentPhone}. Please verify the number is correct.`);
+      // Fallback: Find user by current phone (legacy requests without user_id)
+      if (!userId) {
+        console.log('No user_id in conversation_history, falling back to phone lookup');
+        const normalizedPhone = parsed.currentPhone.replace(/\D/g, '').slice(-9);
+        
+        let { data: profiles, error: findError } = await supabase
+          .from('profiles')
+          .select('id, phone, full_name')
+          .eq('phone', parsed.currentPhone)
+          .limit(1);
+
+        // If exact match fails, try matching last 9 digits
+        if ((!profiles || profiles.length === 0) && normalizedPhone.length === 9) {
+          const { data: fuzzyProfiles } = await supabase
+            .from('profiles')
+            .select('id, phone, full_name')
+            .ilike('phone', `%${normalizedPhone}`)
+            .limit(1);
+          
+          if (fuzzyProfiles && fuzzyProfiles.length > 0) {
+            profiles = fuzzyProfiles;
+          }
+        }
+
+        if (findError || !profiles || profiles.length === 0) {
+          throw new Error(`Could not find user with phone number: ${parsed.currentPhone}. Please verify the number is correct.`);
+        }
+
+        userId = profiles[0].id;
+        profilePhone = profiles[0].phone;
+        profileName = profiles[0].full_name;
       }
 
-      const profile = profiles[0];
-      const userId = profile.id;
+      console.log(`Updating phone for user ${userId}: ${profilePhone} → ${parsed.newPhone}`);
 
       // Step 3: Update profile phone number
       const { error: profileError, count: profileCount } = await supabase
@@ -213,7 +243,7 @@ export function CustomerCallbacks() {
 
       if (paymentError) {
         // Attempt to rollback profile change
-        await supabase.from('profiles').update({ phone: profile.phone }).eq('id', userId);
+        await supabase.from('profiles').update({ phone: profilePhone }).eq('id', userId);
         throw new Error(`Failed to update payment method: ${paymentError.message}`);
       }
 
@@ -228,11 +258,11 @@ export function CustomerCallbacks() {
         throw new Error('Phone number update could not be verified. The new number may already be in use or there may be a permissions issue.');
       }
 
-      // Step 5: Mark callback as resolved with detailed notes
+      // Step 6: Mark callback as resolved with detailed notes
       await updateStatusMutation.mutateAsync({
         id: callback.id,
         status: 'resolved',
-        notes: `APPROVED: Payment method changed from ${parsed.currentPhone} to ${parsed.newPhone} for user ${profile.full_name || userId}. Original reason: ${parsed.reason}`
+        notes: `APPROVED: Payment method changed from ${profilePhone || parsed.currentPhone} to ${parsed.newPhone} for user ${profileName || userId}. Original reason: ${parsed.reason}`
       });
 
       toast({
