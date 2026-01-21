@@ -140,38 +140,81 @@ export function CustomerCallbacks() {
 
     setProcessingAction('approve');
     try {
-      // Update the user's phone in profiles table
-      // First, find the user by their current phone
-      const { data: profile, error: findError } = await supabase
+      // Step 1: Find the user by phone (with flexible matching for format variations)
+      // Try exact match first, then fall back to last 9 digits matching
+      const normalizedPhone = parsed.currentPhone.replace(/\D/g, '').slice(-9);
+      
+      let { data: profiles, error: findError } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, phone, full_name')
         .eq('phone', parsed.currentPhone)
-        .single();
+        .limit(1);
 
-      if (findError || !profile) {
-        throw new Error('Could not find user with current phone number');
+      // If exact match fails, try matching last 9 digits
+      if ((!profiles || profiles.length === 0) && normalizedPhone.length === 9) {
+        const { data: fuzzyProfiles, error: fuzzyError } = await supabase
+          .from('profiles')
+          .select('id, phone, full_name')
+          .ilike('phone', `%${normalizedPhone}`)
+          .limit(1);
+        
+        if (!fuzzyError && fuzzyProfiles && fuzzyProfiles.length > 0) {
+          profiles = fuzzyProfiles;
+        }
       }
 
-      // Update the phone number
-      const { error: updateError } = await supabase
+      if (findError || !profiles || profiles.length === 0) {
+        throw new Error(`Could not find user with phone number: ${parsed.currentPhone}. Please verify the number is correct.`);
+      }
+
+      const profile = profiles[0];
+      const userId = profile.id;
+
+      // Step 2: Update profile phone number
+      const { error: profileError } = await supabase
         .from('profiles')
-        .update({ phone: parsed.newPhone })
-        .eq('id', profile.id);
+        .update({ 
+          phone: parsed.newPhone,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
 
-      if (updateError) throw updateError;
+      if (profileError) {
+        throw new Error(`Failed to update profile phone: ${profileError.message}`);
+      }
 
-      // Also update payment_methods if they exist
-      await supabase
+      // Step 3: Update M-Pesa payment method
+      const { error: paymentError } = await supabase
         .from('payment_methods')
-        .update({ phone_number: parsed.newPhone })
-        .eq('user_id', profile.id)
+        .update({ 
+          phone_number: parsed.newPhone,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
         .eq('method_type', 'mpesa');
 
-      // Mark callback as resolved
+      if (paymentError) {
+        // Attempt to rollback profile change
+        await supabase.from('profiles').update({ phone: profile.phone }).eq('id', userId);
+        throw new Error(`Failed to update payment method: ${paymentError.message}`);
+      }
+
+      // Step 4: Verify the changes were applied
+      const { data: verifiedProfile, error: verifyError } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', userId)
+        .single();
+
+      if (verifyError || verifiedProfile?.phone !== parsed.newPhone) {
+        throw new Error('Phone number update could not be verified. Please check admin permissions.');
+      }
+
+      // Step 5: Mark callback as resolved with detailed notes
       await updateStatusMutation.mutateAsync({
         id: callback.id,
         status: 'resolved',
-        notes: `APPROVED: Payment method changed from ${parsed.currentPhone} to ${parsed.newPhone}. ${callback.notes || ''}`
+        notes: `APPROVED: Payment method changed from ${parsed.currentPhone} to ${parsed.newPhone} for user ${profile.full_name || userId}. Original reason: ${parsed.reason}`
       });
 
       toast({
@@ -179,6 +222,7 @@ export function CustomerCallbacks() {
         description: `Successfully changed payment number to ${parsed.newPhone}`,
       });
     } catch (error: any) {
+      console.error('Payment change approval error:', error);
       toast({
         title: 'Update Failed',
         description: error.message || 'Failed to update payment method',
