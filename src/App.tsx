@@ -38,6 +38,7 @@ import AdminAudit from "./pages/AdminAudit";
 import AdminExport from "./pages/AdminExport";
 import AdminSearch from "./pages/AdminSearch";
 import AdminPaymentConfig from "./pages/AdminPaymentConfig";
+import AdminOrganizations from "./pages/AdminOrganizations";
 import KYCUpload from "./pages/KYCUpload";
 import NotFound from "./pages/NotFound";
 import AboutUs from "./pages/AboutUs";
@@ -91,6 +92,7 @@ const AppContent = () => {
           <Route path="/admin/withdrawals" element={<AdminProtectedRoute><AdminWithdrawals /></AdminProtectedRoute>} />
           <Route path="/admin/chamas" element={<AdminProtectedRoute><AdminChamas /></AdminProtectedRoute>} />
           <Route path="/admin/campaigns" element={<AdminProtectedRoute><AdminCampaigns /></AdminProtectedRoute>} />
+          <Route path="/admin/organizations" element={<AdminProtectedRoute><AdminOrganizations /></AdminProtectedRoute>} />
           <Route path="/admin/callbacks" element={<AdminProtectedRoute><AdminCallbacks /></AdminProtectedRoute>} />
           <Route path="/admin/audit" element={<AdminProtectedRoute><AdminAudit /></AdminProtectedRoute>} />
           <Route path="/admin/search" element={<AdminProtectedRoute><AdminSearch /></AdminProtectedRoute>} />

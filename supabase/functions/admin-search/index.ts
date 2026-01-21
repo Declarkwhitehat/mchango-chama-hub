@@ -87,6 +87,7 @@ serve(async (req) => {
       members: [],
       mchangos: [],
       chamas: [],
+      organizations: [],
       transactions: [],
     };
 
@@ -160,7 +161,7 @@ serve(async (req) => {
     }
 
     // Search chama slugs (limit 50)
-    if (searchType === 'all') {
+    if (searchType === 'all' || searchType === 'chama') {
       const { data: chamas } = await supabaseClient
         .from('chama')
         .select(`
@@ -171,6 +172,20 @@ serve(async (req) => {
         .limit(50);
 
       results.chamas = chamas || [];
+    }
+
+    // Search organizations (limit 50)
+    if (searchType === 'all' || searchType === 'organization') {
+      const { data: orgs } = await supabaseClient
+        .from('organizations')
+        .select(`
+          *,
+          profiles:created_by (full_name, email)
+        `)
+        .or(`slug.ilike.%${sanitizedQuery}%,name.ilike.%${sanitizedQuery}%,category.ilike.%${sanitizedQuery}%`)
+        .limit(50);
+
+      results.organizations = orgs || [];
     }
 
     // Search transactions by ID (limit 50)

@@ -7,7 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { Download, Loader2 } from "lucide-react";
 
 export const DataExport = () => {
-  const [exportType, setExportType] = useState<'transactions' | 'members'>('transactions');
+  const [exportType, setExportType] = useState<'transactions' | 'members' | 'organizations' | 'organization_donations'>('transactions');
   const [loading, setLoading] = useState(false);
 
   const handleExport = async () => {
@@ -80,6 +80,8 @@ export const DataExport = () => {
             <SelectContent>
               <SelectItem value="transactions">Transactions</SelectItem>
               <SelectItem value="members">Members</SelectItem>
+              <SelectItem value="organizations">Organizations</SelectItem>
+              <SelectItem value="organization_donations">Organization Donations</SelectItem>
             </SelectContent>
           </Select>
 
