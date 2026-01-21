@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -9,7 +9,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Phone, Clock, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Phone, Clock, CheckCircle2, MessageSquare, CreditCard, ArrowRight, Loader2, XCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface Callback {
   id: string;
@@ -23,10 +25,35 @@ interface Callback {
   notes: string | null;
 }
 
+interface ParsedPaymentRequest {
+  currentPhone: string;
+  newPhone: string;
+  reason: string;
+}
+
+const parsePaymentRequest = (callback: Callback): ParsedPaymentRequest | null => {
+  if (!callback.question.includes('Payment Method Change Request')) return null;
+  
+  const match = callback.question.match(/Current M-Pesa: ([^,]+), New M-Pesa: (.+)/);
+  if (!match) return null;
+  
+  return {
+    currentPhone: match[1] || 'Unknown',
+    newPhone: match[2] || 'Unknown',
+    reason: callback.notes?.replace('Reason: ', '') || 'No reason provided'
+  };
+};
+
+const isPaymentChangeRequest = (callback: Callback): boolean => {
+  return callback.question.includes('Payment Method Change Request');
+};
+
 export function CustomerCallbacks() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [showOnlyPaymentRequests, setShowOnlyPaymentRequests] = useState(false);
   const [selectedCallback, setSelectedCallback] = useState<Callback | null>(null);
   const [notes, setNotes] = useState('');
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -46,6 +73,12 @@ export function CustomerCallbacks() {
       if (error) throw error;
       return data as Callback[];
     },
+  });
+
+  // Filter callbacks based on payment request toggle
+  const filteredCallbacks = callbacks?.filter(callback => {
+    if (!showOnlyPaymentRequests) return true;
+    return isPaymentChangeRequest(callback);
   });
 
   const updateStatusMutation = useMutation({
@@ -84,6 +117,85 @@ export function CustomerCallbacks() {
     },
   });
 
+  const handleApprovePaymentChange = async (callback: Callback) => {
+    const parsed = parsePaymentRequest(callback);
+    if (!parsed) return;
+
+    setProcessingAction('approve');
+    try {
+      // Update the user's phone in profiles table
+      // First, find the user by their current phone
+      const { data: profile, error: findError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', parsed.currentPhone)
+        .single();
+
+      if (findError || !profile) {
+        throw new Error('Could not find user with current phone number');
+      }
+
+      // Update the phone number
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ phone: parsed.newPhone })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      // Also update payment_methods if they exist
+      await supabase
+        .from('payment_methods')
+        .update({ phone_number: parsed.newPhone })
+        .eq('user_id', profile.id)
+        .eq('method_type', 'mpesa');
+
+      // Mark callback as resolved
+      await updateStatusMutation.mutateAsync({
+        id: callback.id,
+        status: 'resolved',
+        notes: `APPROVED: Payment method changed from ${parsed.currentPhone} to ${parsed.newPhone}. ${callback.notes || ''}`
+      });
+
+      toast({
+        title: 'Payment Method Updated',
+        description: `Successfully changed payment number to ${parsed.newPhone}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Update Failed',
+        description: error.message || 'Failed to update payment method',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  const handleRejectPaymentChange = async (callback: Callback) => {
+    setProcessingAction('reject');
+    try {
+      await updateStatusMutation.mutateAsync({
+        id: callback.id,
+        status: 'resolved',
+        notes: `REJECTED: ${notes || 'Request was rejected by admin'}. Original notes: ${callback.notes || 'None'}`
+      });
+
+      toast({
+        title: 'Request Rejected',
+        description: 'Payment method change request has been rejected.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Action Failed',
+        description: error.message || 'Failed to reject request',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       pending: 'destructive',
@@ -110,21 +222,49 @@ export function CustomerCallbacks() {
     }
   };
 
+  const allCallbacks = callbacks || [];
   const statusCounts = {
-    all: callbacks?.length || 0,
-    pending: callbacks?.filter(c => c.status === 'pending').length || 0,
-    contacted: callbacks?.filter(c => c.status === 'contacted').length || 0,
-    resolved: callbacks?.filter(c => c.status === 'resolved').length || 0,
+    all: filteredCallbacks?.length || 0,
+    pending: filteredCallbacks?.filter(c => c.status === 'pending').length || 0,
+    contacted: filteredCallbacks?.filter(c => c.status === 'contacted').length || 0,
+    resolved: filteredCallbacks?.filter(c => c.status === 'resolved').length || 0,
   };
+
+  const paymentRequestCount = allCallbacks.filter(c => isPaymentChangeRequest(c) && c.status === 'pending').length;
 
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Customer Callbacks
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Customer Callbacks
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Manage customer support and payment change requests
+              </CardDescription>
+            </div>
+            
+            {/* Payment requests filter toggle */}
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="payment-filter" className="text-sm cursor-pointer">
+                Payment Requests Only
+              </Label>
+              <Switch
+                id="payment-filter"
+                checked={showOnlyPaymentRequests}
+                onCheckedChange={setShowOnlyPaymentRequests}
+              />
+              {paymentRequestCount > 0 && (
+                <Badge variant="destructive" className="ml-1">
+                  {paymentRequestCount}
+                </Badge>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs value={selectedStatus} onValueChange={setSelectedStatus}>
@@ -138,74 +278,153 @@ export function CustomerCallbacks() {
             <TabsContent value={selectedStatus}>
               {isLoading ? (
                 <div className="text-center py-8 text-muted-foreground">Loading...</div>
-              ) : !callbacks || callbacks.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No callbacks found</div>
+              ) : !filteredCallbacks || filteredCallbacks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {showOnlyPaymentRequests ? 'No payment change requests found' : 'No callbacks found'}
+                </div>
               ) : (
                 <div className="space-y-4">
-                  {callbacks.map((callback) => (
-                    <Card key={callback.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="pt-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2">
-                              {getStatusIcon(callback.status)}
-                              {getStatusBadge(callback.status)}
-                              <span className="text-sm text-muted-foreground">
-                                {new Date(callback.created_at).toLocaleString()}
-                              </span>
+                  {filteredCallbacks.map((callback) => {
+                    const isPaymentRequest = isPaymentChangeRequest(callback);
+                    const parsed = isPaymentRequest ? parsePaymentRequest(callback) : null;
+                    
+                    return (
+                      <Card key={callback.id} className={`hover:shadow-md transition-shadow ${isPaymentRequest ? 'border-l-4 border-l-primary' : ''}`}>
+                        <CardContent className="pt-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {getStatusIcon(callback.status)}
+                                {getStatusBadge(callback.status)}
+                                {isPaymentRequest && (
+                                  <Badge variant="outline" className="bg-primary/10">
+                                    <CreditCard className="h-3 w-3 mr-1" />
+                                    Payment Change
+                                  </Badge>
+                                )}
+                                <span className="text-sm text-muted-foreground">
+                                  {new Date(callback.created_at).toLocaleString()}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-semibold">
+                                  {callback.customer_name || 'Anonymous'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {callback.phone_number}
+                                </p>
+                              </div>
+                              
+                              {/* Payment request details */}
+                              {isPaymentRequest && parsed ? (
+                                <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <span className="font-medium">Current:</span>
+                                    <code className="px-2 py-0.5 bg-background rounded">{parsed.currentPhone}</code>
+                                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                    <span className="font-medium">New:</span>
+                                    <code className="px-2 py-0.5 bg-primary/10 text-primary rounded">{parsed.newPhone}</code>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    <span className="font-medium">Reason:</span> {parsed.reason}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-sm line-clamp-2">
+                                  <span className="font-medium">Question:</span> {callback.question}
+                                </p>
+                              )}
+                              
+                              {callback.notes && !isPaymentRequest && (
+                                <p className="text-sm text-muted-foreground">
+                                  <span className="font-medium">Notes:</span> {callback.notes}
+                                </p>
+                              )}
                             </div>
-                            <div>
-                              <p className="font-semibold">
-                                {callback.customer_name || 'Anonymous'}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {callback.phone_number}
-                              </p>
+                            
+                            <div className="flex gap-2 ml-4 flex-wrap justify-end">
+                              {/* Payment request actions */}
+                              {isPaymentRequest && callback.status === 'pending' && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleApprovePaymentChange(callback)}
+                                    disabled={!!processingAction}
+                                  >
+                                    {processingAction === 'approve' ? (
+                                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                    ) : (
+                                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                                    )}
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => {
+                                      setSelectedCallback(callback);
+                                      setNotes('');
+                                    }}
+                                    disabled={!!processingAction}
+                                  >
+                                    <XCircle className="h-4 w-4 mr-1" />
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
+                              
+                              {/* Regular callback actions */}
+                              {!isPaymentRequest && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setSelectedCallback(callback)}
+                                  >
+                                    View Details
+                                  </Button>
+                                  {callback.status === 'pending' && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateStatusMutation.mutate({ 
+                                        id: callback.id, 
+                                        status: 'contacted' 
+                                      })}
+                                    >
+                                      Mark Contacted
+                                    </Button>
+                                  )}
+                                  {callback.status === 'contacted' && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedCallback(callback);
+                                        setNotes(callback.notes || '');
+                                      }}
+                                    >
+                                      Mark Resolved
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                              
+                              {/* View details for resolved payment requests */}
+                              {isPaymentRequest && callback.status !== 'pending' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedCallback(callback)}
+                                >
+                                  View Details
+                                </Button>
+                              )}
                             </div>
-                            <p className="text-sm line-clamp-2">
-                              <span className="font-medium">Question:</span> {callback.question}
-                            </p>
-                            {callback.notes && (
-                              <p className="text-sm text-muted-foreground">
-                                <span className="font-medium">Notes:</span> {callback.notes}
-                              </p>
-                            )}
                           </div>
-                          <div className="flex gap-2 ml-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedCallback(callback)}
-                            >
-                              View Details
-                            </Button>
-                            {callback.status === 'pending' && (
-                              <Button
-                                size="sm"
-                                onClick={() => updateStatusMutation.mutate({ 
-                                  id: callback.id, 
-                                  status: 'contacted' 
-                                })}
-                              >
-                                Mark Contacted
-                              </Button>
-                            )}
-                            {callback.status === 'contacted' && (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedCallback(callback);
-                                  setNotes(callback.notes || '');
-                                }}
-                              >
-                                Mark Resolved
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </TabsContent>
@@ -217,9 +436,17 @@ export function CustomerCallbacks() {
       <Dialog open={!!selectedCallback} onOpenChange={() => setSelectedCallback(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Callback Details</DialogTitle>
+            <DialogTitle>
+              {selectedCallback && isPaymentChangeRequest(selectedCallback) 
+                ? 'Payment Change Request Details' 
+                : 'Callback Details'
+              }
+            </DialogTitle>
             <DialogDescription>
-              Review conversation history and manage callback status
+              {selectedCallback && isPaymentChangeRequest(selectedCallback)
+                ? 'Review and process payment method change request'
+                : 'Review conversation history and manage callback status'
+              }
             </DialogDescription>
           </DialogHeader>
 
@@ -244,10 +471,37 @@ export function CustomerCallbacks() {
                 </div>
               </div>
 
-              <div>
-                <Label>Question</Label>
-                <p className="text-sm mt-1 p-3 bg-muted rounded-lg">{selectedCallback.question}</p>
-              </div>
+              {/* Payment request specific view */}
+              {isPaymentChangeRequest(selectedCallback) && (() => {
+                const parsed = parsePaymentRequest(selectedCallback);
+                return parsed ? (
+                  <Alert className="border-primary/30 bg-primary/5">
+                    <CreditCard className="h-4 w-4" />
+                    <AlertDescription>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Current Number:</span>
+                          <code className="px-2 py-0.5 bg-background rounded">{parsed.currentPhone}</code>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Requested Number:</span>
+                          <code className="px-2 py-0.5 bg-primary/10 text-primary rounded">{parsed.newPhone}</code>
+                        </div>
+                        <div>
+                          <span className="font-medium">Reason:</span> {parsed.reason}
+                        </div>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                ) : null;
+              })()}
+
+              {!isPaymentChangeRequest(selectedCallback) && (
+                <div>
+                  <Label>Question</Label>
+                  <p className="text-sm mt-1 p-3 bg-muted rounded-lg">{selectedCallback.question}</p>
+                </div>
+              )}
 
               {selectedCallback.conversation_history && (
                 <div>
@@ -265,43 +519,96 @@ export function CustomerCallbacks() {
                 </div>
               )}
 
-              {(selectedCallback.status === 'contacted' || selectedCallback.notes) && (
+              {/* Notes for rejection or resolution */}
+              {(selectedCallback.status === 'pending' && isPaymentChangeRequest(selectedCallback)) || 
+               (selectedCallback.status === 'contacted' || selectedCallback.notes) ? (
                 <div>
-                  <Label htmlFor="notes">Notes</Label>
+                  <Label htmlFor="notes">
+                    {selectedCallback.status === 'pending' && isPaymentChangeRequest(selectedCallback)
+                      ? 'Rejection Reason (required for rejection)'
+                      : 'Notes'
+                    }
+                  </Label>
                   <Textarea
                     id="notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Add notes about this callback..."
-                    rows={4}
+                    placeholder={
+                      selectedCallback.status === 'pending' && isPaymentChangeRequest(selectedCallback)
+                        ? 'Provide a reason for rejecting this request...'
+                        : 'Add notes about this callback...'
+                    }
+                    rows={3}
                     className="mt-1"
                   />
+                </div>
+              ) : null}
+
+              {/* Display existing notes for resolved items */}
+              {selectedCallback.status === 'resolved' && selectedCallback.notes && (
+                <div>
+                  <Label>Resolution Notes</Label>
+                  <p className="text-sm mt-1 p-3 bg-muted rounded-lg whitespace-pre-wrap">{selectedCallback.notes}</p>
                 </div>
               )}
 
               <div className="flex gap-2 justify-end">
-                {selectedCallback.status === 'pending' && (
-                  <Button
-                    onClick={() => updateStatusMutation.mutate({ 
-                      id: selectedCallback.id, 
-                      status: 'contacted' 
-                    })}
-                    disabled={updateStatusMutation.isPending}
-                  >
-                    Mark as Contacted
-                  </Button>
+                {/* Payment request actions in dialog */}
+                {isPaymentChangeRequest(selectedCallback) && selectedCallback.status === 'pending' && (
+                  <>
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleRejectPaymentChange(selectedCallback)}
+                      disabled={!!processingAction || !notes.trim()}
+                    >
+                      {processingAction === 'reject' ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-1" />
+                      )}
+                      Reject Request
+                    </Button>
+                    <Button
+                      onClick={() => handleApprovePaymentChange(selectedCallback)}
+                      disabled={!!processingAction}
+                    >
+                      {processingAction === 'approve' ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                      )}
+                      Approve & Update
+                    </Button>
+                  </>
                 )}
-                {selectedCallback.status === 'contacted' && (
-                  <Button
-                    onClick={() => updateStatusMutation.mutate({ 
-                      id: selectedCallback.id, 
-                      status: 'resolved',
-                      notes
-                    })}
-                    disabled={updateStatusMutation.isPending}
-                  >
-                    Mark as Resolved
-                  </Button>
+                
+                {/* Regular callback actions */}
+                {!isPaymentChangeRequest(selectedCallback) && (
+                  <>
+                    {selectedCallback.status === 'pending' && (
+                      <Button
+                        onClick={() => updateStatusMutation.mutate({ 
+                          id: selectedCallback.id, 
+                          status: 'contacted' 
+                        })}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        Mark as Contacted
+                      </Button>
+                    )}
+                    {selectedCallback.status === 'contacted' && (
+                      <Button
+                        onClick={() => updateStatusMutation.mutate({ 
+                          id: selectedCallback.id, 
+                          status: 'resolved',
+                          notes
+                        })}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        Mark as Resolved
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
