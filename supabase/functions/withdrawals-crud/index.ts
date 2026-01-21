@@ -422,12 +422,11 @@ serve(async (req) => {
       const chamaId = url.searchParams.get('chama_id');
       const mchangoId = url.searchParams.get('mchango_id');
 
-      let query = supabaseClient
+      // Use admin client to bypass RLS for listing
+      let query = supabaseAdmin
         .from('withdrawals')
         .select(`
           *,
-          requester:profiles!withdrawals_requested_by_fkey(full_name, email),
-          reviewer:profiles!withdrawals_reviewed_by_fkey(full_name, email),
           payment_method:payment_methods(
             method_type,
             phone_number,
@@ -444,11 +443,37 @@ serve(async (req) => {
         query = query.eq('mchango_id', mchangoId);
       }
 
-      const { data, error } = await query;
+      const { data: withdrawals, error } = await query;
 
       if (error) throw error;
 
-      return new Response(JSON.stringify({ data }), {
+      // Fetch requester and reviewer profiles separately
+      const enrichedWithdrawals = await Promise.all((withdrawals || []).map(async (w: any) => {
+        let requester = null;
+        let reviewer = null;
+
+        if (w.requested_by) {
+          const { data: requesterData } = await supabaseAdmin
+            .from('profiles')
+            .select('full_name, email, phone')
+            .eq('id', w.requested_by)
+            .single();
+          requester = requesterData;
+        }
+
+        if (w.reviewed_by) {
+          const { data: reviewerData } = await supabaseAdmin
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', w.reviewed_by)
+            .single();
+          reviewer = reviewerData;
+        }
+
+        return { ...w, requester, reviewer };
+      }));
+
+      return new Response(JSON.stringify({ data: enrichedWithdrawals }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
