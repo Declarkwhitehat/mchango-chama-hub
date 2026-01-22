@@ -19,9 +19,11 @@ import { PaymentTransparency } from "@/components/chama/PaymentTransparency";
 import { SkippedMemberAlert } from "@/components/chama/SkippedMemberAlert";
 import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
+import { WhatsAppLinkManager } from "@/components/chama/WhatsAppLinkManager";
 import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+
 
 interface ChamaData {
   id: string;
@@ -39,6 +41,7 @@ interface ChamaData {
   current_cycle_round?: number;
   last_cycle_completed_at?: string;
   accepting_rejoin_requests?: boolean;
+  whatsapp_link?: string | null;
   profiles: {
     full_name: string;
     email: string;
@@ -697,7 +700,15 @@ const ChamaDetail = () => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="details">
+            <TabsContent value="details" className="space-y-4">
+              {/* WhatsApp Group Link */}
+              <WhatsAppLinkManager
+                chamaId={chama.id}
+                currentLink={chama.whatsapp_link}
+                isManager={isManager}
+                onUpdate={loadChama}
+              />
+
               <Card>
                 <CardHeader>
                   <CardTitle>Chama Details</CardTitle>
