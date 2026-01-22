@@ -413,11 +413,11 @@ serve(async (req) => {
       }
 
       // Validate constraints
-      const minMembers = body.min_members || 5;
+      const minMembers = body.min_members || 2;
       const maxMembers = body.max_members || 50;
 
-      if (minMembers < 5) {
-        return new Response(JSON.stringify({ error: 'Minimum members must be at least 5' }), {
+      if (minMembers < 2) {
+        return new Response(JSON.stringify({ error: 'Minimum members must be at least 2' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

@@ -93,10 +93,10 @@ Deno.serve(async (req) => {
 
     if (requestsError) throw requestsError;
 
-    if (!approvedRequests || approvedRequests.length < (chama.min_members || 5)) {
+    if (!approvedRequests || approvedRequests.length < (chama.min_members || 2)) {
       return new Response(
         JSON.stringify({ 
-          error: `Need at least ${chama.min_members || 5} approved members to start new cycle. Currently have ${approvedRequests?.length || 0}` 
+          error: `Need at least ${chama.min_members || 2} approved members to start new cycle. Currently have ${approvedRequests?.length || 0}` 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
