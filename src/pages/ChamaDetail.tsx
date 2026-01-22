@@ -460,8 +460,8 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Withdrawal Status Section */}
-        {isMember && isActive && (
+        {/* Withdrawal Status Section - Only show when funds are available */}
+        {isMember && isActive && totalContributions > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
