@@ -22,7 +22,7 @@ interface Chama {
   created_at: string;
   profiles: {
     full_name: string;
-  };
+  } | null;
   chama_members: Array<{
     approval_status: string;
   }>;
@@ -83,7 +83,7 @@ const ChamaList = () => {
       c.name.toLowerCase().includes(query) ||
       c.slug.toLowerCase().includes(query) ||
       c.description?.toLowerCase().includes(query) ||
-      c.profiles.full_name.toLowerCase().includes(query)
+      c.profiles?.full_name?.toLowerCase().includes(query)
     );
   });
 
@@ -179,7 +179,7 @@ const ChamaList = () => {
                     </div>
                     <CardTitle className="line-clamp-1">{chama.name}</CardTitle>
                     <CardDescription className="line-clamp-1">
-                      Manager: {chama.profiles.full_name}
+                      Manager: {chama.profiles?.full_name || 'Unknown'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
