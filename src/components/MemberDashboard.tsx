@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,10 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface MemberDashboardProps {
   chamaId: string;
+  onPayNow?: () => void;
 }
 
-export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
+export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -156,7 +157,11 @@ export const MemberDashboard = ({ chamaId }: MemberDashboardProps) => {
   return (
     <div className="space-y-6">
       {/* Cycle Payment Status - For all contribution frequencies */}
-      <CyclePaymentStatus chamaId={chamaId} frequency={chama.contribution_frequency} />
+      <CyclePaymentStatus 
+        chamaId={chamaId} 
+        frequency={chama.contribution_frequency} 
+        onPayNow={onPayNow}
+      />
 
       {/* Member ID Badge - Prominent Display */}
       <Card className="border-primary bg-gradient-to-r from-primary/10 via-primary/5 to-background">
