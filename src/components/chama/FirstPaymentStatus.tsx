@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Clock, Wallet } from "lucide-react";
+import { Clock, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface FirstPaymentStatusProps {
@@ -22,8 +22,8 @@ export const FirstPaymentStatus = ({
   chamaName,
   chamaStatus
 }: FirstPaymentStatusProps) => {
-  // If chama is already active, don't show this component
-  if (chamaStatus === 'active') {
+  // Only show this component for pending chamas (waiting to start)
+  if (chamaStatus !== 'pending') {
     return null;
   }
 
@@ -34,92 +34,41 @@ export const FirstPaymentStatus = ({
         <Clock className="h-4 w-4" />
         <AlertTitle>Awaiting Approval</AlertTitle>
         <AlertDescription>
-          Your join request is pending manager approval. Once approved, you'll need to make your first payment to secure your position.
+          Your join request is pending manager approval. Once approved, you'll be ready to participate when the manager starts the chama.
         </AlertDescription>
       </Alert>
     );
   }
 
-  // Member is approved but hasn't paid
-  if (!memberStatus.first_payment_completed) {
-    return (
-      <Card className="border-amber-500/50 bg-amber-500/5">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-amber-600" />
-            <CardTitle className="text-lg">First Payment Required</CardTitle>
-          </div>
-          <CardDescription>
-            Pay your first contribution to secure your position
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-            <div>
-              <p className="text-sm text-muted-foreground">Amount Required</p>
-              <p className="text-2xl font-bold">KES {contributionAmount.toLocaleString()}</p>
-            </div>
-            <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
-              <AlertCircle className="h-3 w-3 mr-1" />
-              Not Paid
-            </Badge>
-          </div>
-          
-          <Alert variant="destructive" className="border-amber-500/50 bg-amber-50 text-amber-900">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Important</AlertTitle>
-            <AlertDescription>
-              <strong>Members who don't pay before the chama starts will be automatically removed.</strong>
-              {' '}Pay now to secure your position. Your member number will be assigned based on payment order - 
-              pay early to get a lower number and earlier payout!
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Member has paid - show their secured position
+  // Member is approved - waiting for manager to start
   return (
-    <Card className="border-green-500/50 bg-green-500/5">
+    <Card className="border-primary/50 bg-primary/5">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-green-600" />
-          <CardTitle className="text-lg">Position Secured!</CardTitle>
+          <CheckCircle2 className="h-5 w-5 text-primary" />
+          <CardTitle className="text-lg">You're Approved!</CardTitle>
         </div>
         <CardDescription>
-          Your first payment has been received
+          Waiting for the manager to start the chama
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground">Your Position</p>
-            <p className="text-2xl font-bold text-green-600">#{memberStatus.order_index || '?'}</p>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+          <div>
+            <p className="text-sm text-muted-foreground">Contribution Amount</p>
+            <p className="text-2xl font-bold">KES {contributionAmount.toLocaleString()}</p>
           </div>
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground">Member Code</p>
-            <p className="text-lg font-mono font-semibold">{memberStatus.member_code || 'Pending'}</p>
-          </div>
+          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Approved
+          </Badge>
         </div>
         
-        {memberStatus.first_payment_at && (
-          <p className="text-xs text-muted-foreground mt-3">
-            Paid on {new Date(memberStatus.first_payment_at).toLocaleDateString('en-US', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </p>
-        )}
-        
-        <Alert className="mt-4 bg-green-50 border-green-200">
-          <CheckCircle2 className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">
-            You're all set! Wait for the manager to start the chama. You will receive an SMS notification when it begins.
+        <Alert className="bg-primary/5 border-primary/20">
+          <Clock className="h-4 w-4 text-primary" />
+          <AlertDescription className="text-foreground">
+            Once the manager starts "{chamaName}", you'll receive an SMS with your member number and payout schedule. 
+            Contributions will begin immediately after the chama starts.
           </AlertDescription>
         </Alert>
       </CardContent>

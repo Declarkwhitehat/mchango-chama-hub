@@ -74,6 +74,7 @@ serve(async (req) => {
           first_payment_at,
           approval_status,
           status,
+          joined_at,
           profiles!chama_members_user_id_fkey(full_name, phone, email)
         )
       `)
@@ -96,36 +97,31 @@ serve(async (req) => {
     }
 
     // ============================================
-    // SPLIT MEMBERS INTO PAID AND UNPAID
+    // GET ALL APPROVED MEMBERS (no payment requirement)
     // ============================================
     const approvedMembers = (chama.chama_members || []).filter(
-      (m: any) => m.approval_status === 'approved'
+      (m: any) => m.approval_status === 'approved' && m.status !== 'removed'
     );
-
-    const paidMembers = approvedMembers.filter((m: any) => m.first_payment_completed === true);
-    const unpaidMembers = approvedMembers.filter((m: any) => m.first_payment_completed !== true);
 
     console.log('Start Chama Analysis:', {
       chamaId,
       chamaName: chama.name,
       totalApproved: approvedMembers.length,
-      paidCount: paidMembers.length,
-      unpaidCount: unpaidMembers.length,
       minMembers: chama.min_members
     });
 
     // ============================================
-    // VALIDATE MINIMUM MEMBERS
+    // VALIDATE MINIMUM APPROVED MEMBERS
     // ============================================
-    if (paidMembers.length < (chama.min_members || 2)) {
+    const minMembers = chama.min_members || 2;
+    if (approvedMembers.length < minMembers) {
       return new Response(
         JSON.stringify({ 
-          error: `Cannot start: Need at least ${chama.min_members || 2} members who have paid their first contribution`,
+          error: `Cannot start: Need at least ${minMembers} approved members`,
           details: {
-            required: chama.min_members || 2,
-            paid: paidMembers.length,
-            unpaid: unpaidMembers.length,
-            message: `${(chama.min_members || 2) - paidMembers.length} more members need to make their first payment before you can start.`
+            required: minMembers,
+            approved: approvedMembers.length,
+            message: `${minMembers - approvedMembers.length} more approved member(s) needed before you can start.`
           }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -133,118 +129,44 @@ serve(async (req) => {
     }
 
     const startDate = new Date();
-    const removedMemberIds: string[] = [];
-    const removalNotifications: Promise<any>[] = [];
 
     // ============================================
-    // REMOVE UNPAID MEMBERS
+    // ASSIGN ORDER INDICES TO ALL APPROVED MEMBERS
+    // Order by join date (earliest first)
     // ============================================
-    for (const member of unpaidMembers) {
-      console.log('Removing unpaid member:', {
-        memberId: member.id,
-        userId: member.user_id,
-        name: member.profiles?.full_name
-      });
-
-      // Update member status to 'removed'
-      const { error: updateError } = await supabaseClient
-        .from('chama_members')
-        .update({
-          status: 'removed',
-          removal_reason: 'NO_FIRST_PAYMENT',
-          removed_at: startDate.toISOString(),
-          order_index: null, // Clear any order index
-          member_code: null, // Clear member code
-        })
-        .eq('id', member.id);
-
-      if (updateError) {
-        console.error('Error updating member status:', updateError);
-        continue;
-      }
-
-      removedMemberIds.push(member.id);
-
-      // Create removal audit record
-      await supabaseClient
-        .from('chama_member_removals')
-        .insert({
-          chama_id: chamaId,
-          member_id: member.id,
-          user_id: member.user_id,
-          removal_reason: 'NO_FIRST_PAYMENT',
-          removed_at: startDate.toISOString(),
-          was_manager: member.is_manager || false,
-          member_name: member.profiles?.full_name || 'Unknown',
-          member_phone: member.profiles?.phone || null,
-          chama_name: chama.name,
-          notification_sent: !!member.profiles?.phone
-        });
-
-      // Send removal SMS notification
-      if (member.profiles?.phone) {
-        const smsPromise = supabaseClient.functions.invoke('send-transactional-sms', {
-          body: {
-            phone: member.profiles.phone,
-            message: `You were removed from "${chama.name}" because you did not pay your first contribution of KES ${chama.contribution_amount.toLocaleString()} before the chama started. You may request to join again in the next cycle.`,
-            eventType: 'member_removed_no_payment'
-          }
-        }).catch(err => {
-          console.error(`Failed to send removal SMS to ${member.profiles.full_name}:`, err);
-        });
-        
-        removalNotifications.push(smsPromise);
-      }
-    }
-
-    // Wait for all removal notifications to complete
-    await Promise.allSettled(removalNotifications);
-
-    // ============================================
-    // VERIFY & RESEQUENCE PAID MEMBERS
-    // ============================================
-    // Ensure all paid members have sequential order indices
-    const sortedPaidMembers = paidMembers.sort((a: any, b: any) => {
-      // Sort by first_payment_at to maintain payment order
-      const aTime = a.first_payment_at ? new Date(a.first_payment_at).getTime() : 0;
-      const bTime = b.first_payment_at ? new Date(b.first_payment_at).getTime() : 0;
+    const sortedMembers = approvedMembers.sort((a: any, b: any) => {
+      const aTime = a.joined_at ? new Date(a.joined_at).getTime() : 0;
+      const bTime = b.joined_at ? new Date(b.joined_at).getTime() : 0;
       return aTime - bTime;
     });
 
-    // Resequence order indices to ensure no gaps
-    for (let i = 0; i < sortedPaidMembers.length; i++) {
-      const member = sortedPaidMembers[i];
-      const expectedIndex = i + 1;
+    // Assign sequential order indices and generate member codes
+    for (let i = 0; i < sortedMembers.length; i++) {
+      const member = sortedMembers[i];
+      const newIndex = i + 1;
 
-      if (member.order_index !== expectedIndex) {
-        console.log('Resequencing member:', {
-          memberId: member.id,
-          oldIndex: member.order_index,
-          newIndex: expectedIndex
+      console.log('Assigning member order:', {
+        memberId: member.id,
+        name: member.profiles?.full_name,
+        newIndex: newIndex,
+        joinedAt: member.joined_at
+      });
+
+      // Generate new member code using DB function
+      const { data: newMemberCode } = await supabaseClient
+        .rpc('generate_member_code', {
+          p_chama_id: chamaId,
+          p_order_index: newIndex
         });
 
-        // Generate new member code if needed (uses DB function with new format)
-        const { data: newMemberCode } = await supabaseClient
-          .rpc('generate_member_code', {
-            p_chama_id: chamaId,
-            p_order_index: expectedIndex
-          });
-
-        await supabaseClient
-          .from('chama_members')
-          .update({
-            order_index: expectedIndex,
-            member_code: newMemberCode || member.member_code, // Keep existing code if RPC fails
-            status: 'active' // Ensure status is active
-          })
-          .eq('id', member.id);
-      } else {
-        // Ensure status is active
-        await supabaseClient
-          .from('chama_members')
-          .update({ status: 'active' })
-          .eq('id', member.id);
-      }
+      await supabaseClient
+        .from('chama_members')
+        .update({
+          order_index: newIndex,
+          member_code: newMemberCode || member.member_code,
+          status: 'active'
+        })
+        .eq('id', member.id);
     }
 
     // ============================================
@@ -275,8 +197,8 @@ serve(async (req) => {
         start_date: startDate.toISOString(),
         end_date: cycleEndDate.toISOString(),
         due_amount: chama.contribution_amount,
-        beneficiary_member_id: sortedPaidMembers[0]?.id || null, // First member gets first payout
-        total_expected_amount: chama.contribution_amount * sortedPaidMembers.length,
+        beneficiary_member_id: sortedMembers[0]?.id || null, // First member gets first payout
+        total_expected_amount: chama.contribution_amount * sortedMembers.length,
         total_collected_amount: 0,
         members_paid_count: 0,
         members_skipped_count: 0
@@ -289,7 +211,7 @@ serve(async (req) => {
     }
 
     // ============================================
-    // SEND START NOTIFICATIONS TO ACTIVE MEMBERS
+    // SEND START NOTIFICATIONS TO ALL MEMBERS
     // ============================================
     const frequencyText = chama.contribution_frequency === 'every_n_days' 
       ? `every ${chama.every_n_days_count} days`
@@ -297,8 +219,8 @@ serve(async (req) => {
 
     const cycleLength = getCycleLengthInDays(chama.contribution_frequency, chama.every_n_days_count);
 
-    for (let i = 0; i < sortedPaidMembers.length; i++) {
-      const member = sortedPaidMembers[i];
+    for (let i = 0; i < sortedMembers.length; i++) {
+      const member = sortedMembers[i];
       const memberIndex = i + 1;
       
       // Calculate payout date based on position
@@ -306,7 +228,7 @@ serve(async (req) => {
       const payoutDate = new Date(startDate);
       payoutDate.setDate(payoutDate.getDate() + daysUntilPayout);
 
-      const message = `🎉 "${chama.name}" has started! You are Member #${memberIndex}. You will contribute KES ${chama.contribution_amount.toLocaleString()} ${frequencyText}. Your payout date: ${payoutDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}. ${i === 0 ? 'You are first in line!' : `${memberIndex - 1} member(s) before you.`}`;
+      const message = `🎉 "${chama.name}" has started! You are Member #${memberIndex}. Contribute KES ${chama.contribution_amount.toLocaleString()} ${frequencyText}. Your payout date: ${payoutDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}. ${i === 0 ? 'You are first in line - make your contribution now!' : `${memberIndex - 1} member(s) before you.`}`;
 
       if (member.profiles?.phone) {
         try {
@@ -329,15 +251,14 @@ serve(async (req) => {
         success: true, 
         message: 'Chama started successfully',
         summary: {
-          activeMembers: sortedPaidMembers.length,
-          removedMembers: unpaidMembers.length,
-          removedMemberIds,
+          activeMembers: sortedMembers.length,
+          removedMembers: 0,
           firstCycleId: firstCycle?.id || null,
           startDate: startDate.toISOString(),
           firstPayoutDate: cycleEndDate.toISOString(),
-          firstBeneficiary: sortedPaidMembers[0]?.profiles?.full_name || 'Unknown'
+          firstBeneficiary: sortedMembers[0]?.profiles?.full_name || 'Unknown'
         },
-        notificationsSent: sortedPaidMembers.length + unpaidMembers.length
+        notificationsSent: sortedMembers.length
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

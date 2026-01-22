@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,11 +5,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   CheckCircle2, 
-  XCircle, 
   Users, 
   AlertTriangle, 
   Play,
-  Loader2
+  Loader2,
+  Calendar
 } from "lucide-react";
 import {
   AlertDialog,
@@ -33,6 +32,7 @@ interface Member {
   first_payment_at: string | null;
   approval_status: string;
   is_manager: boolean;
+  joined_at?: string;
   profiles: {
     full_name: string;
     phone?: string;
@@ -60,37 +60,28 @@ export const PreStartDashboard = ({
   onStart,
   isStarting
 }: PreStartDashboardProps) => {
+  // All approved members are ready to participate
   const approvedMembers = members.filter(m => m.approval_status === 'approved');
-  const paidMembers = approvedMembers.filter(m => m.first_payment_completed);
-  const unpaidMembers = approvedMembers.filter(m => !m.first_payment_completed);
   
-  const canStart = paidMembers.length >= minMembers;
-  const membersNeeded = minMembers - paidMembers.length;
+  const canStart = approvedMembers.length >= minMembers;
+  const membersNeeded = minMembers - approvedMembers.length;
 
-  // Sort paid members by payment time
-  const sortedPaidMembers = [...paidMembers].sort((a, b) => {
-    const aTime = a.first_payment_at ? new Date(a.first_payment_at).getTime() : 0;
-    const bTime = b.first_payment_at ? new Date(b.first_payment_at).getTime() : 0;
+  // Sort by join date for display (earliest first = will be first in payout order)
+  const sortedMembers = [...approvedMembers].sort((a, b) => {
+    const aTime = a.joined_at ? new Date(a.joined_at).getTime() : 0;
+    const bTime = b.joined_at ? new Date(b.joined_at).getTime() : 0;
     return aTime - bTime;
   });
 
   return (
     <div className="space-y-6">
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-3xl font-bold text-green-600">{paidMembers.length}</div>
-              <p className="text-sm text-muted-foreground">Paid & Ready</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-amber-600">{unpaidMembers.length}</div>
-              <p className="text-sm text-muted-foreground">Not Paid</p>
+              <div className="text-3xl font-bold text-primary">{approvedMembers.length}</div>
+              <p className="text-sm text-muted-foreground">Approved Members</p>
             </div>
           </CardContent>
         </Card>
@@ -110,8 +101,8 @@ export const PreStartDashboard = ({
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Cannot Start Yet</AlertTitle>
           <AlertDescription>
-            You need {membersNeeded} more member(s) to pay their first contribution before you can start.
-            Current: {paidMembers.length}/{minMembers} minimum required.
+            You need {membersNeeded} more approved member(s) before you can start.
+            Current: {approvedMembers.length}/{minMembers} minimum required.
           </AlertDescription>
         </Alert>
       ) : (
@@ -119,39 +110,37 @@ export const PreStartDashboard = ({
           <CheckCircle2 className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-800">Ready to Start!</AlertTitle>
           <AlertDescription className="text-green-700">
-            You have {paidMembers.length} paid members (minimum: {minMembers}). 
-            {unpaidMembers.length > 0 && (
-              <span className="font-semibold"> {unpaidMembers.length} member(s) will be removed for not paying.</span>
-            )}
+            You have {approvedMembers.length} approved members (minimum: {minMembers}). 
+            Start the chama to begin the contribution cycle.
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Ready Members (Paid) */}
+      {/* Members Ready to Participate */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
-            <CardTitle>Ready to Start ({paidMembers.length})</CardTitle>
+            <Users className="h-5 w-5 text-primary" />
+            <CardTitle>Members ({approvedMembers.length})</CardTitle>
           </div>
           <CardDescription>
-            These members have paid and will be active when the chama starts
+            These members will participate when the chama starts. Order is based on join date.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {sortedPaidMembers.length === 0 ? (
+          {sortedMembers.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">
-              No members have paid yet
+              No approved members yet
             </p>
           ) : (
             <div className="space-y-3">
-              {sortedPaidMembers.map((member, index) => (
+              {sortedMembers.map((member, index) => (
                 <div 
                   key={member.id} 
-                  className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100"
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold text-sm">
+                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
                       {index + 1}
                     </div>
                     <Avatar className="h-8 w-8">
@@ -166,14 +155,14 @@ export const PreStartDashboard = ({
                           <Badge variant="secondary" className="ml-2 text-xs">Manager</Badge>
                         )}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        Paid {member.first_payment_at && new Date(member.first_payment_at).toLocaleDateString()}
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Joined {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : 'N/A'}
                       </p>
                     </div>
                   </div>
-                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Position #{index + 1}
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                    Payout #{index + 1}
                   </Badge>
                 </div>
               ))}
@@ -182,61 +171,18 @@ export const PreStartDashboard = ({
         </CardContent>
       </Card>
 
-      {/* Unpaid Members (Will Be Removed) */}
-      {unpaidMembers.length > 0 && (
-        <Card className="border-amber-500/50">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-amber-600" />
-              <CardTitle className="text-amber-800">Will Be Removed ({unpaidMembers.length})</CardTitle>
-            </div>
-            <CardDescription>
-              These members have not paid and will be removed when the chama starts
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {unpaidMembers.map((member) => (
-                <div 
-                  key={member.id} 
-                  className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback>
-                        {member.profiles?.full_name?.charAt(0).toUpperCase() || '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">
-                        {member.profiles?.full_name || 'Unknown'}
-                        {member.is_manager && (
-                          <Badge variant="secondary" className="ml-2 text-xs">Manager</Badge>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Awaiting payment of KES {contributionAmount.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Not Paid
-                  </Badge>
-                </div>
-              ))}
-            </div>
-            
-            <Alert className="mt-4 bg-amber-50 border-amber-200">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800">
-                These members will be marked as "REMOVED - NO FIRST PAYMENT" and excluded from this cycle.
-                They will be notified via SMS.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-      )}
+      {/* What Happens When You Start */}
+      <Card className="border-dashed">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">What happens when you start?</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-2">
+          <p>• All approved members will be activated with their payout positions</p>
+          <p>• The first contribution cycle will begin immediately</p>
+          <p>• Members will receive SMS notifications with their contribution schedule</p>
+          <p>• The first member in order will receive the pooled contributions after the cycle ends</p>
+        </CardContent>
+      </Card>
 
       {/* Start Button */}
       {isManager && (
@@ -256,8 +202,7 @@ export const PreStartDashboard = ({
                 ) : (
                   <>
                     <Play className="h-5 w-5 mr-2" />
-                    Start Chama
-                    {unpaidMembers.length > 0 && ` (${unpaidMembers.length} will be removed)`}
+                    Start Chama ({approvedMembers.length} members)
                   </>
                 )}
               </Button>
@@ -269,15 +214,11 @@ export const PreStartDashboard = ({
                   <p>This action will:</p>
                   <ul className="list-disc list-inside space-y-1 text-sm">
                     <li className="text-green-700">
-                      Activate <strong>{paidMembers.length}</strong> paid member(s)
+                      Activate <strong>{approvedMembers.length}</strong> member(s)
                     </li>
-                    {unpaidMembers.length > 0 && (
-                      <li className="text-amber-700">
-                        Remove <strong>{unpaidMembers.length}</strong> unpaid member(s)
-                      </li>
-                    )}
-                    <li>Create the first contribution cycle</li>
+                    <li>Start the first contribution cycle</li>
                     <li>Send SMS notifications to all members</li>
+                    <li>Members will need to contribute KES {contributionAmount.toLocaleString()}</li>
                   </ul>
                   <p className="font-semibold mt-2">This action cannot be undone.</p>
                 </AlertDialogDescription>
