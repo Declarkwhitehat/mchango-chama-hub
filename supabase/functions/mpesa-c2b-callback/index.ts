@@ -115,22 +115,30 @@ serve(async (req) => {
       // Get chama details
       const { data: chamaData } = await supabase
         .from('chama')
-        .select('id, group_code, name, contribution_amount')
+        .select('id, group_code, name, contribution_amount, commission_rate, total_gross_collected, total_commission_paid, available_balance')
         .eq('id', chamaMemberData.chama_id)
         .single();
 
+      // Calculate commission (default 5% for chama)
+      const commissionRate = chamaData?.commission_rate || 0.05;
+      const grossAmount = parseFloat(amount);
+      const commissionAmount = grossAmount * commissionRate;
+      const netAmount = grossAmount - commissionAmount;
+
       // Record chama contribution
-      const { error: contributionError } = await supabase
+      const { data: contribution, error: contributionError } = await supabase
         .from('contributions')
         .insert({
           chama_id: chamaMemberData.chama_id,
           member_id: chamaMemberData.id,
           paid_by_member_id: chamaMemberData.id,
-          amount: parseFloat(amount),
+          amount: grossAmount,
           payment_reference: mpesaReceiptNumber,
           status: 'completed',
           payment_notes: `Offline payment via till number. Payer: ${firstName} ${middleName || ''} ${lastName}. Phone: ${phoneNumber}`,
-        });
+        })
+        .select()
+        .single();
 
       if (contributionError) {
         console.error('Error recording contribution:', contributionError);
@@ -139,13 +147,60 @@ serve(async (req) => {
 
       console.log('Contribution recorded successfully');
 
-      // Send SMS notification (optional)
+      // Update chama financial tracking with NET amount as available
+      if (chamaData) {
+        const { error: chamaUpdateError } = await supabase
+          .from('chama')
+          .update({
+            total_gross_collected: (chamaData.total_gross_collected || 0) + grossAmount,
+            total_commission_paid: (chamaData.total_commission_paid || 0) + commissionAmount,
+            available_balance: (chamaData.available_balance || 0) + netAmount,
+          })
+          .eq('id', chamaData.id);
+
+        if (chamaUpdateError) {
+          console.error('Error updating chama financials:', chamaUpdateError);
+        } else {
+          console.log('Chama financials updated:', { grossAmount, commissionAmount, netAmount });
+        }
+      }
+
+      // Record commission as company earnings
+      await supabase
+        .from('company_earnings')
+        .insert({
+          source: 'chama_contribution',
+          amount: commissionAmount,
+          reference_id: contribution?.id,
+          description: `${(commissionRate * 100)}% commission on offline chama contribution of KES ${grossAmount}. Net credited: KES ${netAmount}`
+        });
+
+      // Record in financial ledger for detailed tracking
+      await supabase
+        .from('financial_ledger')
+        .insert({
+          transaction_type: 'contribution',
+          source_type: 'chama',
+          source_id: chamaMemberData.chama_id,
+          reference_id: contribution?.id,
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
+          commission_rate: commissionRate,
+          payer_name: `${firstName} ${middleName || ''} ${lastName}`.trim(),
+          payer_phone: phoneNumber,
+          description: `Offline chama contribution with ${(commissionRate * 100)}% commission deducted`
+        });
+
+      console.log('Commission recorded:', commissionAmount, 'Net available:', netAmount);
+
+      // Send SMS notification
       if (chamaData) {
         try {
           await supabase.functions.invoke('send-transactional-sms', {
             body: {
               phone: phoneNumber,
-              message: `Payment of KSh ${amount} received for ${chamaData.name}. Member ID: ${accountNumber}. Receipt: ${mpesaReceiptNumber}`,
+              message: `Payment of KSh ${grossAmount} received for ${chamaData.name}. Commission: KSh ${commissionAmount.toFixed(2)} (${(commissionRate * 100)}%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
             },
           });
         } catch (smsError) {
@@ -158,7 +213,10 @@ serve(async (req) => {
         JSON.stringify({ 
           ResultCode: 0, 
           ResultDesc: 'Payment accepted and recorded for Chama',
-          type: 'chama'
+          type: 'chama',
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

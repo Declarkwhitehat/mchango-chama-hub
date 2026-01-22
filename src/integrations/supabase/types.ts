@@ -61,6 +61,7 @@ export type Database = {
       chama: {
         Row: {
           accepting_rejoin_requests: boolean | null
+          available_balance: number | null
           commission_rate: number | null
           contribution_amount: number
           contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
@@ -80,12 +81,15 @@ export type Database = {
           slug: string
           start_date: string | null
           status: Database["public"]["Enums"]["chama_status"]
+          total_commission_paid: number | null
+          total_gross_collected: number | null
           total_withdrawn: number | null
           updated_at: string
           whatsapp_link: string | null
         }
         Insert: {
           accepting_rejoin_requests?: boolean | null
+          available_balance?: number | null
           commission_rate?: number | null
           contribution_amount: number
           contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
@@ -105,12 +109,15 @@ export type Database = {
           slug: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["chama_status"]
+          total_commission_paid?: number | null
+          total_gross_collected?: number | null
           total_withdrawn?: number | null
           updated_at?: string
           whatsapp_link?: string | null
         }
         Update: {
           accepting_rejoin_requests?: boolean | null
+          available_balance?: number | null
           commission_rate?: number | null
           contribution_amount?: number
           contribution_frequency?: Database["public"]["Enums"]["contribution_frequency"]
@@ -130,6 +137,8 @@ export type Database = {
           slug?: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["chama_status"]
+          total_commission_paid?: number | null
+          total_gross_collected?: number | null
           total_withdrawn?: number | null
           updated_at?: string
           whatsapp_link?: string | null

@@ -186,7 +186,7 @@ serve(async (req) => {
       if (chama_id) {
         const { data: chama, error: chamaError } = await supabaseClient
           .from('chama')
-          .select('created_by, commission_rate')
+          .select('created_by, commission_rate, available_balance, total_gross_collected, total_commission_paid, total_withdrawn')
           .eq('id', chama_id)
           .single();
 
@@ -266,14 +266,35 @@ serve(async (req) => {
           }
         }
 
-        // Calculate available balance from contributions
-        const { data: contributions } = await supabaseClient
-          .from('contributions')
-          .select('amount')
-          .eq('chama_id', chama_id)
-          .eq('status', 'completed');
+        // Use available_balance (net after commission) for withdrawals
+        // Fall back to calculating from contributions if available_balance is not set
+        const availableBalance = Number(chama.available_balance) || 0;
+        const totalWithdrawn = Number(chama.total_withdrawn) || 0;
+        
+        if (availableBalance > 0) {
+          // Use the tracked available balance (already net of commission)
+          totalAvailable = availableBalance - totalWithdrawn;
+        } else {
+          // Fallback: Calculate from contributions with commission deduction
+          const { data: contributions } = await supabaseClient
+            .from('contributions')
+            .select('amount')
+            .eq('chama_id', chama_id)
+            .eq('status', 'completed');
 
-        totalAvailable = contributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+          const grossTotal = contributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+          const commissionRate = Number(chama.commission_rate) || 0.05;
+          const netTotal = grossTotal * (1 - commissionRate);
+          totalAvailable = netTotal - totalWithdrawn;
+        }
+        
+        console.log('Chama withdrawal balance check:', { 
+          availableBalance, 
+          totalWithdrawn, 
+          totalAvailable,
+          grossCollected: chama.total_gross_collected,
+          commissionPaid: chama.total_commission_paid
+        });
 
       } else if (mchango_id) {
         const { data: mchango, error: mchangoError } = await supabaseClient
