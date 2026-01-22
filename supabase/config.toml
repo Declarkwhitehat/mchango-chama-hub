@@ -103,7 +103,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.mpesa-b2c-payout]
-verify_jwt = true
+verify_jwt = false
 
 [functions.mpesa-b2c-callback]
 verify_jwt = false
