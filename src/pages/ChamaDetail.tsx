@@ -20,7 +20,7 @@ import { SkippedMemberAlert } from "@/components/chama/SkippedMemberAlert";
 import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
 import { WhatsAppLinkManager } from "@/components/chama/WhatsAppLinkManager";
-import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet } from "lucide-react";
+import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -661,7 +661,20 @@ const ChamaDetail = () => {
                   <CardTitle>Group Members ({approvedMembers.length})</CardTitle>
                   <CardDescription>Approved members by join order</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  {/* WhatsApp Group Join Button */}
+                  {chama.whatsapp_link && (
+                    <a
+                      href={chama.whatsapp_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full p-3 bg-primary/10 border border-primary/20 rounded-lg text-primary hover:bg-primary/20 transition-colors font-medium"
+                    >
+                      <MessageCircle className="h-5 w-5" />
+                      Join WhatsApp Group
+                    </a>
+                  )}
+
                   <div className="space-y-4">
                      {approvedMembers
                       .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
