@@ -363,7 +363,7 @@ const ChamaDetail = () => {
               </div>
             </div>
             <CardTitle className="text-2xl">{chama.name}</CardTitle>
-            <CardDescription>Founded by {chama.profiles.full_name}</CardDescription>
+            <CardDescription>Founded by {chama.profiles?.full_name || 'Unknown'}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-foreground leading-relaxed">{chama.description}</p>
@@ -501,7 +501,7 @@ const ChamaDetail = () => {
                     <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="font-medium">
-                        It's {approvedMembers.find(m => m.id === currentTurnMemberId)?.profiles.full_name}'s turn
+                        It's {approvedMembers.find(m => m.id === currentTurnMemberId)?.profiles?.full_name || 'Unknown'}'s turn
                       </p>
                       {nextTurnDates[currentUserMembership.id] && (
                         <p className="text-sm text-muted-foreground mt-1">
@@ -684,12 +684,12 @@ const ChamaDetail = () => {
                           <div className="flex items-center gap-3">
                             <Avatar>
                               <AvatarFallback>
-                                {member.profiles.full_name.charAt(0)}
+                                {member.profiles?.full_name?.charAt(0) || '?'}
                               </AvatarFallback>
                             </Avatar>
                             <div>
                               <p className="font-medium text-foreground">
-                                {member.profiles.full_name}
+                                {member.profiles?.full_name || 'Unknown'}
                                 {member.is_manager && (
                                   <Badge variant="outline" className="ml-2">Manager</Badge>
                                 )}
