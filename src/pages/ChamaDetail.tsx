@@ -616,12 +616,12 @@ const ChamaDetail = () => {
         {/* Tabs - Only visible to approved members and admins */}
         {hasViewAccess && (
           <Tabs defaultValue="dashboard" className="w-full">
-            <TabsList className={`grid w-full ${isManager ? 'grid-cols-5' : 'grid-cols-4'}`}>
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-              <TabsTrigger value="transparency">Transparency</TabsTrigger>
-              {isManager && <TabsTrigger value="payments">Payments</TabsTrigger>}
-              <TabsTrigger value="members">Members</TabsTrigger>
-              <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center">
+              <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
+              <TabsTrigger value="transparency" className="text-xs sm:text-sm">Transparency</TabsTrigger>
+              {isManager && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
+              <TabsTrigger value="members" className="text-xs sm:text-sm">Members</TabsTrigger>
+              <TabsTrigger value="details" className="text-xs sm:text-sm">Details</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard">
