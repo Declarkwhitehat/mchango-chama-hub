@@ -45,17 +45,17 @@ Deno.serve(async (req) => {
       normalizedIdentifier = phoneNumber;
     }
 
-    // Check rate limit: 5 attempts per 1 hour
-    const ONE_HOUR = 60 * 60 * 1000;
+    // Check rate limit: 5 attempts per 5 minutes (only for this specific email/phone)
+    const FIVE_MINUTES = 5 * 60 * 1000;
     const MAX_LOGIN_ATTEMPTS = 5;
 
-    // Check rate limit by identifier (email/phone)
+    // Check rate limit by identifier (email/phone) only - not by IP
     const identifierRateLimit = await checkRateLimit(
       supabase,
       normalizedIdentifier,
       identifierType,
       'login',
-      ONE_HOUR,
+      FIVE_MINUTES,
       MAX_LOGIN_ATTEMPTS
     );
 
@@ -66,28 +66,6 @@ Deno.serve(async (req) => {
           error: identifierRateLimit.error || 'Too many login attempts',
           remainingAttempts: 0,
           resetTime: identifierRateLimit.resetTime
-        }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check rate limit by IP
-    const ipRateLimit = await checkRateLimit(
-      supabase,
-      clientIP,
-      'ip',
-      'login',
-      ONE_HOUR,
-      MAX_LOGIN_ATTEMPTS
-    );
-
-    if (!ipRateLimit.allowed) {
-      console.log(`Rate limit exceeded for IP: ${clientIP}`);
-      return new Response(
-        JSON.stringify({ 
-          error: ipRateLimit.error || 'Too many login attempts from this location',
-          remainingAttempts: 0,
-          resetTime: ipRateLimit.resetTime
         }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -111,12 +89,13 @@ Deno.serve(async (req) => {
           error: profileError,
           errorCode: profileError?.code,
           errorMessage: profileError?.message,
-          errorDetails: profileError?.details
+          errorDetails: profileError?.details,
+          remainingAttempts: identifierRateLimit.remainingAttempts
         });
         return new Response(
           JSON.stringify({ 
             error: 'Invalid credentials - phone number not found',
-            remainingAttempts: Math.min(identifierRateLimit.remainingAttempts, ipRateLimit.remainingAttempts)
+            remainingAttempts: identifierRateLimit.remainingAttempts
           }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -153,7 +132,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ 
           error: 'Invalid credentials - authentication failed',
           details: authError.message,
-          remainingAttempts: Math.min(identifierRateLimit.remainingAttempts, ipRateLimit.remainingAttempts)
+          remainingAttempts: identifierRateLimit.remainingAttempts
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
