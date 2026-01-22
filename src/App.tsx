@@ -1,54 +1,66 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import TermsAndConditions from "./pages/TermsAndConditions";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Home from "./pages/Home";
-import MchangoList from "./pages/MchangoList";
-import MchangoCreate from "./pages/MchangoCreate";
-import MchangoDetail from "./pages/MchangoDetail";
-import MchangoExplore from "./pages/MchangoExplore";
-import OrganizationList from "./pages/OrganizationList";
-import OrganizationCreate from "./pages/OrganizationCreate";
-import OrganizationDetail from "./pages/OrganizationDetail";
-import ChamaCreate from "./pages/ChamaCreate";
-import ChamaDetail from "./pages/ChamaDetail";
-import ChamaJoin from "./pages/ChamaJoin";
-import ChamaList from "./pages/ChamaList";
-import Profile from "./pages/Profile";
-
-import Activity from "./pages/Activity";
-import AdminKYC from "./pages/AdminKYC";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminUserDetail from "./pages/AdminUserDetail";
-import AdminUsers from "./pages/AdminUsers";
-import AdminTransactions from "./pages/AdminTransactions";
-import AdminWithdrawals from "./pages/AdminWithdrawals";
-import AdminChamas from "./pages/AdminChamas";
-import AdminCampaigns from "./pages/AdminCampaigns";
-import AdminCallbacks from "./pages/AdminCallbacks";
-import AdminAudit from "./pages/AdminAudit";
-import AdminExport from "./pages/AdminExport";
-import AdminSearch from "./pages/AdminSearch";
-import AdminPaymentConfig from "./pages/AdminPaymentConfig";
-import AdminOrganizations from "./pages/AdminOrganizations";
-import AdminLedger from "./pages/AdminLedger";
-import KYCUpload from "./pages/KYCUpload";
-import NotFound from "./pages/NotFound";
-import AboutUs from "./pages/AboutUs";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { ChatSupport } from "./components/ChatSupport";
+import { Loader2 } from "lucide-react";
+
+// Lazy load all pages for better initial load performance
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const Home = lazy(() => import("./pages/Home"));
+const MchangoList = lazy(() => import("./pages/MchangoList"));
+const MchangoCreate = lazy(() => import("./pages/MchangoCreate"));
+const MchangoDetail = lazy(() => import("./pages/MchangoDetail"));
+const MchangoExplore = lazy(() => import("./pages/MchangoExplore"));
+const OrganizationList = lazy(() => import("./pages/OrganizationList"));
+const OrganizationCreate = lazy(() => import("./pages/OrganizationCreate"));
+const OrganizationDetail = lazy(() => import("./pages/OrganizationDetail"));
+const ChamaCreate = lazy(() => import("./pages/ChamaCreate"));
+const ChamaDetail = lazy(() => import("./pages/ChamaDetail"));
+const ChamaJoin = lazy(() => import("./pages/ChamaJoin"));
+const ChamaList = lazy(() => import("./pages/ChamaList"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Activity = lazy(() => import("./pages/Activity"));
+const KYCUpload = lazy(() => import("./pages/KYCUpload"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AboutUs = lazy(() => import("./pages/AboutUs"));
+
+// Admin pages - lazy loaded
+const AdminKYC = lazy(() => import("./pages/AdminKYC"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const AdminUserDetail = lazy(() => import("./pages/AdminUserDetail"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminTransactions = lazy(() => import("./pages/AdminTransactions"));
+const AdminWithdrawals = lazy(() => import("./pages/AdminWithdrawals"));
+const AdminChamas = lazy(() => import("./pages/AdminChamas"));
+const AdminCampaigns = lazy(() => import("./pages/AdminCampaigns"));
+const AdminCallbacks = lazy(() => import("./pages/AdminCallbacks"));
+const AdminAudit = lazy(() => import("./pages/AdminAudit"));
+const AdminExport = lazy(() => import("./pages/AdminExport"));
+const AdminSearch = lazy(() => import("./pages/AdminSearch"));
+const AdminPaymentConfig = lazy(() => import("./pages/AdminPaymentConfig"));
+const AdminOrganizations = lazy(() => import("./pages/AdminOrganizations"));
+const AdminLedger = lazy(() => import("./pages/AdminLedger"));
 
 const queryClient = new QueryClient();
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
 
 const AppContent = () => {
   const location = useLocation();
@@ -60,7 +72,8 @@ const AppContent = () => {
       <Sonner />
       <PWAInstallPrompt />
       {!isAdminRoute && <ChatSupport />}
-      <Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -103,6 +116,7 @@ const AppContent = () => {
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+      </Suspense>
     </>
   );
 };
