@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./registerSW";
 import { ThemeProvider } from "./components/ThemeProvider";
 
 // Ensure React is available globally for hooks resolution in Vite HMR
