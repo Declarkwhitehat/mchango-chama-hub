@@ -396,7 +396,7 @@ const ChamaDetail = () => {
             chamaId={chama.id}
             chamaName={chama.name}
             contributionAmount={chama.contribution_amount}
-            minMembers={chama.min_members || 5}
+            minMembers={chama.min_members || 2}
             members={chama.chama_members.filter(m => m.approval_status === 'approved').map(m => ({
               id: m.id,
               user_id: m.user_id || '',
@@ -406,6 +406,7 @@ const ChamaDetail = () => {
               first_payment_at: m.first_payment_at || null,
               approval_status: m.approval_status,
               is_manager: m.is_manager,
+              joined_at: m.joined_at,
               profiles: m.profiles ? { full_name: m.profiles.full_name, phone: m.profiles.phone } : null
             }))}
             isManager={isManager}
