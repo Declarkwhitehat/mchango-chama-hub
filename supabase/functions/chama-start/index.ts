@@ -9,28 +9,45 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '').trim() || null;
+
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Admin client for reliable JWT verification
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Verify user with service role
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Anon client for RLS-respecting database operations
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: authHeader ? { Authorization: authHeader } : {},
+          headers: { Authorization: authHeader! },
         },
         auth: {
           persistSession: false,
         },
       }
     );
-
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     const { chamaId } = await req.json();
 
