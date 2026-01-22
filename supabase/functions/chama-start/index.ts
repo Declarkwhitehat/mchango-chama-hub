@@ -223,7 +223,7 @@ serve(async (req) => {
           newIndex: expectedIndex
         });
 
-        // Generate new member code if needed
+        // Generate new member code if needed (uses DB function with new format)
         const { data: newMemberCode } = await supabaseClient
           .rpc('generate_member_code', {
             p_chama_id: chamaId,
@@ -234,7 +234,7 @@ serve(async (req) => {
           .from('chama_members')
           .update({
             order_index: expectedIndex,
-            member_code: newMemberCode || `${chama.slug}-M${expectedIndex}`,
+            member_code: newMemberCode || member.member_code, // Keep existing code if RPC fails
             status: 'active' // Ensure status is active
           })
           .eq('id', member.id);
