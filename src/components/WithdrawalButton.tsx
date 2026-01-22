@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +30,6 @@ export const WithdrawalButton = ({
 }: WithdrawalButtonProps) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [pendingWithdrawal, setPendingWithdrawal] = useState<any>(null);
@@ -149,19 +147,13 @@ export const WithdrawalButton = ({
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!amount || parseFloat(amount) <= 0) {
-      toast({
-        title: "Invalid Amount",
-        description: "Please enter a valid withdrawal amount",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Use full available balance - no manual amount entry
+    const withdrawAmount = totalAvailable;
 
-    if (parseFloat(amount) > totalAvailable) {
+    if (withdrawAmount <= 0) {
       toast({
-        title: "Insufficient Funds",
-        description: `Available balance is KES ${totalAvailable.toLocaleString()}`,
+        title: "No Funds Available",
+        description: "There are no funds available to withdraw",
         variant: "destructive",
       });
       return;
@@ -185,15 +177,13 @@ export const WithdrawalButton = ({
         body: {
           chama_id: chamaId,
           mchango_id: mchangoId,
-          amount: parseFloat(amount),
+          amount: withdrawAmount,
           notes: notes.trim() ? notes.trim() : undefined,
         },
         method: 'POST'
       });
 
       if (error) throw error;
-
-      const withdrawAmount = parseFloat(amount);
 
       // Check if auto-approved from response
       if (data?.auto_approved) {
@@ -204,11 +194,10 @@ export const WithdrawalButton = ({
       } else {
         toast({
           title: "Withdrawal Submitted",
-          description: `Your request for KES ${withdrawAmount.toLocaleString()} has been submitted for review.`,
+          description: `Your request for KES ${withdrawAmount.toLocaleString()} has been submitted for admin review.`,
         });
       }
 
-      setAmount("");
       setNotes("");
       setIsOpen(false);
       
@@ -231,8 +220,9 @@ export const WithdrawalButton = ({
     }
   };
 
-    // No commission deduction at withdrawal - commission was already deducted at contribution time
-  const withdrawAmount = parseFloat(amount || "0");
+  // No commission deduction at withdrawal - commission was already deducted at contribution time
+  // Use full available balance
+  const withdrawAmount = totalAvailable;
 
   const dailyLimit = defaultPaymentMethod 
     ? PAYMENT_METHOD_LIMITS[defaultPaymentMethod.method_type as PaymentMethodType]?.daily_limit || 0
@@ -354,36 +344,20 @@ export const WithdrawalButton = ({
               </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="amount">Withdrawal Amount (KES)</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0"
-                max={totalAvailable}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Enter amount"
-                required
-              />
-            </div>
-
-            {parseFloat(amount || "0") > 0 && (
-              <Card className="bg-muted/50">
-                <CardContent className="pt-4">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>You'll Receive</span>
-                    <span className="text-primary">
-                      KES {withdrawAmount.toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Commission was already deducted when payments were received
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            {/* Full balance withdrawal - no amount input needed */}
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="pt-4">
+                <div className="flex justify-between text-lg font-bold">
+                  <span>You'll Receive</span>
+                  <span className="text-primary">
+                    KES {withdrawAmount.toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Full balance withdrawal • Commission was already deducted when payments were received
+                </p>
+              </CardContent>
+            </Card>
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
@@ -407,7 +381,7 @@ export const WithdrawalButton = ({
 
             <Button 
               type="submit" 
-              disabled={isLoading || !defaultPaymentMethod || withdrawAmount > remainingLimit} 
+              disabled={isLoading || !defaultPaymentMethod || withdrawAmount > remainingLimit || withdrawAmount <= 0} 
               className="w-full"
             >
               {isLoading ? (
@@ -416,7 +390,7 @@ export const WithdrawalButton = ({
                   Requesting...
                 </>
               ) : (
-                `Request Withdrawal`
+                `Withdraw Full Balance (KES ${withdrawAmount.toLocaleString()})`
               )}
             </Button>
           </form>

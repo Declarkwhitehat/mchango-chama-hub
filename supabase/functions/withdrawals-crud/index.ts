@@ -326,13 +326,10 @@ serve(async (req) => {
       }
 
       // Determine if auto-approval is allowed
-      // Auto-approve if payment method is M-Pesa AND:
-      // - Chama withdrawal: member has no payment issues
-      // - Mchango withdrawal: user is the creator
-      const canAutoApprove = defaultPaymentMethod.method_type === 'mpesa' && (
-        (chama_id && !hasPaymentIssues) ||
-        (mchango_id && isCreator)
-      );
+      // Auto-approve ONLY for Mchango withdrawals by creators with M-Pesa
+      // All Chama withdrawals require admin approval (no auto-approve)
+      const canAutoApprove = defaultPaymentMethod.method_type === 'mpesa' && 
+        mchango_id && isCreator;
       const initialStatus = canAutoApprove ? 'approved' : 'pending';
 
       console.log('Auto-approval check:', { 
