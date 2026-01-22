@@ -13,10 +13,13 @@ if (!container) throw new Error("Root element not found");
 
 const root = createRoot(container);
 
-// Remove no-transitions class after initial render to enable smooth theme switching
+// Remove no-transitions class after a brief delay to allow React to hydrate
 const enableTransitions = () => {
+  // Use double RAF to ensure paint has completed
   requestAnimationFrame(() => {
-    document.documentElement.classList.remove('no-transitions');
+    requestAnimationFrame(() => {
+      document.documentElement.classList.remove('no-transitions');
+    });
   });
 };
 
@@ -25,14 +28,14 @@ root.render(
     <ThemeProvider 
       attribute="class" 
       defaultTheme="dark" 
-      enableSystem
+      enableSystem={false}
       storageKey="theme"
-      disableTransitionOnChange={false}
+      disableTransitionOnChange
     >
       <App />
     </ThemeProvider>
   </StrictMode>
 );
 
-// Enable transitions after app is mounted
+// Enable transitions after app is fully mounted
 enableTransitions();

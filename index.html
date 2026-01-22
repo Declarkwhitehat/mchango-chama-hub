@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -26,31 +26,46 @@
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
-    <!-- Prevent theme flash - apply theme before React hydrates -->
+    <!-- Critical: Prevent theme flash by applying theme BEFORE any paint -->
     <script>
       (function() {
+        // Block rendering until theme is applied
+        var d = document.documentElement;
+        var theme = null;
+        
         try {
-          var theme = localStorage.getItem('theme');
-          var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          
-          // Determine which theme to apply
-          var isDark = theme === 'dark' || (!theme && systemDark) || (theme === 'system' && systemDark);
-          
-          // Apply theme class immediately to prevent flash
-          if (isDark) {
-            document.documentElement.classList.add('dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-          }
-          
-          // Add class to disable transitions on initial load
-          document.documentElement.classList.add('no-transitions');
-        } catch (e) {
-          // Fallback to dark theme
-          document.documentElement.classList.add('dark');
+          theme = localStorage.getItem('theme');
+        } catch (e) {}
+        
+        var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        // Determine if dark mode should be applied
+        // Default to dark if no preference is saved
+        var isDark = theme === 'dark' || 
+                     theme === null || 
+                     (theme === 'system' && systemDark);
+        
+        // Apply theme class synchronously before first paint
+        if (isDark) {
+          d.classList.add('dark');
+          d.style.colorScheme = 'dark';
+        } else {
+          d.classList.remove('dark');
+          d.style.colorScheme = 'light';
         }
+        
+        // Block transitions during initial load
+        d.classList.add('no-transitions');
       })();
     </script>
+    
+    <!-- Critical CSS to prevent flash - inline dark theme background -->
+    <style>
+      html { background-color: #0d1a14; }
+      html.dark { background-color: #0d1a14; }
+      html:not(.dark) { background-color: #ffffff; }
+      .no-transitions, .no-transitions * { transition: none !important; }
+    </style>
   </head>
 
   <body>
