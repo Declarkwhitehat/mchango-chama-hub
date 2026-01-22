@@ -76,7 +76,7 @@ const ChamaCreate = () => {
         contribution_amount: Number(formData.get("contribution_amount")),
         contribution_frequency: frequency,
         every_n_days_count: frequency === "every_n_days" ? Number(formData.get("every_n_days_count")) : null,
-        min_members: Number(formData.get("min_members")) || 5,
+        min_members: Number(formData.get("min_members")) || 2,
         max_members: Number(formData.get("max_members")),
         is_public: formData.get("is_public") === "true",
         whatsapp_link: formData.get("whatsapp_link") as string || null,
@@ -269,12 +269,12 @@ const ChamaCreate = () => {
                     id="min_members"
                     name="min_members"
                     type="number"
-                    placeholder="5"
-                    defaultValue="5"
-                    min="5"
+                    placeholder="2"
+                    defaultValue="2"
+                    min="2"
                     disabled={kycStatus !== "approved"}
                   />
-                  <p className="text-xs text-muted-foreground">Minimum 5 members</p>
+                  <p className="text-xs text-muted-foreground">Minimum 2 members</p>
                 </div>
 
                 <div className="space-y-2">
@@ -284,7 +284,7 @@ const ChamaCreate = () => {
                     name="max_members"
                     type="number"
                     placeholder="20"
-                    min="5"
+                    min="2"
                     max="100"
                     required
                     disabled={kycStatus !== "approved"}
