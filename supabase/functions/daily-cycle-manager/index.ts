@@ -212,8 +212,8 @@ Deno.serve(async (req) => {
           )
         `)
         .eq('chama_id', chamaId)
-        .gte('start_date', today)
-        .lte('end_date', today)
+        .lte('start_date', today)
+        .gte('end_date', today)
         .maybeSingle();
 
       if (error) {
@@ -244,7 +244,15 @@ Deno.serve(async (req) => {
         `)
         .eq('cycle_id', cycle.id);
 
-      return new Response(JSON.stringify({ cycle, payments }), {
+      // Return cycle with explicit end_date and cutoff_time for frontend countdown
+      return new Response(JSON.stringify({ 
+        cycle: {
+          ...cycle,
+          end_date: cycle.end_date,
+          cutoff_time: '20:00:00'
+        }, 
+        payments 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }

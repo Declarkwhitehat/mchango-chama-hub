@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Clock, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { PaymentCountdownTimer } from "./PaymentCountdownTimer";
 
 interface CyclePaymentStatusProps {
   chamaId: string;
   frequency: string;
+  onPayNow?: () => void;
 }
 
 interface PaymentStatus {
@@ -28,16 +30,20 @@ interface CycleInfo {
   is_complete: boolean;
   payout_processed: boolean;
   payout_type?: string;
+  end_date: string;
+  due_amount: number;
 }
 
-export function CyclePaymentStatus({ chamaId, frequency }: CyclePaymentStatusProps) {
+export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymentStatusProps) {
   const [loading, setLoading] = useState(true);
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [payments, setPayments] = useState<PaymentStatus[]>([]);
-  const [timeUntilCutoff, setTimeUntilCutoff] = useState<string>("");
+  const [currentUserPaid, setCurrentUserPaid] = useState(false);
 
   const loadPaymentStatus = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
       const { data, error } = await supabase.functions.invoke('daily-cycle-manager', {
         body: { action: 'current', chamaId }
       });
@@ -51,7 +57,9 @@ export function CyclePaymentStatus({ chamaId, frequency }: CyclePaymentStatusPro
           beneficiary_code: data.cycle.beneficiary?.member_code || '',
           is_complete: data.cycle.is_complete,
           payout_processed: data.cycle.payout_processed,
-          payout_type: data.cycle.payout_type
+          payout_type: data.cycle.payout_type,
+          end_date: data.cycle.end_date,
+          due_amount: data.cycle.due_amount
         });
 
         const paymentData = data.payments?.map((p: any) => ({
@@ -61,10 +69,17 @@ export function CyclePaymentStatus({ chamaId, frequency }: CyclePaymentStatusPro
           amount_due: p.amount_due,
           is_paid: p.is_paid,
           payment_time: p.payment_time,
-          is_late_payment: p.is_late_payment
+          is_late_payment: p.is_late_payment,
+          user_id: p.chama_members?.user_id
         })) || [];
 
         setPayments(paymentData);
+        
+        // Check if current user has paid
+        if (session?.user?.id) {
+          const userPayment = paymentData.find((p: any) => p.user_id === session.user.id);
+          setCurrentUserPaid(userPayment?.is_paid || false);
+        }
       }
     } catch (error: any) {
       console.error('Error loading payment status:', error);
@@ -94,34 +109,6 @@ export function CyclePaymentStatus({ chamaId, frequency }: CyclePaymentStatusPro
     };
   }, [chamaId]);
 
-  // Calculate time until 8 PM cutoff on the cycle end date
-  useEffect(() => {
-    const updateCutoffTime = () => {
-      if (!cycleInfo) {
-        setTimeUntilCutoff("");
-        return;
-      }
-
-      const now = new Date();
-      const cutoff = new Date();
-      cutoff.setHours(20, 0, 0, 0); // 8:00 PM today
-
-      if (now > cutoff) {
-        setTimeUntilCutoff("Cutoff passed");
-      } else {
-        const diff = cutoff.getTime() - now.getTime();
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        setTimeUntilCutoff(`${hours}h ${minutes}m until cutoff`);
-      }
-    };
-
-    updateCutoffTime();
-    const interval = setInterval(updateCutoffTime, 60000); // Update every minute
-
-    return () => clearInterval(interval);
-  }, [cycleInfo]);
-
   if (loading) {
     return (
       <Card>
@@ -136,7 +123,7 @@ export function CyclePaymentStatus({ chamaId, frequency }: CyclePaymentStatusPro
     return (
       <Card>
         <CardContent className="py-8 text-center text-muted-foreground">
-          No active payment cycle for today
+          No active payment cycle
         </CardContent>
       </Card>
     );
@@ -147,28 +134,36 @@ export function CyclePaymentStatus({ chamaId, frequency }: CyclePaymentStatusPro
   const allPaid = paidCount === totalCount;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>
-              {frequency === 'daily' ? "Today's" : "Current Cycle"} Payment Status
-            </CardTitle>
-            <CardDescription>
-              Current beneficiary: <span className="font-medium text-foreground">{cycleInfo.beneficiary_name}</span> ({cycleInfo.beneficiary_code})
-            </CardDescription>
-          </div>
-          <div className="text-right">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              {timeUntilCutoff}
+    <div className="space-y-4">
+      {/* Prominent Countdown Timer */}
+      <PaymentCountdownTimer
+        endDate={cycleInfo.end_date}
+        cutoffHour={20}
+        contributionAmount={cycleInfo.due_amount}
+        beneficiaryName={cycleInfo.beneficiary_name}
+        paidCount={paidCount}
+        totalCount={totalCount}
+        isPaid={currentUserPaid}
+        onPayNow={onPayNow}
+      />
+
+      {/* Detailed Payment Status Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>
+                {frequency === 'daily' ? "Today's" : "Current Cycle"} Payment Status
+              </CardTitle>
+              <CardDescription>
+                Beneficiary: <span className="font-medium text-foreground">{cycleInfo.beneficiary_name}</span> ({cycleInfo.beneficiary_code})
+              </CardDescription>
             </div>
-            <div className="text-sm font-medium mt-1">
+            <div className="text-sm font-medium">
               {paidCount}/{totalCount} paid
             </div>
           </div>
-        </div>
-      </CardHeader>
+        </CardHeader>
       <CardContent>
         {cycleInfo.payout_processed && (
           <div className="mb-4 p-3 rounded-lg bg-muted border">
@@ -255,5 +250,6 @@ export function CyclePaymentStatus({ chamaId, frequency }: CyclePaymentStatusPro
         </div>
       </CardContent>
     </Card>
+    </div>
   );
 }
