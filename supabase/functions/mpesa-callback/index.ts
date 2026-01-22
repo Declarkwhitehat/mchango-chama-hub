@@ -80,12 +80,16 @@ serve(async (req) => {
 
       console.log('Contribution updated:', updatedContribution);
 
-      // If successful, update member balance and record commission
+      // If successful, update member balance, chama financials, and record commission
       if (status === 'completed') {
+        // Calculate commission and net amounts
+        const commissionAmount = actualAmount * commissionRate;
+        const netAmount = actualAmount - commissionAmount;
+
         // Get member info
         const { data: member } = await supabaseClient
           .from('chama_members')
-          .select('*, chama(contribution_amount)')
+          .select('*, chama(contribution_amount, total_gross_collected, total_commission_paid, available_balance)')
           .eq('id', contribution.member_id)
           .single();
 
@@ -115,20 +119,56 @@ serve(async (req) => {
           } else {
             console.log('Member balance updated:', { creditDelta, deficitDelta });
           }
+
+          // Update chama financial tracking with NET amount as available
+          const chamaId = contribution.chama_id;
+          const { error: chamaUpdateError } = await supabaseClient
+            .from('chama')
+            .update({
+              total_gross_collected: (member.chama?.total_gross_collected || 0) + actualAmount,
+              total_commission_paid: (member.chama?.total_commission_paid || 0) + commissionAmount,
+              available_balance: (member.chama?.available_balance || 0) + netAmount,
+            })
+            .eq('id', chamaId);
+
+          if (chamaUpdateError) {
+            console.error('Error updating chama financials:', chamaUpdateError);
+          } else {
+            console.log('Chama financials updated:', { grossAmount: actualAmount, commissionAmount, netAmount });
+          }
         }
 
         // Record commission as company earnings
-        const commissionAmount = actualAmount * commissionRate;
         await supabaseClient
           .from('company_earnings')
           .insert({
             source: 'chama_contribution',
             amount: commissionAmount,
             reference_id: contribution.id,
-            description: `${(commissionRate * 100)}% commission on chama contribution of KES ${actualAmount}`
+            description: `${(commissionRate * 100)}% commission on chama contribution of KES ${actualAmount}. Net credited: KES ${netAmount}`
           });
 
-        console.log('Commission recorded:', commissionAmount);
+        // Record in financial ledger for detailed tracking
+        const { error: ledgerError } = await supabaseClient
+          .from('financial_ledger')
+          .insert({
+            transaction_type: 'contribution',
+            source_type: 'chama',
+            source_id: contribution.chama_id,
+            reference_id: contribution.id,
+            gross_amount: actualAmount,
+            commission_amount: commissionAmount,
+            net_amount: netAmount,
+            commission_rate: commissionRate,
+            payer_name: member ? 'Member Contribution' : 'Unknown',
+            description: `Chama contribution with ${(commissionRate * 100)}% commission deducted`
+          });
+
+        if (ledgerError) {
+          console.error('Error recording in financial ledger:', ledgerError);
+        }
+
+        console.log('Commission recorded:', commissionAmount, 'Net available:', netAmount);
 
         // Send SMS notification
         const { data: profile } = await supabaseClient
