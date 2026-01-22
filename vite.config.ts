@@ -107,7 +107,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   preview: {
-    allowedHosts: ["mchango-chama-hub.onrender.com", "mchango-chama-hub-baea.onrender.com"],
+    allowedHosts: ["mchango-chama-hub.onrender.com", "mchango-chama-hub-baea.onrender.com", "pamojafunds.com", "www.pamojafunds.com"],
     host: "0.0.0.0",
     port: 8080,
   },
