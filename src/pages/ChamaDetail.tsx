@@ -15,7 +15,6 @@ import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
 import { PaymentStatusManager } from "@/components/chama/PaymentStatusManager";
-import { PaymentTransparency } from "@/components/chama/PaymentTransparency";
 import { SkippedMemberAlert } from "@/components/chama/SkippedMemberAlert";
 import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
@@ -613,9 +612,8 @@ const ChamaDetail = () => {
         {/* Tabs - Only visible to approved members and admins */}
         {hasViewAccess && (
           <Tabs defaultValue="dashboard" className="w-full">
-            <TabsList className={`grid w-full ${isManager ? 'grid-cols-5' : 'grid-cols-4'}`}>
+            <TabsList className={`grid w-full ${isManager ? 'grid-cols-4' : 'grid-cols-3'}`}>
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-              <TabsTrigger value="transparency">Transparency</TabsTrigger>
               {isManager && <TabsTrigger value="payments">Payments</TabsTrigger>}
               <TabsTrigger value="members">Members</TabsTrigger>
               <TabsTrigger value="details">Details</TabsTrigger>
@@ -632,13 +630,6 @@ const ChamaDetail = () => {
                   </CardContent>
                 </Card>
               )}
-            </TabsContent>
-
-            <TabsContent value="transparency">
-              <PaymentTransparency
-                chamaId={chama.id}
-                contributionAmount={chama.contribution_amount}
-              />
             </TabsContent>
 
             {isManager && (
