@@ -45,15 +45,29 @@ serve(async (req) => {
       );
     }
 
-    // Parse account number to extract group code and member number
-    // Format: ABC1, XYZ7, etc.
-    const match = accountNumber.match(/^([A-Z]+)(\d+)$/);
-    if (!match) {
-      console.error('Invalid account number format:', accountNumber);
+    // Parse account number: 8 characters total
+    // Format: ACT5MOO1 where first 4 chars = chama code, last 4 chars = member suffix
+    // Also support legacy formats for backwards compatibility
+    const upperAccountNumber = accountNumber.toUpperCase();
+    
+    // Extract group code (first 4 characters for new format, or variable for legacy)
+    let groupCode: string;
+    let memberSuffix: string;
+    
+    if (upperAccountNumber.length === 8) {
+      // New format: ACT5MOO1 (4 + 4)
+      groupCode = upperAccountNumber.substring(0, 4);
+      memberSuffix = upperAccountNumber.substring(4, 8);
+    } else if (upperAccountNumber.length >= 4) {
+      // Legacy format or mchango code - treat entire value as the lookup key
+      groupCode = upperAccountNumber;
+      memberSuffix = '';
+    } else {
+      console.error('Invalid account number length:', accountNumber);
       return new Response(
         JSON.stringify({ 
           ResultCode: 1, 
-          ResultDesc: `Invalid account number format: ${accountNumber}` 
+          ResultDesc: `Invalid account number format: ${accountNumber}. Expected 8-character code (e.g., ACT5MOO1)` 
         }),
         { 
           status: 400,
@@ -62,8 +76,7 @@ serve(async (req) => {
       );
     }
 
-    const [, groupCode, memberNumber] = match;
-    console.log(`Parsed account number - Group: ${groupCode}, Member: ${memberNumber}`);
+    console.log(`Parsed account number - Group: ${groupCode}, Member suffix: ${memberSuffix}, Full: ${upperAccountNumber}`);
 
     // Check for duplicate payment (same M-Pesa receipt number) across all tables
     const [
@@ -89,11 +102,11 @@ serve(async (req) => {
       );
     }
 
-    // Try to find member in chama first
+    // Try to find member in chama first using full member code
     const { data: chamaMemberData } = await supabase
       .from('chama_members')
       .select('id, user_id, chama_id, member_code')
-      .eq('member_code', accountNumber)
+      .eq('member_code', upperAccountNumber)
       .maybeSingle();
 
     if (chamaMemberData) {

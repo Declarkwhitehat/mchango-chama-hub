@@ -130,7 +130,30 @@ Deno.serve(async (req) => {
       [randomIndices[0], randomIndices[managerIndexPosition]] = [randomIndices[managerIndexPosition], randomIndices[0]];
     }
 
-    // Create new member records
+    // Generate unique member codes for each member
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const generateUniqueSuffix = async (existingCodes: Set<string>) => {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        let suffix = '';
+        for (let i = 0; i < 4; i++) {
+          suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const fullCode = chama.group_code + suffix;
+        if (!existingCodes.has(fullCode)) {
+          existingCodes.add(fullCode);
+          return fullCode;
+        }
+      }
+      // Fallback: timestamp-based suffix
+      return chama.group_code + Date.now().toString(36).toUpperCase().slice(-4);
+    };
+
+    const existingCodes = new Set<string>();
+    const memberCodes = await Promise.all(
+      approvedRequests.map(() => generateUniqueSuffix(existingCodes))
+    );
+
+    // Create new member records with unique codes
     const newMembers = approvedRequests.map((req, idx) => ({
       chama_id: chamaId,
       user_id: req.user_id,
@@ -138,7 +161,7 @@ Deno.serve(async (req) => {
       is_manager: req.user_id === managerId,
       status: 'active',
       approval_status: 'approved',
-      member_code: `${chama.group_code}${randomIndices[idx]}`
+      member_code: memberCodes[idx]
     }));
 
     const { data: insertedMembers, error: insertError } = await supabase

@@ -352,7 +352,7 @@ serve(async (req) => {
             p_order_index: assignedOrderIndex
           });
 
-        assignedMemberCode = memberCode || `${member.chama.slug}-M${assignedOrderIndex}`;
+        assignedMemberCode = memberCode || member.member_code; // Keep existing code if RPC fails
 
         // Update member with first payment activation
         const { error: activationError } = await supabaseClient

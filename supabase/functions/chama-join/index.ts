@@ -13,33 +13,45 @@ const isValidUUID = (uuid: string): boolean => {
   return uuidRegex.test(uuid);
 };
 
-// Generate a unique 8-character alphanumeric member code
+// Generate a unique member code: {4-char chama code}{4-char unique suffix}
+// Format: ACT5MOO1 where ACT5 = chama code, MOO1 = member suffix
 const generateMemberCode = async (client: any, chamaId: string, maxRetries = 10): Promise<string> => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluding confusing chars like 0,O,I,1
   
+  // Get chama's group code
+  const { data: chama } = await client
+    .from('chama')
+    .select('group_code')
+    .eq('id', chamaId)
+    .single();
+  
+  const groupCode = chama?.group_code || 'TEMP';
+  
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    let code = '';
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    let memberSuffix = '';
+    for (let i = 0; i < 4; i++) {
+      memberSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
     }
+    
+    const fullCode = groupCode + memberSuffix;
     
     // Check if code already exists in this chama
     const { data: existing } = await client
       .from('chama_members')
       .select('id')
       .eq('chama_id', chamaId)
-      .eq('member_code', code)
+      .eq('member_code', fullCode)
       .maybeSingle();
     
     if (!existing) {
-      return code;
+      return fullCode;
     }
     console.log(`Member code collision on attempt ${attempt + 1}, retrying...`);
   }
   
-  // Fallback: use timestamp-based code
-  const timestamp = Date.now().toString(36).toUpperCase().slice(-8);
-  return timestamp.padStart(8, 'X');
+  // Fallback: use timestamp-based suffix
+  const timestamp = Date.now().toString(36).toUpperCase().slice(-4);
+  return groupCode + timestamp;
 };
 
 serve(async (req) => {
