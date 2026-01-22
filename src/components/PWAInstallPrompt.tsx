@@ -11,22 +11,37 @@ interface BeforeInstallPromptEvent extends Event {
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    // Check if already installed as PWA
+    const checkIfInstalled = () => {
+      const isStandalone = window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as any).standalone === true;
+      setIsInstalled(isStandalone);
+      return isStandalone;
+    };
+
+    // If already installed, don't show anything
+    if (checkIfInstalled()) {
+      setShowPrompt(false);
+      return;
+    }
+
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       
       // Check if user has dismissed the prompt before
       const dismissed = localStorage.getItem("pwa-install-dismissed");
-      if (!dismissed) {
+      if (!dismissed && !checkIfInstalled()) {
         setShowPrompt(true);
       }
     };
 
     // Handle manual install trigger
     const manualInstallHandler = () => {
-      if (deferredPrompt) {
+      if (deferredPrompt && !checkIfInstalled()) {
         setShowPrompt(true);
       }
     };
@@ -34,14 +49,20 @@ export default function PWAInstallPrompt() {
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("triggerPWAInstall", manualInstallHandler);
 
-    // Check if already installed
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setShowPrompt(false);
-    }
+    // Listen for display mode changes (user installs the app)
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+    const handleDisplayModeChange = () => {
+      if (mediaQuery.matches) {
+        setIsInstalled(true);
+        setShowPrompt(false);
+      }
+    };
+    mediaQuery.addEventListener("change", handleDisplayModeChange);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
       window.removeEventListener("triggerPWAInstall", manualInstallHandler);
+      mediaQuery.removeEventListener("change", handleDisplayModeChange);
     };
   }, [deferredPrompt]);
 
@@ -62,7 +83,8 @@ export default function PWAInstallPrompt() {
     localStorage.setItem("pwa-install-dismissed", "true");
   };
 
-  if (!showPrompt) return null;
+  // Don't show if already installed or prompt is hidden
+  if (isInstalled || !showPrompt) return null;
 
   return (
     <Card className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] left-4 right-4 md:left-auto md:right-4 md:w-96 z-50 p-4 shadow-lg border-primary">

@@ -3,7 +3,7 @@ import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Users, TrendingUp, Heart, Shield, Building2, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -20,6 +20,20 @@ import profilePhoto from "@/assets/profile-photo.png";
 
 const Index = () => {
   const [isFaqOpen, setIsFaqOpen] = useState(false);
+  const [isPWAInstalled, setIsPWAInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if running as installed PWA
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as any).standalone === true;
+    setIsPWAInstalled(isStandalone);
+
+    // Listen for display mode changes
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+    const handleChange = () => setIsPWAInstalled(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -238,37 +252,39 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Download App Section - Compact */}
-      <section className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <div className="bg-gradient-to-br from-accent/5 to-primary/5 rounded-xl p-6 sm:p-8 max-w-4xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-            <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 bg-primary/10 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 sm:w-7 sm:h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
+      {/* Download App Section - Compact - Only show if not installed */}
+      {!isPWAInstalled && (
+        <section className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
+          <div className="bg-gradient-to-br from-accent/5 to-primary/5 rounded-xl p-6 sm:p-8 max-w-4xl mx-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 bg-primary/10 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 sm:w-7 sm:h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <h3 className="text-lg sm:text-xl font-bold text-foreground mb-1">
+                  Install Our Progressive Web App
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Get offline access, faster loading, and instant notifications
+                </p>
+              </div>
+              <Button 
+                variant="default"
+                size="lg"
+                className="whitespace-nowrap"
+                onClick={() => {
+                  const event = new Event('beforeinstallprompt');
+                  window.dispatchEvent(event);
+                }}
+              >
+                Install App
+              </Button>
             </div>
-            <div className="flex-1 text-center sm:text-left">
-              <h3 className="text-lg sm:text-xl font-bold text-foreground mb-1">
-                Install Our Progressive Web App
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Get offline access, faster loading, and instant notifications
-              </p>
-            </div>
-            <Button 
-              variant="default"
-              size="lg"
-              className="whitespace-nowrap"
-              onClick={() => {
-                const event = new Event('beforeinstallprompt');
-                window.dispatchEvent(event);
-              }}
-            >
-              Install App
-            </Button>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* FAQ Section - Collapsible */}
       <section className="container mx-auto px-4 sm:px-6 py-6">
