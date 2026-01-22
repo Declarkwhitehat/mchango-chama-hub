@@ -117,15 +117,15 @@ serve(async (req) => {
     // ============================================
     // VALIDATE MINIMUM MEMBERS
     // ============================================
-    if (paidMembers.length < (chama.min_members || 5)) {
+    if (paidMembers.length < (chama.min_members || 2)) {
       return new Response(
         JSON.stringify({ 
-          error: `Cannot start: Need at least ${chama.min_members || 5} members who have paid their first contribution`,
+          error: `Cannot start: Need at least ${chama.min_members || 2} members who have paid their first contribution`,
           details: {
-            required: chama.min_members || 5,
+            required: chama.min_members || 2,
             paid: paidMembers.length,
             unpaid: unpaidMembers.length,
-            message: `${chama.min_members - paidMembers.length} more members need to make their first payment before you can start.`
+            message: `${(chama.min_members || 2) - paidMembers.length} more members need to make their first payment before you can start.`
           }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
