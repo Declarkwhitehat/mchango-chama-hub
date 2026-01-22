@@ -36,16 +36,6 @@ interface Chama {
   contribution_frequency: string;
 }
 
-interface SavingsGroup {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  created_at: string;
-  saving_goal: number;
-  total_savings: number;
-  status: string;
-}
 
 interface Organization {
   id: string;

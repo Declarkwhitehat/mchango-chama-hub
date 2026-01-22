@@ -23,7 +23,7 @@ import ChamaDetail from "./pages/ChamaDetail";
 import ChamaJoin from "./pages/ChamaJoin";
 import ChamaList from "./pages/ChamaList";
 import Profile from "./pages/Profile";
-import MemberActivity from "./pages/MemberActivity";
+
 import Activity from "./pages/Activity";
 import AdminKYC from "./pages/AdminKYC";
 import AdminDashboard from "./pages/AdminDashboard";

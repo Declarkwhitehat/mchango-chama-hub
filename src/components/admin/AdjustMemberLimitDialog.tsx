@@ -10,7 +10,7 @@ import { Users, Loader2 } from "lucide-react";
 interface AdjustMemberLimitDialogProps {
   entityId: string;
   entityName: string;
-  entityType?: 'chama' | 'saving_groups';
+  entityType?: 'chama';
   currentLimit: number;
   maxLimit?: number;
   onSuccess: () => void;
