@@ -174,12 +174,18 @@ const ChamaDetail = () => {
         .eq('chama_id', data.data.id)
         .eq('status', 'completed');
 
-      if (!contribError && contributionsData) {
-        const total = contributionsData.reduce((sum, contrib) => sum + Number(contrib.amount), 0);
-        setTotalContributions(total);
-      } else {
-        setTotalContributions(0);
-      }
+      // Fetch withdrawals to calculate net available balance
+      const { data: withdrawalsData } = await supabase
+        .from('withdrawals')
+        .select('net_amount, status')
+        .eq('chama_id', data.data.id)
+        .in('status', ['approved', 'completed', 'processing']);
+
+      const totalContrib = contributionsData?.reduce((sum, contrib) => sum + Number(contrib.amount), 0) || 0;
+      const totalWithdrawn = withdrawalsData?.reduce((sum, w) => sum + Number(w.net_amount), 0) || 0;
+      
+      // Net available = contributions - withdrawals
+      setTotalContributions(Math.max(0, totalContrib - totalWithdrawn));
 
       // Calculate whose turn it is and next turn dates
       await calculateTurns(data.data);
