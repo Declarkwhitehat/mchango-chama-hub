@@ -26,10 +26,32 @@
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
+    <!-- Force clear stale PWA caches on version update -->
+    <script>
+      (function() {
+        var cacheVersion = 'v2-20260122';
+        var storedVersion = localStorage.getItem('cache-version');
+        
+        if (storedVersion !== cacheVersion) {
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              names.forEach(function(name) { caches.delete(name); });
+            });
+          }
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(reg) { reg.unregister(); });
+            });
+          }
+          localStorage.setItem('cache-version', cacheVersion);
+          if (storedVersion) window.location.reload();
+        }
+      })();
+    </script>
+    
     <!-- Critical: Prevent theme flash by applying theme BEFORE any paint -->
     <script>
       (function() {
-        // Block rendering until theme is applied
         var d = document.documentElement;
         var theme = null;
         
