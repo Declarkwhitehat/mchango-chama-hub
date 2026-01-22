@@ -125,3 +125,6 @@ verify_jwt = false
 
 [functions.withdrawal-member-analytics]
 verify_jwt = false
+
+[functions.cycle-auto-create]
+verify_jwt = false

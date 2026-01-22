@@ -535,6 +535,34 @@ Deno.serve(async (req) => {
             console.error('Error invoking cycle-complete function:', invokeError);
           }
         }
+      } else {
+        // ========== AUTO-CREATE NEXT CYCLE ==========
+        // If not a full cycle complete, automatically create the next contribution cycle
+        console.log(`📅 Auto-creating next cycle for chama ${chama.name}`);
+        
+        try {
+          const createCycleResponse = await fetch(`${supabaseUrl}/functions/v1/cycle-auto-create`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              chamaId: chama.id,
+              lastCycleId: cycle.id
+            })
+          });
+
+          const createCycleResult = await createCycleResponse.json();
+          
+          if (createCycleResponse.ok && createCycleResult.success) {
+            console.log(`✅ Next cycle created for ${chama.name}. Beneficiary: ${createCycleResult.beneficiary?.name}`);
+          } else {
+            console.error(`⚠️ Failed to create next cycle:`, createCycleResult);
+          }
+        } catch (createError: any) {
+          console.error(`⚠️ Error creating next cycle:`, createError);
+        }
       }
 
       payoutsProcessed++;
