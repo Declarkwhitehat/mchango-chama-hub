@@ -12,7 +12,6 @@ import { MemberDashboard } from "@/components/MemberDashboard";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
-import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
 import { PaymentStatusManager } from "@/components/chama/PaymentStatusManager";
@@ -609,11 +608,6 @@ const ChamaDetail = () => {
             contributionAmount={chama.contribution_amount}
             onPaymentSuccess={loadChama}
           />
-        )}
-
-        {/* Withdrawal History - Visible to all approved members and admins when active */}
-        {hasViewAccess && isActive && (
-          <WithdrawalHistory chamaId={chama.id} />
         )}
 
         {/* Tabs - Only visible to approved members and admins */}
