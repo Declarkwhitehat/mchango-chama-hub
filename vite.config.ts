@@ -46,11 +46,24 @@ export default defineConfig(({ mode }) => ({
         screenshots: []
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg}'],
+        globPatterns: ['**/*.{js,css,ico,png,svg,jpg,jpeg}'], // Exclude HTML from precache
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
         skipWaiting: true,
         clientsClaim: true,
+        navigateFallback: null, // Disable offline fallback to cached HTML
         runtimeCaching: [
+          {
+            // Always fetch HTML from network first
+            urlPattern: /\/[^.]*$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-cache',
+              expiration: {
+                maxAgeSeconds: 0, // Never serve stale HTML
+              },
+              networkTimeoutSeconds: 3, // Fallback to cache only if offline
+            },
+          },
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: 'NetworkFirst',
