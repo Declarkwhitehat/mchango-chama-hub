@@ -264,79 +264,7 @@ serve(async (req) => {
       }
     }
 
-    // --- Step 4: Create or update deposit record if this is a savings deposit ---
-    let depositId = null;
-    if (body.callback_metadata?.type === 'savings_deposit' && result.CheckoutRequestID) {
-      const checkoutRequestId = result.CheckoutRequestID;
-      const commissionAmount = body.amount * 0.01;
-      const netAmount = body.amount - commissionAmount;
-      const isRetry = body.callback_metadata.is_retry || false;
-      const existingDepositId = body.callback_metadata.existing_deposit_id;
-      const retryCount = body.callback_metadata.retry_count || 0;
-
-      if (isRetry && existingDepositId) {
-        // Update existing deposit for retry
-        console.log('Updating existing deposit for retry:', {
-          depositId: existingDepositId,
-          checkoutRequestId,
-          retryCount
-        });
-
-        const { data: updateResult, error: updateError } = await supabaseClient
-          .from('saving_group_deposits')
-          .update({
-            payment_reference: checkoutRequestId,
-            status: 'pending',
-            retry_count: retryCount,
-            last_retry_at: new Date().toISOString(),
-            failed_reason: null, // Clear previous failure reason
-          })
-          .eq('id', existingDepositId)
-          .select()
-          .single();
-
-        if (updateError) {
-          console.error('Error updating deposit record:', updateError);
-        } else {
-          depositId = existingDepositId;
-          console.log('Deposit record updated for retry:', depositId);
-        }
-      } else {
-        // Create new deposit record
-        console.log('Creating new pending deposit record:', {
-          groupId: body.callback_metadata.group_id,
-          amount: body.amount,
-          checkoutRequestId
-        });
-
-        const { data: depositRecord, error: depositError } = await supabaseClient
-          .from('saving_group_deposits')
-          .insert({
-            saving_group_id: body.callback_metadata.group_id,
-            member_user_id: body.callback_metadata.beneficiary_user_id,
-            payer_user_id: body.callback_metadata.payer_user_id,
-            amount: body.amount,
-            commission_amount: commissionAmount,
-            net_amount: netAmount,
-            payment_reference: checkoutRequestId,
-            status: 'pending',
-            saved_for_member_id: body.callback_metadata.saved_for_member_id || null,
-            retry_count: 0,
-            max_retries: 3,
-          })
-          .select()
-          .single();
-
-        if (depositError) {
-          console.error('Error creating deposit record:', depositError);
-        } else {
-          depositId = depositRecord.id;
-          console.log('Deposit record created:', depositId);
-        }
-      }
-    }
-
-    // --- Step 5: Create pending contribution if this is a chama contribution ---
+    // --- Step 4: Create pending contribution if this is a chama contribution ---
     let contributionId = null;
     if (body.callback_metadata?.type === 'chama_contribution' && result.CheckoutRequestID) {
       const checkoutRequestId = result.CheckoutRequestID;
@@ -371,7 +299,7 @@ serve(async (req) => {
     }
 
     // --- Step 6: Return result with deposit_id and contribution_id ---
-    return new Response(JSON.stringify({ ...result, deposit_id: depositId, contribution_id: contributionId }), {
+    return new Response(JSON.stringify({ ...result, contribution_id: contributionId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
