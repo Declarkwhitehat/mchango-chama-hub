@@ -135,16 +135,27 @@ export const WithdrawalsManagement = () => {
         return;
       }
 
-      const { error } = await supabase.functions.invoke('withdrawals-crud', {
-        method: 'PATCH',
-        body: {
-          withdrawal_id: selectedWithdrawal.id,
-          status: 'approved',
-          // No payment_reference - signals B2C payout
+      // IMPORTANT: Use direct fetch so we can read non-2xx error bodies.
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/withdrawals-crud`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            withdrawal_id: selectedWithdrawal.id,
+            status: 'approved'
+            // No payment_reference - signals B2C payout
+          })
         }
-      });
+      );
 
-      if (error) throw error;
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result?.error || 'Failed to initiate M-Pesa payout');
+      }
 
       toast({
         title: "M-Pesa Payout Initiated",

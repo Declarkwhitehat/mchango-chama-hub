@@ -881,8 +881,21 @@ serve(async (req) => {
           
           const supabaseUrl = Deno.env.get('SUPABASE_URL');
           const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-          
-          fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+
+          if (!supabaseUrl || !serviceRoleKey) {
+            console.error('Missing backend configuration for B2C payout', {
+              hasSupabaseUrl: !!supabaseUrl,
+              hasServiceRoleKey: !!serviceRoleKey,
+            });
+            return new Response(JSON.stringify({ error: 'Backend payout configuration missing' }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          // IMPORTANT: Do NOT fire-and-forget. The edge runtime may terminate the request and cancel
+          // the outbound call before it completes, so we await the initiation call here.
+          const payoutRes = await fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${serviceRoleKey}`,
@@ -893,12 +906,42 @@ serve(async (req) => {
               phone_number: phoneNumber,
               amount: existingWithdrawal.net_amount
             })
-          }).then(async (res) => {
-            const result = await res.json();
-            console.log('B2C payout triggered:', result);
-          }).catch((err) => {
-            console.error('Failed to trigger B2C payout:', err);
           });
+
+          const payoutText = await payoutRes.text();
+          let payoutResult: any = null;
+          try {
+            payoutResult = payoutText ? JSON.parse(payoutText) : null;
+          } catch {
+            payoutResult = { raw: payoutText };
+          }
+
+          if (!payoutRes.ok || payoutResult?.success === false || payoutResult?.error) {
+            console.error('Failed to initiate B2C payout:', {
+              status: payoutRes.status,
+              body: payoutResult,
+            });
+
+            // Ensure withdrawal is marked failed if initiation call failed before mpesa-b2c-payout could update it.
+            await supabaseAdmin
+              .from('withdrawals')
+              .update({
+                status: 'failed',
+                b2c_error_details: typeof payoutResult === 'string' ? payoutResult : JSON.stringify(payoutResult),
+                notes: (existingWithdrawal.notes || '') + `\n[SYSTEM] Failed to initiate B2C payout (admin action).`,
+              })
+              .eq('id', withdrawal_id);
+
+            return new Response(JSON.stringify({
+              error: payoutResult?.error || 'Failed to initiate M-Pesa payout',
+              details: payoutResult,
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          console.log('B2C payout initiated:', payoutResult);
 
           // Send approval SMS
           const { data: requesterProfile } = await supabaseAdmin
@@ -929,6 +972,13 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+
+        return new Response(JSON.stringify({
+          error: 'Cannot initiate M-Pesa payout: missing phone number on payment method'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       return new Response(JSON.stringify({ data: withdrawal }), {
