@@ -108,7 +108,15 @@ serve(async (req) => {
     const initiatorName = Deno.env.get('MPESA_B2C_INITIATOR_NAME');
     const securityCredential = Deno.env.get('MPESA_B2C_SECURITY_CREDENTIAL');
     const shortcode = Deno.env.get('MPESA_SHORTCODE');
-    const callbackUrl = Deno.env.get('VITE_APP_URL');
+    // IMPORTANT: Use SUPABASE_URL for callback URL, not frontend VITE_APP_URL
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+
+    console.log('B2C credentials check:', {
+      hasInitiator: !!initiatorName,
+      hasSecurityCredential: !!securityCredential,
+      hasShortcode: !!shortcode,
+      hasCallbackUrl: !!supabaseUrl
+    });
 
     if (!initiatorName || !securityCredential || !shortcode) {
       console.error('M-Pesa B2C credentials not configured');
@@ -134,6 +142,15 @@ serve(async (req) => {
     // Generate unique conversation ID
     const conversationId = `WD${withdrawal_id.substring(0, 8)}${Date.now()}`;
 
+    // Update B2C attempt tracking before making request
+    await supabaseAdmin
+      .from('withdrawals')
+      .update({
+        b2c_attempt_count: (withdrawal.b2c_attempt_count || 0) + 1,
+        last_b2c_attempt_at: new Date().toISOString()
+      })
+      .eq('id', withdrawal_id);
+
     // Make B2C payment request
     const b2cPayload = {
       InitiatorName: initiatorName,
@@ -143,8 +160,8 @@ serve(async (req) => {
       PartyA: shortcode,
       PartyB: formattedPhone,
       Remarks: `Withdrawal ${withdrawal_id.substring(0, 8)}`,
-      QueueTimeOutURL: `${callbackUrl}/functions/v1/mpesa-b2c-callback`,
-      ResultURL: `${callbackUrl}/functions/v1/mpesa-b2c-callback`,
+      QueueTimeOutURL: `${supabaseUrl}/functions/v1/mpesa-b2c-callback`,
+      ResultURL: `${supabaseUrl}/functions/v1/mpesa-b2c-callback`,
       Occasion: conversationId
     };
 
@@ -161,6 +178,34 @@ serve(async (req) => {
         body: JSON.stringify(b2cPayload),
       }
     );
+
+    // Handle non-OK responses with detailed logging
+    if (!b2cResponse.ok) {
+      const errorText = await b2cResponse.text();
+      console.error('M-Pesa B2C API HTTP error:', {
+        status: b2cResponse.status,
+        statusText: b2cResponse.statusText,
+        body: errorText
+      });
+
+      await supabaseAdmin
+        .from('withdrawals')
+        .update({
+          status: 'failed',
+          b2c_error_details: `HTTP ${b2cResponse.status}: ${errorText}`,
+          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C API HTTP error: ${b2cResponse.status}`
+        })
+        .eq('id', withdrawal_id);
+
+      return new Response(JSON.stringify({
+        success: false,
+        error: `M-Pesa API returned HTTP ${b2cResponse.status}`,
+        details: errorText
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const b2cResult = await b2cResponse.json();
     console.log('B2C response:', b2cResult);

@@ -71,18 +71,20 @@ export const WithdrawalButton = ({
 
   const loadPendingWithdrawal = async () => {
     try {
-      const query = supabase
+      // Check for ANY in-progress or failed withdrawal (freeze button until admin action)
+      // Statuses that block new withdrawals: pending, approved, processing, pending_retry, failed
+      let query = supabase
         .from('withdrawals')
         .select('*')
-        .eq('status', 'pending');
+        .in('status', ['pending', 'approved', 'processing', 'pending_retry', 'failed']);
 
       if (chamaId) {
-        query.eq('chama_id', chamaId);
+        query = query.eq('chama_id', chamaId);
       } else if (mchangoId) {
-        query.eq('mchango_id', mchangoId);
+        query = query.eq('mchango_id', mchangoId);
       }
 
-      const { data, error } = await query.maybeSingle();
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle();
 
       if (error) throw error;
       setPendingWithdrawal(data);
@@ -272,11 +274,23 @@ export const WithdrawalButton = ({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5 text-warning" />
-                Withdrawal Pending
+                {pendingWithdrawal.status === 'pending' && <Clock className="h-5 w-5 text-warning" />}
+                {pendingWithdrawal.status === 'approved' && <Loader2 className="h-5 w-5 text-primary animate-spin" />}
+                {pendingWithdrawal.status === 'processing' && <Loader2 className="h-5 w-5 text-primary animate-spin" />}
+                {pendingWithdrawal.status === 'pending_retry' && <Loader2 className="h-5 w-5 text-warning animate-spin" />}
+                {pendingWithdrawal.status === 'failed' && <AlertCircle className="h-5 w-5 text-destructive" />}
+                {pendingWithdrawal.status === 'pending' && 'Withdrawal Pending'}
+                {pendingWithdrawal.status === 'approved' && 'Withdrawal Approved'}
+                {pendingWithdrawal.status === 'processing' && 'Processing Payment'}
+                {pendingWithdrawal.status === 'pending_retry' && 'Retrying Payment'}
+                {pendingWithdrawal.status === 'failed' && 'Withdrawal Failed'}
               </CardTitle>
               <CardDescription>
-                Your withdrawal request is awaiting admin approval
+                {pendingWithdrawal.status === 'pending' && 'Your withdrawal request is awaiting admin approval'}
+                {pendingWithdrawal.status === 'approved' && 'Your withdrawal has been approved and is being processed'}
+                {pendingWithdrawal.status === 'processing' && 'Money is being sent to your M-Pesa'}
+                {pendingWithdrawal.status === 'pending_retry' && 'The system is retrying your payout automatically'}
+                {pendingWithdrawal.status === 'failed' && 'Your payout failed. Please contact admin for assistance.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -292,10 +306,29 @@ export const WithdrawalButton = ({
                   KES {Number(pendingWithdrawal.net_amount).toLocaleString()}
                 </p>
               </div>
+              {pendingWithdrawal.status === 'failed' && pendingWithdrawal.b2c_error_details && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Error: {pendingWithdrawal.b2c_error_details}
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="pt-3 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Requested on {new Date(pendingWithdrawal.requested_at).toLocaleString()}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Requested on {new Date(pendingWithdrawal.requested_at).toLocaleString()}
+                  </p>
+                  <Badge variant={
+                    pendingWithdrawal.status === 'pending' ? 'secondary' :
+                    pendingWithdrawal.status === 'approved' ? 'default' :
+                    pendingWithdrawal.status === 'processing' ? 'default' :
+                    pendingWithdrawal.status === 'pending_retry' ? 'secondary' :
+                    'destructive'
+                  }>
+                    {pendingWithdrawal.status.replace('_', ' ')}
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
