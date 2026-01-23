@@ -321,16 +321,29 @@ serve(async (req) => {
         });
       }
 
-      // Check for pending withdrawals
-      const { data: pendingWithdrawals } = await supabaseClient
+      // Check for any in-progress or failed withdrawals (block new requests)
+      // Statuses that block: pending, approved, processing, pending_retry, failed
+      const { data: blockingWithdrawal } = await supabaseClient
         .from('withdrawals')
-        .select('id')
+        .select('id, status')
         .or(`chama_id.eq.${chama_id},mchango_id.eq.${mchango_id}`)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'approved', 'processing', 'pending_retry', 'failed'])
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (pendingWithdrawals) {
-        return new Response(JSON.stringify({ error: 'There is already a pending withdrawal request' }), {
+      if (blockingWithdrawal) {
+        const statusMessages: Record<string, string> = {
+          'pending': 'There is already a pending withdrawal request awaiting admin approval',
+          'approved': 'Your approved withdrawal is being processed',
+          'processing': 'A payout is currently being processed via M-Pesa',
+          'pending_retry': 'The system is automatically retrying a previous payout',
+          'failed': 'A previous withdrawal failed. Please contact admin before requesting again'
+        };
+        return new Response(JSON.stringify({ 
+          error: statusMessages[blockingWithdrawal.status] || 'A withdrawal is already in progress',
+          blocking_status: blockingWithdrawal.status
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
