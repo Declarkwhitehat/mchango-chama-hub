@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Ban, PlayCircle, Loader2, ExternalLink } from "lucide-react";
+import { Search, Ban, PlayCircle, Loader2, ExternalLink, BadgeCheck, BadgeX } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -19,6 +20,7 @@ interface Campaign {
   target_amount: number;
   current_amount: number;
   status: string;
+  is_verified: boolean;
   created_at: string;
   profiles: {
     full_name: string;
@@ -87,6 +89,34 @@ export const CampaignsManagement = () => {
       toast({
         title: "Error",
         description: "Failed to update campaign status",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const toggleVerification = async (campaignId: string, currentStatus: boolean) => {
+    setProcessing(campaignId);
+    try {
+      const { error } = await supabase
+        .from('mchango')
+        .update({ is_verified: !currentStatus })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Campaign ${!currentStatus ? 'verified' : 'unverified'}`,
+      });
+
+      await fetchCampaigns();
+    } catch (error: any) {
+      console.error('Error toggling verification:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update verification status",
         variant: "destructive",
       });
     } finally {
@@ -182,6 +212,7 @@ export const CampaignsManagement = () => {
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium">{campaign.title}</h3>
+                        {campaign.is_verified && <VerifiedBadge size="sm" />}
                         {getStatusBadge(campaign.status)}
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-2">
@@ -216,6 +247,28 @@ export const CampaignsManagement = () => {
                     >
                       <ExternalLink className="h-4 w-4 mr-1" />
                       View
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant={campaign.is_verified ? "outline" : "default"}
+                      onClick={() => toggleVerification(campaign.id, campaign.is_verified)}
+                      disabled={processing === campaign.id}
+                      className={campaign.is_verified ? "text-muted-foreground" : "bg-blue-500 hover:bg-blue-600"}
+                    >
+                      {processing === campaign.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : campaign.is_verified ? (
+                        <>
+                          <BadgeX className="h-4 w-4 mr-1" />
+                          Unverify
+                        </>
+                      ) : (
+                        <>
+                          <BadgeCheck className="h-4 w-4 mr-1" />
+                          Verify
+                        </>
+                      )}
                     </Button>
                     
                     {campaign.status === 'active' && (

@@ -16,9 +16,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { AdjustMemberLimitDialog } from "@/components/admin/AdjustMemberLimitDialog";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Ban, PlayCircle, Loader2, ExternalLink, Users, Trash2 } from "lucide-react";
+import { Search, Ban, PlayCircle, Loader2, ExternalLink, Users, Trash2, BadgeCheck, BadgeX } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -31,6 +32,7 @@ interface Chama {
   contribution_frequency: string;
   max_members: number;
   status: string;
+  is_verified: boolean;
   created_at: string;
   profiles: {
     full_name: string;
@@ -102,6 +104,34 @@ export const ChamaManagement = () => {
       toast({
         title: "Error",
         description: "Failed to update chama status",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const toggleVerification = async (chamaId: string, currentStatus: boolean) => {
+    setProcessing(chamaId);
+    try {
+      const { error } = await supabase
+        .from('chama')
+        .update({ is_verified: !currentStatus })
+        .eq('id', chamaId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Chama ${!currentStatus ? 'verified' : 'unverified'}`,
+      });
+
+      await fetchChamas();
+    } catch (error: any) {
+      console.error('Error toggling verification:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update verification status",
         variant: "destructive",
       });
     } finally {
@@ -293,6 +323,7 @@ export const ChamaManagement = () => {
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium">{chama.name}</h3>
+                        {chama.is_verified && <VerifiedBadge size="sm" />}
                         {getStatusBadge(chama.status)}
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-2">
@@ -346,6 +377,28 @@ export const ChamaManagement = () => {
                       maxLimit={1000}
                       onSuccess={fetchChamas}
                     />
+
+                    <Button
+                      size="sm"
+                      variant={chama.is_verified ? "outline" : "default"}
+                      onClick={() => toggleVerification(chama.id, chama.is_verified)}
+                      disabled={processing === chama.id}
+                      className={chama.is_verified ? "text-muted-foreground" : "bg-blue-500 hover:bg-blue-600"}
+                    >
+                      {processing === chama.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : chama.is_verified ? (
+                        <>
+                          <BadgeX className="h-4 w-4 mr-1" />
+                          Unverify
+                        </>
+                      ) : (
+                        <>
+                          <BadgeCheck className="h-4 w-4 mr-1" />
+                          Verify
+                        </>
+                      )}
+                    </Button>
                     
                     {chama.status === 'active' && (
                       <Button

@@ -73,6 +73,7 @@ export type Database = {
           group_code: string | null
           id: string
           is_public: boolean | null
+          is_verified: boolean
           last_cycle_completed_at: string | null
           max_members: number
           min_members: number | null
@@ -101,6 +102,7 @@ export type Database = {
           group_code?: string | null
           id?: string
           is_public?: boolean | null
+          is_verified?: boolean
           last_cycle_completed_at?: string | null
           max_members?: number
           min_members?: number | null
@@ -129,6 +131,7 @@ export type Database = {
           group_code?: string | null
           id?: string
           is_public?: boolean | null
+          is_verified?: boolean
           last_cycle_completed_at?: string | null
           max_members?: number
           min_members?: number | null
@@ -776,6 +779,7 @@ export type Database = {
           image_url_2: string | null
           image_url_3: string | null
           is_public: boolean | null
+          is_verified: boolean
           managers: string[] | null
           slug: string
           status: Database["public"]["Enums"]["mchango_status"]
@@ -802,6 +806,7 @@ export type Database = {
           image_url_2?: string | null
           image_url_3?: string | null
           is_public?: boolean | null
+          is_verified?: boolean
           managers?: string[] | null
           slug: string
           status?: Database["public"]["Enums"]["mchango_status"]
@@ -828,6 +833,7 @@ export type Database = {
           image_url_2?: string | null
           image_url_3?: string | null
           is_public?: boolean | null
+          is_verified?: boolean
           managers?: string[] | null
           slug?: string
           status?: Database["public"]["Enums"]["mchango_status"]

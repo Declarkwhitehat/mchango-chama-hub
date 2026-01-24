@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Building2, MapPin, Globe, Share2, CheckCircle, Plus } from "lucide-react";
+import { Search, Building2, MapPin, Globe, Share2, Plus } from "lucide-react";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -118,7 +119,7 @@ const OrganizationList = () => {
             <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-lg line-clamp-1">{org.name}</CardTitle>
               {org.is_verified && (
-                <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                <VerifiedBadge size="sm" />
               )}
             </div>
             <div className="flex items-center gap-2 mt-1">

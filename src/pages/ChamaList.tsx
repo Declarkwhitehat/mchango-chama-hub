@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, Calendar, TrendingUp } from "lucide-react";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -19,6 +20,7 @@ interface Chama {
   contribution_frequency: string;
   max_members: number;
   status: string;
+  is_verified: boolean;
   created_at: string;
   profiles: {
     full_name: string;
@@ -177,7 +179,10 @@ const ChamaList = () => {
                         {chama.status === 'pending' ? 'Forming' : 'Active'}
                       </Badge>
                     </div>
-                    <CardTitle className="line-clamp-1">{chama.name}</CardTitle>
+                    <CardTitle className="line-clamp-1 flex items-center gap-2">
+                      {chama.name}
+                      {chama.is_verified && <VerifiedBadge size="sm" />}
+                    </CardTitle>
                     <CardDescription className="line-clamp-1">
                       Manager: {chama.profiles?.full_name || 'Unknown'}
                     </CardDescription>
