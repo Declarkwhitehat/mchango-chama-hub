@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, TrendingUp, Calendar, Heart, Share2 } from "lucide-react";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +26,7 @@ interface Mchango {
   created_at: string;
   created_by: string;
   image_url?: string;
+  is_verified: boolean;
 }
 
 const MchangoList = () => {
@@ -207,7 +209,10 @@ const MchangoList = () => {
                               </Badge>
                             )}
                           </div>
-                          <CardTitle className="line-clamp-2">{mchango.title}</CardTitle>
+                          <CardTitle className="line-clamp-2 flex items-center gap-2">
+                            {mchango.title}
+                            {mchango.is_verified && <VerifiedBadge size="sm" />}
+                          </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                           <p className="text-sm text-muted-foreground line-clamp-2">
@@ -280,7 +285,10 @@ const MchangoList = () => {
                               </Badge>
                             )}
                           </div>
-                          <CardTitle className="line-clamp-2">{mchango.title}</CardTitle>
+                          <CardTitle className="line-clamp-2 flex items-center gap-2">
+                            {mchango.title}
+                            {mchango.is_verified && <VerifiedBadge size="sm" />}
+                          </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                           <p className="text-sm text-muted-foreground line-clamp-2">

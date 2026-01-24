@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Heart, Calendar, TrendingUp, Share2 } from "lucide-react";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { toast } from "sonner";
 
 interface Mchango {
@@ -22,6 +23,7 @@ interface Mchango {
   category: string | null;
   image_url: string | null;
   created_at: string;
+  is_verified: boolean;
 }
 
 const MchangoExplore = () => {
@@ -38,7 +40,7 @@ const MchangoExplore = () => {
     try {
       let query = supabase
         .from("mchango")
-        .select("id, title, slug, description, target_amount, current_amount, status, end_date, category, image_url, created_at")
+        .select("id, title, slug, description, target_amount, current_amount, status, end_date, category, image_url, created_at, is_verified")
         .eq("status", "active")
         .eq("is_public", true);
 
@@ -179,7 +181,10 @@ const MchangoExplore = () => {
                   )}
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-lg line-clamp-2">{mchango.title}</CardTitle>
+                      <CardTitle className="text-lg line-clamp-2 flex items-center gap-2">
+                        {mchango.title}
+                        {mchango.is_verified && <VerifiedBadge size="sm" />}
+                      </CardTitle>
                       {mchango.category && (
                         <Badge variant="secondary" className="shrink-0">
                           {mchango.category}

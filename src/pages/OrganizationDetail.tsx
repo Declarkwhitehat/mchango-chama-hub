@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, MapPin, Globe, Phone, Mail, Share2, Loader2, CheckCircle, Calendar, MessageCircle } from "lucide-react";
+import { Building2, MapPin, Globe, Phone, Mail, Share2, Loader2, Calendar, MessageCircle } from "lucide-react";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { OrganizationDonationForm } from "@/components/OrganizationDonationForm";
@@ -150,7 +151,7 @@ const OrganizationDetail = () => {
                 <div className="flex items-center gap-2 flex-wrap">
                   <CardTitle className="text-2xl md:text-3xl">{organization.name}</CardTitle>
                   {organization.is_verified && (
-                    <CheckCircle className="h-6 w-6 text-primary" />
+                    <VerifiedBadge size="lg" />
                   )}
                 </div>
                 

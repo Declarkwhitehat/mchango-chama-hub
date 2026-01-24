@@ -13,6 +13,7 @@ import { DonorsList } from "@/components/DonorsList";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -34,6 +35,7 @@ interface Campaign {
   whatsapp_link?: string;
   created_by: string;
   group_code?: string;
+  is_verified: boolean;
 }
 
 // Helper to convert YouTube URL to embed URL
@@ -146,7 +148,10 @@ const MchangoDetail = () => {
                 </Button>
               </div>
             </div>
-            <CardTitle className="text-2xl">{campaign.title}</CardTitle>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              {campaign.title}
+              {campaign.is_verified && <VerifiedBadge size="md" />}
+            </CardTitle>
             <CardDescription>
               Created on {new Date(campaign.created_at).toLocaleDateString()}
             </CardDescription>
