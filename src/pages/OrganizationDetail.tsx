@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, MapPin, Globe, Phone, Mail, Share2, Loader2, Calendar, MessageCircle } from "lucide-react";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { OrganizationDonationForm } from "@/components/OrganizationDonationForm";
@@ -153,6 +154,13 @@ const OrganizationDetail = () => {
                   {organization.is_verified && (
                     <VerifiedBadge size="lg" />
                   )}
+                  <VerificationRequestButton
+                    entityType="organization"
+                    entityId={organization.id}
+                    entityName={organization.name}
+                    isVerified={organization.is_verified}
+                    isOwner={isCreator}
+                  />
                 </div>
                 
                 <div className="flex items-center gap-2 flex-wrap">

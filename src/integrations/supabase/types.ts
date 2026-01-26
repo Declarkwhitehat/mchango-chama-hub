@@ -1677,6 +1677,51 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_requests: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          rejection_reason: string | null
+          request_reason: string | null
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          supporting_documents: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          rejection_reason?: string | null
+          request_reason?: string | null
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          supporting_documents?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          rejection_reason?: string | null
+          request_reason?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          supporting_documents?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       webauthn_credentials: {
         Row: {
           counter: number

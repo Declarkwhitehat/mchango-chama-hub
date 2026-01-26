@@ -14,7 +14,7 @@ import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
-
+import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Campaign {
@@ -148,10 +148,19 @@ const MchangoDetail = () => {
                 </Button>
               </div>
             </div>
-            <CardTitle className="text-2xl flex items-center gap-2">
-              {campaign.title}
-              {campaign.is_verified && <VerifiedBadge size="md" />}
-            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <CardTitle className="text-2xl flex items-center gap-2">
+                {campaign.title}
+                {campaign.is_verified && <VerifiedBadge size="md" />}
+              </CardTitle>
+              <VerificationRequestButton
+                entityType="mchango"
+                entityId={campaign.id}
+                entityName={campaign.title}
+                isVerified={campaign.is_verified}
+                isOwner={isCreator}
+              />
+            </div>
             <CardDescription>
               Created on {new Date(campaign.created_at).toLocaleDateString()}
             </CardDescription>
