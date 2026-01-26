@@ -21,6 +21,7 @@ import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
 import { WhatsAppLinkManager } from "@/components/chama/WhatsAppLinkManager";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -380,10 +381,21 @@ const ChamaDetail = () => {
                 {isPending && <Badge variant="secondary">Pending Approval</Badge>}
               </div>
             </div>
-            <CardTitle className="text-2xl flex items-center gap-2">
-              {chama.name}
-              {chama.is_verified && <VerifiedBadge size="md" />}
-            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <CardTitle className="text-2xl flex items-center gap-2">
+                {chama.name}
+                {chama.is_verified && <VerifiedBadge size="md" />}
+              </CardTitle>
+              {isManager && (
+                <VerificationRequestButton
+                  entityType="chama"
+                  entityId={chama.id}
+                  entityName={chama.name}
+                  isVerified={chama.is_verified || false}
+                  isOwner={isManager}
+                />
+              )}
+            </div>
             <CardDescription>Founded by {chama.profiles?.full_name || 'Unknown'}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

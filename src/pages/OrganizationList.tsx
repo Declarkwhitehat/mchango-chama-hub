@@ -37,6 +37,7 @@ const OrganizationList = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [verifiedFilter, setVerifiedFilter] = useState("all");
 
   useEffect(() => {
     fetchOrganizations();
@@ -63,6 +64,10 @@ const OrganizationList = () => {
   };
 
   const filteredOrganizations = organizations.filter(org => {
+    // Verified filter
+    if (verifiedFilter === "verified" && !org.is_verified) return false;
+    if (verifiedFilter === "unverified" && org.is_verified) return false;
+
     const matchesSearch = !searchQuery || 
       org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       org.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -217,6 +222,16 @@ const OrganizationList = () => {
                   {categories.map(cat => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={verifiedFilter} onValueChange={setVerifiedFilter}>
+                <SelectTrigger className="w-full md:w-[150px]">
+                  <SelectValue placeholder="Verification" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="verified">Verified Only</SelectItem>
+                  <SelectItem value="unverified">Unverified</SelectItem>
                 </SelectContent>
               </Select>
             </div>

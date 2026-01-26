@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   Shield,
   Building2,
-  Landmark
+  Landmark,
+  BadgeCheck
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +54,7 @@ export function AdminSidebar() {
   const [pendingKyc, setPendingKyc] = useState(0);
   const [pendingWithdrawals, setPendingWithdrawals] = useState(0);
   const [pendingCallbacks, setPendingCallbacks] = useState(0);
+  const [pendingVerifications, setPendingVerifications] = useState(0);
 
   useEffect(() => {
     fetchPendingCounts();
@@ -75,9 +77,15 @@ export function AdminSidebar() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
 
+    const { count: verificationsCount } = await supabase
+      .from('verification_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
     setPendingKyc(kycCount || 0);
     setPendingWithdrawals(withdrawalsCount || 0);
     setPendingCallbacks(callbacksCount || 0);
+    setPendingVerifications(verificationsCount || 0);
   };
 
   const mainMenuItems: MenuItem[] = [
@@ -99,6 +107,12 @@ export function AdminSidebar() {
     { title: "Chama Groups", url: "/admin/chamas", icon: Activity },
     { title: "Campaigns", url: "/admin/campaigns", icon: TrendingUp },
     { title: "Organizations", url: "/admin/organizations", icon: Building2 },
+    { 
+      title: "Verification Requests", 
+      url: "/admin/verification-requests", 
+      icon: BadgeCheck,
+      badge: pendingVerifications > 0 ? pendingVerifications : null
+    },
   ];
 
   const financialItems: MenuItem[] = [

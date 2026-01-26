@@ -36,6 +36,7 @@ const ChamaList = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
+  const [verifiedFilter, setVerifiedFilter] = useState("all");
 
   useEffect(() => {
     fetchChamas();
@@ -79,6 +80,11 @@ const ChamaList = () => {
   };
 
   const filteredChamas = chamas.filter(c => {
+    // Verified filter
+    if (verifiedFilter === "verified" && !c.is_verified) return false;
+    if (verifiedFilter === "unverified" && c.is_verified) return false;
+
+    // Search filter
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -143,6 +149,16 @@ const ChamaList = () => {
                 <SelectContent>
                   <SelectItem value="newest">Newest First</SelectItem>
                   <SelectItem value="members">Most Members</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={verifiedFilter} onValueChange={setVerifiedFilter}>
+                <SelectTrigger className="w-full md:w-[150px]">
+                  <SelectValue placeholder="Verification" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="verified">Verified Only</SelectItem>
+                  <SelectItem value="unverified">Unverified</SelectItem>
                 </SelectContent>
               </Select>
             </div>

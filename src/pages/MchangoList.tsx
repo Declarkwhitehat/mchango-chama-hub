@@ -36,6 +36,7 @@ const MchangoList = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
+  const [verifiedFilter, setVerifiedFilter] = useState("all");
 
   useEffect(() => {
     if (authLoading) return;
@@ -77,6 +78,11 @@ const MchangoList = () => {
   };
 
   const filteredMchangos = mchangos.filter(m => {
+    // Verified filter
+    if (verifiedFilter === "verified" && !m.is_verified) return false;
+    if (verifiedFilter === "unverified" && m.is_verified) return false;
+
+    // Search filter
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -162,6 +168,16 @@ const MchangoList = () => {
                   <SelectItem value="newest">Newest First</SelectItem>
                   <SelectItem value="most-funded">Most Funded</SelectItem>
                   <SelectItem value="ending-soon">Ending Soon</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={verifiedFilter} onValueChange={setVerifiedFilter}>
+                <SelectTrigger className="w-full md:w-[150px]">
+                  <SelectValue placeholder="Verification" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="verified">Verified Only</SelectItem>
+                  <SelectItem value="unverified">Unverified</SelectItem>
                 </SelectContent>
               </Select>
             </div>

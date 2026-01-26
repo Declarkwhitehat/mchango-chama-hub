@@ -31,6 +31,7 @@ const MchangoExplore = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
+  const [verifiedFilter, setVerifiedFilter] = useState("all");
 
   useEffect(() => {
     fetchMchangos();
@@ -68,10 +69,15 @@ const MchangoExplore = () => {
   };
 
   const filteredMchangos = mchangos.filter(
-    (m) =>
-      m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.category?.toLowerCase().includes(searchQuery.toLowerCase())
+    (m) => {
+      // Verified filter
+      if (verifiedFilter === "verified" && !m.is_verified) return false;
+      if (verifiedFilter === "unverified" && m.is_verified) return false;
+
+      return m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.category?.toLowerCase().includes(searchQuery.toLowerCase());
+    }
   );
 
   const calculateProgress = (current: number, target: number) => {
@@ -136,6 +142,16 @@ const MchangoExplore = () => {
               <SelectItem value="newest">Newest First</SelectItem>
               <SelectItem value="most-funded">Most Funded</SelectItem>
               <SelectItem value="ending-soon">Ending Soon</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={verifiedFilter} onValueChange={setVerifiedFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Verification" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="verified">Verified Only</SelectItem>
+              <SelectItem value="unverified">Unverified</SelectItem>
             </SelectContent>
           </Select>
         </div>
