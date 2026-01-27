@@ -9,6 +9,8 @@ const celcomShortcode = Deno.env.get('CELCOM_SHORTCODE');
 
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MINUTES = 30; // Minimum time between retries
+const STUCK_APPROVED_THRESHOLD_HOURS = 1; // Hours before approved withdrawal is considered stuck
+const STALLED_PROCESSING_MINUTES = 10; // Minutes before processing withdrawal is considered stalled
 
 async function sendSMS(phone: string, message: string) {
   if (!celcomApiKey || !celcomPartnerId || !celcomShortcode) {
@@ -48,12 +50,80 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     console.log('[RETRY] Starting failed payout retry at:', new Date().toISOString());
 
-    // Find withdrawals that need retry:
+    const retryThreshold = new Date(Date.now() - RETRY_DELAY_MINUTES * 60 * 1000).toISOString();
+    const stuckApprovedThreshold = new Date(Date.now() - STUCK_APPROVED_THRESHOLD_HOURS * 60 * 60 * 1000).toISOString();
+    const stalledProcessingThreshold = new Date(Date.now() - STALLED_PROCESSING_MINUTES * 60 * 1000).toISOString();
+
+    let retriedCount = 0;
+    let successCount = 0;
+    let finalFailureCount = 0;
+    let stuckApprovedCount = 0;
+    let stalledResetCount = 0;
+
+    // 1. Handle stuck "approved" withdrawals (B2C was never triggered or failed silently)
+    const { data: stuckApproved, error: stuckError } = await supabase
+      .from('withdrawals')
+      .select(`
+        *,
+        profiles:requested_by(full_name, phone),
+        payment_methods:payment_method_id(method_type, phone_number, account_number)
+      `)
+      .eq('status', 'approved')
+      .lt('reviewed_at', stuckApprovedThreshold)
+      .eq('b2c_attempt_count', 0);
+
+    if (stuckError) {
+      console.error('Error fetching stuck approved withdrawals:', stuckError);
+    }
+
+    console.log(`Found ${stuckApproved?.length || 0} stuck approved withdrawals`);
+
+    for (const stuck of stuckApproved || []) {
+      console.log(`Recovering stuck approved withdrawal ${stuck.id}`);
+      
+      // Mark for retry so normal retry flow picks it up
+      await supabase
+        .from('withdrawals')
+        .update({
+          status: 'pending_retry',
+          notes: (stuck.notes || '') + `\n[SYSTEM] Stuck approved withdrawal recovered at ${new Date().toISOString()}`
+        })
+        .eq('id', stuck.id);
+
+      stuckApprovedCount++;
+    }
+
+    // 2. Handle stalled "processing" withdrawals (stuck for more than threshold)
+    const { data: stalledWithdrawals, error: stalledError } = await supabase
+      .from('withdrawals')
+      .select('id, notes, b2c_attempt_count, last_b2c_attempt_at')
+      .eq('status', 'processing')
+      .lt('last_b2c_attempt_at', stalledProcessingThreshold);
+
+    if (stalledError) {
+      console.error('Error fetching stalled withdrawals:', stalledError);
+    }
+
+    console.log(`Found ${stalledWithdrawals?.length || 0} stalled processing withdrawals`);
+
+    for (const stalled of stalledWithdrawals || []) {
+      console.log(`Marking stalled withdrawal ${stalled.id} for retry`);
+      
+      await supabase
+        .from('withdrawals')
+        .update({
+          status: 'pending_retry',
+          notes: (stalled.notes || '') + `\n[SYSTEM] Marked as stalled at ${new Date().toISOString()}`
+        })
+        .eq('id', stalled.id);
+
+      stalledResetCount++;
+    }
+
+    // 3. Find withdrawals that need retry:
     // - Status is 'failed' or 'pending_retry'
     // - Less than MAX_RETRY_ATTEMPTS
     // - Last attempt was more than RETRY_DELAY_MINUTES ago (or never attempted)
-    const retryThreshold = new Date(Date.now() - RETRY_DELAY_MINUTES * 60 * 1000).toISOString();
-
     const { data: failedWithdrawals, error: fetchError } = await supabase
       .from('withdrawals')
       .select(`
@@ -76,10 +146,6 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${failedWithdrawals?.length || 0} withdrawals to retry`);
 
-    let retriedCount = 0;
-    let successCount = 0;
-    let finalFailureCount = 0;
-
     for (const withdrawal of failedWithdrawals || []) {
       const paymentMethod = withdrawal.payment_methods;
       const attemptNumber = (withdrawal.b2c_attempt_count || 0) + 1;
@@ -91,17 +157,6 @@ Deno.serve(async (req) => {
         console.log(`Skipping non-M-Pesa withdrawal: ${withdrawal.id}`);
         continue;
       }
-
-      // Update attempt tracking before calling B2C
-      await supabase
-        .from('withdrawals')
-        .update({
-          b2c_attempt_count: attemptNumber,
-          last_b2c_attempt_at: new Date().toISOString(),
-          status: 'processing',
-          notes: (withdrawal.notes || '') + `\n[SYSTEM] Retry attempt ${attemptNumber} at ${new Date().toISOString()}`
-        })
-        .eq('id', withdrawal.id);
 
       try {
         // Trigger B2C payout
@@ -121,7 +176,7 @@ Deno.serve(async (req) => {
         const b2cResult = await b2cResponse.json();
 
         if (b2cResponse.ok && b2cResult.success) {
-          console.log(`B2C initiated for withdrawal ${withdrawal.id}: ${b2cResult.conversation_id}`);
+          console.log(`B2C initiated for withdrawal ${withdrawal.id}: ${b2cResult.conversation_id || b2cResult.payout_reference}`);
           retriedCount++;
         } else {
           console.error(`B2C failed for withdrawal ${withdrawal.id}:`, b2cResult);
@@ -151,24 +206,13 @@ Deno.serve(async (req) => {
             }
 
             finalFailureCount++;
-          } else {
-            // Mark for retry later
-            await supabase
-              .from('withdrawals')
-              .update({
-                status: 'pending_retry',
-                b2c_error_details: {
-                  last_error: b2cResult.error || 'Unknown error',
-                  attempt: attemptNumber
-                }
-              })
-              .eq('id', withdrawal.id);
           }
+          // Note: If not final, mpesa-b2c-payout already marked it as pending_retry
         }
       } catch (error: any) {
         console.error(`Error triggering B2C for ${withdrawal.id}:`, error);
 
-        // Mark for retry if not final attempt
+        // Mark for retry or final failure
         if (attemptNumber >= MAX_RETRY_ATTEMPTS) {
           await supabase
             .from('withdrawals')
@@ -178,7 +222,8 @@ Deno.serve(async (req) => {
                 final_failure: true,
                 last_error: error.message,
                 total_attempts: attemptNumber
-              }
+              },
+              notes: (withdrawal.notes || '') + `\n[SYSTEM] FINAL FAILURE (exception): ${error.message}`
             })
             .eq('id', withdrawal.id);
           finalFailureCount++;
@@ -187,42 +232,23 @@ Deno.serve(async (req) => {
             .from('withdrawals')
             .update({
               status: 'pending_retry',
-              b2c_error_details: { last_error: error.message, attempt: attemptNumber }
+              b2c_error_details: { last_error: error.message, attempt: attemptNumber },
+              notes: (withdrawal.notes || '') + `\n[SYSTEM] Retry failed (exception): ${error.message}`
             })
             .eq('id', withdrawal.id);
         }
       }
     }
 
-    // Also check for stalled "processing" withdrawals (stuck for more than 10 minutes)
-    const stalledThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    
-    const { data: stalledWithdrawals } = await supabase
-      .from('withdrawals')
-      .select('id, notes, b2c_attempt_count')
-      .eq('status', 'processing')
-      .lt('last_b2c_attempt_at', stalledThreshold);
-
-    for (const stalled of stalledWithdrawals || []) {
-      console.log(`Marking stalled withdrawal ${stalled.id} for retry`);
-      
-      await supabase
-        .from('withdrawals')
-        .update({
-          status: 'pending_retry',
-          notes: (stalled.notes || '') + `\n[SYSTEM] Marked as stalled at ${new Date().toISOString()}`
-        })
-        .eq('id', stalled.id);
-    }
-
-    console.log(`[RETRY] Completed. Retried: ${retriedCount}, Final failures: ${finalFailureCount}, Stalled reset: ${stalledWithdrawals?.length || 0}`);
+    console.log(`[RETRY] Completed. Retried: ${retriedCount}, Final failures: ${finalFailureCount}, Stuck approved recovered: ${stuckApprovedCount}, Stalled reset: ${stalledResetCount}`);
 
     return new Response(JSON.stringify({
       success: true,
       retried: retriedCount,
       finalFailures: finalFailureCount,
-      stalledReset: stalledWithdrawals?.length || 0,
-      totalProcessed: failedWithdrawals?.length || 0
+      stuckApprovedRecovered: stuckApprovedCount,
+      stalledReset: stalledResetCount,
+      totalProcessed: (failedWithdrawals?.length || 0) + stuckApprovedCount + stalledResetCount
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
