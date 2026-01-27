@@ -74,7 +74,7 @@ serve(async (req) => {
       });
     }
 
-    // Validate withdrawal exists and is in approved status
+    // Validate withdrawal exists and is in approved or processing status
     const { data: withdrawal, error: withdrawalError } = await supabaseAdmin
       .from('withdrawals')
       .select('*')
@@ -89,7 +89,8 @@ serve(async (req) => {
       });
     }
 
-    if (withdrawal.status !== 'approved') {
+    // Allow approved, pending_retry, or processing status
+    if (!['approved', 'pending_retry', 'processing'].includes(withdrawal.status)) {
       return new Response(JSON.stringify({ error: 'Withdrawal must be approved first' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -108,7 +109,6 @@ serve(async (req) => {
     const initiatorName = Deno.env.get('MPESA_B2C_INITIATOR_NAME');
     const securityCredential = Deno.env.get('MPESA_B2C_SECURITY_CREDENTIAL');
     const shortcode = Deno.env.get('MPESA_SHORTCODE');
-    // IMPORTANT: Use SUPABASE_URL for callback URL, not frontend VITE_APP_URL
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
 
     console.log('B2C credentials check:', {
@@ -126,6 +126,7 @@ serve(async (req) => {
         .from('withdrawals')
         .update({
           status: 'failed',
+          b2c_error_details: { error: 'B2C credentials not configured' },
           notes: (withdrawal.notes || '') + '\n[SYSTEM] B2C credentials not configured'
         })
         .eq('id', withdrawal_id);
@@ -136,20 +137,25 @@ serve(async (req) => {
       });
     }
 
-    // Get access token
-    const accessToken = await getMpesaAccessToken();
+    // Generate predictable reference BEFORE B2C call
+    // This allows callback to find the withdrawal even if this function times out
+    const payoutReference = `WD-${withdrawal_id}`;
 
-    // Generate unique conversation ID
-    const conversationId = `WD${withdrawal_id.substring(0, 8)}${Date.now()}`;
-
-    // Update B2C attempt tracking before making request
+    // Update status to processing and store reference BEFORE making B2C call
+    const attemptCount = (withdrawal.b2c_attempt_count || 0) + 1;
     await supabaseAdmin
       .from('withdrawals')
       .update({
-        b2c_attempt_count: (withdrawal.b2c_attempt_count || 0) + 1,
-        last_b2c_attempt_at: new Date().toISOString()
+        payment_reference: payoutReference,
+        status: 'processing',
+        b2c_attempt_count: attemptCount,
+        last_b2c_attempt_at: new Date().toISOString(),
+        notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C attempt ${attemptCount} started at ${new Date().toISOString()}`
       })
       .eq('id', withdrawal_id);
+
+    // Get access token
+    const accessToken = await getMpesaAccessToken();
 
     // Make B2C payment request
     const b2cPayload = {
@@ -162,7 +168,7 @@ serve(async (req) => {
       Remarks: `Withdrawal ${withdrawal_id.substring(0, 8)}`,
       QueueTimeOutURL: `${supabaseUrl}/functions/v1/mpesa-b2c-callback`,
       ResultURL: `${supabaseUrl}/functions/v1/mpesa-b2c-callback`,
-      Occasion: conversationId
+      Occasion: payoutReference // Use our predictable reference for callback lookup
     };
 
     console.log('Sending B2C request:', { ...b2cPayload, SecurityCredential: '[REDACTED]' });
@@ -188,19 +194,28 @@ serve(async (req) => {
         body: errorText
       });
 
+      // Determine if should retry or fail permanently
+      const shouldRetry = attemptCount < 3;
+      const newStatus = shouldRetry ? 'pending_retry' : 'failed';
+
       await supabaseAdmin
         .from('withdrawals')
         .update({
-          status: 'failed',
-          b2c_error_details: `HTTP ${b2cResponse.status}: ${errorText}`,
-          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C API HTTP error: ${b2cResponse.status}`
+          status: newStatus,
+          b2c_error_details: { 
+            error: `HTTP ${b2cResponse.status}: ${errorText}`,
+            attempt: attemptCount,
+            final_failure: !shouldRetry
+          },
+          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C API HTTP error ${b2cResponse.status} (attempt ${attemptCount})`
         })
         .eq('id', withdrawal_id);
 
       return new Response(JSON.stringify({
         success: false,
         error: `M-Pesa API returned HTTP ${b2cResponse.status}`,
-        details: errorText
+        details: errorText,
+        will_retry: shouldRetry
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -211,13 +226,12 @@ serve(async (req) => {
     console.log('B2C response:', b2cResult);
 
     if (b2cResult.ResponseCode === '0') {
-      // Update withdrawal with pending B2C status
+      // B2C request accepted - update with M-Pesa conversation ID
+      // Note: Status stays 'processing' - callback will update to 'completed' or 'failed'
       await supabaseAdmin
         .from('withdrawals')
         .update({
-          status: 'processing',
-          payment_reference: b2cResult.ConversationID,
-          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C initiated: ${b2cResult.ConversationID}`
+          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C initiated: ${b2cResult.ConversationID} (attempt ${attemptCount})`
         })
         .eq('id', withdrawal_id);
 
@@ -225,26 +239,37 @@ serve(async (req) => {
         success: true,
         message: 'B2C payment initiated',
         conversation_id: b2cResult.ConversationID,
-        originator_conversation_id: b2cResult.OriginatorConversationID
+        originator_conversation_id: b2cResult.OriginatorConversationID,
+        payout_reference: payoutReference
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } else {
-      // B2C request failed
+      // B2C request failed at M-Pesa level
       console.error('B2C request failed:', b2cResult);
+
+      const shouldRetry = attemptCount < 3;
+      const newStatus = shouldRetry ? 'pending_retry' : 'failed';
 
       await supabaseAdmin
         .from('withdrawals')
         .update({
-          status: 'failed',
-          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C failed: ${b2cResult.ResponseDescription || 'Unknown error'}`
+          status: newStatus,
+          b2c_error_details: {
+            error: b2cResult.ResponseDescription || 'Unknown error',
+            code: b2cResult.ResponseCode,
+            attempt: attemptCount,
+            final_failure: !shouldRetry
+          },
+          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C failed (attempt ${attemptCount}): ${b2cResult.ResponseDescription || 'Unknown error'}`
         })
         .eq('id', withdrawal_id);
 
       return new Response(JSON.stringify({
         success: false,
         error: b2cResult.ResponseDescription || 'B2C request failed',
-        error_code: b2cResult.ResponseCode
+        error_code: b2cResult.ResponseCode,
+        will_retry: shouldRetry
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

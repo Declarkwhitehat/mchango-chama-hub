@@ -1930,6 +1930,14 @@ export type Database = {
         Returns: string
       }
       check_all_members_paid: { Args: { p_cycle_id: string }; Returns: boolean }
+      check_and_lock_withdrawal_balance: {
+        Args: { p_amount: number; p_chama_id?: string; p_mchango_id?: string }
+        Returns: {
+          available_balance: number
+          can_withdraw: boolean
+          entity_name: string
+        }[]
+      }
       check_kyc_approved: { Args: { _user_id: string }; Returns: boolean }
       check_loan_eligibility: {
         Args: { p_member_id: string }
@@ -2013,6 +2021,14 @@ export type Database = {
       }
       resequence_member_order: {
         Args: { p_chama_id: string }
+        Returns: undefined
+      }
+      update_chama_withdrawn: {
+        Args: { p_amount: number; p_chama_id: string }
+        Returns: undefined
+      }
+      update_mchango_withdrawn: {
+        Args: { p_amount: number; p_mchango_id: string }
         Returns: undefined
       }
     }

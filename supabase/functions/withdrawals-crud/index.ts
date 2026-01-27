@@ -406,33 +406,86 @@ serve(async (req) => {
         const supabaseUrl = Deno.env.get('SUPABASE_URL');
         const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
         
-        // Fire and forget - don't wait for B2C to complete
-        fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            withdrawal_id: withdrawal.id,
-            phone_number: defaultPaymentMethod.phone_number,
-            amount: netAmount
-          })
-        }).then(async (res) => {
-          const result = await res.json();
-          console.log('B2C payout triggered for auto-approved withdrawal:', result);
-        }).catch((err) => {
-          console.error('Failed to trigger B2C payout:', err);
-        });
+        // Await B2C call and handle failures properly
+        try {
+          const b2cRes = await fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${serviceRoleKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              withdrawal_id: withdrawal.id,
+              phone_number: defaultPaymentMethod.phone_number,
+              amount: netAmount
+            })
+          });
 
-        return new Response(JSON.stringify({ 
-          data: withdrawal,
-          message: 'Withdrawal approved! Money is being sent to your M-Pesa now.',
-          auto_approved: true
-        }), {
-          status: 201,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+          const b2cResult = await b2cRes.json();
+          console.log('B2C payout result for auto-approved withdrawal:', b2cResult);
+          
+          if (!b2cRes.ok || !b2cResult.success) {
+            console.error('B2C initiation failed:', b2cResult);
+            // Mark withdrawal as pending_retry for automatic recovery
+            await supabaseAdmin
+              .from('withdrawals')
+              .update({
+                status: 'pending_retry',
+                b2c_error_details: { 
+                  error: b2cResult.error || 'Initiation failed',
+                  auto_approval_failure: true 
+                },
+                notes: (notes || '') + `\n[SYSTEM] Auto-approval B2C failed: ${b2cResult.error || 'Unknown error'}`
+              })
+              .eq('id', withdrawal.id);
+
+            return new Response(JSON.stringify({ 
+              data: { ...withdrawal, status: 'pending_retry' },
+              message: 'Withdrawal approved but payout initiation failed. Will retry automatically.',
+              auto_approved: true,
+              payout_pending: true
+            }), {
+              status: 201,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          return new Response(JSON.stringify({ 
+            data: withdrawal,
+            message: 'Withdrawal approved! Money is being sent to your M-Pesa now.',
+            auto_approved: true,
+            payout_reference: b2cResult.payout_reference
+          }), {
+            status: 201,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+
+        } catch (b2cError: any) {
+          console.error('Exception triggering B2C payout:', b2cError);
+          
+          // Mark for retry so the retry cron picks it up
+          await supabaseAdmin
+            .from('withdrawals')
+            .update({
+              status: 'pending_retry',
+              b2c_error_details: { 
+                error: b2cError.message || 'Network error',
+                auto_approval_failure: true 
+              },
+              notes: (notes || '') + `\n[SYSTEM] Auto-approval B2C exception: ${b2cError.message}`
+            })
+            .eq('id', withdrawal.id);
+
+          return new Response(JSON.stringify({ 
+            data: { ...withdrawal, status: 'pending_retry' },
+            message: 'Withdrawal approved but payout encountered an error. Will retry automatically.',
+            auto_approved: true,
+            payout_pending: true
+          }), {
+            status: 201,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
 
       // For pending withdrawals (members with payment issues or non-M-Pesa)

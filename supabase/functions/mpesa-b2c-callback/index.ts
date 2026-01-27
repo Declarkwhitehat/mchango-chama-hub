@@ -39,6 +39,110 @@ async function sendSMS(phone: string, message: string) {
   }
 }
 
+async function findWithdrawal(supabaseAdmin: any, result: any) {
+  const conversationId = result.ConversationID;
+  const occasion = result.Occasion || '';
+
+  console.log('Finding withdrawal:', { conversationId, occasion });
+
+  // Method 1: Lookup by payment_reference matching our predictable reference (WD-{uuid})
+  if (occasion && occasion.startsWith('WD-')) {
+    const { data: wd1, error: err1 } = await supabaseAdmin
+      .from('withdrawals')
+      .select(`
+        *,
+        profiles:requested_by(full_name, phone),
+        chama:chama_id(name),
+        mchango:mchango_id(title)
+      `)
+      .eq('payment_reference', occasion)
+      .maybeSingle();
+
+    if (wd1) {
+      console.log('Found withdrawal by payment_reference (Occasion):', wd1.id);
+      return wd1;
+    }
+
+    // Method 2: Extract withdrawal ID from Occasion format WD-{uuid}
+    const withdrawalId = occasion.substring(3);
+    if (withdrawalId && withdrawalId.length > 0) {
+      const { data: wd2, error: err2 } = await supabaseAdmin
+        .from('withdrawals')
+        .select(`
+          *,
+          profiles:requested_by(full_name, phone),
+          chama:chama_id(name),
+          mchango:mchango_id(title)
+        `)
+        .eq('id', withdrawalId)
+        .maybeSingle();
+
+      if (wd2) {
+        console.log('Found withdrawal by extracted ID from Occasion:', wd2.id);
+        return wd2;
+      }
+    }
+  }
+
+  // Method 3: Fallback - lookup by ConversationID in payment_reference
+  if (conversationId) {
+    const { data: wd3, error: err3 } = await supabaseAdmin
+      .from('withdrawals')
+      .select(`
+        *,
+        profiles:requested_by(full_name, phone),
+        chama:chama_id(name),
+        mchango:mchango_id(title)
+      `)
+      .eq('payment_reference', conversationId)
+      .maybeSingle();
+
+    if (wd3) {
+      console.log('Found withdrawal by ConversationID:', wd3.id);
+      return wd3;
+    }
+  }
+
+  // Method 4: Look for processing withdrawals without ConversationID match (race condition recovery)
+  // Find the most recent processing withdrawal that matches the phone number
+  if (result.ResultParameters?.ResultParameter) {
+    let recipientPhone = '';
+    for (const param of result.ResultParameters.ResultParameter) {
+      if (param.Key === 'ReceiverPartyPublicName') {
+        recipientPhone = param.Value.split(' - ')[0] || param.Value;
+        break;
+      }
+    }
+
+    if (recipientPhone) {
+      const formattedPhone = recipientPhone.replace(/\D/g, '');
+      const { data: wd4 } = await supabaseAdmin
+        .from('withdrawals')
+        .select(`
+          *,
+          profiles:requested_by(full_name, phone),
+          chama:chama_id(name),
+          mchango:mchango_id(title),
+          payment_methods:payment_method_id(phone_number)
+        `)
+        .eq('status', 'processing')
+        .order('last_b2c_attempt_at', { ascending: false })
+        .limit(5);
+
+      for (const wd of wd4 || []) {
+        const pmPhone = wd.payment_methods?.phone_number?.replace(/\D/g, '') || '';
+        if (pmPhone.endsWith(formattedPhone.slice(-9)) || formattedPhone.endsWith(pmPhone.slice(-9))) {
+          console.log('Found withdrawal by phone number match:', wd.id);
+          return wd;
+        }
+      }
+    }
+  }
+
+  console.error('Could not find withdrawal with any method');
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -68,21 +172,12 @@ serve(async (req) => {
 
     console.log('B2C Result:', { conversationId, resultCode, resultDesc });
 
-    // Find withdrawal by conversation ID (stored in payment_reference)
-    const { data: withdrawal, error: findError } = await supabaseAdmin
-      .from('withdrawals')
-      .select(`
-        *,
-        profiles:requested_by(full_name, phone),
-        chama:chama_id(name),
-        mchango:mchango_id(title)
-      `)
-      .eq('payment_reference', conversationId)
-      .single();
+    // Find withdrawal using multiple fallback methods
+    const withdrawal = await findWithdrawal(supabaseAdmin, result);
 
-    if (findError || !withdrawal) {
-      console.error('Withdrawal not found for conversation:', conversationId);
-      // Still return success to M-Pesa
+    if (!withdrawal) {
+      console.error('Withdrawal not found for callback:', { conversationId, occasion: result.Occasion });
+      // Still return success to M-Pesa to prevent retries
       return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -116,7 +211,7 @@ serve(async (req) => {
 
       console.log('B2C Success:', { transactionId, transactionAmount, mpesaRecipientPhone });
 
-      // Update withdrawal as completed
+      // Update withdrawal as completed with M-Pesa transaction ID
       const { error: updateError } = await supabaseAdmin
         .from('withdrawals')
         .update({
@@ -132,26 +227,65 @@ serve(async (req) => {
         console.error('Failed to update withdrawal:', updateError);
       }
 
-      // Update chama total_withdrawn if this is a chama withdrawal
-      if (withdrawal.chama_id) {
-        const { data: chama } = await supabaseAdmin
-          .from('chama')
-          .select('total_withdrawn')
-          .eq('id', withdrawal.chama_id)
-          .single();
+      // Update chama total_withdrawn atomically using database function
+      if (withdrawal.chama_id && transactionAmount > 0) {
+        const { error: chamaError } = await supabaseAdmin.rpc('update_chama_withdrawn', {
+          p_chama_id: withdrawal.chama_id,
+          p_amount: transactionAmount
+        });
         
-        if (chama) {
-          const newTotalWithdrawn = Number(chama.total_withdrawn || 0) + transactionAmount;
-          await supabaseAdmin
+        if (chamaError) {
+          console.error('Failed to update chama withdrawn:', chamaError);
+          // Fallback to direct update
+          const { data: chama } = await supabaseAdmin
             .from('chama')
-            .update({ total_withdrawn: newTotalWithdrawn })
-            .eq('id', withdrawal.chama_id);
+            .select('total_withdrawn')
+            .eq('id', withdrawal.chama_id)
+            .single();
           
-          console.log('Updated chama total_withdrawn:', { 
+          if (chama) {
+            await supabaseAdmin
+              .from('chama')
+              .update({ total_withdrawn: (Number(chama.total_withdrawn) || 0) + transactionAmount })
+              .eq('id', withdrawal.chama_id);
+          }
+        } else {
+          console.log('Updated chama total_withdrawn atomically:', { 
             chama_id: withdrawal.chama_id, 
-            previous: chama.total_withdrawn,
-            added: transactionAmount,
-            new_total: newTotalWithdrawn
+            amount: transactionAmount
+          });
+        }
+      }
+
+      // Update mchango balance atomically using database function
+      if (withdrawal.mchango_id && transactionAmount > 0) {
+        const { error: mchangoError } = await supabaseAdmin.rpc('update_mchango_withdrawn', {
+          p_mchango_id: withdrawal.mchango_id,
+          p_amount: transactionAmount
+        });
+        
+        if (mchangoError) {
+          console.error('Failed to update mchango withdrawn:', mchangoError);
+          // Fallback to direct update
+          const { data: mchango } = await supabaseAdmin
+            .from('mchango')
+            .select('current_amount, available_balance')
+            .eq('id', withdrawal.mchango_id)
+            .single();
+
+          if (mchango) {
+            await supabaseAdmin
+              .from('mchango')
+              .update({
+                current_amount: Math.max(0, Number(mchango.current_amount) - transactionAmount),
+                available_balance: Math.max(0, Number(mchango.available_balance) - transactionAmount)
+              })
+              .eq('id', withdrawal.mchango_id);
+          }
+        } else {
+          console.log('Updated mchango balance atomically:', {
+            mchango_id: withdrawal.mchango_id,
+            amount: transactionAmount
           });
         }
       }
@@ -160,24 +294,6 @@ serve(async (req) => {
       if (recipientPhone) {
         const successMessage = `🎉 Your ${groupName} payout of KES ${transactionAmount.toFixed(2)} has been sent to your M-Pesa. Transaction: ${transactionId}. Thank you for being a valued member!`;
         await sendSMS(recipientPhone, successMessage);
-      }
-
-      // If it's a mchango withdrawal, update the current_amount
-      if (withdrawal.mchango_id) {
-        const { data: mchango } = await supabaseAdmin
-          .from('mchango')
-          .select('current_amount')
-          .eq('id', withdrawal.mchango_id)
-          .single();
-
-        if (mchango) {
-          await supabaseAdmin
-            .from('mchango')
-            .update({
-              current_amount: Math.max(0, Number(mchango.current_amount) - withdrawal.amount)
-            })
-            .eq('id', withdrawal.mchango_id);
-        }
       }
 
       // Record commission as company earning
