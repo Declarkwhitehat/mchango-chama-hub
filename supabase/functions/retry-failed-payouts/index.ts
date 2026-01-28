@@ -64,9 +64,8 @@ Deno.serve(async (req) => {
     const { data: stuckApproved, error: stuckError } = await supabase
       .from('withdrawals')
       .select(`
-        *,
-        profiles:requested_by(full_name, phone),
-        payment_methods:payment_method_id(method_type, phone_number, account_number)
+        id, status, net_amount, notes, b2c_attempt_count, chama_id, mchango_id, requested_by, payment_method_id,
+        payment_methods!payment_method_id(method_type, phone_number, account_number)
       `)
       .eq('status', 'approved')
       .lt('reviewed_at', stuckApprovedThreshold)
@@ -127,9 +126,8 @@ Deno.serve(async (req) => {
     const { data: failedWithdrawals, error: fetchError } = await supabase
       .from('withdrawals')
       .select(`
-        *,
-        profiles:requested_by(full_name, phone),
-        payment_methods:payment_method_id(method_type, phone_number, account_number)
+        id, status, net_amount, notes, b2c_attempt_count, chama_id, mchango_id, requested_by, payment_method_id, last_b2c_attempt_at, created_at,
+        payment_methods!payment_method_id(method_type, phone_number, account_number)
       `)
       .in('status', ['failed', 'pending_retry'])
       .lt('b2c_attempt_count', MAX_RETRY_ATTEMPTS)
@@ -197,8 +195,8 @@ Deno.serve(async (req) => {
               })
               .eq('id', withdrawal.id);
 
-            // Send final failure SMS
-            const phone = withdrawal.profiles?.phone || paymentMethod?.phone_number;
+            // Send final failure SMS - use payment method phone since we don't join profiles
+            const phone = paymentMethod?.phone_number;
             if (phone) {
               const chamaName = withdrawal.chama_id ? 'your Chama' : 'your Mchango';
               const message = `❌ Your ${chamaName} payout of KES ${withdrawal.net_amount?.toFixed(2)} failed after multiple attempts. Error: ${b2cResult.error || 'Payment provider error'}. Please update your payment method or contact support.`;
