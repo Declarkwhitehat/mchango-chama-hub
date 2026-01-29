@@ -6,9 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Ban, PlayCircle, Loader2, ExternalLink, BadgeCheck, BadgeX } from "lucide-react";
+import { Search, Ban, PlayCircle, Loader2, ExternalLink, BadgeCheck, BadgeX, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -35,6 +45,11 @@ export const CampaignsManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [processing, setProcessing] = useState<string | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; campaign: Campaign | null; confirmText: string }>({
+    open: false,
+    campaign: null,
+    confirmText: "",
+  });
 
   useEffect(() => {
     fetchCampaigns();
@@ -124,6 +139,61 @@ export const CampaignsManagement = () => {
     }
   };
 
+  const deleteCampaign = async (campaignId: string, campaignTitle: string) => {
+    setProcessing(campaignId);
+    try {
+      // Delete related records first
+      // 1. Delete donations
+      await supabase
+        .from("mchango_donations")
+        .delete()
+        .eq("mchango_id", campaignId);
+
+      // 2. Delete transactions
+      await supabase
+        .from("transactions")
+        .delete()
+        .eq("mchango_id", campaignId);
+
+      // 3. Delete payouts
+      await supabase
+        .from("payouts")
+        .delete()
+        .eq("mchango_id", campaignId);
+
+      // 4. Delete withdrawals
+      await supabase
+        .from("withdrawals")
+        .delete()
+        .eq("mchango_id", campaignId);
+
+      // 5. Finally delete the campaign
+      const { error } = await supabase
+        .from("mchango")
+        .delete()
+        .eq("id", campaignId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Campaign Deleted",
+        description: `"${campaignTitle}" has been permanently deleted`,
+      });
+
+      setDeleteDialog({ open: false, campaign: null, confirmText: "" });
+      await fetchCampaigns();
+    } catch (error: any) {
+      console.error("Error deleting campaign:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete campaign",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const filteredCampaigns = campaigns.filter(campaign => {
     const matchesSearch = 
       campaign.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -142,7 +212,7 @@ export const CampaignsManagement = () => {
       case 'active':
         return <Badge>Active</Badge>;
       case 'completed':
-        return <Badge className="bg-green-500">Completed</Badge>;
+        return <Badge className="bg-accent text-accent-foreground">Completed</Badge>;
       case 'cancelled':
         return <Badge variant="destructive">Cancelled</Badge>;
       default:
@@ -306,6 +376,17 @@ export const CampaignsManagement = () => {
                         )}
                       </Button>
                     )}
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setDeleteDialog({ open: true, campaign, confirmText: "" })}
+                      disabled={processing === campaign.id}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
               );
@@ -313,6 +394,44 @@ export const CampaignsManagement = () => {
           )}
         </div>
       </CardContent>
+
+      {/* Delete Confirmation Dialog with Type-to-Confirm */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, campaign: null, confirmText: "" })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">⚠️ Delete Campaign Permanently</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                You are about to <strong>permanently delete</strong> the campaign <strong>"{deleteDialog.campaign?.title}"</strong>. 
+                This will remove all donations, transactions, and related records.
+              </p>
+              <p className="text-destructive font-medium">This action cannot be undone!</p>
+              <div className="space-y-2">
+                <p className="text-sm">To confirm, type <strong>DELETE</strong> below:</p>
+                <Input
+                  value={deleteDialog.confirmText}
+                  onChange={(e) => setDeleteDialog(prev => ({ ...prev, confirmText: e.target.value }))}
+                  placeholder="Type DELETE to confirm"
+                  className="border-destructive/50 focus-visible:ring-destructive"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteDialog.campaign && deleteCampaign(deleteDialog.campaign.id, deleteDialog.campaign.title)}
+              disabled={deleteDialog.confirmText !== "DELETE" || processing === deleteDialog.campaign?.id}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {processing === deleteDialog.campaign?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
