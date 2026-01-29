@@ -48,6 +48,11 @@ export const ChamaManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [processing, setProcessing] = useState<string | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; chama: Chama | null; confirmText: string }>({
+    open: false,
+    chama: null,
+    confirmText: "",
+  });
 
   useEffect(() => {
     fetchChamas();
@@ -189,13 +194,25 @@ export const ChamaManagement = () => {
         .delete()
         .eq("chama_id", chamaId);
 
-      // 7. Delete payouts
+      // 7. Delete payout skips
+      await supabase
+        .from("payout_skips")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 8. Delete payouts
       await supabase
         .from("payouts")
         .delete()
         .eq("chama_id", chamaId);
 
-      // 8. Delete transactions
+      // 9. Delete withdrawals
+      await supabase
+        .from("withdrawals")
+        .delete()
+        .eq("chama_id", chamaId);
+
+      // 10. Delete transactions
       await supabase
         .from("transactions")
         .delete()
@@ -220,6 +237,7 @@ export const ChamaManagement = () => {
         description: `"${chamaName}" has been permanently deleted`,
       });
 
+      setDeleteDialog({ open: false, chama: null, confirmText: "" });
       await fetchChamas();
     } catch (error: any) {
       console.error("Error deleting chama:", error);
@@ -251,7 +269,7 @@ export const ChamaManagement = () => {
       case 'active':
         return <Badge>Active</Badge>;
       case 'completed':
-        return <Badge className="bg-green-500">Completed</Badge>;
+        return <Badge className="bg-accent text-accent-foreground">Completed</Badge>;
       case 'inactive':
         return <Badge variant="destructive">Inactive</Badge>;
       default:
@@ -436,41 +454,16 @@ export const ChamaManagement = () => {
                       </Button>
                     )}
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          disabled={processing === chama.id}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Chama Permanently</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to permanently delete <strong>"{chama.name}"</strong>? 
-                            This action cannot be undone and will remove all associated members, 
-                            contributions, cycles, and transaction records.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteChama(chama.id, chama.name)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            {processing === chama.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                            ) : null}
-                            Delete Permanently
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setDeleteDialog({ open: true, chama, confirmText: "" })}
+                      disabled={processing === chama.id}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
               );
@@ -478,6 +471,44 @@ export const ChamaManagement = () => {
           )}
         </div>
       </CardContent>
+
+      {/* Delete Confirmation Dialog with Type-to-Confirm */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, chama: null, confirmText: "" })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">⚠️ Delete Chama Permanently</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                You are about to <strong>permanently delete</strong> the chama <strong>"{deleteDialog.chama?.name}"</strong>. 
+                This will remove all members, contributions, cycles, and transaction records.
+              </p>
+              <p className="text-destructive font-medium">This action cannot be undone!</p>
+              <div className="space-y-2">
+                <p className="text-sm">To confirm, type <strong>DELETE</strong> below:</p>
+                <Input
+                  value={deleteDialog.confirmText}
+                  onChange={(e) => setDeleteDialog(prev => ({ ...prev, confirmText: e.target.value }))}
+                  placeholder="Type DELETE to confirm"
+                  className="border-destructive/50 focus-visible:ring-destructive"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteDialog.chama && deleteChama(deleteDialog.chama.id, deleteDialog.chama.name)}
+              disabled={deleteDialog.confirmText !== "DELETE" || processing === deleteDialog.chama?.id}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {processing === deleteDialog.chama?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };

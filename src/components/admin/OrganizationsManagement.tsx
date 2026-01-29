@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Ban, PlayCircle, Loader2, ExternalLink, CheckCircle, Building2, ShieldCheck } from "lucide-react";
+import { Search, Ban, PlayCircle, Loader2, ExternalLink, CheckCircle, Building2, ShieldCheck, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import {
@@ -53,9 +53,14 @@ export const OrganizationsManagement = () => {
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     orgId: string;
-    action: 'verify' | 'unverify' | 'deactivate' | 'activate' | 'delete';
+    action: 'verify' | 'unverify' | 'deactivate' | 'activate';
     orgName: string;
   } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; org: Organization | null; confirmText: string }>({
+    open: false,
+    org: null,
+    confirmText: "",
+  });
 
   useEffect(() => {
     fetchOrganizations();
@@ -128,9 +133,6 @@ export const OrganizationsManagement = () => {
         case 'deactivate':
           updateData = { status: 'inactive' };
           break;
-        case 'delete':
-          updateData = { status: 'deleted' };
-          break;
       }
 
       const { error } = await supabase
@@ -145,7 +147,6 @@ export const OrganizationsManagement = () => {
         unverify: 'Organization verification removed',
         activate: 'Organization activated',
         deactivate: 'Organization deactivated',
-        delete: 'Organization deleted',
       };
 
       toast({
@@ -164,6 +165,50 @@ export const OrganizationsManagement = () => {
     } finally {
       setProcessing(null);
       setConfirmDialog(null);
+    }
+  };
+
+  const deleteOrganization = async (orgId: string, orgName: string) => {
+    setProcessing(orgId);
+    try {
+      // Delete related records first
+      // 1. Delete donations
+      await supabase
+        .from("organization_donations")
+        .delete()
+        .eq("organization_id", orgId);
+
+      // 2. Delete verification requests
+      await supabase
+        .from("verification_requests")
+        .delete()
+        .eq("entity_id", orgId)
+        .eq("entity_type", "organization");
+
+      // 3. Finally delete the organization
+      const { error } = await supabase
+        .from("organizations")
+        .delete()
+        .eq("id", orgId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Organization Deleted",
+        description: `"${orgName}" has been permanently deleted`,
+      });
+
+      setDeleteDialog({ open: false, org: null, confirmText: "" });
+      await fetchOrganizations();
+    } catch (error: any) {
+      console.error("Error deleting organization:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete organization",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(null);
     }
   };
 
@@ -303,7 +348,7 @@ export const OrganizationsManagement = () => {
                         <h3 className="font-medium">{org.name}</h3>
                         {getStatusBadge(org.status)}
                         {org.is_verified && (
-                          <Badge variant="outline" className="text-green-600 border-green-600">
+                          <Badge variant="outline" className="text-accent border-accent">
                             <ShieldCheck className="h-3 w-3 mr-1" />
                             Verified
                           </Badge>
@@ -355,7 +400,7 @@ export const OrganizationsManagement = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-green-600 border-green-600 hover:bg-green-50"
+                        className="text-accent border-accent hover:bg-accent/10"
                         onClick={() => setConfirmDialog({ 
                           open: true, 
                           orgId: org.id, 
@@ -387,7 +432,7 @@ export const OrganizationsManagement = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                        className="text-secondary border-secondary hover:bg-secondary/10"
                         onClick={() => setConfirmDialog({ 
                           open: true, 
                           orgId: org.id, 
@@ -419,15 +464,12 @@ export const OrganizationsManagement = () => {
                     {org.status !== 'deleted' && (
                       <Button
                         size="sm"
-                        variant="destructive"
-                        onClick={() => setConfirmDialog({ 
-                          open: true, 
-                          orgId: org.id, 
-                          action: 'delete',
-                          orgName: org.name 
-                        })}
+                        variant="outline"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteDialog({ open: true, org, confirmText: "" })}
                         disabled={processing === org.id}
                       >
+                        <Trash2 className="h-4 w-4 mr-1" />
                         Delete
                       </Button>
                     )}
@@ -443,7 +485,7 @@ export const OrganizationsManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialog for non-destructive actions */}
       <AlertDialog open={confirmDialog?.open} onOpenChange={(open) => !open && setConfirmDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -452,7 +494,6 @@ export const OrganizationsManagement = () => {
               {confirmDialog?.action === 'unverify' && 'Remove Verification'}
               {confirmDialog?.action === 'activate' && 'Activate Organization'}
               {confirmDialog?.action === 'deactivate' && 'Deactivate Organization'}
-              {confirmDialog?.action === 'delete' && 'Delete Organization'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDialog?.action === 'verify' && 
@@ -463,21 +504,53 @@ export const OrganizationsManagement = () => {
                 `Are you sure you want to activate "${confirmDialog?.orgName}"?`}
               {confirmDialog?.action === 'deactivate' && 
                 `Are you sure you want to deactivate "${confirmDialog?.orgName}"? It will no longer be visible publicly.`}
-              {confirmDialog?.action === 'delete' && 
-                `Are you sure you want to delete "${confirmDialog?.orgName}"? This action cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleAction}
-              className={confirmDialog?.action === 'delete' ? 'bg-destructive hover:bg-destructive/90' : ''}
-            >
+            <AlertDialogAction onClick={handleAction}>
               {confirmDialog?.action === 'verify' && 'Verify'}
               {confirmDialog?.action === 'unverify' && 'Remove'}
               {confirmDialog?.action === 'activate' && 'Activate'}
               {confirmDialog?.action === 'deactivate' && 'Deactivate'}
-              {confirmDialog?.action === 'delete' && 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog with Type-to-Confirm */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, org: null, confirmText: "" })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">⚠️ Delete Organization Permanently</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                You are about to <strong>permanently delete</strong> the organization <strong>"{deleteDialog.org?.name}"</strong>. 
+                This will remove all donations, transaction records, and verification requests.
+              </p>
+              <p className="text-destructive font-medium">This action cannot be undone!</p>
+              <div className="space-y-2">
+                <p className="text-sm">To confirm, type <strong>DELETE</strong> below:</p>
+                <Input
+                  value={deleteDialog.confirmText}
+                  onChange={(e) => setDeleteDialog(prev => ({ ...prev, confirmText: e.target.value }))}
+                  placeholder="Type DELETE to confirm"
+                  className="border-destructive/50 focus-visible:ring-destructive"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteDialog.org && deleteOrganization(deleteDialog.org.id, deleteDialog.org.name)}
+              disabled={deleteDialog.confirmText !== "DELETE" || processing === deleteDialog.org?.id}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {processing === deleteDialog.org?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
