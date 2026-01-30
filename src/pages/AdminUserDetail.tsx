@@ -580,46 +580,98 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
                     <p>Not a member of any chamas yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {chamas.map((membership) => (
                       <div
                         key={membership.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
+                        className="p-4 border rounded-lg space-y-3"
                       >
-                        <div>
-                          <p className="font-medium">{membership.chama.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Code: {membership.member_code} • 
-                            Position: #{membership.order_index}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Status: {membership.approval_status} • 
-                            {membership.is_manager && " Manager •"}
-                            {" "}Joined {format(new Date(membership.joined_at), "MMM d, yyyy")}
-                          </p>
-                          {(membership.balance_credit > 0 || membership.balance_deficit > 0) && (
-                            <div className="flex gap-4 mt-2">
-                              {membership.balance_credit > 0 && (
-                                <Badge variant="default">
-                                  Credit: KES {membership.balance_credit}
-                                </Badge>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{membership.chama?.name}</p>
+                              {membership.is_manager && (
+                                <Badge variant="default" className="text-xs">Manager</Badge>
                               )}
-                              {membership.balance_deficit > 0 && (
-                                <Badge variant="destructive">
-                                  Deficit: KES {membership.balance_deficit}
-                                </Badge>
-                              )}
+                              <Badge variant={membership.approval_status === 'approved' ? 'outline' : 'secondary'}>
+                                {membership.approval_status}
+                              </Badge>
                             </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Member Code: <code>{membership.member_code}</code> • 
+                              Position: #{membership.order_index || '-'} • 
+                              Joined {format(new Date(membership.joined_at), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => navigate(`/admin/chama/${membership.chama?.id}`)}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              Admin View
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Member Stats Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Total Contributed</p>
+                            <p className="font-medium">KES {Number(membership.total_contributed || 0).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Missed Payments</p>
+                            <p className="font-medium">
+                              {membership.missed_payments_count > 0 ? (
+                                <Badge variant="destructive">{membership.missed_payments_count}</Badge>
+                              ) : (
+                                <Badge variant="outline">0</Badge>
+                              )}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Credit Balance</p>
+                            <p className="font-medium">
+                              {Number(membership.balance_credit || 0) > 0 ? (
+                                <span className="text-green-600">+KES {Number(membership.balance_credit).toLocaleString()}</span>
+                              ) : '-'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Deficit</p>
+                            <p className="font-medium">
+                              {Number(membership.balance_deficit || 0) > 0 ? (
+                                <span className="text-red-600">-KES {Number(membership.balance_deficit).toLocaleString()}</span>
+                              ) : '-'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Additional Status Indicators */}
+                        <div className="flex flex-wrap gap-2">
+                          {membership.first_payment_completed && (
+                            <Badge variant="outline" className="text-green-600 border-green-600">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              First Payment Done
+                            </Badge>
+                          )}
+                          {!membership.first_payment_completed && membership.approval_status === 'approved' && (
+                            <Badge variant="outline" className="text-orange-600 border-orange-600">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Awaiting First Payment
+                            </Badge>
+                          )}
+                          {membership.requires_admin_verification && (
+                            <Badge variant="destructive">
+                              Needs Admin Verification
+                            </Badge>
+                          )}
+                          {membership.status === 'removed' && (
+                            <Badge variant="destructive">Removed</Badge>
                           )}
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => navigate(`/chama/${membership.chama.slug}`)}
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
                       </div>
                     ))}
                   </div>

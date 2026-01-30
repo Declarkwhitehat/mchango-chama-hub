@@ -309,14 +309,21 @@ export const CampaignsManagement = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => navigate(`/admin/campaign/${campaign.id}`)}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      View Details
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => navigate(`/mchango/${campaign.slug}`)}
                     >
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      View
+                      Public View
                     </Button>
 
                     <Button
