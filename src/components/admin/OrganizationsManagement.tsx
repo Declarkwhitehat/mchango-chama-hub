@@ -389,11 +389,18 @@ export const OrganizationsManagement = () => {
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
+                      variant="default"
+                      onClick={() => navigate(`/admin/organization/${org.id}`)}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      View Details
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => navigate(`/organizations/${org.slug}`)}
                     >
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      View
+                      Public View
                     </Button>
                     
                     {!org.is_verified ? (

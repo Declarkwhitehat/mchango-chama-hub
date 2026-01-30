@@ -44,13 +44,16 @@ const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const AdminTransactions = lazy(() => import("./pages/AdminTransactions"));
 const AdminWithdrawals = lazy(() => import("./pages/AdminWithdrawals"));
 const AdminChamas = lazy(() => import("./pages/AdminChamas"));
+const AdminChamaDetail = lazy(() => import("./pages/AdminChamaDetail"));
 const AdminCampaigns = lazy(() => import("./pages/AdminCampaigns"));
+const AdminCampaignDetail = lazy(() => import("./pages/AdminCampaignDetail"));
 const AdminCallbacks = lazy(() => import("./pages/AdminCallbacks"));
 const AdminAudit = lazy(() => import("./pages/AdminAudit"));
 const AdminExport = lazy(() => import("./pages/AdminExport"));
 const AdminSearch = lazy(() => import("./pages/AdminSearch"));
 const AdminPaymentConfig = lazy(() => import("./pages/AdminPaymentConfig"));
 const AdminOrganizations = lazy(() => import("./pages/AdminOrganizations"));
+const AdminOrganizationDetail = lazy(() => import("./pages/AdminOrganizationDetail"));
 const AdminLedger = lazy(() => import("./pages/AdminLedger"));
 const AdminVerificationRequests = lazy(() => import("./pages/AdminVerificationRequests"));
 
@@ -106,8 +109,11 @@ const AppContent = () => {
           <Route path="/admin/transactions" element={<AdminProtectedRoute><AdminTransactions /></AdminProtectedRoute>} />
           <Route path="/admin/withdrawals" element={<AdminProtectedRoute><AdminWithdrawals /></AdminProtectedRoute>} />
           <Route path="/admin/chamas" element={<AdminProtectedRoute><AdminChamas /></AdminProtectedRoute>} />
+          <Route path="/admin/chama/:chamaId" element={<AdminProtectedRoute><AdminChamaDetail /></AdminProtectedRoute>} />
           <Route path="/admin/campaigns" element={<AdminProtectedRoute><AdminCampaigns /></AdminProtectedRoute>} />
+          <Route path="/admin/campaign/:campaignId" element={<AdminProtectedRoute><AdminCampaignDetail /></AdminProtectedRoute>} />
           <Route path="/admin/organizations" element={<AdminProtectedRoute><AdminOrganizations /></AdminProtectedRoute>} />
+          <Route path="/admin/organization/:organizationId" element={<AdminProtectedRoute><AdminOrganizationDetail /></AdminProtectedRoute>} />
           <Route path="/admin/callbacks" element={<AdminProtectedRoute><AdminCallbacks /></AdminProtectedRoute>} />
           <Route path="/admin/audit" element={<AdminProtectedRoute><AdminAudit /></AdminProtectedRoute>} />
           <Route path="/admin/search" element={<AdminProtectedRoute><AdminSearch /></AdminProtectedRoute>} />
