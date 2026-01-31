@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Shield, ShieldOff, Eye, Loader2, ExternalLink } from "lucide-react";
+import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
@@ -23,6 +24,8 @@ interface UserRole {
   role: string;
 }
 
+const ADMIN_PRIVILEGE_CODE = "D3E9C0L1A3R9K";
+
 export const UsersManagement = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
@@ -31,6 +34,10 @@ export const UsersManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [processing, setProcessing] = useState<string | null>(null);
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
+  const [privilegeCode, setPrivilegeCode] = useState("");
+  const [pendingAdminUserId, setPendingAdminUserId] = useState<string | null>(null);
+  const [codeError, setCodeError] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -76,45 +83,78 @@ export const UsersManagement = () => {
     }
   };
 
-  const toggleAdminRole = async (userId: string, currentRoles: UserRole[]) => {
-    setProcessing(userId);
+  const handleMakeAdminClick = (userId: string) => {
+    setPendingAdminUserId(userId);
+    setPrivilegeCode("");
+    setCodeError(false);
+    setAdminDialogOpen(true);
+  };
+
+  const confirmGrantAdmin = async () => {
+    if (privilegeCode !== ADMIN_PRIVILEGE_CODE) {
+      setCodeError(true);
+      toast({
+        title: "Invalid Code",
+        description: "The privilege code you entered is incorrect",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!pendingAdminUserId) return;
+
+    setProcessing(pendingAdminUserId);
+    setAdminDialogOpen(false);
+
     try {
-      const isAdmin = currentRoles?.some(r => r.role === 'admin');
+      const { error } = await supabase
+        .from('user_roles')
+        .insert({ user_id: pendingAdminUserId, role: 'admin' });
 
-      if (isAdmin) {
-        // Remove admin role
-        const { error } = await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', userId)
-          .eq('role', 'admin');
+      if (error) throw error;
 
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Admin role removed",
-        });
-      } else {
-        // Add admin role
-        const { error } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: 'admin' });
-
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Admin role granted",
-        });
-      }
+      toast({
+        title: "Success",
+        description: "Admin role granted",
+      });
 
       await fetchUsers();
     } catch (error: any) {
-      console.error('Error toggling admin role:', error);
+      console.error('Error granting admin role:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update role",
+        description: error.message || "Failed to grant admin role",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(null);
+      setPendingAdminUserId(null);
+      setPrivilegeCode("");
+    }
+  };
+
+  const removeAdminRole = async (userId: string) => {
+    setProcessing(userId);
+    try {
+      const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId)
+        .eq('role', 'admin');
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Admin role removed",
+      });
+
+      await fetchUsers();
+    } catch (error: any) {
+      console.error('Error removing admin role:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove admin role",
         variant: "destructive",
       });
     } finally {
@@ -235,7 +275,7 @@ export const UsersManagement = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => toggleAdminRole(user.id, userRolesList)}
+                      onClick={() => isAdmin ? removeAdminRole(user.id) : handleMakeAdminClick(user.id)}
                       disabled={processing === user.id}
                     >
                       {processing === user.id ? (
@@ -259,6 +299,54 @@ export const UsersManagement = () => {
           )}
         </div>
       </CardContent>
+
+      {/* Admin Privilege Code Dialog */}
+      <AlertDialog open={adminDialogOpen} onOpenChange={setAdminDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              Admin Privilege Required
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                To grant admin privileges, you must enter the admin privilege code.
+                This is a security measure to prevent unauthorized admin creation.
+              </p>
+              <div className="space-y-2">
+                <Input
+                  type="password"
+                  placeholder="Enter privilege code"
+                  value={privilegeCode}
+                  onChange={(e) => {
+                    setPrivilegeCode(e.target.value);
+                    setCodeError(false);
+                  }}
+                  className={codeError ? "border-destructive" : ""}
+                />
+                {codeError && (
+                  <p className="text-sm text-destructive">Invalid privilege code</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setPrivilegeCode("");
+              setCodeError(false);
+              setPendingAdminUserId(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmGrantAdmin}
+              disabled={!privilegeCode}
+            >
+              Grant Admin Access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
