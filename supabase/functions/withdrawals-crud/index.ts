@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { createNotification, NotificationTemplates } from "../_shared/notifications.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -398,6 +399,33 @@ serve(async (req) => {
       if (error) throw error;
 
       console.log('Withdrawal request created:', withdrawal);
+
+      // Get entity name for notification
+      let entityName = 'your account';
+      if (chama_id) {
+        const { data: chamaInfo } = await supabaseAdmin
+          .from('chama')
+          .select('name')
+          .eq('id', chama_id)
+          .single();
+        entityName = chamaInfo?.name || 'Chama';
+      } else if (mchango_id) {
+        const { data: mchangoInfo } = await supabaseAdmin
+          .from('mchango')
+          .select('title')
+          .eq('id', mchango_id)
+          .single();
+        entityName = mchangoInfo?.title || 'Campaign';
+      }
+
+      // Create notification for withdrawal request
+      const notif = NotificationTemplates.withdrawalRequested(netAmount, entityName);
+      await createNotification(supabaseAdmin, {
+        userId: user.id,
+        ...notif,
+        relatedEntityId: withdrawal.id,
+        relatedEntityType: 'withdrawal',
+      });
 
       // If auto-approved and M-Pesa, trigger B2C payout immediately
       if (canAutoApprove && defaultPaymentMethod.phone_number) {
@@ -829,6 +857,18 @@ serve(async (req) => {
                   })
                 }).catch(err => console.error('Failed to send next-in-line SMS:', err));
               }
+
+              // Create notification for rejection
+              const rejectNotif = NotificationTemplates.withdrawalRejected(
+                existingWithdrawal.net_amount, 
+                rejection_reason || 'Payment issues detected'
+              );
+              await createNotification(supabaseAdmin, {
+                userId: rejectedMember.user_id,
+                ...rejectNotif,
+                relatedEntityId: withdrawal_id,
+                relatedEntityType: 'withdrawal',
+              });
             }
 
             // Log audit trail
@@ -1018,6 +1058,15 @@ serve(async (req) => {
               })
             }).catch(err => console.error('Failed to send approval SMS:', err));
           }
+
+          // Create notification for withdrawal approval
+          const approvalNotif = NotificationTemplates.withdrawalApproved(existingWithdrawal.net_amount);
+          await createNotification(supabaseAdmin, {
+            userId: existingWithdrawal.requested_by,
+            ...approvalNotif,
+            relatedEntityId: withdrawal_id,
+            relatedEntityType: 'withdrawal',
+          });
 
           return new Response(JSON.stringify({ 
             data: withdrawal,
