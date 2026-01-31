@@ -159,6 +159,21 @@ export const VerificationRequestsManagement = () => {
 
       if (entityError) throw entityError;
 
+      // Create notification for the requester
+      const entityTypeLabel = request.entity_type === 'mchango' ? 'Campaign' : 
+                              request.entity_type === 'chama' ? 'Chama' : 'Organization';
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: request.requested_by,
+          title: 'Verification Approved! ✓',
+          message: `Congratulations! Your ${entityTypeLabel} "${request.entity_name}" has been verified.`,
+          type: 'success',
+          category: 'verification',
+          related_entity_id: request.entity_id,
+          related_entity_type: request.entity_type,
+        });
+
       toast({
         title: "Approved",
         description: `${request.entity_name} has been verified`,
@@ -192,6 +207,21 @@ export const VerificationRequestsManagement = () => {
         .eq('id', selectedRequest.id);
 
       if (error) throw error;
+
+      // Create notification for the requester
+      const entityTypeLabel = selectedRequest.entity_type === 'mchango' ? 'Campaign' : 
+                              selectedRequest.entity_type === 'chama' ? 'Chama' : 'Organization';
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: selectedRequest.requested_by,
+          title: 'Verification Request Rejected',
+          message: `Your verification request for ${entityTypeLabel} "${selectedRequest.entity_name}" was not approved.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`,
+          type: 'error',
+          category: 'verification',
+          related_entity_id: selectedRequest.entity_id,
+          related_entity_type: selectedRequest.entity_type,
+        });
 
       toast({
         title: "Rejected",
