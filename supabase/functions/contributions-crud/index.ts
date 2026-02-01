@@ -497,7 +497,7 @@ serve(async (req) => {
               requires_admin_verification: member.missed_payments_count - allocationResult.periods_cleared >= 1
             })
             .eq('id', body.member_id);
-        }
+      }
       }
 
       // Build allocation summary message
@@ -521,6 +521,191 @@ serve(async (req) => {
           });
         } catch (smsError) {
           console.error('Failed to send allocation SMS:', smsError);
+        }
+      }
+
+      // ============================================
+      // AUTOMATIC IMMEDIATE PAYOUT TRIGGER
+      // When all members have paid for a cycle, trigger payout immediately
+      // ============================================
+      if (cycle) {
+        // Check if all members have now paid
+        const { data: allPaymentsCheck } = await supabaseClient
+          .from('member_cycle_payments')
+          .select('is_paid, is_late_payment')
+          .eq('cycle_id', cycle.id);
+
+        const totalMembers = allPaymentsCheck?.length || 0;
+        const paidOnTime = allPaymentsCheck?.filter((p: any) => p.is_paid && !p.is_late_payment).length || 0;
+        const allMembersPaid = paidOnTime === totalMembers && totalMembers > 0;
+
+        if (allMembersPaid && !cycle.payout_processed) {
+          console.log('🎉 All members paid! Triggering immediate payout for cycle:', cycle.id);
+          
+          // Get chama details for payout
+          const { data: chamaDetails } = await supabaseClient
+            .from('chama')
+            .select('id, name, contribution_amount, commission_rate')
+            .eq('id', body.chama_id)
+            .single();
+
+          // Get beneficiary for this cycle
+          const { data: beneficiaryMember } = await supabaseClient
+            .from('chama_members')
+            .select(`
+              id, user_id, member_code, order_index, 
+              missed_payments_count, requires_admin_verification,
+              profiles!chama_members_user_id_fkey(full_name, phone)
+            `)
+            .eq('id', cycle.beneficiary_member_id)
+            .single();
+
+          if (beneficiaryMember && chamaDetails) {
+            // Calculate payout: each member's contribution × number of members, minus commission
+            const commissionRate = chamaDetails.commission_rate || 0.05;
+            const grossAmount = chamaDetails.contribution_amount * totalMembers;
+            const commissionAmount = grossAmount * commissionRate;
+            const netPayoutAmount = grossAmount - commissionAmount;
+
+            console.log(`Immediate payout calculation: ${totalMembers} members × KES ${chamaDetails.contribution_amount} = KES ${grossAmount}, commission: KES ${commissionAmount}, net: KES ${netPayoutAmount}`);
+
+            // Get beneficiary's payment method
+            const { data: paymentMethod } = await supabaseClient
+              .from('payment_methods')
+              .select('*')
+              .eq('user_id', beneficiaryMember.user_id)
+              .eq('is_default', true)
+              .maybeSingle();
+
+            if (paymentMethod) {
+              // Check if auto-approval is allowed (M-Pesa, no admin verification needed)
+              const canAutoApprove = paymentMethod.method_type === 'mpesa' &&
+                                     !beneficiaryMember.requires_admin_verification &&
+                                     (beneficiaryMember.missed_payments_count || 0) === 0;
+
+              const withdrawalStatus = canAutoApprove ? 'approved' : 'pending';
+
+              // Create withdrawal request
+              const { data: newWithdrawal, error: withdrawalError } = await supabaseClient
+                .from('withdrawals')
+                .insert({
+                  chama_id: body.chama_id,
+                  requested_by: beneficiaryMember.user_id,
+                  amount: grossAmount,
+                  commission_amount: commissionAmount,
+                  net_amount: netPayoutAmount,
+                  status: withdrawalStatus,
+                  payment_method_id: paymentMethod.id,
+                  payment_method_type: paymentMethod.method_type,
+                  notes: `Automatic immediate payout - all ${totalMembers} members paid`,
+                  requested_at: new Date().toISOString(),
+                  b2c_attempt_count: 0,
+                  ...(withdrawalStatus === 'approved' ? { reviewed_at: new Date().toISOString() } : {})
+                })
+                .select('id')
+                .single();
+
+              if (!withdrawalError && newWithdrawal) {
+                // Record commission
+                await supabaseClient.rpc('record_company_earning', {
+                  p_source: 'chama_commission',
+                  p_amount: commissionAmount,
+                  p_group_id: body.chama_id,
+                  p_description: `Immediate payout commission - ${chamaDetails.name} (all members paid)`
+                });
+
+                // Mark cycle as complete
+                await supabaseClient
+                  .from('contribution_cycles')
+                  .update({
+                    is_complete: true,
+                    payout_processed: true,
+                    payout_processed_at: new Date().toISOString(),
+                    payout_amount: netPayoutAmount,
+                    payout_type: 'full',
+                    members_paid_count: totalMembers,
+                    total_collected_amount: grossAmount
+                  })
+                  .eq('id', cycle.id);
+
+                // Trigger automatic B2C payout if approved
+                if (canAutoApprove && paymentMethod.phone_number) {
+                  console.log('🚀 Triggering automatic B2C payout for immediate full payment');
+                  
+                  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+                  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+                  // Send SMS notification
+                  const beneficiaryPhone = beneficiaryMember.profiles?.phone || paymentMethod.phone_number;
+                  if (beneficiaryPhone) {
+                    await supabaseClient.functions.invoke('send-transactional-sms', {
+                      body: {
+                        phone: beneficiaryPhone,
+                        message: `🎉 Great news! All members have paid for "${chamaDetails.name}". Your payout of KES ${netPayoutAmount.toFixed(2)} is being processed now!`,
+                        eventType: 'immediate_payout'
+                      }
+                    });
+                  }
+
+                  try {
+                    const b2cResponse = await fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${serviceKey}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        withdrawal_id: newWithdrawal.id,
+                        phone_number: paymentMethod.phone_number,
+                        amount: netPayoutAmount
+                      })
+                    });
+
+                    const b2cResult = await b2cResponse.json();
+                    if (b2cResponse.ok && b2cResult.success) {
+                      console.log('✅ Immediate B2C payout initiated:', b2cResult.conversation_id);
+                    } else {
+                      console.error('⚠️ B2C payout failed, will retry:', b2cResult);
+                      await supabaseClient
+                        .from('withdrawals')
+                        .update({
+                          status: 'pending_retry',
+                          b2c_attempt_count: 1,
+                          last_b2c_attempt_at: new Date().toISOString(),
+                          b2c_error_details: { error: b2cResult.error || 'B2C initiation failed' }
+                        })
+                        .eq('id', newWithdrawal.id);
+                    }
+                  } catch (b2cError: any) {
+                    console.error('⚠️ B2C request error:', b2cError);
+                  }
+                } else if (!canAutoApprove) {
+                  // Notify beneficiary that payout requires admin approval
+                  const beneficiaryPhone = beneficiaryMember.profiles?.phone;
+                  if (beneficiaryPhone) {
+                    await supabaseClient.functions.invoke('send-transactional-sms', {
+                      body: {
+                        phone: beneficiaryPhone,
+                        message: `🎉 All members have paid for "${chamaDetails.name}"! Your payout of KES ${netPayoutAmount.toFixed(2)} requires admin approval and will be processed soon.`,
+                        eventType: 'immediate_payout_pending'
+                      }
+                    });
+                  }
+                }
+
+                // Create notification for beneficiary
+                await supabaseClient
+                  .from('notifications')
+                  .insert({
+                    user_id: beneficiaryMember.user_id,
+                    title: '🎉 Payout Ready!',
+                    message: `All members have paid! Your payout of KES ${netPayoutAmount.toFixed(2)} from "${chamaDetails.name}" ${canAutoApprove ? 'is being sent to your M-Pesa' : 'requires admin approval'}.`,
+                    type: 'success',
+                    category: 'withdrawal'
+                  });
+              }
+            }
+          }
         }
       }
 
