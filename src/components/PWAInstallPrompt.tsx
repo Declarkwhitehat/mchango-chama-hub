@@ -83,6 +83,18 @@ export default function PWAInstallPrompt() {
     localStorage.setItem("pwa-install-dismissed", "true");
   };
 
+  const handleResetAndShow = () => {
+    localStorage.removeItem("pwa-install-dismissed");
+    if (deferredPrompt) {
+      setShowPrompt(true);
+    }
+  };
+
+  // Expose reset function globally for debugging
+  useEffect(() => {
+    (window as any).resetPWAPrompt = handleResetAndShow;
+  }, [deferredPrompt]);
+
   // Don't show if already installed or prompt is hidden
   if (isInstalled || !showPrompt) return null;
 
