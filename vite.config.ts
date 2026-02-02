@@ -107,7 +107,6 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   preview: {
-    allowedHosts: ["pamojafunds.com", "www.pamojafunds.com"],
     host: "0.0.0.0",
     port: 8080,
   },
