@@ -29,7 +29,7 @@
     <!-- Force clear stale PWA caches on version update -->
     <script>
       (function() {
-        var cacheVersion = 'v3-20260122-force';
+        var cacheVersion = 'v4-20260202-pwa-fix';
         var storedVersion = localStorage.getItem('cache-version');
         
         if (storedVersion !== cacheVersion) {
@@ -41,10 +41,14 @@
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(regs) {
               regs.forEach(function(reg) { reg.unregister(); });
+            }).then(function() {
+              localStorage.setItem('cache-version', cacheVersion);
+              if (storedVersion) window.location.reload();
             });
+          } else {
+            localStorage.setItem('cache-version', cacheVersion);
+            if (storedVersion) window.location.reload();
           }
-          localStorage.setItem('cache-version', cacheVersion);
-          if (storedVersion) window.location.reload();
         }
       })();
     </script>
