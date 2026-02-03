@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { corsHeaders } from '../_shared/cors.ts';
+import { createNotification, NotificationTemplates } from '../_shared/notifications.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -63,6 +64,7 @@ Deno.serve(async (req) => {
     }
 
     let remindersSent = 0;
+    let notificationsCreated = 0;
     let errors = 0;
 
     for (const chama of chamas || []) {
@@ -103,40 +105,72 @@ Deno.serve(async (req) => {
       for (const payment of unpaidPayments || []) {
         const member = payment.chama_members;
         const profile = member?.profiles;
+        const userId = member?.user_id;
 
-        if (!profile?.phone) {
-          console.log(`No phone for member ${member?.member_code}`);
+        if (!profile?.full_name) {
+          console.log(`No profile for member ${member?.member_code}`);
           continue;
         }
 
-        const message = `Hi ${profile.full_name}, reminder: Your contribution of KES ${payment.amount_due} is due today. Pay via M-Pesa or online. Member ID: ${member.member_code}`;
+        // Format the due time from cycle end_date
+        const dueDate = new Date(cycle.end_date);
+        const dueTime = dueDate.toLocaleTimeString('en-KE', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: true 
+        });
 
-        const smsResult = await sendSMS(profile.phone, message);
-        
-        if (smsResult.success) {
-          // Update reminder_sent_at
-          await supabase
-            .from('member_cycle_payments')
-            .update({ reminder_sent_at: new Date().toISOString() })
-            .eq('id', payment.id);
+        // Create in-app notification if user_id exists
+        if (userId) {
+          const notificationData = NotificationTemplates.paymentReminder(
+            payment.amount_due,
+            chama.name,
+            dueTime
+          );
 
-          remindersSent++;
-          console.log(`Reminder sent to ${member.member_code}`);
-        } else {
-          errors++;
-          console.error(`Failed to send reminder to ${member.member_code}:`, smsResult.error);
+          await createNotification(supabase, {
+            userId,
+            ...notificationData,
+            relatedEntityId: chama.id,
+            relatedEntityType: 'chama',
+          });
+
+          notificationsCreated++;
+          console.log(`In-app notification created for ${member.member_code}`);
         }
 
-        // Rate limit - wait 500ms between SMS
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Send SMS if phone exists
+        if (profile?.phone) {
+          const message = `Hi ${profile.full_name}, reminder: Your contribution of KES ${payment.amount_due} is due today. Pay via M-Pesa or online. Member ID: ${member.member_code}`;
+
+          const smsResult = await sendSMS(profile.phone, message);
+          
+          if (smsResult.success) {
+            remindersSent++;
+            console.log(`SMS reminder sent to ${member.member_code}`);
+          } else {
+            errors++;
+            console.error(`Failed to send SMS to ${member.member_code}:`, smsResult.error);
+          }
+
+          // Rate limit - wait 500ms between SMS
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // Update reminder_sent_at regardless of SMS success (notification was created)
+        await supabase
+          .from('member_cycle_payments')
+          .update({ reminder_sent_at: new Date().toISOString() })
+          .eq('id', payment.id);
       }
     }
 
-    console.log(`[CRON] Daily reminder completed. Sent: ${remindersSent}, Errors: ${errors}`);
+    console.log(`[CRON] Daily reminder completed. SMS Sent: ${remindersSent}, Notifications: ${notificationsCreated}, Errors: ${errors}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
       remindersSent,
+      notificationsCreated,
       errors,
       processedChamas: chamas?.length || 0
     }), {
