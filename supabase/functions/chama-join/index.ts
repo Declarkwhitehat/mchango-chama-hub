@@ -300,10 +300,21 @@ serve(async (req) => {
         });
       }
 
-      // Allow joining chamas that are 'pending' or 'active' (not 'completed' or 'deleted')
-      if (chama.status === 'completed' || chama.status === 'deleted') {
+      // Only allow joining chamas that are 'pending' (not started yet)
+      // Once a chama is 'active' (started), no new members can join
+      if (chama.status === 'active') {
         return new Response(JSON.stringify({ 
-          error: 'Chama not active',
+          error: 'Chama already started',
+          details: 'This chama has already started and is no longer accepting new members. New members can only join before the chama starts.'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (chama.status === 'completed' || chama.status === 'deleted' || chama.status === 'cycle_complete') {
+        return new Response(JSON.stringify({ 
+          error: 'Chama not accepting members',
           details: 'This chama is no longer accepting new members'
         }), {
           status: 400,

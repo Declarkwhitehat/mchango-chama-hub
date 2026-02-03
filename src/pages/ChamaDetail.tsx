@@ -20,6 +20,7 @@ import { SkippedMemberAlert } from "@/components/chama/SkippedMemberAlert";
 import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
 import { WhatsAppLinkManager } from "@/components/chama/WhatsAppLinkManager";
+import { ChamaEndDate } from "@/components/chama/ChamaEndDate";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle } from "lucide-react";
@@ -39,6 +40,7 @@ interface ChamaData {
   commission_rate: number;
   status: string;
   created_at: string;
+  start_date?: string | null;
   every_n_days_count?: number;
   current_cycle_round?: number;
   last_cycle_completed_at?: string;
@@ -461,6 +463,17 @@ const ChamaDetail = () => {
             contributionAmount={chama.contribution_amount}
             chamaName={chama.name}
             chamaStatus={chama.status}
+          />
+        )}
+
+        {/* Chama End Date - Show when chama is active */}
+        {isActive && (
+          <ChamaEndDate
+            startDate={chama.start_date || chama.created_at}
+            contributionFrequency={chama.contribution_frequency}
+            everyNDaysCount={chama.every_n_days_count}
+            memberCount={approvedMembers.length}
+            status={chama.status}
           />
         )}
 
