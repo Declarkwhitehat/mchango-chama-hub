@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogIn, UserPlus, Users, Heart, User, LogOut, Activity, Settings, ChevronDown, LayoutDashboard, Building2, Home } from "lucide-react";
+import { Menu, X, LogIn, UserPlus, Users, Heart, User, LogOut, Activity, Settings, ChevronDown, LayoutDashboard, Building2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,11 +21,8 @@ export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, signOut, profile } = useAuth();
   const { toast } = useToast();
-
-  const isLandingPage = location.pathname === '/';
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -91,28 +88,6 @@ export const Header = () => {
               </Button>
             ) : (
               <>
-                {/* Home - always visible, goes to landing page */}
-                {!isLandingPage && (
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => navigate('/')}
-                    className="gap-2"
-                  >
-                    <Home className="h-4 w-4" />
-                    Home
-                  </Button>
-                )}
-                {/* Dashboard - only for logged-in users */}
-                {user && (
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => navigate('/home')}
-                    className="gap-2"
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
-                  </Button>
-                )}
                 <Button 
                   variant="ghost" 
                   onClick={() => navigate('/chama')}
@@ -241,34 +216,6 @@ export const Header = () => {
                 </Button>
               ) : (
                 <>
-                  {/* Home - always visible, goes to landing page */}
-                  {!isLandingPage && (
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => {
-                        navigate('/');
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full justify-start gap-2"
-                    >
-                      <Home className="h-4 w-4" />
-                      Home
-                    </Button>
-                  )}
-                  {/* Dashboard - only for logged-in users */}
-                  {user && (
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => {
-                        navigate('/home');
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full justify-start gap-2"
-                    >
-                      <LayoutDashboard className="h-4 w-4" />
-                      Dashboard
-                    </Button>
-                  )}
                   <Button 
                     variant="ghost" 
                     onClick={() => {
