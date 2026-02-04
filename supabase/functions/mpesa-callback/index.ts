@@ -57,7 +57,12 @@ serve(async (req) => {
 
     if (contributions && contributions.length > 0) {
       const contribution = contributions[0];
-      console.log('Found chama contribution record:', contribution.id);
+      console.log('Found chama contribution record:', {
+        id: contribution.id,
+        member_id: contribution.member_id,
+        paid_by_member_id: contribution.paid_by_member_id,
+        isPaidByOther: contribution.paid_by_member_id !== contribution.member_id
+      });
 
       // Determine commission rate (default 5%)
       const commissionRate = contribution.chama?.commission_rate || 0.05;
@@ -170,24 +175,82 @@ serve(async (req) => {
 
         console.log('Commission recorded:', commissionAmount, 'Net available:', netAmount);
 
-        // Send SMS notification
-        const { data: profile } = await supabaseClient
+        // Get beneficiary profile for notification
+        const { data: beneficiaryProfile } = await supabaseClient
           .from('profiles')
           .select('full_name, phone')
           .eq('id', member?.user_id)
           .single();
 
-        if (profile?.phone) {
-          try {
-            await supabaseClient.functions.invoke('send-transactional-sms', {
-              body: {
-                phone: profile.phone,
-                message: `Chama contribution confirmed! KES ${actualAmount} received. Receipt: ${mpesaReceiptNumber || 'N/A'}`
+        // Check if someone else paid for this member
+        const paidByDifferentMember = contribution.paid_by_member_id && 
+          contribution.paid_by_member_id !== contribution.member_id;
+
+        if (paidByDifferentMember) {
+          // Get payer's member info to find their user_id
+          const { data: payerMember } = await supabaseClient
+            .from('chama_members')
+            .select('user_id')
+            .eq('id', contribution.paid_by_member_id)
+            .single();
+
+          if (payerMember?.user_id) {
+            const { data: payerProfile } = await supabaseClient
+              .from('profiles')
+              .select('full_name, phone')
+              .eq('id', payerMember.user_id)
+              .single();
+
+            // Notify the payer
+            if (payerProfile?.phone) {
+              try {
+                await supabaseClient.functions.invoke('send-transactional-sms', {
+                  body: {
+                    phone: payerProfile.phone,
+                    message: `Payment successful! KES ${actualAmount} credited to ${beneficiaryProfile?.full_name || 'member'}'s account. Receipt: ${mpesaReceiptNumber || 'N/A'}`
+                  }
+                });
+                console.log('SMS notification sent to payer');
+              } catch (smsError) {
+                console.error('Error sending SMS to payer:', smsError);
               }
-            });
-            console.log('SMS notification sent');
-          } catch (smsError) {
-            console.error('Error sending SMS:', smsError);
+            }
+          }
+
+          // Notify the beneficiary that someone paid for them
+          if (beneficiaryProfile?.phone) {
+            try {
+              const { data: payerProfile } = await supabaseClient
+                .from('profiles')
+                .select('full_name')
+                .eq('id', payerMember?.user_id)
+                .single();
+              
+              await supabaseClient.functions.invoke('send-transactional-sms', {
+                body: {
+                  phone: beneficiaryProfile.phone,
+                  message: `Good news! ${payerProfile?.full_name || 'A member'} has paid KES ${actualAmount} for your chama contribution. Receipt: ${mpesaReceiptNumber || 'N/A'}`
+                }
+              });
+              console.log('SMS notification sent to beneficiary');
+            } catch (smsError) {
+              console.error('Error sending SMS to beneficiary:', smsError);
+            }
+          }
+        } else {
+          // Self-payment - notify the member directly
+          if (beneficiaryProfile?.phone) {
+            try {
+              await supabaseClient.functions.invoke('send-transactional-sms', {
+                body: {
+                  phone: beneficiaryProfile.phone,
+                  message: `Chama contribution confirmed! KES ${actualAmount} received. Receipt: ${mpesaReceiptNumber || 'N/A'}`
+                }
+              });
+              console.log('SMS notification sent');
+            } catch (smsError) {
+              console.error('Error sending SMS:', smsError);
+            }
           }
         }
       }
