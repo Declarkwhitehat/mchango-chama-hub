@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Share2, Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Calendar, Share2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DonationForm } from "@/components/DonationForm";
@@ -15,6 +16,7 @@ import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
+import { ExtendCampaignDays } from "@/components/mchango/ExtendCampaignDays";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Campaign {
@@ -62,12 +64,11 @@ const MchangoDetail = () => {
     try {
       setLoading(true);
       
-      // Fetch by slug
+      // First, try to fetch the campaign
       const { data, error } = await supabase
         .from('mchango')
         .select('*')
         .eq('slug', id)
-        .eq('is_public', true)
         .maybeSingle();
 
       if (error) throw error;
@@ -78,8 +79,29 @@ const MchangoDetail = () => {
         return;
       }
 
+      // Check if user is the creator
+      const isOwner = user?.id === data.created_by;
+
+      // Calculate days left
+      const daysRemaining = data.end_date ? getDaysLeft(data.end_date) : null;
+      const isExpired = daysRemaining === 0;
+
+      // If campaign is expired and user is not the owner, redirect
+      if (isExpired && !isOwner) {
+        toast.error("This campaign has ended");
+        navigate("/mchango");
+        return;
+      }
+
+      // If campaign is not public and user is not owner, redirect
+      if (!data.is_public && !isOwner) {
+        toast.error("Campaign not found");
+        navigate("/mchango");
+        return;
+      }
+
       setCampaign(data);
-      setIsCreator(user?.id === data.created_by);
+      setIsCreator(isOwner);
     } catch (error: any) {
       console.error('Error fetching campaign:', error);
       toast.error("Failed to load campaign");
@@ -126,10 +148,21 @@ const MchangoDetail = () => {
 
   const progress = (Number(campaign.current_amount) / Number(campaign.target_amount)) * 100;
   const daysLeft = getDaysLeft(campaign.end_date);
+  const isExpired = daysLeft === 0;
 
   return (
     <Layout showBackButton>
       <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
+        {/* Expired Campaign Alert for Owner */}
+        {isExpired && isCreator && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Campaign Expired</AlertTitle>
+            <AlertDescription>
+              Your campaign has ended and is no longer visible to the public. Use the "Extend Campaign" option below to reactivate it.
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Campaign Header */}
         <Card>
           <CardHeader>
@@ -239,6 +272,15 @@ const MchangoDetail = () => {
           showBreakdown={true}
         />
 
+        {/* Extend Campaign Days - Only for creators */}
+        {isCreator && (
+          <ExtendCampaignDays
+            campaignId={campaign.id}
+            currentEndDate={campaign.end_date}
+            onSuccess={fetchCampaign}
+          />
+        )}
+
         {/* Withdrawal Button - Only for creators */}
         {isCreator && (
           <WithdrawalButton
@@ -253,21 +295,23 @@ const MchangoDetail = () => {
         <WithdrawalHistory mchangoId={campaign.id} />
 
 
-        {/* Two Column Layout: Donate Form & Contributors */}
-        <div className="grid md:grid-cols-2 gap-6">
-          <DonationForm 
-            mchangoId={campaign.id} 
-            mchangoTitle={campaign.title}
-            onSuccess={handleDonationSuccess}
-          />
+        {/* Two Column Layout: Donate Form & Contributors - Hide if expired */}
+        {!isExpired && (
+          <div className="grid md:grid-cols-2 gap-6">
+            <DonationForm 
+              mchangoId={campaign.id} 
+              mchangoTitle={campaign.title}
+              onSuccess={handleDonationSuccess}
+            />
           
-          <DonorsList 
-            mchangoId={campaign.id} 
-            totalAmount={campaign.current_amount}
-            targetAmount={campaign.target_amount}
-            mchangoTitle={campaign.title}
-          />
-        </div>
+            <DonorsList 
+              mchangoId={campaign.id} 
+              totalAmount={campaign.current_amount}
+              targetAmount={campaign.target_amount}
+              mchangoTitle={campaign.title}
+            />
+          </div>
+        )}
 
         {/* WhatsApp Link */}
         {campaign.whatsapp_link && (
