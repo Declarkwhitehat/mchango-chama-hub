@@ -70,6 +70,10 @@ const MchangoExplore = () => {
 
   const filteredMchangos = mchangos.filter(
     (m) => {
+      // Hide expired campaigns (0 days left) from public view
+      const daysRemaining = getDaysLeft(m.end_date);
+      if (daysRemaining === 0) return false;
+
       // Verified filter
       if (verifiedFilter === "verified" && !m.is_verified) return false;
       if (verifiedFilter === "unverified" && m.is_verified) return false;

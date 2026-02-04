@@ -92,8 +92,14 @@ const MchangoList = () => {
     );
   });
 
+  // Owners can see their expired campaigns, others cannot
   const myCampaigns = filteredMchangos.filter(m => m.created_by === user?.id);
-  const otherCampaigns = filteredMchangos.filter(m => m.created_by !== user?.id);
+  const otherCampaigns = filteredMchangos.filter(m => {
+    if (m.created_by === user?.id) return false;
+    // Hide expired campaigns from non-owners
+    const daysLeft = getDaysLeft(m.end_date);
+    return daysLeft === null || daysLeft > 0;
+  });
 
   const calculateProgress = (current: number, target: number) => {
     return (current / target) * 100;
