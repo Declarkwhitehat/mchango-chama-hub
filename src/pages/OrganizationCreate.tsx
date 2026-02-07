@@ -155,6 +155,16 @@ const OrganizationCreate = () => {
       const name = formData.get("name") as string;
       const baseSlug = generateSlug(name);
       const slug = `${baseSlug}-${Date.now().toString(36)}`;
+      
+      // Generate unique paybill account ID for M-PESA payments
+      const generatePaybillAccountId = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `ORG-${code}`;
+      };
 
       const organizationData = {
         name,
@@ -171,6 +181,7 @@ const OrganizationCreate = () => {
         whatsapp_link: formData.get("whatsapp") as string || null,
         youtube_url: youtubeUrl || null,
         created_by: userCheck.user.id,
+        paybill_account_id: generatePaybillAccountId(),
       };
 
       const { data, error } = await supabase
