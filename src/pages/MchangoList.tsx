@@ -77,6 +77,19 @@ const MchangoList = () => {
     }
   };
 
+  const calculateProgress = (current: number, target: number) => {
+    return (current / target) * 100;
+  };
+
+  const getDaysLeft = (endDate: string) => {
+    if (!endDate) return null;
+    const now = new Date();
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
   const filteredMchangos = mchangos.filter(m => {
     // Verified filter
     if (verifiedFilter === "verified" && !m.is_verified) return false;
@@ -100,19 +113,6 @@ const MchangoList = () => {
     const daysLeft = getDaysLeft(m.end_date);
     return daysLeft === null || daysLeft > 0;
   });
-
-  const calculateProgress = (current: number, target: number) => {
-    return (current / target) * 100;
-  };
-
-  const getDaysLeft = (endDate: string) => {
-    if (!endDate) return null;
-    const now = new Date();
-    const end = new Date(endDate);
-    const diffTime = end.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-  };
 
   const handleSharePublicLink = async () => {
     const publicUrl = `${window.location.origin}/explore/mchango`;
