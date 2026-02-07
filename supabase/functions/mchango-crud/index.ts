@@ -196,6 +196,16 @@ serve(async (req) => {
         slug = `${slug}-${Date.now()}`;
       }
 
+      // Generate unique paybill account ID
+      const generatePaybillAccountId = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `MC${code}`;
+      };
+
       const { data, error } = await supabaseClient
         .from('mchango')
         .insert({
@@ -214,6 +224,7 @@ serve(async (req) => {
           image_url_2: body.image_url_2,
           image_url_3: body.image_url_3,
           youtube_url: body.youtube_url,
+          paybill_account_id: generatePaybillAccountId(),
         })
         .select()
         .single();
