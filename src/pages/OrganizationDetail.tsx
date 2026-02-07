@@ -14,7 +14,6 @@ import { OrganizationDonationForm } from "@/components/OrganizationDonationForm"
 import { OrganizationDonorsList } from "@/components/OrganizationDonorsList";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
-import { PayBillAccountCard } from "@/components/PayBillAccountCard";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Organization {
@@ -40,7 +39,6 @@ interface Organization {
   created_at: string;
   created_by: string;
   group_code?: string;
-  paybill_account_id?: string;
 }
 
 const getYoutubeEmbedUrl = (url: string): string => {
@@ -316,16 +314,7 @@ const OrganizationDetail = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="donate" className="space-y-4">
-            {/* PayBill Payment Card */}
-            {organization.paybill_account_id && (
-              <PayBillAccountCard
-                paybillAccountId={organization.paybill_account_id}
-                entityName={organization.name}
-                entityType="organization"
-              />
-            )}
-            
+          <TabsContent value="donate">
             <OrganizationDonationForm 
               organizationId={organization.id} 
               organizationName={organization.name}

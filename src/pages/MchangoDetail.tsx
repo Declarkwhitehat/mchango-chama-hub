@@ -17,7 +17,6 @@ import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { ExtendCampaignDays } from "@/components/mchango/ExtendCampaignDays";
-import { PayBillAccountCard } from "@/components/PayBillAccountCard";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Campaign {
@@ -38,7 +37,6 @@ interface Campaign {
   whatsapp_link?: string;
   created_by: string;
   group_code?: string;
-  paybill_account_id?: string;
   is_verified: boolean;
 }
 
@@ -296,15 +294,6 @@ const MchangoDetail = () => {
         {/* Withdrawal History - Visible to all */}
         <WithdrawalHistory mchangoId={campaign.id} />
 
-
-        {/* PayBill Payment Card - Show if paybill_account_id exists */}
-        {campaign.paybill_account_id && !isExpired && (
-          <PayBillAccountCard
-            paybillAccountId={campaign.paybill_account_id}
-            entityName={campaign.title}
-            entityType="mchango"
-          />
-        )}
 
         {/* Two Column Layout: Donate Form & Contributors - Hide if expired */}
         {!isExpired && (

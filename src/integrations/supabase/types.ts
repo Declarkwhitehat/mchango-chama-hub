@@ -781,7 +781,6 @@ export type Database = {
           is_public: boolean | null
           is_verified: boolean
           managers: string[] | null
-          paybill_account_id: string
           slug: string
           status: Database["public"]["Enums"]["mchango_status"]
           target_amount: number
@@ -809,7 +808,6 @@ export type Database = {
           is_public?: boolean | null
           is_verified?: boolean
           managers?: string[] | null
-          paybill_account_id: string
           slug: string
           status?: Database["public"]["Enums"]["mchango_status"]
           target_amount: number
@@ -837,7 +835,6 @@ export type Database = {
           is_public?: boolean | null
           is_verified?: boolean
           managers?: string[] | null
-          paybill_account_id?: string
           slug?: string
           status?: Database["public"]["Enums"]["mchango_status"]
           target_amount?: number
@@ -1129,7 +1126,6 @@ export type Database = {
           location: string | null
           logo_url: string | null
           name: string
-          paybill_account_id: string
           phone: string | null
           slug: string
           status: string
@@ -1157,7 +1153,6 @@ export type Database = {
           location?: string | null
           logo_url?: string | null
           name: string
-          paybill_account_id: string
           phone?: string | null
           slug: string
           status?: string
@@ -1185,7 +1180,6 @@ export type Database = {
           location?: string | null
           logo_url?: string | null
           name?: string
-          paybill_account_id?: string
           phone?: string | null
           slug?: string
           status?: string
@@ -2025,10 +2019,6 @@ export type Database = {
         Returns: string
       }
       generate_org_code: { Args: never; Returns: string }
-      generate_paybill_account_id: {
-        Args: { entity_type: string }
-        Returns: string
-      }
       generate_short_member_code: {
         Args: { p_group_code: string; p_member_number: number }
         Returns: string
