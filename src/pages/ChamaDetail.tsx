@@ -51,6 +51,7 @@ interface ChamaData {
   available_balance?: number;
   total_withdrawn?: number;
   is_verified?: boolean;
+  group_code?: string;
   profiles: {
     full_name: string;
     email: string;
@@ -417,6 +418,16 @@ const ChamaDetail = () => {
                 </p>
               </div>
             </div>
+
+            {/* Group Code Display */}
+            {chama.group_code && (
+              <div className="p-3 bg-muted/50 rounded-lg border">
+                <p className="text-xs text-muted-foreground">Group Code</p>
+                <p className="text-lg font-mono font-semibold text-foreground">
+                  {chama.group_code}
+                </p>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 pt-2 border-t border-border text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />

@@ -38,6 +38,7 @@ interface Campaign {
   created_by: string;
   group_code?: string;
   is_verified: boolean;
+  paybill_account_id?: string;
 }
 
 // Helper to convert YouTube URL to embed URL
@@ -260,6 +261,16 @@ const MchangoDetail = () => {
               <div className="text-sm text-muted-foreground">
                 {progress.toFixed(1)}% funded
               </div>
+              
+              {/* PayBill Account ID */}
+              {campaign.paybill_account_id && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg border">
+                  <p className="text-xs text-muted-foreground">PayBill Account ID</p>
+                  <p className="text-lg font-mono font-semibold text-foreground">
+                    {campaign.paybill_account_id}
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
