@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, MapPin, Globe, Phone, Mail, Share2, Loader2, Calendar, MessageCircle } from "lucide-react";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
+import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { OrganizationDonationForm } from "@/components/OrganizationDonationForm";
@@ -216,10 +217,7 @@ const OrganizationDetail = () => {
                 </p>
                 {organization.paybill_account_id && (
                   <div className="mt-3 pt-3 border-t border-border">
-                    <p className="text-xs text-muted-foreground">Unique ID (for offline payments)</p>
-                    <p className="text-lg font-mono font-semibold text-foreground">
-                      {organization.paybill_account_id}
-                    </p>
+                    <CopyableUniqueId uniqueId={organization.paybill_account_id} className="p-0 bg-transparent border-0" />
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">

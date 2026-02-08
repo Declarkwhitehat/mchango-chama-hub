@@ -17,6 +17,7 @@ import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { ExtendCampaignDays } from "@/components/mchango/ExtendCampaignDays";
+import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Campaign {
@@ -264,12 +265,7 @@ const MchangoDetail = () => {
               
               {/* Unique ID for offline payments */}
               {campaign.paybill_account_id && (
-                <div className="mt-4 p-3 bg-muted/50 rounded-lg border">
-                  <p className="text-xs text-muted-foreground">Unique ID (for offline payments)</p>
-                  <p className="text-lg font-mono font-semibold text-foreground">
-                    {campaign.paybill_account_id}
-                  </p>
-                </div>
+                <CopyableUniqueId uniqueId={campaign.paybill_account_id} className="mt-4" />
               )}
             </div>
           </CardContent>
