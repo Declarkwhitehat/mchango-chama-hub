@@ -39,6 +39,7 @@ interface Organization {
   created_at: string;
   created_by: string;
   group_code?: string;
+  paybill_account_id?: string;
 }
 
 const getYoutubeEmbedUrl = (url: string): string => {
@@ -213,6 +214,14 @@ const OrganizationDetail = () => {
                 <p className="text-3xl font-bold text-primary">
                   KES {Number(organization.available_balance || 0).toLocaleString()}
                 </p>
+                {organization.paybill_account_id && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-xs text-muted-foreground">PayBill Account ID</p>
+                    <p className="text-lg font-mono font-semibold text-foreground">
+                      {organization.paybill_account_id}
+                    </p>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground mt-2">
                   Since {new Date(organization.created_at).toLocaleDateString('en-US', { 
                     month: 'long', 
