@@ -401,11 +401,11 @@ serve(async (req) => {
       );
     }
 
-    // Try mchango (fundraising campaign) - matches by group_code directly
+    // Try mchango (fundraising campaign) - matches by paybill_account_id (e.g., MCAB1234) or group_code
     const { data: mchangoData } = await supabase
       .from('mchango')
-      .select('id, group_code, title, current_amount')
-      .eq('group_code', accountNumber.toUpperCase())
+      .select('id, group_code, paybill_account_id, title, current_amount, total_gross_collected, total_commission_paid, available_balance')
+      .or(`paybill_account_id.eq.${upperAccountNumber},group_code.eq.${upperAccountNumber}`)
       .eq('status', 'active')
       .maybeSingle();
 
@@ -421,20 +421,25 @@ serve(async (req) => {
       // Create donor display name
       const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
 
-      // Record mchango donation
-      const { error: donationError } = await supabase
+      // Record mchango donation with full financial tracking
+      const { data: donation, error: donationError } = await supabase
         .from('mchango_donations')
         .insert({
           mchango_id: mchangoData.id,
           amount: grossAmount,
-          display_name: displayName || 'Anonymous',
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
+          display_name: displayName,
           phone: phoneNumber,
           is_anonymous: false,
           payment_reference: mpesaReceiptNumber,
           payment_method: 'mpesa_offline',
           payment_status: 'completed',
           completed_at: new Date().toISOString(),
-        });
+        })
+        .select()
+        .single();
 
       if (donationError) {
         console.error('Error recording mchango donation:', donationError);
@@ -443,12 +448,56 @@ serve(async (req) => {
 
       console.log('Mchango donation recorded successfully');
 
+      // Update mchango financial tracking
+      const { error: mchangoUpdateError } = await supabase
+        .from('mchango')
+        .update({
+          current_amount: (mchangoData.current_amount || 0) + grossAmount,
+          total_gross_collected: (mchangoData.total_gross_collected || 0) + grossAmount,
+          total_commission_paid: (mchangoData.total_commission_paid || 0) + commissionAmount,
+          available_balance: (mchangoData.available_balance || 0) + netAmount,
+        })
+        .eq('id', mchangoData.id);
+
+      if (mchangoUpdateError) {
+        console.error('Error updating mchango financials:', mchangoUpdateError);
+      } else {
+        console.log('Mchango financials updated:', { grossAmount, commissionAmount, netAmount });
+      }
+
+      // Record commission as company earnings
+      await supabase
+        .from('company_earnings')
+        .insert({
+          source: 'mchango_donation',
+          amount: commissionAmount,
+          reference_id: donation?.id,
+          description: `15% commission on offline mchango donation of KES ${grossAmount}. Net credited: KES ${netAmount}`
+        });
+
+      // Record in financial ledger
+      await supabase
+        .from('financial_ledger')
+        .insert({
+          transaction_type: 'donation',
+          source_type: 'mchango',
+          source_id: mchangoData.id,
+          reference_id: donation?.id,
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
+          commission_rate: commissionRate,
+          payer_name: displayName,
+          payer_phone: phoneNumber,
+          description: `Offline mchango donation with 15% commission deducted`
+        });
+
       // Send SMS notification
       try {
         await supabase.functions.invoke('send-transactional-sms', {
           body: {
             phone: phoneNumber,
-            message: `Thank you for your donation of KSh ${amount} to "${mchangoData.title}". Receipt: ${mpesaReceiptNumber}`,
+            message: `Thank you ${firstName}! Your donation of KSh ${grossAmount} to "${mchangoData.title}" was received. Commission: KSh ${commissionAmount.toFixed(2)} (15%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
           },
         });
       } catch (smsError) {
@@ -459,7 +508,128 @@ serve(async (req) => {
         JSON.stringify({ 
           ResultCode: 0, 
           ResultDesc: 'Donation accepted and recorded for Mchango',
-          type: 'mchango'
+          type: 'mchango',
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Try organization - matches by paybill_account_id (e.g., ORG-XY7890) or group_code
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('id, name, group_code, paybill_account_id, current_amount, total_gross_collected, total_commission_paid, available_balance')
+      .or(`paybill_account_id.eq.${upperAccountNumber},group_code.eq.${upperAccountNumber}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (orgData) {
+      console.log('Found Organization:', orgData);
+
+      // Calculate commission (5% for organizations)
+      const commissionRate = 0.05;
+      const grossAmount = parseFloat(amount);
+      const commissionAmount = grossAmount * commissionRate;
+      const netAmount = grossAmount - commissionAmount;
+
+      // Use the payer's real name from M-Pesa
+      const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+
+      // Record organization donation
+      const { data: donation, error: donationError } = await supabase
+        .from('organization_donations')
+        .insert({
+          organization_id: orgData.id,
+          amount: grossAmount,
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
+          display_name: displayName,
+          phone: phoneNumber,
+          is_anonymous: false,
+          payment_reference: mpesaReceiptNumber,
+          payment_method: 'mpesa_offline',
+          payment_status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (donationError) {
+        console.error('Error recording organization donation:', donationError);
+        throw donationError;
+      }
+
+      console.log('Organization donation recorded successfully');
+
+      // Update organization financial tracking
+      const { error: orgUpdateError } = await supabase
+        .from('organizations')
+        .update({
+          current_amount: (orgData.current_amount || 0) + grossAmount,
+          total_gross_collected: (orgData.total_gross_collected || 0) + grossAmount,
+          total_commission_paid: (orgData.total_commission_paid || 0) + commissionAmount,
+          available_balance: (orgData.available_balance || 0) + netAmount,
+        })
+        .eq('id', orgData.id);
+
+      if (orgUpdateError) {
+        console.error('Error updating organization financials:', orgUpdateError);
+      } else {
+        console.log('Organization financials updated:', { grossAmount, commissionAmount, netAmount });
+      }
+
+      // Record commission as company earnings
+      await supabase
+        .from('company_earnings')
+        .insert({
+          source: 'organization_donation',
+          amount: commissionAmount,
+          reference_id: donation?.id,
+          description: `5% commission on offline organization donation of KES ${grossAmount}. Net credited: KES ${netAmount}`
+        });
+
+      // Record in financial ledger
+      await supabase
+        .from('financial_ledger')
+        .insert({
+          transaction_type: 'donation',
+          source_type: 'organization',
+          source_id: orgData.id,
+          reference_id: donation?.id,
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
+          commission_rate: commissionRate,
+          payer_name: displayName,
+          payer_phone: phoneNumber,
+          description: `Offline organization donation with 5% commission deducted`
+        });
+
+      // Send SMS notification
+      try {
+        await supabase.functions.invoke('send-transactional-sms', {
+          body: {
+            phone: phoneNumber,
+            message: `Thank you ${firstName}! Your donation of KSh ${grossAmount} to "${orgData.name}" was received. Commission: KSh ${commissionAmount.toFixed(2)} (5%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
+          },
+        });
+      } catch (smsError) {
+        console.error('Error sending SMS:', smsError);
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          ResultCode: 0, 
+          ResultDesc: 'Donation accepted and recorded for Organization',
+          type: 'organization',
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
