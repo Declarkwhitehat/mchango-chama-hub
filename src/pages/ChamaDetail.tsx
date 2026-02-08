@@ -419,10 +419,10 @@ const ChamaDetail = () => {
               </div>
             </div>
 
-            {/* Group Code Display */}
+            {/* Unique ID for offline payments */}
             {chama.group_code && (
               <div className="p-3 bg-muted/50 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Group Code</p>
+                <p className="text-xs text-muted-foreground">Unique ID (for offline payments)</p>
                 <p className="text-lg font-mono font-semibold text-foreground">
                   {chama.group_code}
                 </p>
