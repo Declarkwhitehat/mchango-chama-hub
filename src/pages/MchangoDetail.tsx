@@ -262,10 +262,10 @@ const MchangoDetail = () => {
                 {progress.toFixed(1)}% funded
               </div>
               
-              {/* PayBill Account ID */}
+              {/* Unique ID for offline payments */}
               {campaign.paybill_account_id && (
                 <div className="mt-4 p-3 bg-muted/50 rounded-lg border">
-                  <p className="text-xs text-muted-foreground">PayBill Account ID</p>
+                  <p className="text-xs text-muted-foreground">Unique ID (for offline payments)</p>
                   <p className="text-lg font-mono font-semibold text-foreground">
                     {campaign.paybill_account_id}
                   </p>

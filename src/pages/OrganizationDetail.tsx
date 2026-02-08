@@ -216,7 +216,7 @@ const OrganizationDetail = () => {
                 </p>
                 {organization.paybill_account_id && (
                   <div className="mt-3 pt-3 border-t border-border">
-                    <p className="text-xs text-muted-foreground">PayBill Account ID</p>
+                    <p className="text-xs text-muted-foreground">Unique ID (for offline payments)</p>
                     <p className="text-lg font-mono font-semibold text-foreground">
                       {organization.paybill_account_id}
                     </p>
