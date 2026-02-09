@@ -45,38 +45,11 @@ serve(async (req) => {
       );
     }
 
-    // Parse account number: 8 characters total
-    // Format: ACT5MOO1 where first 4 chars = chama code, last 4 chars = member suffix
-    // Also support legacy formats for backwards compatibility
-    const upperAccountNumber = accountNumber.toUpperCase();
+    // Normalize account number: uppercase and remove all spaces
+    // This allows customers to enter "act5 moo1" or "ACT5MOO1" - both will work
+    const upperAccountNumber = accountNumber.toUpperCase().replace(/\s+/g, '');
     
-    // Extract group code (first 4 characters for new format, or variable for legacy)
-    let groupCode: string;
-    let memberSuffix: string;
-    
-    if (upperAccountNumber.length === 8) {
-      // New format: ACT5MOO1 (4 + 4)
-      groupCode = upperAccountNumber.substring(0, 4);
-      memberSuffix = upperAccountNumber.substring(4, 8);
-    } else if (upperAccountNumber.length >= 4) {
-      // Legacy format or mchango code - treat entire value as the lookup key
-      groupCode = upperAccountNumber;
-      memberSuffix = '';
-    } else {
-      console.error('Invalid account number length:', accountNumber);
-      return new Response(
-        JSON.stringify({ 
-          ResultCode: 1, 
-          ResultDesc: `Invalid account number format: ${accountNumber}. Expected 8-character code (e.g., ACT5MOO1)` 
-        }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    console.log(`Parsed account number - Group: ${groupCode}, Member suffix: ${memberSuffix}, Full: ${upperAccountNumber}`);
+    console.log(`Original account: "${accountNumber}" -> Normalized: "${upperAccountNumber}"`);
 
     // Check for duplicate payment (same M-Pesa receipt number) across all tables
     const [
@@ -637,22 +610,19 @@ serve(async (req) => {
       );
     }
 
-    // IMPORTANT: No matching entity found - DO NOT update anything
-    // This is a critical safety check to prevent payments being credited to wrong accounts
-    console.error('❌ UNMATCHED PAYMENT - Account not found:', accountNumber);
-    console.error('Searched for:', {
-      chama_member_code: upperAccountNumber,
-      mchango_paybill_or_code: upperAccountNumber,
-      org_paybill_or_code: upperAccountNumber
-    });
+    // IMPORTANT: No matching entity found - payment is accepted but NOT credited to any account
+    // Customer will be notified to contact support with correct details
+    console.warn('⚠️ UNMATCHED PAYMENT - Account not found:', accountNumber);
+    console.warn('Normalized search value:', upperAccountNumber);
+    console.warn('Searched tables: chama_members.member_code, mchango.paybill_account_id/group_code, organizations.paybill_account_id/group_code');
     
-    // Send SMS to payer informing them of the issue
+    // Send SMS to payer informing them the code was invalid
     if (phoneNumber) {
       try {
         await supabase.functions.invoke('send-transactional-sms', {
           body: {
             phone: phoneNumber,
-            message: `Payment of KSh ${amount} with ID "${accountNumber}" was NOT processed. This payment code does not exist in our system. Please contact support with receipt ${mpesaReceiptNumber} for assistance.`,
+            message: `Your payment of KSh ${amount} (Receipt: ${mpesaReceiptNumber}) was received but the payment code "${accountNumber}" was not found. Your money is safe. Please contact customer care with your correct payment ID to have your payment allocated.`,
           },
         });
         console.log('Sent unmatched payment notification SMS to:', phoneNumber);
@@ -661,14 +631,16 @@ serve(async (req) => {
       }
     }
     
-    // Return error - M-Pesa will handle the reversal if needed
+    // Accept the payment (return success) - customer support will manually allocate
     return new Response(
       JSON.stringify({ 
-        ResultCode: 1, 
-        ResultDesc: `Payment code "${accountNumber}" not found. No account was credited. Please verify your payment code and try again.` 
+        ResultCode: 0, 
+        ResultDesc: 'Payment received but account code not matched. Customer notified.',
+        matched: false,
+        original_code: accountNumber,
+        normalized_code: upperAccountNumber
       }),
       { 
-        status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
