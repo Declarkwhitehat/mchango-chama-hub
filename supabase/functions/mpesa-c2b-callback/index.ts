@@ -637,12 +637,35 @@ serve(async (req) => {
       );
     }
 
-    // Not found in any table
-    console.error('Account not found:', accountNumber);
+    // IMPORTANT: No matching entity found - DO NOT update anything
+    // This is a critical safety check to prevent payments being credited to wrong accounts
+    console.error('❌ UNMATCHED PAYMENT - Account not found:', accountNumber);
+    console.error('Searched for:', {
+      chama_member_code: upperAccountNumber,
+      mchango_paybill_or_code: upperAccountNumber,
+      org_paybill_or_code: upperAccountNumber
+    });
+    
+    // Send SMS to payer informing them of the issue
+    if (phoneNumber) {
+      try {
+        await supabase.functions.invoke('send-transactional-sms', {
+          body: {
+            phone: phoneNumber,
+            message: `Payment of KSh ${amount} with ID "${accountNumber}" was NOT processed. This payment code does not exist in our system. Please contact support with receipt ${mpesaReceiptNumber} for assistance.`,
+          },
+        });
+        console.log('Sent unmatched payment notification SMS to:', phoneNumber);
+      } catch (smsError) {
+        console.error('Failed to send unmatched payment SMS:', smsError);
+      }
+    }
+    
+    // Return error - M-Pesa will handle the reversal if needed
     return new Response(
       JSON.stringify({ 
         ResultCode: 1, 
-        ResultDesc: `Account not found with ID: ${accountNumber}. Please verify your payment code.` 
+        ResultDesc: `Payment code "${accountNumber}" not found. No account was credited. Please verify your payment code and try again.` 
       }),
       { 
         status: 404,
