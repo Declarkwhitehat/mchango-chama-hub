@@ -454,25 +454,113 @@ Deno.serve(async (req) => {
         const member = unpaid.chama_members;
         const newMissedCount = (member.missed_payments_count || 0) + 1;
 
+        // Calculate total outstanding amount (missed payments × contribution amount)
+        const totalOutstanding = newMissedCount * chama.contribution_amount;
+
         await supabase
           .from('chama_members')
           .update({
             missed_payments_count: newMissedCount,
-            requires_admin_verification: newMissedCount >= 1
+            requires_admin_verification: newMissedCount >= 1,
+            balance_deficit: totalOutstanding
           })
           .eq('id', member.id);
 
-        // Alert manager if member missed 2 payments
-        if (newMissedCount >= 2) {
+        const memberPhone = member.profiles?.phone;
+
+        // Alert member about missed payment
+        if (memberPhone && newMissedCount >= 1) {
+          const warningMessage = newMissedCount === 1
+            ? `⚠️ You missed a payment for "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. Please pay to stay in the group.`
+            : newMissedCount === 2
+            ? `🚨 WARNING: You have missed ${newMissedCount} consecutive payments for "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. You will be REMOVED if you miss one more payment!`
+            : '';
+          if (warningMessage) {
+            await sendSMS(memberPhone, warningMessage);
+          }
+        }
+
+        // AUTO-REMOVE after 3 consecutive missed payments
+        if (newMissedCount >= 3) {
+          console.log(`🚫 AUTO-REMOVING member ${member.member_code} from chama ${chama.name} - 3 consecutive missed payments`);
+
+          // Record removal in chama_member_removals
+          await supabase
+            .from('chama_member_removals')
+            .insert({
+              chama_id: chama.id,
+              member_id: member.id,
+              user_id: member.user_id,
+              removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}`,
+              chama_name: chama.name,
+              member_name: member.profiles?.full_name,
+              member_phone: memberPhone,
+              was_manager: member.is_manager || false,
+              removed_at: new Date().toISOString()
+            });
+
+          // Mark member as removed
+          await supabase
+            .from('chama_members')
+            .update({
+              status: 'removed',
+              removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}`,
+              removed_at: new Date().toISOString()
+            })
+            .eq('id', member.id);
+
+          // Send removal SMS to member
+          if (memberPhone) {
+            await sendSMS(memberPhone,
+              `❌ You have been removed from "${chama.name}" after ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}. Contact customer care for assistance.`
+            );
+          }
+
+          // Notify manager
           const { data: manager } = await supabase
             .from('chama_members')
             .select('profiles!chama_members_user_id_fkey(phone)')
             .eq('chama_id', chama.id)
             .eq('is_manager', true)
+            .eq('status', 'active')
             .maybeSingle();
 
           if (manager?.profiles?.phone) {
-            const alertMessage = `Alert: Member ${member.profiles?.full_name} (${member.member_code}) has missed ${newMissedCount} contributions in your Chama "${chama.name}". Please follow up.`;
+            await sendSMS(manager.profiles.phone,
+              `🚫 Member ${member.profiles?.full_name} (${member.member_code}) has been AUTO-REMOVED from "${chama.name}" after 3 consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}.`
+            );
+          }
+
+          // Create notification record
+          if (member.user_id) {
+            await supabase
+              .from('notifications')
+              .insert({
+                user_id: member.user_id,
+                title: 'Removed from Chama',
+                message: `You were removed from "${chama.name}" due to ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}.`,
+                type: 'warning',
+                category: 'chama',
+                related_entity_id: chama.id,
+                related_entity_type: 'chama'
+              });
+          }
+
+          continue; // Skip further processing for this removed member
+        }
+
+        // Alert manager if member missed 2 payments (warning before removal)
+        if (newMissedCount === 2) {
+          const { data: manager } = await supabase
+            .from('chama_members')
+            .select('profiles!chama_members_user_id_fkey(phone)')
+            .eq('chama_id', chama.id)
+            .eq('is_manager', true)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (manager?.profiles?.phone) {
+            const alertMessage = `⚠️ URGENT: Member ${member.profiles?.full_name} (${member.member_code}) has missed ${newMissedCount} consecutive payments in "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. They will be auto-removed after 1 more missed payment.`;
             await sendSMS(manager.profiles.phone, alertMessage);
           }
         }

@@ -70,6 +70,8 @@ interface ChamaData {
     first_payment_completed?: boolean;
     first_payment_at?: string;
     removal_reason?: string;
+    missed_payments_count?: number;
+    balance_deficit?: number;
     profiles: {
       full_name: string;
       email: string;
@@ -828,7 +830,17 @@ const ChamaDetail = () => {
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {member.member_code} • Position #{member.order_index}
+                                {(member.missed_payments_count || 0) > 0 && (
+                                  <span className="text-destructive font-medium ml-2">
+                                    • {member.missed_payments_count} missed
+                                  </span>
+                                )}
                               </p>
+                              {(member.balance_deficit || 0) > 0 && (
+                                <p className="text-xs text-destructive font-medium">
+                                  Outstanding: KES {(member.balance_deficit || 0).toLocaleString()}
+                                </p>
+                              )}
                               {nextTurnDates[member.id] && (
                                 <p className="text-xs text-muted-foreground">
                                   Next turn: {nextTurnDates[member.id].toLocaleDateString()}
