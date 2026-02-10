@@ -21,10 +21,11 @@ import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
 import { WhatsAppLinkManager } from "@/components/chama/WhatsAppLinkManager";
 import { ChamaEndDate } from "@/components/chama/ChamaEndDate";
+import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { CopyableUniqueId } from "@/components/CopyableUniqueId";
-import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle } from "lucide-react";
+import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -87,6 +88,7 @@ const ChamaDetail = () => {
   const [totalContributions, setTotalContributions] = useState<number>(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [memberPaymentStatuses, setMemberPaymentStatuses] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadChama();
@@ -214,6 +216,26 @@ const ChamaDetail = () => {
 
       // Calculate whose turn it is and next turn dates
       await calculateTurns(data.data);
+
+      // Load member payment statuses for current cycle
+      if (data.data.status === 'active') {
+        try {
+          const { data: cycleData } = await supabase.functions.invoke('daily-cycle-manager', {
+            body: { action: 'current', chamaId: data.data.id }
+          });
+          if (cycleData?.payments) {
+            const statuses: Record<string, boolean> = {};
+            cycleData.payments.forEach((p: any) => {
+              if (p.chama_members?.id) {
+                statuses[p.chama_members.id] = p.is_paid || false;
+              }
+            });
+            setMemberPaymentStatuses(statuses);
+          }
+        } catch (e) {
+          console.error('Error loading payment statuses:', e);
+        }
+      }
     } catch (error: any) {
       console.error("Error loading chama:", error);
       toast({
@@ -473,6 +495,18 @@ const ChamaDetail = () => {
           />
         )}
 
+        {/* Prominent Countdown Timer - Visible to all members when active */}
+        {isMember && isActive && (
+          <CyclePaymentStatus
+            chamaId={chama.id}
+            frequency={chama.contribution_frequency}
+            onPayNow={() => {
+              // Scroll to payment form
+              document.getElementById('payment-form-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+        )}
+
         {/* Chama End Date - Show when chama is active */}
         {isActive && (
           <ChamaEndDate
@@ -657,14 +691,44 @@ const ChamaDetail = () => {
           </Card>
         )}
 
+        {/* Red Banner for unpaid current user */}
+        {isMember && isActive && currentUserMembership?.id && 
+         currentUserMembership.id in memberPaymentStatuses && 
+         !memberPaymentStatuses[currentUserMembership.id] && (
+          <Card className="border-destructive bg-destructive/10">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-destructive p-2 rounded-full">
+                  <AlertTriangle className="h-5 w-5 text-destructive-foreground" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-destructive">Payment Required!</p>
+                  <p className="text-sm text-muted-foreground">
+                    You haven't paid KES {chama.contribution_amount.toLocaleString()} for this cycle. Pay now to avoid being marked as late.
+                  </p>
+                </div>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => document.getElementById('payment-form-section')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  Pay Now
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Payment Form - Only visible to approved members when chama is active */}
         {isMember && isActive && (
+          <div id="payment-form-section">
           <ChamaPaymentForm
             chamaId={chama.id}
             currentMemberId={currentUserMembership.id}
             contributionAmount={chama.contribution_amount}
             onPaymentSuccess={loadChama}
           />
+          </div>
         )}
 
         {/* Tabs - Only visible to approved members and admins */}
@@ -729,11 +793,23 @@ const ChamaDetail = () => {
                     </a>
                   )}
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                      {approvedMembers
                       .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-                      .map((member) => (
-                        <div key={member.id} className="flex items-center justify-between">
+                      .map((member) => {
+                        const hasPaid = memberPaymentStatuses[member.id];
+                        const isPaidKnown = member.id in memberPaymentStatuses;
+                        return (
+                        <div 
+                          key={member.id} 
+                          className={`flex items-center justify-between p-3 rounded-lg border ${
+                            isActive && isPaidKnown
+                              ? hasPaid 
+                                ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                                : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                              : 'border-border'
+                          }`}
+                        >
                           <div className="flex items-center gap-3">
                             <Avatar>
                               <AvatarFallback>
@@ -760,8 +836,24 @@ const ChamaDetail = () => {
                               )}
                             </div>
                           </div>
+                          {isActive && isPaidKnown && (
+                            <div>
+                              {hasPaid ? (
+                                <Badge variant="default" className="bg-green-600 gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Paid
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="gap-1">
+                                  <XCircle className="h-3 w-3" />
+                                  Unpaid
+                                </Badge>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </CardContent>
               </Card>
