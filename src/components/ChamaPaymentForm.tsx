@@ -112,6 +112,15 @@ export const ChamaPaymentForm = ({
       return;
     }
 
+    if (parseFloat(amount) < contributionAmount) {
+      toast({
+        title: "Amount Too Low",
+        description: `Minimum payment is KES ${contributionAmount.toLocaleString()}. You can pay more but not less.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!phoneNumber) {
       toast({
         title: "Phone Required",
@@ -328,18 +337,23 @@ export const ChamaPaymentForm = ({
               id="amount"
               type="number"
               step="0.01"
-              min="1"
+              min={contributionAmount}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter amount"
+              placeholder={`Minimum KES ${contributionAmount.toLocaleString()}`}
               required
             />
-            {parseFloat(amount) !== contributionAmount && parseFloat(amount) > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {parseFloat(amount) > contributionAmount 
-                  ? `Overpayment of KES ${(parseFloat(amount) - contributionAmount).toLocaleString()} will be credited`
-                  : `Underpayment of KES ${(contributionAmount - parseFloat(amount)).toLocaleString()} will be recorded as deficit`
-                }
+            <p className="text-xs text-muted-foreground">
+              Minimum: KES {contributionAmount.toLocaleString()}
+            </p>
+            {parseFloat(amount) > contributionAmount && (
+              <p className="text-xs text-green-600">
+                Overpayment of KES {(parseFloat(amount) - contributionAmount).toLocaleString()} will be credited to your next cycle
+              </p>
+            )}
+            {parseFloat(amount) > 0 && parseFloat(amount) < contributionAmount && (
+              <p className="text-xs text-destructive font-medium">
+                ⚠️ Amount must be at least KES {contributionAmount.toLocaleString()}
               </p>
             )}
           </div>
