@@ -146,8 +146,10 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
     );
   }
 
-  const { member, chama, current_cycle, payment_history, payout_schedule } = dashboardData;
+  const { member, chama, current_cycle, payment_history, payout_schedule, missed_payments } = dashboardData;
   const netBalance = member.balance_credit - member.balance_deficit;
+  const missedCount = member.missed_payments_count || 0;
+  const totalOutstanding = member.total_outstanding || 0;
   
   // Calculate total pool for commission display
   const totalContributions = payment_history.reduce((sum: number, payment: any) => 
@@ -156,6 +158,118 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
 
   return (
     <div className="space-y-6">
+      {/* Missed Payments Warning Banner */}
+      {missedCount >= 2 && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <div className="bg-destructive p-2 rounded-full shrink-0">
+                <AlertCircle className="h-5 w-5 text-destructive-foreground" />
+              </div>
+              <div>
+                <p className="font-bold text-destructive text-lg">
+                  ⚠️ {missedCount} Consecutive Missed Payments!
+                </p>
+                <p className="text-sm text-destructive mt-1">
+                  {missedCount >= 3
+                    ? "You have been removed from this group due to 3 consecutive missed payments."
+                    : `You will be REMOVED from the group if you miss 1 more payment! Clear your outstanding balance of KES ${totalOutstanding.toLocaleString()} immediately.`
+                  }
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {missedCount === 1 && (
+        <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-yellow-700 dark:text-yellow-400">
+                  1 Missed Payment
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Outstanding: KES {totalOutstanding.toLocaleString()}. Pay now to avoid further penalties.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Outstanding Balance Card - Always visible if there's money owed */}
+      {totalOutstanding > 0 && (
+        <Card className="border-destructive">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <CreditCard className="h-5 w-5" />
+              Outstanding Balance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 bg-destructive/10 rounded-lg">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Amount Due</p>
+                <p className="text-3xl font-bold text-destructive">
+                  KES {totalOutstanding.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  From {missedCount} missed payment{missedCount !== 1 ? 's' : ''}
+                </p>
+              </div>
+              {onPayNow && (
+                <Button variant="destructive" onClick={onPayNow}>
+                  Pay Now
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Missed Payments Breakdown */}
+      {missed_payments && missed_payments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Missed Payments Record
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cycle</TableHead>
+                  <TableHead>Period</TableHead>
+                  <TableHead>Due</TableHead>
+                  <TableHead>Paid</TableHead>
+                  <TableHead>Remaining</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {missed_payments.map((mp: any, idx: number) => (
+                  <TableRow key={idx} className="bg-destructive/5">
+                    <TableCell className="font-medium">#{mp.cycle_number}</TableCell>
+                    <TableCell className="text-sm">
+                      {mp.start_date ? new Date(mp.start_date).toLocaleDateString() : '-'} – {mp.end_date ? new Date(mp.end_date).toLocaleDateString() : '-'}
+                    </TableCell>
+                    <TableCell>KES {(mp.amount_due || 0).toLocaleString()}</TableCell>
+                    <TableCell>KES {(mp.amount_paid || 0).toLocaleString()}</TableCell>
+                    <TableCell className="font-bold text-destructive">
+                      KES {(mp.amount_remaining || 0).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Cycle Payment Status - For all contribution frequencies */}
       <CyclePaymentStatus 
         chamaId={chamaId} 

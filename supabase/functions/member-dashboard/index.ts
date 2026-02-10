@@ -196,6 +196,27 @@ serve(async (req) => {
       .eq('chama_id', chamaId)
       .eq('approval_status', 'approved');
 
+    // Get missed cycle payment records for this member
+    const { data: missedCyclePayments } = await supabaseClient
+      .from('member_cycle_payments')
+      .select(`
+        *,
+        contribution_cycles!cycle_id(
+          cycle_number,
+          start_date,
+          end_date,
+          due_amount
+        )
+      `)
+      .eq('member_id', member.id)
+      .eq('is_paid', false)
+      .order('created_at', { ascending: true });
+
+    const missedPayments = missedCyclePayments || [];
+    const totalOutstanding = missedPayments.reduce((sum: number, p: any) => 
+      sum + ((p.amount_due || 0) - (p.amount_paid || 0)), 0
+    );
+
     const dashboardData = {
       member: {
         id: member.id,
@@ -207,9 +228,19 @@ serve(async (req) => {
         order_index: member.order_index,
         balance_credit: member.balance_credit || 0,
         balance_deficit: member.balance_deficit || 0,
+        missed_payments_count: member.missed_payments_count || 0,
+        total_outstanding: totalOutstanding,
         last_payment_date: member.last_payment_date,
         next_due_date: member.next_due_date,
       },
+      missed_payments: missedPayments.map((p: any) => ({
+        cycle_number: p.contribution_cycles?.cycle_number,
+        start_date: p.contribution_cycles?.start_date,
+        end_date: p.contribution_cycles?.end_date,
+        amount_due: p.amount_due,
+        amount_paid: p.amount_paid || 0,
+        amount_remaining: (p.amount_due || 0) - (p.amount_paid || 0),
+      })),
       chama: {
         name: chama.name,
         contribution_amount: chama.contribution_amount,
