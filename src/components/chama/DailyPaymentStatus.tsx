@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { PaymentCountdownTimer } from "./PaymentCountdownTimer";
+import { AmountToPayCard } from "./AmountToPayCard";
 
 interface CyclePaymentStatusProps {
   chamaId: string;
@@ -65,7 +66,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
   const [cycleHistory, setCycleHistory] = useState<CycleHistoryItem[]>([]);
   const [missedCyclesCount, setMissedCyclesCount] = useState(0);
   const [totalOutstanding, setTotalOutstanding] = useState(0);
-
+  const [cutoffPassed, setCutoffPassed] = useState(false);
   const loadPaymentStatus = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -88,6 +89,12 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
           end_date: data.cycle.end_date,
           due_amount: data.cycle.due_amount
         });
+
+        // Check if cutoff has passed
+        const endDate = new Date(data.cycle.end_date);
+        const cutoff = new Date(endDate);
+        cutoff.setHours(20, 0, 0, 0);
+        setCutoffPassed(new Date() > cutoff);
 
         const paymentData = data.payments?.map((p: any) => ({
           id: p.id,
@@ -200,6 +207,15 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
         </Card>
       )}
 
+      {/* Amount to Pay Card - Always visible before payment */}
+      {!currentUserPaid && (
+        <AmountToPayCard
+          contributionAmount={cycleInfo.due_amount}
+          missedCycles={missedCyclesCount}
+          currentCycleDue={!cutoffPassed}
+        />
+      )}
+
       {/* Prominent Countdown Timer */}
       <PaymentCountdownTimer
         endDate={cycleInfo.end_date}
@@ -249,6 +265,11 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
                     <span className="text-sm font-medium">
                       KES {cycle.due_amount.toLocaleString()}
                     </span>
+                    {cycle.status === 'missed' && (
+                      <span className="text-xs text-destructive font-medium">
+                        +{((cycle as any).commission_rate * 100 || 10)}% late fee
+                      </span>
+                    )}
                     {cycle.status === 'paid' ? (
                       <Badge variant="default" className="gap-1 bg-green-600 text-xs">
                         <CheckCircle2 className="h-3 w-3" />
