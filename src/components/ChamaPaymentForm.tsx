@@ -10,13 +10,16 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, CreditCard, Users, TrendingDown, Wallet, Phone } from "lucide-react";
-import { CHAMA_DEFAULT_COMMISSION_RATE, calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
+import { CHAMA_DEFAULT_COMMISSION_RATE, CHAMA_LATE_COMMISSION_RATE, calculateAmountToPay } from "@/utils/commissionCalculator";
+import { AmountToPayCard } from "@/components/chama/AmountToPayCard";
 
 interface ChamaPaymentFormProps {
   chamaId: string;
   currentMemberId: string;
   contributionAmount: number;
   commissionRate?: number;
+  missedCycles?: number;
+  currentCycleDue?: boolean;
   onPaymentSuccess?: () => void;
 }
 
@@ -25,6 +28,8 @@ export const ChamaPaymentForm = ({
   currentMemberId, 
   contributionAmount,
   commissionRate = CHAMA_DEFAULT_COMMISSION_RATE,
+  missedCycles = 0,
+  currentCycleDue = true,
   onPaymentSuccess 
 }: ChamaPaymentFormProps) => {
   const navigate = useNavigate();
@@ -264,7 +269,7 @@ export const ChamaPaymentForm = ({
           Make Payment via M-Pesa
         </CardTitle>
         <CardDescription>
-          Contribute to your chama (Expected: KES {contributionAmount.toLocaleString()})
+          Contribute to your chama (Base: KES {contributionAmount.toLocaleString()} per cycle)
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -368,23 +373,23 @@ export const ChamaPaymentForm = ({
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
                     <TrendingDown className="h-3 w-3" />
-                    Commission ({(commissionRate * 100)}%)
+                    Commission (5-10%)
                   </span>
                   <span className="font-medium text-orange-600 dark:text-orange-400">
-                    - KES {calculateCommission(parseFloat(amount), commissionRate).toLocaleString()}
+                    Deducted at payment
                   </span>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-primary/20">
                   <span className="flex items-center gap-1 font-medium text-primary">
                     <Wallet className="h-4 w-4" />
-                    Chama Pool Receives
+                    Net to Chama Pool
                   </span>
                   <span className="font-bold text-lg text-primary">
-                    KES {calculateNetBalance(parseFloat(amount), commissionRate).toLocaleString()}
+                    Allocated per cycle
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground italic">
-                  * Commission is deducted to cover platform costs
+                  * 5% on-time, 10% late. Commission deducted immediately — only net goes to pool.
                 </p>
               </CardContent>
             </Card>

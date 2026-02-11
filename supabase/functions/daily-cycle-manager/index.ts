@@ -332,6 +332,9 @@ Deno.serve(async (req) => {
             is_late_payment: payment.is_late_payment || false,
             paid_at: payment.paid_at,
           } : null,
+          // Commission info per cycle
+          commission_rate: isPastDue && !(payment?.fully_paid) ? 0.10 : 0.05,
+          commission_label: isPastDue && !(payment?.fully_paid) ? '10% (late)' : '5% (on-time)',
           // Determine display status
           status: payment?.fully_paid 
             ? (payment.is_late_payment ? 'late' : 'paid')

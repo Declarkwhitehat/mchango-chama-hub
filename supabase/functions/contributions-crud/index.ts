@@ -10,6 +10,8 @@ interface PaymentAllocation {
   cycle_id: string;
   cycle_number: number;
   amount_applied: number;
+  commission_amount: number;
+  commission_rate: number;
   type: 'missed_period' | 'current_period' | 'carry_forward';
   was_fully_paid: boolean;
 }
@@ -18,29 +20,36 @@ interface AllocationResult {
   allocations: PaymentAllocation[];
   carry_forward: number;
   total_applied: number;
+  total_commission: number;
   periods_cleared: number;
 }
 
 /**
- * Allocates payment to missed periods first (oldest to newest),
- * then current period, with any excess stored as carry-forward.
+ * Allocates payment with IMMEDIATE commission deduction.
  * 
- * STRICT RULES:
- * - No period may receive more than its contribution amount
- * - Oldest unpaid periods are cleared first
- * - Overpayment becomes carry-forward credit
+ * RULES:
+ * - On-time payments: 5% commission
+ * - Late payments (missed cycles): 10% commission
+ * - Commission is deducted FIRST from the gross payment
+ * - Only NET funds are allocated to cycles
+ * - Oldest unpaid cycles are cleared first
+ * - Commission is NEVER used for payouts
  */
 async function allocatePayment(
   supabase: any,
   memberId: string,
   chamaId: string,
-  paymentAmount: number,
+  grossPaymentAmount: number,
   contributionAmount: number
 ): Promise<AllocationResult> {
   const allocations: PaymentAllocation[] = [];
   let periodsClosed = 0;
+  let totalCommission = 0;
 
-  // 1. Get member's current carry-forward credit
+  const ONTIME_RATE = 0.05;
+  const LATE_RATE = 0.10;
+
+  // 1. Get member's current carry-forward credit (already net)
   const { data: member } = await supabase
     .from('chama_members')
     .select('carry_forward_credit')
@@ -48,14 +57,6 @@ async function allocatePayment(
     .single();
   
   const existingCarryForward = member?.carry_forward_credit || 0;
-  let remainingAmount = paymentAmount + existingCarryForward;
-
-  console.log('Payment allocation starting:', {
-    paymentAmount,
-    existingCarryForward,
-    totalAvailable: remainingAmount,
-    contributionAmount
-  });
 
   // 2. Get ALL unpaid/partially-paid cycles (oldest first)
   const { data: unpaidCycles, error: cyclesError } = await supabase
@@ -78,68 +79,125 @@ async function allocatePayment(
     console.error('Error fetching unpaid cycles:', cyclesError);
   }
 
-  // 3. Allocate to each unpaid period (oldest first)
-  for (const cycle of (unpaidCycles || [])) {
-    if (remainingAmount <= 0) break;
+  const cycles = unpaidCycles || [];
+  const now = new Date();
 
-    const amountOwed = Math.min(
-      contributionAmount, // Cap at contribution amount
-      (cycle.amount_due || contributionAmount) - (cycle.amount_paid || 0)
-    );
+  // 3. Calculate how much gross is needed for each cycle (base + commission)
+  //    and determine commission per cycle
+  let remainingGross = grossPaymentAmount;
+  
+  console.log('Payment allocation starting:', {
+    grossPaymentAmount,
+    existingCarryForward,
+    contributionAmount,
+    unpaidCyclesCount: cycles.length
+  });
+
+  // Process each unpaid cycle
+  for (const cycle of cycles) {
+    if (remainingGross <= 0 && existingCarryForward <= 0) break;
+
+    const cycleEndDate = new Date(cycle.contribution_cycles?.end_date);
+    const isLate = now > cycleEndDate;
+    const commissionRate = isLate ? LATE_RATE : ONTIME_RATE;
     
-    if (amountOwed <= 0) continue;
-    
-    const applied = Math.min(amountOwed, remainingAmount);
-    remainingAmount -= applied;
+    const amountStillOwed = (cycle.amount_due || contributionAmount) - (cycle.amount_paid || 0);
+    if (amountStillOwed <= 0) continue;
 
-    const newAmountPaid = (cycle.amount_paid || 0) + applied;
-    const isFullyPaid = newAmountPaid >= (cycle.amount_due || contributionAmount);
+    // First, apply any existing carry-forward (already net, no commission)
+    let netApplied = 0;
+    let commissionCharged = 0;
 
-    // Update cycle payment record
-    const existingAllocations = cycle.payment_allocations || [];
-    const newAllocation = {
-      amount: applied,
-      timestamp: new Date().toISOString(),
-      source: 'contribution'
-    };
-
-    const { error: updateError } = await supabase
-      .from('member_cycle_payments')
-      .update({
-        amount_paid: newAmountPaid,
-        amount_remaining: Math.max(0, (cycle.amount_due || contributionAmount) - newAmountPaid),
-        fully_paid: isFullyPaid,
-        is_paid: isFullyPaid,
-        paid_at: isFullyPaid ? new Date().toISOString() : cycle.paid_at,
-        payment_allocations: [...existingAllocations, newAllocation]
-      })
-      .eq('id', cycle.id);
-
-    if (updateError) {
-      console.error('Error updating cycle payment:', updateError);
+    if (existingCarryForward > 0 && amountStillOwed > 0) {
+      // Carry-forward is already net, no commission
+      // But we track it separately - it was already accounted for in original allocation
     }
 
-    if (isFullyPaid) periodsClosed++;
+    // Calculate: to fill `amountStillOwed` of NET, the member needs to pay gross = net / (1 - rate)
+    // But we simplify: deduct commission from gross first, then apply net
+    const grossNeededForCycle = amountStillOwed / (1 - commissionRate);
+    const grossToApply = Math.min(grossNeededForCycle, remainingGross);
+    
+    if (grossToApply > 0) {
+      commissionCharged = grossToApply * commissionRate;
+      netApplied = grossToApply - commissionCharged;
+      remainingGross -= grossToApply;
+      totalCommission += commissionCharged;
+    }
 
-    allocations.push({
-      cycle_id: cycle.cycle_id,
-      cycle_number: cycle.contribution_cycles?.cycle_number || 0,
-      amount_applied: applied,
-      type: 'missed_period',
-      was_fully_paid: isFullyPaid
-    });
+    // Also apply carry-forward if needed (already net)
+    const stillNeeded = amountStillOwed - netApplied;
+    let carryForwardApplied = 0;
+    // Note: carry-forward is handled at cycle creation, not here
+    // This keeps the math clean
 
-    console.log('Allocated to period:', {
-      cycleNumber: cycle.contribution_cycles?.cycle_number,
-      amountOwed,
-      applied,
-      remainingAmount,
-      isFullyPaid
-    });
+    const totalNetApplied = netApplied;
+    const newAmountPaid = (cycle.amount_paid || 0) + totalNetApplied;
+    const isFullyPaid = newAmountPaid >= (cycle.amount_due || contributionAmount);
+
+    if (totalNetApplied > 0) {
+      // Update cycle payment record
+      const existingAllocations = cycle.payment_allocations || [];
+      const newAllocation = {
+        amount: totalNetApplied,
+        gross_paid: grossToApply,
+        commission: commissionCharged,
+        commission_rate: commissionRate,
+        timestamp: new Date().toISOString(),
+        source: 'contribution',
+        is_late: isLate
+      };
+
+      const { error: updateError } = await supabase
+        .from('member_cycle_payments')
+        .update({
+          amount_paid: newAmountPaid,
+          amount_remaining: Math.max(0, (cycle.amount_due || contributionAmount) - newAmountPaid),
+          fully_paid: isFullyPaid,
+          is_paid: isFullyPaid,
+          is_late_payment: isLate,
+          paid_at: isFullyPaid ? new Date().toISOString() : cycle.paid_at,
+          payment_allocations: [...existingAllocations, newAllocation]
+        })
+        .eq('id', cycle.id);
+
+      if (updateError) {
+        console.error('Error updating cycle payment:', updateError);
+      }
+
+      if (isFullyPaid) periodsClosed++;
+
+      allocations.push({
+        cycle_id: cycle.cycle_id,
+        cycle_number: cycle.contribution_cycles?.cycle_number || 0,
+        amount_applied: totalNetApplied,
+        commission_amount: commissionCharged,
+        commission_rate: commissionRate,
+        type: isLate ? 'missed_period' : 'current_period',
+        was_fully_paid: isFullyPaid
+      });
+
+      console.log('Allocated to period:', {
+        cycleNumber: cycle.contribution_cycles?.cycle_number,
+        isLate,
+        commissionRate: `${commissionRate * 100}%`,
+        grossUsed: grossToApply,
+        commissionCharged,
+        netApplied: totalNetApplied,
+        isFullyPaid
+      });
+    }
   }
 
-  // 4. Any remaining becomes carry-forward credit
-  const carryForward = remainingAmount;
+  // 4. Any remaining gross after commission → carry-forward as net
+  // Remaining gross has no specific cycle, so apply on-time rate
+  let carryForward = existingCarryForward;
+  if (remainingGross > 0) {
+    const remainingCommission = remainingGross * ONTIME_RATE;
+    const remainingNet = remainingGross - remainingCommission;
+    totalCommission += remainingCommission;
+    carryForward += remainingNet;
+  }
 
   // 5. Update member carry-forward
   const { error: memberUpdateError } = await supabase
@@ -154,17 +212,62 @@ async function allocatePayment(
     console.error('Error updating member carry-forward:', memberUpdateError);
   }
 
+  // 6. Record commission in financial ledger and company earnings
+  if (totalCommission > 0) {
+    await supabase
+      .from('company_earnings')
+      .insert({
+        source: 'chama_contribution',
+        amount: totalCommission,
+        group_id: chamaId,
+        description: `Tiered commission on contribution of KES ${grossPaymentAmount}. On-time: 5%, Late: 10%.`
+      });
+
+    await supabase
+      .from('financial_ledger')
+      .insert({
+        transaction_type: 'contribution',
+        source_type: 'chama',
+        source_id: chamaId,
+        gross_amount: grossPaymentAmount,
+        commission_amount: totalCommission,
+        net_amount: grossPaymentAmount - totalCommission,
+        commission_rate: totalCommission / grossPaymentAmount,
+        description: `Tiered commission deducted at payment. Allocated to ${allocations.length} cycle(s).`
+      });
+
+    // Update chama financial tracking
+    const { data: chamaData } = await supabase
+      .from('chama')
+      .select('total_gross_collected, total_commission_paid, available_balance')
+      .eq('id', chamaId)
+      .single();
+
+    if (chamaData) {
+      await supabase
+        .from('chama')
+        .update({
+          total_gross_collected: (chamaData.total_gross_collected || 0) + grossPaymentAmount,
+          total_commission_paid: (chamaData.total_commission_paid || 0) + totalCommission,
+          available_balance: (chamaData.available_balance || 0) + (grossPaymentAmount - totalCommission),
+        })
+        .eq('id', chamaId);
+    }
+  }
+
   console.log('Payment allocation complete:', {
     totalAllocations: allocations.length,
     periodsClosed,
+    totalCommission,
     carryForward,
-    totalApplied: paymentAmount + existingCarryForward - carryForward
+    netApplied: grossPaymentAmount - totalCommission - (carryForward - existingCarryForward)
   });
 
   return {
     allocations,
     carry_forward: carryForward,
-    total_applied: paymentAmount + existingCarryForward - carryForward,
+    total_applied: grossPaymentAmount - totalCommission,
+    total_commission: totalCommission,
     periods_cleared: periodsClosed
   };
 }

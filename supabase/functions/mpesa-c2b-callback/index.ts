@@ -92,10 +92,25 @@ serve(async (req) => {
         .eq('id', chamaMemberData.chama_id)
         .single();
 
-      // Calculate commission (default 5% for chama)
-      const commissionRate = chamaData?.commission_rate || 0.05;
+      // Calculate commission using tiered rates
+      // For C2B, we check if member has unpaid past cycles to determine rate
+      const ONTIME_RATE = 0.05;
+      const LATE_RATE = 0.10;
+      const commissionRate = chamaData?.commission_rate || ONTIME_RATE;
       const grossAmount = parseFloat(amount);
-      const commissionAmount = grossAmount * commissionRate;
+      
+      // Check for unpaid past cycles to determine effective commission
+      const { data: unpaidPastCycles } = await supabase
+        .from('member_cycle_payments')
+        .select('id, contribution_cycles!inner(end_date)')
+        .eq('member_id', chamaMemberData.id)
+        .eq('fully_paid', false);
+      
+      const now = new Date();
+      const hasLateCycles = (unpaidPastCycles || []).some((c: any) => new Date(c.contribution_cycles.end_date) < now);
+      const effectiveRate = hasLateCycles ? LATE_RATE : ONTIME_RATE;
+      
+      const commissionAmount = grossAmount * effectiveRate;
       const netAmount = grossAmount - commissionAmount;
 
       // Record chama contribution

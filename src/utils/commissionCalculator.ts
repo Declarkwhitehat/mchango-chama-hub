@@ -2,7 +2,8 @@
  * Commission rate constants
  */
 export const MCHANGO_COMMISSION_RATE = 0.15; // 15%
-export const CHAMA_DEFAULT_COMMISSION_RATE = 0.05; // 5%
+export const CHAMA_DEFAULT_COMMISSION_RATE = 0.05; // 5% on-time
+export const CHAMA_LATE_COMMISSION_RATE = 0.10; // 10% late
 export const ORGANIZATION_COMMISSION_RATE = 0.05; // 5%
 
 /**
@@ -31,6 +32,45 @@ export const calculateTransactionNet = (amount: number, rate: number): number =>
  */
 export const formatCommissionPercentage = (rate: number): string => {
   return `${(rate * 100).toFixed(0)}%`;
+};
+
+/**
+ * Calculate the total amount a member needs to pay for N cycles,
+ * factoring in tiered commission (5% on-time, 10% late).
+ */
+export const calculateAmountToPay = (
+  baseContribution: number,
+  missedCycles: number,
+  currentCycleDue: boolean
+): {
+  onTimeCycles: number;
+  lateCycles: number;
+  baseTotal: number;
+  onTimeCommission: number;
+  lateCommission: number;
+  totalCommission: number;
+  totalPayable: number;
+} => {
+  const onTimeCycles = currentCycleDue ? 1 : 0;
+  const lateCycles = missedCycles;
+  
+  const onTimeBase = onTimeCycles * baseContribution;
+  const lateBase = lateCycles * baseContribution;
+  const baseTotal = onTimeBase + lateBase;
+  
+  const onTimeCommission = onTimeBase * CHAMA_DEFAULT_COMMISSION_RATE;
+  const lateCommission = lateBase * CHAMA_LATE_COMMISSION_RATE;
+  const totalCommission = onTimeCommission + lateCommission;
+  
+  return {
+    onTimeCycles,
+    lateCycles,
+    baseTotal,
+    onTimeCommission,
+    lateCommission,
+    totalCommission,
+    totalPayable: baseTotal + totalCommission,
+  };
 };
 
 /**
