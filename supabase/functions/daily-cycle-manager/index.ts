@@ -257,6 +257,95 @@ Deno.serve(async (req) => {
       });
     }
 
+    // GET ALL CYCLES WITH PER-CYCLE PAYMENT STATUS
+    if (action === 'all-cycles' && req.method === 'POST') {
+      const { chamaId, userId } = requestBody;
+
+      // Get all cycles for this chama, ordered by cycle_number desc
+      const { data: cycles, error: cyclesError } = await supabase
+        .from('contribution_cycles')
+        .select(`
+          *,
+          beneficiary:chama_members!beneficiary_member_id(
+            id,
+            member_code,
+            user_id,
+            profiles!chama_members_user_id_fkey(full_name)
+          )
+        `)
+        .eq('chama_id', chamaId)
+        .order('cycle_number', { ascending: false })
+        .limit(50);
+
+      if (cyclesError) {
+        return new Response(JSON.stringify({ error: cyclesError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Get the member_id for this user
+      const { data: memberData } = await supabase
+        .from('chama_members')
+        .select('id')
+        .eq('chama_id', chamaId)
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      let memberPayments: any[] = [];
+      if (memberData) {
+        // Get all payment records for this member across all cycles
+        const { data: payments } = await supabase
+          .from('member_cycle_payments')
+          .select('cycle_id, amount_due, amount_paid, amount_remaining, fully_paid, is_paid, is_late_payment, paid_at')
+          .eq('member_id', memberData.id);
+        
+        memberPayments = payments || [];
+      }
+
+      // Build per-cycle status
+      const cyclesWithStatus = (cycles || []).map((cycle: any) => {
+        const payment = memberPayments.find((p: any) => p.cycle_id === cycle.id);
+        const now = new Date();
+        const endDate = new Date(cycle.end_date);
+        const isPastDue = now > endDate;
+
+        return {
+          id: cycle.id,
+          cycle_number: cycle.cycle_number,
+          start_date: cycle.start_date,
+          end_date: cycle.end_date,
+          due_amount: cycle.due_amount,
+          beneficiary_name: cycle.beneficiary?.profiles?.full_name || 'Unknown',
+          beneficiary_code: cycle.beneficiary?.member_code || '',
+          is_complete: cycle.is_complete,
+          payout_processed: cycle.payout_processed,
+          payout_type: cycle.payout_type,
+          // Per-cycle payment status for this member
+          member_payment: payment ? {
+            amount_due: payment.amount_due,
+            amount_paid: payment.amount_paid || 0,
+            amount_remaining: payment.amount_remaining || 0,
+            fully_paid: payment.fully_paid || false,
+            is_paid: payment.is_paid || false,
+            is_late_payment: payment.is_late_payment || false,
+            paid_at: payment.paid_at,
+          } : null,
+          // Determine display status
+          status: payment?.fully_paid 
+            ? (payment.is_late_payment ? 'late' : 'paid')
+            : isPastDue 
+              ? 'missed' 
+              : 'pending'
+        };
+      });
+
+      return new Response(JSON.stringify({ cycles: cyclesWithStatus, memberId: memberData?.id }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     return new Response(JSON.stringify({ error: 'Invalid endpoint' }), {
       status: 404,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
