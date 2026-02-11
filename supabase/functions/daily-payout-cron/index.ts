@@ -36,31 +36,43 @@ async function sendSMS(phone: string, message: string) {
   }
 }
 
-// Check if a member is eligible for payout based on their contributions
+// Check if a member is eligible for payout based on PER-CYCLE payment records
+// NEVER use total contributions or last_payment_date - always check each cycle individually
 async function checkMemberEligibility(supabase: any, memberId: string, chamaId: string, contributionAmount: number, orderIndex: number) {
-  // Required amount = contribution_amount × order_index (all contributions up to their turn)
-  const requiredAmount = contributionAmount * orderIndex;
-  
-  // Get total completed contributions for this member
-  const { data: contributions, error } = await supabase
-    .from('contributions')
-    .select('amount')
+  // Get ALL cycle payment records for this member (past and current)
+  const { data: cyclePayments, error } = await supabase
+    .from('member_cycle_payments')
+    .select(`
+      id,
+      cycle_id,
+      amount_due,
+      amount_paid,
+      fully_paid,
+      contribution_cycles!inner(cycle_number, start_date, end_date, payout_processed)
+    `)
     .eq('member_id', memberId)
-    .eq('status', 'completed');
+    .order('contribution_cycles(start_date)', { ascending: true });
 
   if (error) {
-    console.error('Error fetching contributions:', error);
-    return { isEligible: false, required: requiredAmount, contributed: 0, shortfall: requiredAmount };
+    console.error('Error fetching cycle payments:', error);
+    return { isEligible: false, required: 0, contributed: 0, shortfall: 0, unpaidCycles: 0 };
   }
 
-  const totalContributed = contributions?.reduce((sum: number, c: any) => sum + Number(c.amount), 0) || 0;
-  const shortfall = Math.max(requiredAmount - totalContributed, 0);
+  // Count unpaid cycles (each cycle is independently required)
+  const unpaidCycles = (cyclePayments || []).filter((p: any) => !p.fully_paid);
+  const totalUnpaid = unpaidCycles.reduce((sum: number, p: any) => sum + ((p.amount_due || contributionAmount) - (p.amount_paid || 0)), 0);
+  const totalPaidCycles = (cyclePayments || []).filter((p: any) => p.fully_paid).length;
+  const totalCycles = (cyclePayments || []).length;
+
+  // Member is eligible ONLY if ALL their cycles are fully paid
+  const isEligible = unpaidCycles.length === 0 && totalCycles > 0;
 
   return {
-    isEligible: totalContributed >= requiredAmount,
-    required: requiredAmount,
-    contributed: totalContributed,
-    shortfall
+    isEligible,
+    required: totalCycles * contributionAmount,
+    contributed: totalPaidCycles * contributionAmount,
+    shortfall: totalUnpaid,
+    unpaidCycles: unpaidCycles.length
   };
 }
 
@@ -239,13 +251,13 @@ Deno.serve(async (req) => {
           null, // Will be updated when they complete contributions
           eligibility.shortfall,
           eligibility.contributed,
-          `Incomplete contributions: paid KES ${eligibility.contributed}, required KES ${eligibility.required}`
+          `Incomplete cycle payments: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}`
         );
 
         // Send skip notification SMS
         const skipPhone = scheduledBeneficiary.profiles?.phone;
         if (skipPhone) {
-          const skipMessage = `⚠️ Your chama "${chama.name}" payout was SKIPPED today. Reason: Incomplete contributions. You paid KES ${eligibility.contributed} but need KES ${eligibility.required}. Please complete your contributions to be rescheduled.`;
+          const skipMessage = `⚠️ Your chama "${chama.name}" payout was SKIPPED today. Reason: ${eligibility.unpaidCycles} unpaid cycle(s). Outstanding: KES ${eligibility.shortfall}. Please clear your missed payments to be rescheduled.`;
           await sendSMS(skipPhone, skipMessage);
         }
 

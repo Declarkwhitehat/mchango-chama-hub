@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, AlertCircle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -34,16 +34,43 @@ interface CycleInfo {
   due_amount: number;
 }
 
+interface CycleHistoryItem {
+  id: string;
+  cycle_number: number;
+  start_date: string;
+  end_date: string;
+  due_amount: number;
+  beneficiary_name: string;
+  beneficiary_code: string;
+  is_complete: boolean;
+  payout_processed: boolean;
+  payout_type?: string;
+  status: 'paid' | 'late' | 'missed' | 'pending';
+  member_payment: {
+    amount_due: number;
+    amount_paid: number;
+    amount_remaining: number;
+    fully_paid: boolean;
+    is_paid: boolean;
+    is_late_payment: boolean;
+    paid_at?: string;
+  } | null;
+}
+
 export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymentStatusProps) {
   const [loading, setLoading] = useState(true);
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [payments, setPayments] = useState<PaymentStatus[]>([]);
   const [currentUserPaid, setCurrentUserPaid] = useState(false);
+  const [cycleHistory, setCycleHistory] = useState<CycleHistoryItem[]>([]);
+  const [missedCyclesCount, setMissedCyclesCount] = useState(0);
+  const [totalOutstanding, setTotalOutstanding] = useState(0);
 
   const loadPaymentStatus = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
+      // Load current cycle
       const { data, error } = await supabase.functions.invoke('daily-cycle-manager', {
         body: { action: 'current', chamaId }
       });
@@ -75,10 +102,28 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
 
         setPayments(paymentData);
         
-        // Check if current user has paid
         if (session?.user?.id) {
           const userPayment = paymentData.find((p: any) => p.user_id === session.user.id);
           setCurrentUserPaid(userPayment?.is_paid || false);
+        }
+      }
+
+      // Load ALL cycles with per-cycle payment history
+      if (session?.user?.id) {
+        const { data: historyData, error: historyError } = await supabase.functions.invoke('daily-cycle-manager', {
+          body: { action: 'all-cycles', chamaId, userId: session.user.id }
+        });
+
+        if (!historyError && historyData?.cycles) {
+          setCycleHistory(historyData.cycles);
+          
+          const missed = historyData.cycles.filter((c: CycleHistoryItem) => c.status === 'missed');
+          setMissedCyclesCount(missed.length);
+          
+          const outstanding = missed.reduce((sum: number, c: CycleHistoryItem) => {
+            return sum + (c.member_payment?.amount_remaining || c.due_amount);
+          }, 0);
+          setTotalOutstanding(outstanding);
         }
       }
     } catch (error: any) {
@@ -92,7 +137,6 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
   useEffect(() => {
     loadPaymentStatus();
 
-    // Set up real-time subscription
     const channel = supabase
       .channel('payment-status-changes')
       .on('postgres_changes', {
@@ -135,6 +179,27 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
 
   return (
     <div className="space-y-4">
+      {/* Outstanding Missed Cycles Alert */}
+      {missedCyclesCount > 0 && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-destructive p-2 rounded-full">
+                <XCircle className="h-5 w-5 text-destructive-foreground" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-destructive">
+                  {missedCyclesCount} Missed Cycle{missedCyclesCount > 1 ? 's' : ''} - KES {totalOutstanding.toLocaleString()} Outstanding
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  You have unpaid cycles. Your next payment will clear the oldest missed cycle first.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Prominent Countdown Timer */}
       <PaymentCountdownTimer
         endDate={cycleInfo.end_date}
@@ -147,7 +212,78 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
         onPayNow={onPayNow}
       />
 
-      {/* Detailed Payment Status Card */}
+      {/* Per-Cycle Payment History */}
+      {cycleHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Your Payment History (Per Cycle)</CardTitle>
+            <CardDescription>
+              Each cycle is tracked independently. Missed cycles must be cleared individually.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {cycleHistory.slice(0, 10).map((cycle) => (
+                <div
+                  key={cycle.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                    cycle.status === 'paid' ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
+                    cycle.status === 'missed' ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
+                    cycle.status === 'late' ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' :
+                    'border-border'
+                  }`}
+                >
+                  <div>
+                    <div className="font-medium text-sm">
+                      Cycle #{cycle.cycle_number}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(cycle.start_date), 'MMM d')} - {format(new Date(cycle.end_date), 'MMM d, yyyy')}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Beneficiary: {cycle.beneficiary_name}
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-sm font-medium">
+                      KES {cycle.due_amount.toLocaleString()}
+                    </span>
+                    {cycle.status === 'paid' ? (
+                      <Badge variant="default" className="gap-1 bg-green-600 text-xs">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Paid
+                      </Badge>
+                    ) : cycle.status === 'late' ? (
+                      <Badge variant="outline" className="gap-1 text-xs border-yellow-500 text-yellow-700">
+                        <AlertCircle className="h-3 w-3" />
+                        Late
+                      </Badge>
+                    ) : cycle.status === 'missed' ? (
+                      <Badge variant="destructive" className="gap-1 text-xs">
+                        <XCircle className="h-3 w-3" />
+                        Missed
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="gap-1 text-xs">
+                        <Clock className="h-3 w-3" />
+                        Pending
+                      </Badge>
+                    )}
+                    {cycle.member_payment && !cycle.member_payment.fully_paid && cycle.member_payment.amount_paid > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        Paid: KES {cycle.member_payment.amount_paid.toLocaleString()} / {cycle.member_payment.amount_due.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Detailed Payment Status Card - Current Cycle */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -239,13 +375,13 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
 
         <div className="mt-4 p-3 rounded-lg bg-muted text-xs text-muted-foreground">
           <p>
-            • Payments made before 8:00 PM on the due date count towards this payout
+            • Each cycle is tracked independently - payment status is per cycle, not cumulative
           </p>
           <p className="mt-1">
-            • Late payments (after 8:00 PM on due date) are credited to next cycle
+            • Late payments (after 8:00 PM on due date) clear the oldest missed cycle first
           </p>
           <p className="mt-1">
-            • Full payout if all members pay, partial payout at 8:00 PM on due date otherwise
+            • Overpayments are credited as carry-forward for the next cycle
           </p>
         </div>
       </CardContent>
