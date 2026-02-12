@@ -78,19 +78,58 @@ export const CommissionAnalyticsDashboard = () => {
     mchangoGross: 0, chamaGross: 0, orgGross: 0, transactionCount: 0
   });
   const [trendData, setTrendData] = useState<TrendPoint[]>([]);
-  const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 3), "yyyy-MM-dd"));
+  const [dateFrom, setDateFrom] = useState(format(new Date(), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [liveVerification, setLiveVerification] = useState<{
+    mchangoDonations: number;
+    orgDonations: number;
+    chamaContributions: number;
+    totalLive: number;
+  } | null>(null);
   const [sourceFilter, setSourceFilter] = useState("all");
   const [trendPeriod, setTrendPeriod] = useState<"daily" | "weekly" | "monthly">("weekly");
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchData();
+    fetchLiveVerification();
   }, [dateFrom, dateTo, sourceFilter]);
 
   useEffect(() => {
     buildTrendData();
   }, [ledgerData, trendPeriod]);
+
+  const fetchLiveVerification = async () => {
+    try {
+      const fromISO = startOfDay(parseISO(dateFrom)).toISOString();
+      const toISO = endOfDay(parseISO(dateTo)).toISOString();
+
+      const [mchangoRes, orgRes] = await Promise.all([
+        supabase.from("mchango_donations")
+          .select("commission_amount")
+          .eq("payment_status", "completed")
+          .gte("completed_at", fromISO)
+          .lte("completed_at", toISO),
+        supabase.from("organization_donations")
+          .select("commission_amount")
+          .eq("payment_status", "completed")
+          .gte("completed_at", fromISO)
+          .lte("completed_at", toISO),
+      ]);
+
+      const mchangoTotal = (mchangoRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
+      const orgTotal = (orgRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
+
+      setLiveVerification({
+        mchangoDonations: mchangoTotal,
+        orgDonations: orgTotal,
+        chamaContributions: 0, // chama commissions are in financial_ledger only
+        totalLive: mchangoTotal + orgTotal,
+      });
+    } catch (err) {
+      console.error("Live verification error:", err);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -340,7 +379,11 @@ export const CommissionAnalyticsDashboard = () => {
             <DollarSign className="h-8 w-8 text-primary" />
             Commission Analytics
           </h1>
-          <p className="text-muted-foreground mt-1">Accurate, ledger-based commission tracking</p>
+          <p className="text-muted-foreground mt-1">
+            {dateFrom === dateTo && dateFrom === format(new Date(), "yyyy-MM-dd") 
+              ? "Showing today's commission data" 
+              : `Showing data from ${format(parseISO(dateFrom), "dd MMM yyyy")} to ${format(parseISO(dateTo), "dd MMM yyyy")}`}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={downloadCSV}>
@@ -376,7 +419,8 @@ export const CommissionAnalyticsDashboard = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button variant={dateFrom === format(new Date(), "yyyy-MM-dd") && dateTo === format(new Date(), "yyyy-MM-dd") ? "default" : "outline"} size="sm" onClick={() => { const today = format(new Date(), "yyyy-MM-dd"); setDateFrom(today); setDateTo(today); }}>Today</Button>
               <Button variant="outline" size="sm" onClick={() => { setDateFrom(format(subDays(new Date(), 7), "yyyy-MM-dd")); setDateTo(format(new Date(), "yyyy-MM-dd")); }}>7D</Button>
               <Button variant="outline" size="sm" onClick={() => { setDateFrom(format(subDays(new Date(), 30), "yyyy-MM-dd")); setDateTo(format(new Date(), "yyyy-MM-dd")); }}>30D</Button>
               <Button variant="outline" size="sm" onClick={() => { setDateFrom(format(subMonths(new Date(), 3), "yyyy-MM-dd")); setDateTo(format(new Date(), "yyyy-MM-dd")); }}>3M</Button>
@@ -437,7 +481,45 @@ export const CommissionAnalyticsDashboard = () => {
         </Card>
       </div>
 
-      {/* Charts Section */}
+      {/* Live Data Verification */}
+      {liveVerification && (
+        <Card className="border border-dashed border-primary/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Live Data Cross-Verification
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Comparing ledger totals with live donation tables for {dateFrom === dateTo ? "today" : "selected period"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Mchango (Donations)</p>
+                <p className="font-semibold">KES {liveVerification.mchangoDonations.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Organizations (Donations)</p>
+                <p className="font-semibold">KES {liveVerification.orgDonations.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Ledger Total</p>
+                <p className="font-semibold">KES {summary.totalCommission.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Status</p>
+                {Math.abs(summary.totalCommission - (liveVerification.mchangoDonations + liveVerification.orgDonations + summary.chamaCommission)) < 1 ? (
+                  <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">✓ Verified</Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">⚠ Check Chama entries</Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Trend Chart */}
         <Card className="lg:col-span-2" ref={chartRef}>
