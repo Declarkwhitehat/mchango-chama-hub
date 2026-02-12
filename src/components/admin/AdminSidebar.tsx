@@ -123,6 +123,7 @@ export function AdminSidebar() {
       icon: DollarSign,
       badge: pendingWithdrawals > 0 ? pendingWithdrawals : null
     },
+    { title: "Commission Analytics", url: "/admin/commission-analytics", icon: TrendingUp },
     { title: "Financial Ledger", url: "/admin/ledger", icon: Landmark },
     { title: "Payment Config", url: "/admin/payment-config", icon: Settings },
   ];
