@@ -56,6 +56,7 @@ const AdminOrganizations = lazy(() => import("./pages/AdminOrganizations"));
 const AdminOrganizationDetail = lazy(() => import("./pages/AdminOrganizationDetail"));
 const AdminLedger = lazy(() => import("./pages/AdminLedger"));
 const AdminVerificationRequests = lazy(() => import("./pages/AdminVerificationRequests"));
+const AdminCommissionAnalytics = lazy(() => import("./pages/AdminCommissionAnalytics"));
 
 const queryClient = new QueryClient();
 
@@ -121,6 +122,7 @@ const AppContent = () => {
           <Route path="/admin/payment-config" element={<AdminProtectedRoute><AdminPaymentConfig /></AdminProtectedRoute>} />
           <Route path="/admin/ledger" element={<AdminProtectedRoute><AdminLedger /></AdminProtectedRoute>} />
           <Route path="/admin/verification-requests" element={<AdminProtectedRoute><AdminVerificationRequests /></AdminProtectedRoute>} />
+          <Route path="/admin/commission-analytics" element={<AdminProtectedRoute><AdminCommissionAnalytics /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
