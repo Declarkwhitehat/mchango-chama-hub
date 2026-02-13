@@ -128,3 +128,6 @@ verify_jwt = false
 
 [functions.cycle-auto-create]
 verify_jwt = false
+
+[functions.admin-mpesa-search]
+verify_jwt = false
