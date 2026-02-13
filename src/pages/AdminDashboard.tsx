@@ -20,7 +20,6 @@ import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { EnhancedAnalytics } from "@/components/admin/EnhancedAnalytics";
 import { PlatformStatistics } from "@/components/admin/PlatformStatistics";
-import { CommissionOverview } from "@/components/admin/CommissionOverview";
 import { AdminFinancialOverview } from "@/components/admin/AdminFinancialOverview";
 import { CleanupJobStatus } from "@/components/admin/CleanupJobStatus";
 
@@ -38,6 +37,7 @@ const AdminDashboard = () => {
     pendingWithdrawals: 0,
     pendingCallbacks: 0,
     recentTransactions: 0,
+    totalPlatformRevenue: 0,
   });
 
   useEffect(() => {
@@ -59,7 +59,8 @@ const AdminDashboard = () => {
         revenueResult,
         withdrawalsResult,
         callbacksResult,
-        transactionsResult
+        transactionsResult,
+        ledgerResult
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
@@ -70,10 +71,13 @@ const AdminDashboard = () => {
         supabase.from('company_earnings').select('amount'),
         supabase.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('customer_callbacks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('transactions').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        supabase.from('transactions').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+        // Fetch accurate platform revenue from financial_ledger
+        supabase.from('financial_ledger').select('commission_amount'),
       ]);
 
       const totalRevenue = revenueResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
+      const totalPlatformRevenue = ledgerResult.data?.reduce((sum, item) => sum + (item.commission_amount || 0), 0) || 0;
 
       setStats({
         totalUsers: usersResult.count || 0,
@@ -86,6 +90,7 @@ const AdminDashboard = () => {
         pendingWithdrawals: withdrawalsResult.count || 0,
         pendingCallbacks: callbacksResult.count || 0,
         recentTransactions: transactionsResult.count || 0,
+        totalPlatformRevenue,
       });
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -183,21 +188,28 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Total Revenue */}
-          <Card className="border-l-4 border-l-secondary hover:shadow-lg transition-shadow">
+          {/* Total Platform Revenue */}
+          <Card 
+            className="border-l-4 border-l-secondary hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate("/admin/commission-analytics")}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardDescription>Total Revenue</CardDescription>
+                <CardDescription>Total Platform Revenue</CardDescription>
                 <DollarSign className="h-5 w-5 text-secondary" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                KES {(stats.totalRevenue / 1000).toFixed(1)}K
+                KES {stats.totalPlatformRevenue.toLocaleString('en-KE', { maximumFractionDigits: 0 })}
               </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Commission earned
-              </p>
+              <Button
+                variant="link"
+                className="p-0 h-auto mt-2 text-sm"
+                onClick={(e) => { e.stopPropagation(); navigate("/admin/commission-analytics"); }}
+              >
+                View detailed breakdown <ArrowRight className="ml-1 h-3 w-3" />
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -256,8 +268,7 @@ const AdminDashboard = () => {
         {/* Platform Statistics */}
         <PlatformStatistics />
 
-        {/* Commission Overview */}
-        <CommissionOverview />
+        {/* Commission Analytics accessible via Total Platform Revenue card */}
 
         {/* Enhanced Analytics */}
         <EnhancedAnalytics />

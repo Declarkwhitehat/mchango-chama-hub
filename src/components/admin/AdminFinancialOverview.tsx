@@ -192,23 +192,7 @@ export const AdminFinancialOverview = () => {
           </CardContent>
         </Card>
 
-        {/* Platform Revenue */}
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2 text-green-700 dark:text-green-300">
-              <DollarSign className="h-4 w-4" />
-              Platform Revenue
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-900 dark:text-green-100">
-              {formatShort(data.totals.platformRevenue)}
-            </div>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-              Commission earned (yours to keep)
-            </p>
-          </CardContent>
-        </Card>
+        {/* Platform Revenue - removed, consolidated into Total Platform Revenue card on dashboard */}
 
         {/* Client Funds Held */}
         <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800">
