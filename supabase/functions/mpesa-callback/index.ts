@@ -73,6 +73,7 @@ serve(async (req) => {
         .from('contributions')
         .update({
           status: status,
+          ...(mpesaReceiptNumber ? { mpesa_receipt_number: mpesaReceiptNumber } : {}),
         })
         .eq('id', contribution.id)
         .select()
@@ -290,6 +291,7 @@ serve(async (req) => {
           commission_amount: commissionAmount,
           net_amount: netAmount,
           completed_at: status === 'completed' ? new Date().toISOString() : null,
+          ...(mpesaReceiptNumber ? { mpesa_receipt_number: mpesaReceiptNumber } : {}),
         })
         .eq('id', donation.id)
         .select()
@@ -397,6 +399,7 @@ serve(async (req) => {
           commission_amount: commissionAmount,
           net_amount: netAmount,
           completed_at: status === 'completed' ? new Date().toISOString() : null,
+          ...(mpesaReceiptNumber ? { mpesa_receipt_number: mpesaReceiptNumber } : {}),
         })
         .eq('id', orgDonation.id)
         .select()
