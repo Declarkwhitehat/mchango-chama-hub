@@ -56,114 +56,143 @@ Deno.serve(async (req) => {
     const searchId = transaction_id.trim().toUpperCase();
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Search all three tables in parallel
-    const [transactionsRes, mchangoRes, orgRes] = await Promise.all([
-      adminClient
-        .from("transactions")
-        .select("id, payment_reference, amount, status, created_at, chama_id, mchango_id")
-        .eq("payment_reference", searchId)
-        .gte("created_at", thirtyDaysAgo),
-      adminClient
-        .from("mchango_donations")
-        .select("id, payment_reference, amount, payment_status, created_at, completed_at, mchango_id, display_name, phone")
-        .eq("payment_reference", searchId)
-        .gte("created_at", thirtyDaysAgo),
-      adminClient
-        .from("organization_donations")
-        .select("id, payment_reference, amount, payment_status, created_at, completed_at, organization_id, display_name, phone")
-        .eq("payment_reference", searchId)
-        .gte("created_at", thirtyDaysAgo),
+    // Search all tables in parallel - check both payment_reference and mpesa_receipt_number
+    const [
+      transactionsRef, transactionsReceipt,
+      contributionsRef, contributionsReceipt,
+      mchangoRef, mchangoReceipt,
+      orgRef, orgReceipt,
+    ] = await Promise.all([
+      // transactions table
+      adminClient.from("transactions")
+        .select("id, payment_reference, mpesa_receipt_number, amount, status, created_at, chama_id, mchango_id")
+        .eq("payment_reference", searchId).gte("created_at", thirtyDaysAgo),
+      adminClient.from("transactions")
+        .select("id, payment_reference, mpesa_receipt_number, amount, status, created_at, chama_id, mchango_id")
+        .eq("mpesa_receipt_number", searchId).gte("created_at", thirtyDaysAgo),
+      // contributions table
+      adminClient.from("contributions")
+        .select("id, payment_reference, mpesa_receipt_number, amount, status, created_at, chama_id")
+        .eq("payment_reference", searchId).gte("created_at", thirtyDaysAgo),
+      adminClient.from("contributions")
+        .select("id, payment_reference, mpesa_receipt_number, amount, status, created_at, chama_id")
+        .eq("mpesa_receipt_number", searchId).gte("created_at", thirtyDaysAgo),
+      // mchango_donations table
+      adminClient.from("mchango_donations")
+        .select("id, payment_reference, mpesa_receipt_number, amount, payment_status, created_at, completed_at, mchango_id, display_name, phone")
+        .eq("payment_reference", searchId).gte("created_at", thirtyDaysAgo),
+      adminClient.from("mchango_donations")
+        .select("id, payment_reference, mpesa_receipt_number, amount, payment_status, created_at, completed_at, mchango_id, display_name, phone")
+        .eq("mpesa_receipt_number", searchId).gte("created_at", thirtyDaysAgo),
+      // organization_donations table
+      adminClient.from("organization_donations")
+        .select("id, payment_reference, mpesa_receipt_number, amount, payment_status, created_at, completed_at, organization_id, display_name, phone")
+        .eq("payment_reference", searchId).gte("created_at", thirtyDaysAgo),
+      adminClient.from("organization_donations")
+        .select("id, payment_reference, mpesa_receipt_number, amount, payment_status, created_at, completed_at, organization_id, display_name, phone")
+        .eq("mpesa_receipt_number", searchId).gte("created_at", thirtyDaysAgo),
     ]);
+
+    // Deduplicate by ID
+    const dedup = (arr1: any[], arr2: any[]) => {
+      const map = new Map();
+      for (const item of [...(arr1 || []), ...(arr2 || [])]) {
+        map.set(item.id, item);
+      }
+      return Array.from(map.values());
+    };
+
+    const transactionsData = dedup(transactionsRef.data || [], transactionsReceipt.data || []);
+    const contributionsData = dedup(contributionsRef.data || [], contributionsReceipt.data || []);
+    const mchangoData = dedup(mchangoRef.data || [], mchangoReceipt.data || []);
+    const orgData = dedup(orgRef.data || [], orgReceipt.data || []);
 
     const results: any[] = [];
 
-    // Process transactions (Chama contributions)
-    if (transactionsRes.data && transactionsRes.data.length > 0) {
-      for (const tx of transactionsRes.data) {
-        let destinationName = "Unknown";
-        let destinationType = "Chama";
+    // Process transactions
+    for (const tx of transactionsData) {
+      let destinationName = "Unknown";
+      let destinationType = "Chama";
 
-        if (tx.chama_id) {
-          const { data: chama } = await adminClient
-            .from("chama")
-            .select("name")
-            .eq("id", tx.chama_id)
-            .maybeSingle();
-          destinationName = chama?.name || "Unknown Chama";
-          destinationType = "Chama";
-        } else if (tx.mchango_id) {
-          const { data: mchango } = await adminClient
-            .from("mchango")
-            .select("title")
-            .eq("id", tx.mchango_id)
-            .maybeSingle();
-          destinationName = mchango?.title || "Unknown Campaign";
-          destinationType = "Campaign";
-        }
-
-        const dt = new Date(tx.created_at);
-        results.push({
-          transaction_id: tx.payment_reference,
-          date: dt.toISOString().split("T")[0],
-          time: dt.toTimeString().split(" ")[0],
-          amount: tx.amount,
-          destination_type: destinationType,
-          destination_name: destinationName,
-          status: tx.status,
-          source_table: "transactions",
-        });
+      if (tx.chama_id) {
+        const { data: chama } = await adminClient.from("chama").select("name").eq("id", tx.chama_id).maybeSingle();
+        destinationName = chama?.name || "Unknown Chama";
+        destinationType = "Chama";
+      } else if (tx.mchango_id) {
+        const { data: mchango } = await adminClient.from("mchango").select("title").eq("id", tx.mchango_id).maybeSingle();
+        destinationName = mchango?.title || "Unknown Campaign";
+        destinationType = "Campaign";
       }
+
+      const dt = new Date(tx.created_at);
+      results.push({
+        transaction_id: tx.mpesa_receipt_number || tx.payment_reference,
+        date: dt.toISOString().split("T")[0],
+        time: dt.toTimeString().split(" ")[0],
+        amount: tx.amount,
+        destination_type: destinationType,
+        destination_name: destinationName,
+        status: tx.status,
+        source_table: "transactions",
+      });
+    }
+
+    // Process contributions (Chama C2B payments)
+    for (const c of contributionsData) {
+      const { data: chama } = await adminClient.from("chama").select("name").eq("id", c.chama_id).maybeSingle();
+      const dt = new Date(c.created_at);
+      results.push({
+        transaction_id: c.mpesa_receipt_number || c.payment_reference,
+        date: dt.toISOString().split("T")[0],
+        time: dt.toTimeString().split(" ")[0],
+        amount: c.amount,
+        destination_type: "Chama",
+        destination_name: chama?.name || "Unknown Chama",
+        status: c.status,
+        source_table: "contributions",
+      });
     }
 
     // Process mchango donations
-    if (mchangoRes.data && mchangoRes.data.length > 0) {
-      for (const d of mchangoRes.data) {
-        const { data: mchango } = await adminClient
-          .from("mchango")
-          .select("title")
-          .eq("id", d.mchango_id)
-          .maybeSingle();
-
-        const dt = new Date(d.completed_at || d.created_at);
-        results.push({
-          transaction_id: d.payment_reference,
-          date: dt.toISOString().split("T")[0],
-          time: dt.toTimeString().split(" ")[0],
-          amount: d.amount,
-          destination_type: "Campaign",
-          destination_name: mchango?.title || "Unknown Campaign",
-          status: d.payment_status,
-          sender: d.display_name || d.phone || "Anonymous",
-          source_table: "mchango_donations",
-        });
-      }
+    for (const d of mchangoData) {
+      const { data: mchango } = await adminClient.from("mchango").select("title").eq("id", d.mchango_id).maybeSingle();
+      const dt = new Date(d.completed_at || d.created_at);
+      results.push({
+        transaction_id: d.mpesa_receipt_number || d.payment_reference,
+        date: dt.toISOString().split("T")[0],
+        time: dt.toTimeString().split(" ")[0],
+        amount: d.amount,
+        destination_type: "Campaign",
+        destination_name: mchango?.title || "Unknown Campaign",
+        status: d.payment_status,
+        sender: d.display_name || d.phone || "Anonymous",
+        source_table: "mchango_donations",
+      });
     }
 
     // Process organization donations
-    if (orgRes.data && orgRes.data.length > 0) {
-      for (const d of orgRes.data) {
-        const { data: org } = await adminClient
-          .from("organizations")
-          .select("name")
-          .eq("id", d.organization_id)
-          .maybeSingle();
-
-        const dt = new Date(d.completed_at || d.created_at);
-        results.push({
-          transaction_id: d.payment_reference,
-          date: dt.toISOString().split("T")[0],
-          time: dt.toTimeString().split(" ")[0],
-          amount: d.amount,
-          destination_type: "Organization",
-          destination_name: org?.name || "Unknown Organization",
-          status: d.payment_status,
-          sender: d.display_name || d.phone || "Anonymous",
-          source_table: "organization_donations",
-        });
-      }
+    for (const d of orgData) {
+      const { data: org } = await adminClient.from("organizations").select("name").eq("id", d.organization_id).maybeSingle();
+      const dt = new Date(d.completed_at || d.created_at);
+      results.push({
+        transaction_id: d.mpesa_receipt_number || d.payment_reference,
+        date: dt.toISOString().split("T")[0],
+        time: dt.toTimeString().split(" ")[0],
+        amount: d.amount,
+        destination_type: "Organization",
+        destination_name: org?.name || "Unknown Organization",
+        status: d.payment_status,
+        sender: d.display_name || d.phone || "Anonymous",
+        source_table: "organization_donations",
+      });
     }
 
-    return new Response(JSON.stringify({ results }), {
+    // Deduplicate results by transaction_id + source_table
+    const uniqueResults = Array.from(
+      new Map(results.map(r => [`${r.transaction_id}-${r.source_table}`, r])).values()
+    );
+
+    return new Response(JSON.stringify({ results: uniqueResults }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

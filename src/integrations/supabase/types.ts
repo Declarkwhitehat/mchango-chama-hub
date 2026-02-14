@@ -623,6 +623,7 @@ export type Database = {
           created_at: string
           id: string
           member_id: string
+          mpesa_receipt_number: string | null
           paid_by_member_id: string | null
           payment_notes: string | null
           payment_reference: string
@@ -635,6 +636,7 @@ export type Database = {
           created_at?: string
           id?: string
           member_id: string
+          mpesa_receipt_number?: string | null
           paid_by_member_id?: string | null
           payment_notes?: string | null
           payment_reference: string
@@ -647,6 +649,7 @@ export type Database = {
           created_at?: string
           id?: string
           member_id?: string
+          mpesa_receipt_number?: string | null
           paid_by_member_id?: string | null
           payment_notes?: string | null
           payment_reference?: string
@@ -870,6 +873,7 @@ export type Database = {
           id: string
           is_anonymous: boolean
           mchango_id: string
+          mpesa_receipt_number: string | null
           net_amount: number | null
           payment_method: string | null
           payment_reference: string
@@ -888,6 +892,7 @@ export type Database = {
           id?: string
           is_anonymous?: boolean
           mchango_id: string
+          mpesa_receipt_number?: string | null
           net_amount?: number | null
           payment_method?: string | null
           payment_reference: string
@@ -906,6 +911,7 @@ export type Database = {
           id?: string
           is_anonymous?: boolean
           mchango_id?: string
+          mpesa_receipt_number?: string | null
           net_amount?: number | null
           payment_method?: string | null
           payment_reference?: string
@@ -1050,6 +1056,7 @@ export type Database = {
           gross_amount: number | null
           id: string
           is_anonymous: boolean
+          mpesa_receipt_number: string | null
           net_amount: number | null
           organization_id: string
           payment_method: string | null
@@ -1068,6 +1075,7 @@ export type Database = {
           gross_amount?: number | null
           id?: string
           is_anonymous?: boolean
+          mpesa_receipt_number?: string | null
           net_amount?: number | null
           organization_id: string
           payment_method?: string | null
@@ -1086,6 +1094,7 @@ export type Database = {
           gross_amount?: number | null
           id?: string
           is_anonymous?: boolean
+          mpesa_receipt_number?: string | null
           net_amount?: number | null
           organization_id?: string
           payment_method?: string | null
@@ -1617,6 +1626,7 @@ export type Database = {
           created_at: string
           id: string
           mchango_id: string | null
+          mpesa_receipt_number: string | null
           payment_method: string | null
           payment_reference: string
           status: Database["public"]["Enums"]["transaction_status"]
@@ -1629,6 +1639,7 @@ export type Database = {
           created_at?: string
           id?: string
           mchango_id?: string | null
+          mpesa_receipt_number?: string | null
           payment_method?: string | null
           payment_reference: string
           status?: Database["public"]["Enums"]["transaction_status"]
@@ -1641,6 +1652,7 @@ export type Database = {
           created_at?: string
           id?: string
           mchango_id?: string | null
+          mpesa_receipt_number?: string | null
           payment_method?: string | null
           payment_reference?: string
           status?: Database["public"]["Enums"]["transaction_status"]
