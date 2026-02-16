@@ -1,63 +1,64 @@
 
+# Fix Plan: "The Declarks" Chama Cycle & Payment Logic
 
-# Admin M-Pesa Transaction Search
+## Problems Found
 
-## Overview
-Add a dedicated, professionally designed admin page for searching M-Pesa transactions by their transaction ID, restricted to the last 30 days. The search will query across all payment tables (transactions, mchango_donations, organization_donations) to identify where the funds were directed.
+After investigating the database and code, here are the issues causing incorrect behavior for "The Declarks" chama:
 
-## What Will Be Built
+### Bug 1: Chama Start Does NOT Create Member Cycle Payments
+When the manager starts the chama (`chama-start`), cycle 1 is created but **no `member_cycle_payments` records are created** for the members. Without these records, the system can't track who paid and who didn't for each cycle.
 
-### 1. New Edge Function: `admin-mpesa-search`
-A secure backend function that:
-- Validates the user is an admin (same pattern as `admin-search`)
-- Accepts an M-Pesa transaction ID string
-- Automatically restricts queries to the last 30 days
-- Searches across three tables using `payment_reference`:
-  - `transactions` (Chama contributions) -- joined with `chama` for the group name
-  - `mchango_donations` (Campaign donations) -- joined with `mchango` for the campaign title
-  - `organization_donations` (Org donations) -- joined with `organizations` for the org name
-- Returns matched records with date, time, amount, destination type, and destination name
+### Bug 2: Daily Payout Cron Uses Exact Date Match (Misses Cycles)
+The daily payout cron (`daily-payout-cron`) filters cycles with `.eq('end_date', today)` where `today` is a date string like `2026-01-23`. But the cycle's `end_date` is stored as a full timestamp (`2026-01-23 18:47:55.211+00`). An exact equality check **never matches**, so the cycle is permanently skipped and never processed. No new cycles are created after it, no payouts happen, and no missed payments are tracked.
 
-### 2. New Page: `AdminMpesaSearch.tsx`
-A clean, professional admin page featuring:
-- A search input with placeholder text (e.g., "Enter M-Pesa Transaction ID e.g. SLK7H6Y5X4")
-- A search button with loading state
-- Results displayed in a card layout showing:
-  - M-Pesa Transaction ID
-  - Date and Time of transaction
-  - Amount (formatted as KES)
-  - Destination type badge (Chama / Campaign / Organization)
-  - Destination name
-- Empty state: "No transaction found within the last 30 days."
-- Info banner noting the 30-day search window
+### Bug 3: Cycle End Date Calculation is Off by One
+In `chama-start`, the `calculateCycleEndDate` function adds the full cycle length to the start date. For daily frequency, this means `start + 1 day` instead of `start + 0 days` (same day). A daily cycle starting Jan 22 should end Jan 22 (same day), not Jan 23.
 
-### 3. Routing and Navigation
-- Register route `/admin/mpesa-search` in `App.tsx` (wrapped in `AdminProtectedRoute`)
-- Add sidebar link in `AdminSidebar.tsx` under the Financial section
+### Bug 4: No Catch-Up Logic for Missed Cron Runs
+If the daily cron misses a day (or the date-matching bug prevents processing), there's no mechanism to process overdue cycles. Cycles that passed their end date without being processed are stuck forever.
+
+### Current State of "The Declarks"
+- 2 members, daily contribution of KES 100, started Jan 22
+- Only 1 cycle exists (cycle 1), end_date Jan 23 -- never processed
+- Zero `member_cycle_payments` records -- nobody's payments are tracked
+- Both members contributed once (KES 100 each) but `first_payment_completed` is still false
+- `missed_payments_count = 0` for both -- should be much higher after 24+ days
+- A withdrawal of KES 190 was completed on Jan 28 despite the system not tracking payments properly
+
+---
+
+## Fix Plan
+
+### 1. Fix `chama-start`: Create member_cycle_payments when starting
+After creating the first contribution cycle, create a `member_cycle_payments` record for each approved member so the system can track per-cycle payment status from day one.
+
+### 2. Fix `daily-payout-cron`: Use date range instead of exact match
+Change the cycle query from `.eq('end_date', today)` to `.lte('end_date', now)` combined with `.eq('payout_processed', false)`. This catches both same-day and overdue cycles, providing catch-up capability.
+
+### 3. Fix cycle end date calculation in `chama-start`
+For daily frequency, the end date should be the same day as start (or end of that day). Adjust the calculation so daily cycles end on start_date, not start_date + 1.
+
+### 4. Fix "The Declarks" data
+Run a data correction to:
+- Create the missing `member_cycle_payments` for the stuck cycle
+- Allow the daily cron to naturally catch up and process overdue cycles once the code fixes are deployed
+
+---
 
 ## Technical Details
 
-### Edge Function Query Logic
-```text
-For each table:
-  SELECT relevant columns
-  WHERE payment_reference = [exact match]
-  AND created_at >= now() - 30 days
-```
+### File: `supabase/functions/chama-start/index.ts`
+- After creating `firstCycle`, insert `member_cycle_payments` for each approved member with `amount_due = contribution_amount`, `amount_paid = 0`, `fully_paid = false`
+- Fix `calculateCycleEndDate` for daily frequency: end date = same day (set to 23:59:59)
 
-Results are normalized into a unified response format:
-- `transaction_id`, `date`, `time`, `amount`, `destination_type`, `destination_name`, `status`
+### File: `supabase/functions/daily-payout-cron/index.ts`
+- Change line 213 from `.eq('end_date', today)` to `.lte('end_date', new Date().toISOString())` to catch overdue cycles
+- Process cycles in order (oldest first) to handle catch-up correctly
+- Limit to one cycle per chama per cron run to avoid processing too many at once
 
-### Security
-- Admin-only access enforced at two levels:
-  1. `AdminProtectedRoute` wrapper on the frontend
-  2. JWT verification + `user_roles` admin check in the edge function
+### File: `supabase/functions/cycle-auto-create/index.ts`
+- Ensure the end date for daily cycles uses end-of-day timestamps (23:59:59) for consistent matching
 
-### Files to Create
-- `supabase/functions/admin-mpesa-search/index.ts`
-- `src/pages/AdminMpesaSearch.tsx`
-
-### Files to Modify
-- `src/App.tsx` -- add lazy import and route
-- `src/components/admin/AdminSidebar.tsx` -- add menu item
-
+### Database: Data Repair for "The Declarks"
+- Insert missing `member_cycle_payments` records for cycle 1
+- The fixed cron will then naturally process the overdue cycle and create subsequent ones
