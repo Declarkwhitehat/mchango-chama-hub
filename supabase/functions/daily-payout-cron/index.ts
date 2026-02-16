@@ -194,7 +194,8 @@ Deno.serve(async (req) => {
     let errors = 0;
 
     for (const chama of chamas || []) {
-      // Get cycle where end_date is today (payout due today)
+      // Get the OLDEST unprocessed cycle whose end_date has passed (catches overdue + today)
+      const now = new Date().toISOString();
       const { data: cycle } = await supabase
         .from('contribution_cycles')
         .select(`
@@ -210,8 +211,10 @@ Deno.serve(async (req) => {
           )
         `)
         .eq('chama_id', chama.id)
-        .eq('end_date', today)
+        .lte('end_date', now)
         .eq('payout_processed', false)
+        .order('cycle_number', { ascending: true })
+        .limit(1)
         .maybeSingle();
 
       if (!cycle) {

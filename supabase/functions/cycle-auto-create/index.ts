@@ -64,6 +64,7 @@ function calculateNextCycleDates(
   
   switch (frequency) {
     case 'daily':
+      // Daily cycle: ends same day as start at 23:59:59
       endDate.setHours(23, 59, 59, 999);
       break;
     case 'weekly':

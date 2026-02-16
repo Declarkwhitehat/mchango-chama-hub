@@ -228,6 +228,33 @@ serve(async (req) => {
     }
 
     // ============================================
+    // CREATE MEMBER CYCLE PAYMENTS FOR ALL MEMBERS
+    // ============================================
+    if (firstCycle) {
+      const memberPayments = sortedMembers.map((member: any) => ({
+        member_id: member.id,
+        cycle_id: firstCycle.id,
+        amount_due: chama.contribution_amount,
+        amount_paid: 0,
+        amount_remaining: chama.contribution_amount,
+        is_paid: false,
+        fully_paid: false,
+        is_late_payment: false,
+        payment_allocations: []
+      }));
+
+      const { error: paymentsError } = await supabaseAdmin
+        .from('member_cycle_payments')
+        .insert(memberPayments);
+
+      if (paymentsError) {
+        console.error('Error creating member cycle payments:', paymentsError);
+      } else {
+        console.log(`Created ${memberPayments.length} member_cycle_payments for cycle 1`);
+      }
+    }
+
+    // ============================================
     // SEND START NOTIFICATIONS TO ALL MEMBERS
     // ============================================
     const frequencyText = chama.contribution_frequency === 'every_n_days' 
@@ -301,7 +328,13 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
 
 function calculateCycleEndDate(startDate: Date, frequency: string, everyNDays?: number): Date {
   const endDate = new Date(startDate);
-  const cycleDays = getCycleLengthInDays(frequency, everyNDays);
-  endDate.setDate(endDate.getDate() + cycleDays);
+  if (frequency === 'daily') {
+    // Daily cycle ends same day at 23:59:59
+    endDate.setHours(23, 59, 59, 999);
+  } else {
+    const cycleDays = getCycleLengthInDays(frequency, everyNDays);
+    endDate.setDate(endDate.getDate() + cycleDays - 1);
+    endDate.setHours(23, 59, 59, 999);
+  }
   return endDate;
 }
