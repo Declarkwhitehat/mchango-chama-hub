@@ -284,7 +284,7 @@ Deno.serve(async (req) => {
               payout_processed: true,
               payout_processed_at: new Date().toISOString(),
               payout_amount: 0,
-              payout_type: 'skipped',
+              payout_type: 'none',
               members_skipped_count: 1
             })
             .eq('id', cycle.id);
@@ -315,7 +315,7 @@ Deno.serve(async (req) => {
       const payoutAmount = collectedAmount - commissionAmount;
 
       const isFullPayout = paidCount === totalMembers;
-      const payoutType = wasSkipped ? 'redirected' : (isFullPayout ? 'full' : 'partial');
+      const payoutType = wasSkipped ? 'partial' : (isFullPayout ? 'full' : 'partial');
 
       console.log(`Processing ${payoutType} payout for ${chama.name}: ${paidCount}/${totalMembers} paid, amount: ${payoutAmount}`);
 
