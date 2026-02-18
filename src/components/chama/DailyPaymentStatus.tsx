@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, XCircle, AlertCircle, Clock } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, AlertCircle, Clock, TrendingUp, AlertTriangle } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -90,10 +91,10 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
           due_amount: data.cycle.due_amount
         });
 
-        // Check if cutoff has passed
+        // Check if cutoff has passed (10:00 PM deadline)
         const endDate = new Date(data.cycle.end_date);
         const cutoff = new Date(endDate);
-        cutoff.setHours(20, 0, 0, 0);
+        cutoff.setHours(22, 0, 0, 0);
         setCutoffPassed(new Date() > cutoff);
 
         const paymentData = data.payments?.map((p: any) => ({
@@ -180,7 +181,9 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
     );
   }
 
-  const paidCount = payments.filter(p => p.is_paid && !p.is_late_payment).length;
+  const paidCount = payments.filter(p => p.is_paid).length;
+  const paidOnTimeCount = payments.filter(p => p.is_paid && !p.is_late_payment).length;
+  const paidLateCount = payments.filter(p => p.is_paid && p.is_late_payment).length;
   const totalCount = payments.length;
   const allPaid = paidCount === totalCount;
 
@@ -219,7 +222,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
       {/* Prominent Countdown Timer */}
       <PaymentCountdownTimer
         endDate={cycleInfo.end_date}
-        cutoffHour={20}
+        cutoffHour={22}
         contributionAmount={cycleInfo.due_amount}
         beneficiaryName={cycleInfo.beneficiary_name}
         paidCount={paidCount}
@@ -303,6 +306,68 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
           </CardContent>
         </Card>
       )}
+
+      {/* Financial Summary Card */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Cycle Financial Summary</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border bg-muted/40 p-3 text-center">
+              <p className="text-xs text-muted-foreground">Total Expected</p>
+              <p className="text-lg font-bold text-foreground">
+                KES {(totalCount * (cycleInfo?.due_amount || 0)).toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">{totalCount} × KES {(cycleInfo?.due_amount || 0).toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/40 p-3 text-center">
+              <p className="text-xs text-muted-foreground">Total Collected</p>
+              <p className="text-lg font-bold text-foreground">
+                KES {payments.filter(p => p.is_paid).reduce((s, p) => s + p.amount_due, 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">{paidCount}/{totalCount} paid</p>
+            </div>
+            <div className={`rounded-lg border p-3 text-center ${paidLateCount > 0 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-muted/40'}`}>
+              <p className="text-xs text-muted-foreground">Late Penalties (10%)</p>
+              <p className={`text-lg font-bold ${paidLateCount > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-foreground'}`}>
+                KES {(paidLateCount * (cycleInfo?.due_amount || 0) * 0.10).toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">{paidLateCount} late payment{paidLateCount !== 1 ? 's' : ''}</p>
+            </div>
+            <div className={`rounded-lg border p-3 text-center ${payments.filter(p => !p.is_paid).length > 0 ? 'bg-destructive/10 border-destructive/30' : 'bg-green-500/10 border-green-500/30'}`}>
+              <p className="text-xs text-muted-foreground">Unpaid Members</p>
+              <p className={`text-lg font-bold ${payments.filter(p => !p.is_paid).length > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                {payments.filter(p => !p.is_paid).length}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                KES {(payments.filter(p => !p.is_paid).length * (cycleInfo?.due_amount || 0)).toLocaleString()} missing
+              </p>
+            </div>
+          </div>
+          {payments.filter(p => !p.is_paid).length > 0 && (
+            <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <p className="text-sm font-medium text-destructive">Unpaid Members</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {payments.filter(p => !p.is_paid).map(p => (
+                  <Badge key={p.id} variant="destructive" className="text-xs">
+                    {p.full_name}
+                  </Badge>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                ⚠️ Payout at 10:00 PM will include only collected amounts. Overpayments from other members do NOT cover unpaid obligations.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Detailed Payment Status Card - Current Cycle */}
       <Card>
@@ -399,7 +464,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
             • Each cycle is tracked independently - payment status is per cycle, not cumulative
           </p>
           <p className="mt-1">
-            • Late payments (after 8:00 PM on due date) clear the oldest missed cycle first
+            • Late payments (after 10:00 PM) apply to this cycle with a 10% penalty — no carry-forward
           </p>
           <p className="mt-1">
             • Overpayments are credited as carry-forward for the next cycle

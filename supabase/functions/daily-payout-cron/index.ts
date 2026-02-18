@@ -310,16 +310,32 @@ Deno.serve(async (req) => {
           .eq('cycle_id', cycle.id);
 
         const totalMembers = payments?.length || 0;
-        const paidMembers = payments?.filter((p: any) => p.is_paid && !p.is_late_payment) || [];
-        const paidCount = paidMembers.length;
-        const unpaidMembers = payments?.filter((p: any) => !p.is_paid) || [];
+        // On-time paid members (fully paid, not late)
+        const paidOnTimeMembers = payments?.filter((p: any) => p.fully_paid && !p.is_late_payment) || [];
+        // Late paid members (fully paid with 10% penalty already deducted at payment time)
+        const paidLateMembers = payments?.filter((p: any) => p.fully_paid && p.is_late_payment) || [];
+        // All fully paid members
+        const allFullyPaidMembers = payments?.filter((p: any) => p.fully_paid) || [];
+        const paidCount = allFullyPaidMembers.length;
+        // Unpaid members — each obligation is STRICTLY INDEPENDENT (no cross-subsidization)
+        const unpaidMembers = payments?.filter((p: any) => !p.fully_paid) || [];
 
         if (!skipPayout) {
-          // Calculate payout amount from all contributions
-          const collectedAmount = paidMembers.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
-          const commissionRate = chama.commission_rate || 0.05;
-          const commissionAmount = collectedAmount * commissionRate;
-          const payoutAmount = collectedAmount - commissionAmount;
+          // STRICT OVERPAYMENT RULE: only sum payments from members who fully paid their own obligation
+          // An overpaying member's extra NEVER covers another member's unpaid obligation
+          const collectedFromOnTime = paidOnTimeMembers.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
+          const collectedFromLate = paidLateMembers.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
+          const collectedAmount = collectedFromOnTime + collectedFromLate;
+          // Late penalties were already deducted at payment time (10% from gross)
+          // so amount_paid for late members already reflects the net after penalty
+          const latePenaltiesCollected = paidLateMembers.reduce((sum: number, p: any) => {
+            // Commission was already deducted: net = gross * 0.90, so penalty = net * 0.10/0.90
+            return sum + ((p.amount_paid || 0) * (0.10 / 0.90));
+          }, 0);
+          // On-time commission (5%) still needs to be deducted from collected on-time amounts
+          const onTimeCommission = collectedFromOnTime * 0.05;
+          const totalCommission = onTimeCommission; // Late commission already taken at payment
+          const payoutAmount = collectedAmount - onTimeCommission;
 
           const isFullPayout = paidCount === totalMembers;
           const payoutType = wasSkipped ? 'partial' : (isFullPayout ? 'full' : 'partial');
@@ -357,12 +373,12 @@ Deno.serve(async (req) => {
                   chama_id: chama.id,
                   requested_by: actualBeneficiary.user_id,
                   amount: collectedAmount,
-                  commission_amount: commissionAmount,
+                  commission_amount: totalCommission,
                   net_amount: payoutAmount,
                   status: withdrawalStatus,
                   payment_method_id: paymentMethod?.id,
                   payment_method_type: paymentMethod?.method_type,
-                  notes: withdrawalNotes,
+                  notes: `${withdrawalNotes} | Late penalties: KES ${latePenaltiesCollected.toFixed(2)}`,
                   requested_at: new Date().toISOString(),
                   b2c_attempt_count: 0,
                   ...(withdrawalStatus === 'approved' ? { reviewed_at: new Date().toISOString() } : {})
@@ -374,12 +390,12 @@ Deno.serve(async (req) => {
                 console.error('Error creating withdrawal:', withdrawalError);
                 errors++;
               } else {
-                // Record commission earning
+                // Record commission earning (on-time commission only; late penalties already recorded at payment time)
                 await supabase.rpc('record_company_earning', {
                   p_source: 'chama_commission',
-                  p_amount: commissionAmount,
+                  p_amount: totalCommission,
                   p_group_id: chama.id,
-                  p_description: `Daily payout commission - ${chama.name}`
+                  p_description: `Daily payout commission - ${chama.name}. On-time: KES ${onTimeCommission.toFixed(2)}, Late penalties already deducted: KES ${latePenaltiesCollected.toFixed(2)}`
                 });
 
                 // ========== TRIGGER AUTOMATIC B2C PAYOUT ==========
@@ -439,7 +455,8 @@ Deno.serve(async (req) => {
               }
             }
 
-            // Update cycle
+            // Update cycle — track total expected, collected, and penalties separately
+            const totalExpected = totalMembers * chama.contribution_amount;
             await supabase
               .from('contribution_cycles')
               .update({
@@ -448,8 +465,9 @@ Deno.serve(async (req) => {
                 payout_amount: payoutAmount,
                 payout_type: payoutType,
                 members_paid_count: paidCount,
-                members_skipped_count: wasSkipped ? 1 : 0,
-                total_collected_amount: collectedAmount
+                members_skipped_count: (wasSkipped ? 1 : 0) + unpaidMembers.length,
+                total_collected_amount: collectedAmount,
+                total_expected_amount: totalExpected
               })
               .eq('id', cycle.id);
 

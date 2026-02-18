@@ -19,7 +19,7 @@ interface PaymentCountdownTimerProps {
 
 export function PaymentCountdownTimer({
   endDate,
-  cutoffHour = 20,
+  cutoffHour = 22,
   contributionAmount,
   beneficiaryName,
   paidCount,
@@ -188,7 +188,7 @@ export function PaymentCountdownTimer({
               </span>
             </div>
             <Badge variant="outline" className="text-xs">
-              8:00 PM Cutoff
+              10:00 PM Cutoff
             </Badge>
           </div>
 
@@ -285,7 +285,7 @@ export function PaymentCountdownTimer({
           {/* Warning Message */}
           {(urgency === 'critical' || urgency === 'urgent') && (
             <p className="text-xs text-center text-destructive">
-              ⚠️ Payments after 8:00 PM will be marked as LATE and credited to next cycle
+              ⚠️ Payments after 10:00 PM will be marked as LATE and charged a 10% penalty
             </p>
           )}
         </div>

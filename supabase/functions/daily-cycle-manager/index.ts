@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
       
       switch (chama.contribution_frequency) {
         case 'daily':
-          endDate.setHours(23, 59, 59, 999);
+          endDate.setHours(22, 0, 0, 0); // Daily cycles end at 10:00 PM (payout deadline)
           break;
         case 'weekly':
           endDate.setDate(endDate.getDate() + 6);
@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
         cycle: {
           ...cycle,
           end_date: cycle.end_date,
-          cutoff_time: '20:00:00'
+          cutoff_time: '22:00:00'
         }, 
         payments 
       }), {
