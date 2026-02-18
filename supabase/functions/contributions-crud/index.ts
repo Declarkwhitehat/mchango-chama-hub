@@ -98,7 +98,10 @@ async function allocatePayment(
     if (remainingGross <= 0 && existingCarryForward <= 0) break;
 
     const cycleEndDate = new Date(cycle.contribution_cycles?.end_date);
-    const isLate = now > cycleEndDate;
+    // Late if payment is made after 10:00 PM (22:00) on the cycle's end date
+    const lateDeadline = new Date(cycleEndDate);
+    lateDeadline.setHours(22, 0, 0, 0);
+    const isLate = now > lateDeadline;
     const commissionRate = isLate ? LATE_RATE : ONTIME_RATE;
     
     const amountStillOwed = (cycle.amount_due || contributionAmount) - (cycle.amount_paid || 0);
@@ -536,15 +539,15 @@ serve(async (req) => {
       let isLatePayment = false;
       
       if (cycle) {
-        // Check if payment is after 8 PM on cycle end date
+        // Check if payment is after 10:00 PM on cycle end date
         const cycleEndDate = new Date(cycle.end_date);
         const cutoffTime = new Date(cycleEndDate);
-        cutoffTime.setHours(20, 0, 0, 0); // 8:00 PM on end date
+        cutoffTime.setHours(22, 0, 0, 0); // 10:00 PM cutoff
 
         isLatePayment = now > cutoffTime;
 
         if (isLatePayment) {
-          // Late payment - any carry-forward already handled by allocatePayment
+          // Late payment - allocatePayment already applied 10% penalty and credited to current cycle
           // Send late payment notification
           const { data: memberProfile } = await supabaseClient
             .from('profiles')
@@ -553,14 +556,14 @@ serve(async (req) => {
             .single();
 
           if (memberProfile?.phone) {
-            const nextCycleDate = new Date(cycle.end_date);
-            nextCycleDate.setDate(nextCycleDate.getDate() + 1);
+            const penaltyAmount = body.amount * 0.10;
+            const netApplied = body.amount - penaltyAmount;
             
             await supabaseClient.functions.invoke('send-transactional-sms', {
               body: {
                 phone: memberProfile.phone,
-                message: `Your payment of KES ${body.amount} was received after 8 PM. Any excess has been credited for future cycles. Carry-forward: KES ${allocationResult.carry_forward}.`,
-                eventType: 'late_payment_credit'
+                message: `⏰ Late payment received: KES ${body.amount}. A 10% penalty (KES ${penaltyAmount.toFixed(2)}) has been applied. Net credited to current cycle: KES ${netApplied.toFixed(2)}.`,
+                eventType: 'late_payment_penalty'
               }
             });
           }

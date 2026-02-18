@@ -64,8 +64,8 @@ function calculateNextCycleDates(
   
   switch (frequency) {
     case 'daily':
-      // Daily cycle: ends same day as start at 23:59:59
-      endDate.setHours(23, 59, 59, 999);
+      // Daily cycle: ends at 10:00 PM (22:00) — payout trigger time
+      endDate.setHours(22, 0, 0, 0);
       break;
     case 'weekly':
       endDate.setDate(endDate.getDate() + 6);
