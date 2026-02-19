@@ -1,247 +1,317 @@
 
-# Late Payment, Deadline Lock & Disbursement Rule Changes
+# Chama Engine: Universal Production Specification Implementation
 
-## Summary of What You Want vs. What Exists
+## Analysis: What Exists vs. What the Spec Requires
 
-| Feature | Current Behavior | Required Behavior |
-|---|---|---|
-| Deadline hour | 8:00 PM (20:00) | 10:00 PM (22:00) |
-| Payments after deadline | Flagged as late, credited to next cycle | Locked for normal payment, charged 10% penalty, counted for THIS cycle |
-| Disbursement timing | At 10 PM, or when all pay | At 10:00 PM exactly |
-| Partial disbursement | Payout only if enough collected | Release whatever is collected to beneficiary at 10 PM |
-| Overpayment covering others | Partially possible via carry-forward | Strictly forbidden — each member's obligation is completely isolated |
-| UI display | Basic cycle status | Needs: Total expected, total collected, penalties collected, unpaid members list |
+The existing system is a good foundation but has several critical gaps when measured against the full specification. Here is the honest gap analysis:
 
----
+### What Already Works
+- 10:00 PM deadline for daily cycles (end_date set to 22:00:00)
+- FIFO allocation (oldest unpaid cycles cleared first via `allocatePayment()`)
+- Tiered commissions: 5% on-time, 10% late
+- Per-member, per-cycle `member_cycle_payments` records
+- Commission ledgering to `company_earnings` and `financial_ledger`
+- Strict per-member obligation (no cross-subsidization in payout cron)
+- Financial summary UI (Total Expected, Collected, Penalties, Unpaid Members)
+- Auto-payout after deadline and when all pay early
+- 3-strike auto-removal for missed payments
 
-## Current System Architecture
+### Critical Gaps to Close
 
-The existing system has:
-- `contributions-crud` — receives payments, allocates to cycles, triggers immediate payout if all members pay before cutoff
-- `daily-payout-cron` — runs at scheduled intervals, processes overdue cycles
-- `daily-cycle-manager` — manages cycle creation and current-cycle queries
-- `PaymentCountdownTimer` — frontend countdown using 8:00 PM cutoff
-- `DailyPaymentStatus` — shows who has/hasn't paid for a cycle
-- `member_cycle_payments` — per-member, per-cycle payment record with `amount_due`, `amount_paid`, `fully_paid`, `is_late_payment`
+**Gap 1 — Debt/Deficit System Missing**
+The spec defines a formal **Debt Record** (principal_debt + penalty_debt) and **Deficit Record** (linking underpaid recipients to non-payers). Currently, the system tracks `missed_payments_count` and `balance_deficit` on the member, but there are no structured debt records with itemized penalty vs. principal separation, and no formal deficit records linking a recipient to the payer who caused the shortfall.
 
----
+**Gap 2 — Penalty Accrual at Cycle End (Not at Payment Time)**
+The spec says: "Accrue Penalty Immediately" at the END of each cycle for non-payers. The current system only applies the 10% commission when a late payment is received. The penalty should be accrued as a separate debt record the moment the cycle closes, giving the member immediate visibility of what they owe BEFORE they pay.
 
-## Changes Required
+**Gap 3 — Payment Allocation UI Breakdown Missing**
+The spec requires: "Before confirming a payment, the user must be shown exactly how the funds will be allocated (e.g., 'Your 420 Ksh payment will be used to: Clear 20 Ksh penalty, Clear 200 Ksh past due principal, Pay 200 Ksh for current cycle')." The `AmountToPayCard` shows total but not an itemized per-debt allocation preview.
 
-### 1. Deadline: Change 8:00 PM → 10:00 PM (22:00)
+**Gap 4 — Idempotency Key on Payment Endpoint**
+The spec requires idempotency on POST /payments to prevent double-processing. The current `contributions-crud` POST does not validate an `idempotency_key`.
 
-**Files to change:**
-- `contributions-crud/index.ts` — line ~544: `cutoffTime.setHours(20, 0, 0, 0)` → `setHours(22, 0, 0, 0)`
-- `daily-cycle-manager/index.ts` — line 252: `cutoff_time: '20:00:00'` → `'22:00:00'`; also lines 94-96 cutoff check
-- `PaymentCountdownTimer.tsx` — `cutoffHour={20}` default prop and all references to "8:00 PM" text
-- `DailyPaymentStatus.tsx` — line 96: `cutoff.setHours(20, 0, 0, 0)` and badge text "8:00 PM Cutoff"
+**Gap 5 — Self-Inflicted Deficit Edge Case**
+If the cycle recipient is also the only member who fails to pay, no deficit record should be created. This edge case is not explicitly handled in the current cron logic.
 
----
+**Gap 6 — Deficit Visibility UI**
+Underpaid recipients need to see which members caused their deficit and whether those late payments have cleared the deficit. There is no UI for this currently.
 
-### 2. Late Payment = 10% Penalty, Applied to THIS Cycle (Not Next)
+**Gap 7 — Downloadable Transaction Receipt**
+Every transaction must generate a detailed, downloadable receipt with full allocation audit trail. The existing `ContributionsPDFDownload` exists but is a summary, not a per-transaction allocation receipt.
 
-**Current behavior:** After 8 PM, payment goes to `carry_forward_credit` for the next cycle. Member's current cycle remains unpaid.
-
-**Required behavior:** After 10 PM, member can still pay, but:
-- 10% commission is deducted from their gross payment
-- The net is applied to complete **this** cycle's `member_cycle_payments` record
-- The member is still counted as having paid (but "late") for THIS cycle
-- This is distinct from `carry_forward` — it covers the current cycle
-
-**Files to change:**
-- `contributions-crud/index.ts` — in the `isLatePayment` branch (lines ~546-566), instead of sending late payment to carry-forward, apply it to the **current cycle** using 10% commission rate. The existing `allocatePayment()` function already handles `isLate` based on `cycleEndDate`, but currently the cycle end is set at 23:59:59 of the day, so after 10 PM the cycle end has not passed yet for daily chamas. The fix is: mark `isLate = true` when `now > 22:00` on cycle end date (not past the cycle entirely), and write the 10% commission allocation to the current cycle record.
-- `daily-cycle-manager/index.ts` — `allocatePayment` equivalent logic must use 22:00 as the "late cutoff" for determining commission rate
-- The `allocatePayment()` function inside `contributions-crud` computes `isLate` by comparing `now > cycleEndDate`. Since daily cycles end at `23:59:59`, late detection is currently broken for late-within-day payments. We must change to: `isLate = now.getHours() >= 22` on the cycle's day, or specifically compare against 22:00 on the cycle's end date.
+**Gap 8 — Partial Debt Tracking**
+If a payment partially covers a debt (penalty + principal), the system must track the remaining partial debt. The current system tracks partial payments via `amount_remaining` in `member_cycle_payments`, but does not explicitly split into `penalty_remaining` vs. `principal_remaining`.
 
 ---
 
-### 3. Strict Overpayment Rule — No Cross-Member Covering
+## Implementation Plan
 
-**Current behavior:** `carry_forward_credit` can theoretically build up and reduce `amount_due` for the next cycle, but the payout currently pulls from actual `amount_paid` in `member_cycle_payments`.
+### Phase 1 — Database: New Tables for Debt/Deficit System
 
-**Issue:** In `cycle-auto-create` and `daily-cycle-manager` (create-today action), a member's `carry_forward_credit` reduces their next cycle's `amount_due` — this is fine because it's their OWN credit. The strict rule means: member A's overpayment must NEVER go to member B's obligation. This is already the case since carry-forward is per-member. The main concern is:
+**New table: `chama_member_debts`**
+Stores formal debt records created at cycle end for each non-payer.
 
-- In `daily-payout-cron`, `collectedAmount` is calculated as sum of `amount_paid` for **paid members**. Unpaid members' obligations are NOT filled by others. This is correct.
-- We need to add an explicit check: payout amount = only what paid members actually paid (no cross-subsidization).
-
-**Change:** In `daily-payout-cron/index.ts`, change payout calculation:
+```sql
+CREATE TABLE chama_member_debts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  chama_id UUID NOT NULL REFERENCES chama(id),
+  member_id UUID NOT NULL REFERENCES chama_members(id),
+  cycle_id UUID NOT NULL REFERENCES contribution_cycles(id),
+  principal_debt NUMERIC NOT NULL,       -- the expected_contribution amount
+  penalty_debt NUMERIC NOT NULL,         -- expected_contribution × late_penalty_rate
+  principal_remaining NUMERIC NOT NULL,  -- reduces as payments clear it
+  penalty_remaining NUMERIC NOT NULL,    -- reduces first (FIFO within debt)
+  status TEXT NOT NULL DEFAULT 'outstanding', -- outstanding | partial | cleared
+  created_at TIMESTAMPTZ DEFAULT now(),
+  cleared_at TIMESTAMPTZ,
+  payment_allocations JSONB DEFAULT '[]'
+);
 ```
-// Only count payments from members who fully paid their own obligation
-const fullyPaidMembers = payments?.filter(p => p.fully_paid) || [];
-const collectedAmount = fullyPaidMembers.reduce((sum, p) => sum + (p.amount_paid || 0), 0);
+
+**New table: `chama_cycle_deficits`**
+Links an underpaid cycle recipient to the non-paying member, tracking whether the deficit has been compensated.
+
+```sql
+CREATE TABLE chama_cycle_deficits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  chama_id UUID NOT NULL REFERENCES chama(id),
+  cycle_id UUID NOT NULL REFERENCES contribution_cycles(id),
+  recipient_member_id UUID NOT NULL REFERENCES chama_members(id),
+  non_payer_member_id UUID NOT NULL REFERENCES chama_members(id),
+  debt_id UUID NOT NULL REFERENCES chama_member_debts(id),
+  principal_amount NUMERIC NOT NULL,   -- what the non-payer owed
+  net_owed_to_recipient NUMERIC NOT NULL, -- principal × (1 - commission_rate)
+  status TEXT NOT NULL DEFAULT 'outstanding', -- outstanding | paid
+  paid_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
-Also add a `late_penalties_collected` field to the cycle summary.
+
+**New column on `contributions`:**
+Add `idempotency_key TEXT UNIQUE` to prevent double-processing.
+
+**RLS Policies:**
+- `chama_member_debts`: Members can view their own debts; managers can view all in their chama; admins have full access.
+- `chama_cycle_deficits`: Involved members (recipient and non-payer) can view; managers can view; admins have full access.
 
 ---
 
-### 4. 10:00 PM Disbursement — Always Release What Was Collected
+### Phase 2 — Backend: `daily-payout-cron` — Create Debt & Deficit Records at Cycle Close
 
-**Current behavior:** Cron processes at whatever time it runs. The `contributions-crud` triggers immediate payout only if ALL members paid on time.
+After disbursing the payout at cycle end, for each unpaid member:
 
-**Required behavior:** At exactly 10:00 PM, release whatever was collected to the beneficiary. Do NOT wait for everyone to pay.
+1. **Calculate amounts:**
+   - `principal_debt = expected_contribution` (the full amount owed)
+   - `penalty_debt = expected_contribution × 0.10` (10% penalty)
 
-**Changes:**
-- The daily cron runs at whatever schedule is configured. We need to ensure:
-  - At 10 PM, the cycle's end for payout-trigger purposes is treated as 22:00, not 23:59:59
-  - The cron's `end_date` check (`.lte('end_date', now)`) checks 23:59:59. We add a `payout_cutoff` concept: daily cycles trigger payout at 22:00, not at end of day.
-  - In `daily-payout-cron`, change the query to also capture daily cycles where the current time >= 22:00 on the cycle's day, regardless of `end_date`.
-  
-**Approach:** Add a computed check — for daily frequency chamas, also fetch cycles where `start_date` matches today and the current time is past 22:00 on that day.
+2. **Self-inflicted deficit check:** If `non_payer_member_id === cycle.beneficiary_member_id` AND this is the ONLY non-payer, skip creating a deficit record (the recipient short-changed themselves).
 
-Or simpler: Change daily cycle `end_date` from `23:59:59` to `22:00:00`. This way the cron's existing `.lte('end_date', now)` check will naturally process the cycle after 10 PM.
+3. **Insert `chama_member_debts` record** with full `principal_debt` and `penalty_debt`.
 
-**This is the cleanest fix** — change where we set `endDate` for daily cycles to `22:00:00` instead of `23:59:59` in both `daily-cycle-manager` and `cycle-auto-create`.
+4. **Insert `chama_cycle_deficits` record** linking the underpaid recipient to this debt (unless self-inflicted).
 
----
+5. **Update `member_cycle_payments`** to reflect the debt accrual with `payment_allocations` showing `penalty_accrued`.
 
-### 5. Payout Amount = Only What Was Actually Collected (After 10% Penalty)
-
-**Required:** Recipient gets `sum of all member payments (net of commissions)`, regardless of whether all members paid.
-
-**Current behavior:** This is already the case in `daily-payout-cron` — `collectedAmount` sums actual `amount_paid` values, not the expected total. The withdrawal is created for `collectedAmount` minus `commissionAmount`. **This already works correctly.**
-
-We need to make sure:
-- Late payments (with 10% penalty) are included in the collected amount
-- The `commission_amount` in the withdrawal tracks BOTH on-time (5%) and late (10%) commissions
+This replaces the current `missed_payments_count` increment as the primary tracking mechanism (though `missed_payments_count` remains as a strike counter for auto-removal).
 
 ---
 
-### 6. UI — Show Required Financial Summary
+### Phase 3 — Backend: `contributions-crud` — FIFO Debt Settlement (Penalty First)
 
-**Required display for each cycle:**
-- Total expected amount
-- Total collected amount  
-- Total penalties collected (10% late fees)
-- List of unpaid members (clearly highlighted)
+Replace the current `allocatePayment()` function with a new `settleDebts()` function that follows the exact spec order:
 
-**Files to change:**
-- `DailyPaymentStatus.tsx` — Add a summary section at the top of the "Detailed Payment Status" card:
-  - Total Expected: `totalCount × contributionAmount`
-  - Total Collected: sum of `amount_paid` from all payments
-  - Penalties Collected: sum of all late-payment commissions (10% × late payment amounts)
-  - Unpaid: clearly listed with "Unpaid" badge
-  
-- `PaymentCountdownTimer.tsx` — Change all "8:00 PM" references to "10:00 PM"
+```
+For each debt (oldest first):
+  1. Pay penalty_remaining → company_revenue_account
+  2. Pay principal_remaining:
+     a. commission = principal × normal_commission_rate
+     b. record commission → company_revenue_account  
+     c. net = principal - commission
+     d. send net → recipient of the corresponding deficit record
+     e. mark deficit as PAID
+After all debts cleared:
+  3. Remaining amount → current cycle contribution
+     a. commission = amount × normal_commission_rate
+     b. record commission
+     c. net → current cycle collection pot
+  4. Any overage → member's carry_forward_credit (with commission already deducted)
+```
+
+**Idempotency:** At the top of the POST handler, check for `body.idempotency_key`. If provided, check the `contributions` table for an existing record with the same key. If found, return the existing response without re-processing.
 
 ---
 
-## Technical Implementation Plan
+### Phase 4 — Backend: Pre-Payment Allocation Preview Endpoint
 
-### Step 1 — Backend: Fix Late-Payment Detection to 10:00 PM
+Add a new action `preview-allocation` to `contributions-crud` (or a new `payment-preview` edge function). This takes:
+- `member_id`
+- `chama_id`  
+- `gross_amount`
 
-In `contributions-crud/index.ts`, the `isLate` check and the `allocatePayment` function both need updating:
+And returns a detailed breakdown of exactly how the payment will be allocated, without writing any data. This powers the "before confirming payment" UI.
 
-Current:
-```typescript
-// allocatePayment() line ~101
-const cycleEndDate = new Date(cycle.contribution_cycles?.end_date);
-const isLate = now > cycleEndDate; // This is wrong — cycle end is 23:59:59, not 22:00
+Response shape:
+```json
+{
+  "allocations": [
+    { "type": "penalty_clearance", "debt_cycle": 1, "amount": 20, "destination": "company" },
+    { "type": "principal_clearance", "debt_cycle": 1, "amount": 190, "destination": "Alice (recipient deficit)" },
+    { "type": "commission_on_principal", "debt_cycle": 1, "amount": 10, "destination": "company" },
+    { "type": "current_cycle", "amount": 190, "destination": "cycle_pot" },
+    { "type": "commission_on_current", "amount": 10, "destination": "company" }
+  ],
+  "total_gross": 420,
+  "total_to_company": 40,
+  "total_to_recipients": 190,
+  "total_to_cycle_pot": 190,
+  "carry_forward": 0
+}
 ```
-
-Fix:
-```typescript
-const cycleEndDate = new Date(cycle.contribution_cycles?.end_date);
-// Late if current time is past 22:00 on the cycle's start date
-const lateDeadline = new Date(cycleEndDate);
-lateDeadline.setHours(22, 0, 0, 0);
-const isLate = now > lateDeadline;
-```
-
-And in the `isLatePayment` check in the POST handler (line ~543):
-```typescript
-// Change from 20:00 to 22:00
-cutoffTime.setHours(22, 0, 0, 0);
-```
-
-### Step 2 — Backend: Fix Daily Cycle End Time to 22:00
-
-In `daily-cycle-manager/index.ts` (create-today action) and `cycle-auto-create/index.ts`:
-
-Change daily cycle end from:
-```typescript
-case 'daily':
-  endDate.setHours(23, 59, 59, 999); // OLD
-```
-To:
-```typescript
-case 'daily':
-  endDate.setHours(22, 0, 0, 0); // NEW — triggers payout at 10 PM
-```
-
-This ensures the cron processes daily cycles at/after 10 PM instead of midnight.
-
-### Step 3 — Backend: Ensure Late Payments Count for THIS Cycle
-
-Currently, the `isLatePayment` branch in `contributions-crud` sends the payment to carry-forward. We change it to instead allocate it to the current cycle with 10% commission.
-
-The `allocatePayment()` function already handles this correctly if `isLate` is set properly (it uses `LATE_RATE = 0.10`). The issue is that the outer code in the POST handler treats late payments as going to next cycle carry-forward instead of clearing the current cycle.
-
-**Fix:** Remove the special late-payment carry-forward branch; let `allocatePayment()` handle it normally. The function will apply 10% commission and mark the cycle payment as `is_late_payment = true`.
-
-### Step 4 — Backend: Overpayment Isolation in Payout Cron
-
-In `daily-payout-cron/index.ts`, update payout calculation to be explicit:
-
-```typescript
-// Only collect from members who paid their own obligation (no cross-subsidization)
-const paidMembersOnTime = payments?.filter(p => p.fully_paid && !p.is_late_payment) || [];
-const paidMembersLate = payments?.filter(p => p.fully_paid && p.is_late_payment) || [];
-const unpaidMembers = payments?.filter(p => !p.fully_paid) || [];
-
-const collectedFromOnTime = paidMembersOnTime.reduce((sum, p) => sum + (p.amount_paid || 0), 0);
-const collectedFromLate = paidMembersLate.reduce((sum, p) => sum + (p.amount_paid || 0), 0);
-const collectedAmount = collectedFromOnTime + collectedFromLate;
-const totalPenalties = paidMembersLate.reduce((sum, p) => {
-  return sum + ((p.amount_paid || 0) * 0.10 / 0.90); // approximate commission
-}, 0);
-```
-
-Also update the cycle record to store `total_penalties_collected` in metadata.
-
-### Step 5 — Frontend: Update Deadline to 10:00 PM
-
-- `PaymentCountdownTimer.tsx`: Change default `cutoffHour` prop from `20` to `22`, and all text "8:00 PM" to "10:00 PM"
-- `DailyPaymentStatus.tsx`: Change `cutoff.setHours(20, 0, 0, 0)` to `22`, text "8 PM" to "10 PM", update badge text
-
-### Step 6 — Frontend: Enhanced Cycle Payment Summary
-
-Update `DailyPaymentStatus.tsx` to add a financial summary section:
-
-```
-┌──────────────────────────────────────────────────────┐
-│ Cycle #N Financial Summary                           │
-├──────────────────────────────────────────────────────┤
-│ Total Expected:     KES 500 (5 × KES 100)           │
-│ Total Collected:    KES 400                          │
-│ Late Penalties:     KES 10 (10% on KES 100)         │
-│ Unpaid Members:     1 (Member X)                    │
-│ Payout Amount:      KES 400 (net, after commission) │
-└──────────────────────────────────────────────────────┘
-```
-
-This summary will be displayed above the member payment list in the cycle status card.
 
 ---
 
-## Files to Be Changed
+### Phase 5 — Frontend: `AmountToPayCard` — Itemized Debt Breakdown
 
-| File | Changes |
+Update `AmountToPayCard` to fetch and display the formal debt records from `chama_member_debts`:
+
+**Current display:**
+```
+Total Payable: KES 420
+```
+
+**New display:**
+```
+Your Outstanding Balance:
+  ├── Penalty (Cycle #1):     KES  20  → Platform fee
+  ├── Principal (Cycle #1):   KES 200  → Alice (owed to her)
+  └── Current Cycle (on-time): KES 200  → Cycle pot
+  ─────────────────────────────────────
+  Total you pay:              KES 420
+  Commissions deducted:       KES  20  (5% × KES 200 + 5% × KES 200)
+  Net to beneficiaries:       KES 380
+```
+
+This is the "before confirming payment" transparency the spec requires.
+
+---
+
+### Phase 6 — Frontend: Deficit Visibility for Underpaid Recipients
+
+Add a new `DeficitStatus` component to the chama detail page. For members who were the cycle recipient and received a partial payout, show:
+
+```
+┌─────────────────────────────────────────────┐
+│  Your Cycle #1 Deficit                     │
+│  You were owed: KES 190 from 1 non-payer   │
+│                                             │
+│  ┌────────────────────────────────────────┐ │
+│  │ Eva (M002)        ● Outstanding       │ │
+│  │ Principal owed: KES 200               │ │
+│  │ Penalty accrued: KES 20              │ │
+│  │ Status: Eva has not yet paid back     │ │
+│  └────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
+```
+
+This reads from `chama_cycle_deficits` where `recipient_member_id = current_user_member_id`.
+
+---
+
+### Phase 7 — Frontend: Per-Transaction Downloadable Receipt
+
+Add a `TransactionReceiptDownload` component (using jsPDF, already installed). The receipt is generated client-side from the `payment_allocations` JSONB field stored in `contributions` / `member_cycle_payments`. It includes:
+
+- Transaction ID and timestamp
+- Member code and chama name
+- Gross amount paid
+- Itemized allocation table:
+  - Penalty cleared (which debt cycle)
+  - Principal cleared + commission + net to recipient
+  - Current cycle contribution + commission
+  - Carry-forward credited
+- Ledger entry references (company_earnings record IDs)
+- Downloadable as PDF
+
+---
+
+## Files to be Changed / Created
+
+| File | Change |
 |---|---|
-| `supabase/functions/contributions-crud/index.ts` | Cutoff 20→22, fix isLate detection per cycle, stop routing late payments to carry-forward |
-| `supabase/functions/daily-cycle-manager/index.ts` | Daily cycle end time 23:59→22:00, cutoff_time '22:00:00' |
-| `supabase/functions/cycle-auto-create/index.ts` | Daily cycle end time 23:59→22:00 |
-| `supabase/functions/daily-payout-cron/index.ts` | Update payout collection to explicitly isolate member payments, add penalty tracking |
-| `src/components/chama/PaymentCountdownTimer.tsx` | cutoffHour default 20→22, all "8:00 PM" text → "10:00 PM" |
-| `src/components/chama/DailyPaymentStatus.tsx` | Cutoff hour 20→22, add financial summary panel |
+| `supabase/migrations/[new].sql` | Create `chama_member_debts`, `chama_cycle_deficits` tables + RLS |
+| `supabase/migrations/[new].sql` | Add `idempotency_key` column to `contributions` table |
+| `supabase/functions/daily-payout-cron/index.ts` | Add debt + deficit record creation at cycle close; self-inflicted check |
+| `supabase/functions/contributions-crud/index.ts` | Replace `allocatePayment()` with `settleDebts()` (FIFO: penalty → principal → current → carryforward); add idempotency check; add `preview-allocation` action |
+| `src/components/chama/AmountToPayCard.tsx` | Fetch member debts from DB; show itemized per-debt breakdown before payment |
+| `src/components/chama/DailyPaymentStatus.tsx` | Add `DeficitStatus` sub-section for underpaid recipients |
+| `src/components/chama/DeficitStatus.tsx` | New component — shows which members owe this member and current status |
+| `src/components/chama/PaymentAllocationPreview.tsx` | New component — shows "Your KES X will be allocated as follows" modal before payment confirmation |
+| `src/components/TransactionReceiptDownload.tsx` | New component — generates per-transaction PDF receipt with full audit trail |
+| `src/components/ChamaPaymentForm.tsx` | Integrate `PaymentAllocationPreview` before payment confirmation; pass idempotency key |
+
+---
+
+## Database Migration Summary
+
+### Migration 1 — Debt & Deficit Tables
+
+```sql
+-- Formal debt record per non-paying member per cycle
+CREATE TABLE public.chama_member_debts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  chama_id UUID NOT NULL,
+  member_id UUID NOT NULL,
+  cycle_id UUID NOT NULL,
+  principal_debt NUMERIC(15,2) NOT NULL,
+  penalty_debt NUMERIC(15,2) NOT NULL,
+  principal_remaining NUMERIC(15,2) NOT NULL,
+  penalty_remaining NUMERIC(15,2) NOT NULL,
+  status TEXT NOT NULL DEFAULT 'outstanding',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  cleared_at TIMESTAMPTZ,
+  payment_allocations JSONB DEFAULT '[]'::jsonb
+);
+
+-- Deficit record linking underpaid recipient to non-payer
+CREATE TABLE public.chama_cycle_deficits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  chama_id UUID NOT NULL,
+  cycle_id UUID NOT NULL,
+  recipient_member_id UUID NOT NULL,
+  non_payer_member_id UUID NOT NULL,
+  debt_id UUID NOT NULL,
+  principal_amount NUMERIC(15,2) NOT NULL,
+  commission_rate NUMERIC(5,4) NOT NULL DEFAULT 0.05,
+  net_owed_to_recipient NUMERIC(15,2) NOT NULL,
+  status TEXT NOT NULL DEFAULT 'outstanding',
+  paid_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### Migration 2 — Idempotency on Contributions
+
+```sql
+ALTER TABLE public.contributions
+ADD COLUMN IF NOT EXISTS idempotency_key TEXT UNIQUE;
+```
 
 ---
 
 ## Key Design Decisions
 
-1. **Daily cycle end time = 22:00** — This is the simplest solution to trigger the cron at 10 PM. The cycle ends at 10 PM, the cron picks it up, releases payout.
+1. **Penalty Accrued at Cycle Close, Not at Payment**: Following the spec exactly. The moment the 10 PM deadline passes, the cron creates debt records with the full penalty pre-calculated. Members see their total outstanding BEFORE they pay.
 
-2. **Late payments count for THIS cycle** — After 10 PM, members can still pay with 10% penalty, and it counts for the current cycle. No more "carry-forward on late" behavior for current cycle.
+2. **FIFO Penalty-First within Each Debt**: Within each debt record, penalty is cleared before principal (spec §Phase II step 2a and 2b). Between debt records, oldest cycle is cleared first.
 
-3. **No cross-member subsidy** — The payout amount is strictly `sum(each_member's_own_payment)`. An overpaying member's extra goes to their own carry-forward for next cycle.
+3. **Deficit Records Enable Transparency**: When Eva pays back her missed principal, the system can explicitly route the net (190 KES) directly to Alice's deficit record and mark it PAID — this is what enables the "deficit visibility" UI for Alice.
 
-4. **Audit trail** — All commissions (5% on-time, 10% late) already go to `company_earnings` and `financial_ledger`. The cycle record will show `total_collected_amount`, `members_paid_count`, and `members_skipped_count` for transparency.
+4. **Self-Inflicted Deficit Rule**: Handled in cron — if `non_payer === recipient` for the cycle AND no other non-payers exist, no deficit record is created. The cycle is settled with what was collected.
+
+5. **Idempotency via DB Unique Constraint**: The `idempotency_key UNIQUE` constraint on the `contributions` table is the cleanest, most reliable approach — the DB itself prevents double-inserts even under race conditions.
+
+6. **Concurrency via Row-Level Locks**: The `settleDebts()` function in `contributions-crud` will use `SELECT ... FOR UPDATE` via a DB transaction to lock affected `chama_member_debts` rows before updating them, preventing race conditions.
+
+7. **Preview without Side Effects**: The `preview-allocation` action runs all the math but makes zero DB writes, enabling the pre-confirmation UI.
+
+8. **Receipt from Stored Allocations**: Rather than re-deriving allocations at receipt time, the `payment_allocations` JSONB column already stores everything. The receipt component simply renders this stored data as a formatted PDF.
