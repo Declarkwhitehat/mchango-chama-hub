@@ -37,9 +37,7 @@ async function sendSMS(phone: string, message: string) {
 }
 
 // Check if a member is eligible for payout based on PER-CYCLE payment records
-// NEVER use total contributions or last_payment_date - always check each cycle individually
 async function checkMemberEligibility(supabase: any, memberId: string, chamaId: string, contributionAmount: number, orderIndex: number) {
-  // Get ALL cycle payment records for this member (past and current)
   const { data: cyclePayments, error } = await supabase
     .from('member_cycle_payments')
     .select(`
@@ -58,13 +56,11 @@ async function checkMemberEligibility(supabase: any, memberId: string, chamaId: 
     return { isEligible: false, required: 0, contributed: 0, shortfall: 0, unpaidCycles: 0 };
   }
 
-  // Count unpaid cycles (each cycle is independently required)
   const unpaidCycles = (cyclePayments || []).filter((p: any) => !p.fully_paid);
   const totalUnpaid = unpaidCycles.reduce((sum: number, p: any) => sum + ((p.amount_due || contributionAmount) - (p.amount_paid || 0)), 0);
   const totalPaidCycles = (cyclePayments || []).filter((p: any) => p.fully_paid).length;
   const totalCycles = (cyclePayments || []).length;
 
-  // Member is eligible ONLY if ALL their cycles are fully paid
   const isEligible = unpaidCycles.length === 0 && totalCycles > 0;
 
   return {
@@ -76,9 +72,7 @@ async function checkMemberEligibility(supabase: any, memberId: string, chamaId: 
   };
 }
 
-// Find the next eligible member in the payout queue
 async function findNextEligibleMember(supabase: any, chamaId: string, contributionAmount: number, startPosition: number) {
-  // Get all approved, active members who haven't received payout, ordered by order_index
   const { data: members, error } = await supabase
     .from('chama_members')
     .select(`
@@ -102,7 +96,6 @@ async function findNextEligibleMember(supabase: any, chamaId: string, contributi
     return null;
   }
 
-  // Check each member's eligibility
   for (const member of members) {
     const eligibility = await checkMemberEligibility(
       supabase, 
@@ -120,7 +113,6 @@ async function findNextEligibleMember(supabase: any, chamaId: string, contributi
   return null;
 }
 
-// Record a payout skip in the database
 async function recordPayoutSkip(
   supabase: any, 
   chamaId: string, 
@@ -150,7 +142,6 @@ async function recordPayoutSkip(
     console.error('Error recording payout skip:', error);
   }
 
-  // Update the member's status
   await supabase
     .from('chama_members')
     .update({
@@ -164,6 +155,106 @@ async function recordPayoutSkip(
   return !error;
 }
 
+/**
+ * Phase I – Consequence Management:
+ * Create debt and deficit records for each member who did NOT pay this cycle.
+ * Spec rules:
+ *  - principal_debt = expected_contribution
+ *  - penalty_debt   = expected_contribution × late_penalty_rate (10%)
+ *  - Self-inflicted deficit: if the ONLY non-payer IS the recipient, no deficit record is created.
+ */
+async function accrueDebtsForCycle(
+  supabase: any,
+  chamaId: string,
+  cycleId: string,
+  cycleNumber: number,
+  beneficiaryMemberId: string,
+  unpaidPayments: any[],
+  contributionAmount: number,
+  commissionRate: number
+) {
+  if (unpaidPayments.length === 0) return;
+
+  const LATE_PENALTY_RATE = 0.10;
+  const isSelfInflicted = unpaidPayments.length === 1 && unpaidPayments[0].member_id === beneficiaryMemberId;
+
+  for (const payment of unpaidPayments) {
+    const memberId = payment.member_id || payment.chama_members?.id;
+    if (!memberId) continue;
+
+    const principalDebt = contributionAmount;
+    const penaltyDebt = contributionAmount * LATE_PENALTY_RATE;
+
+    // Insert debt record
+    const { data: debt, error: debtError } = await supabase
+      .from('chama_member_debts')
+      .insert({
+        chama_id: chamaId,
+        member_id: memberId,
+        cycle_id: cycleId,
+        principal_debt: principalDebt,
+        penalty_debt: penaltyDebt,
+        principal_remaining: principalDebt,
+        penalty_remaining: penaltyDebt,
+        status: 'outstanding',
+        payment_allocations: JSON.stringify([{
+          event: 'debt_accrued',
+          cycle_number: cycleNumber,
+          principal: principalDebt,
+          penalty: penaltyDebt,
+          timestamp: new Date().toISOString()
+        }])
+      })
+      .select('id')
+      .single();
+
+    if (debtError) {
+      console.error(`Error creating debt for member ${memberId}:`, debtError);
+      continue;
+    }
+
+    console.log(`✅ Debt created for member ${memberId}: KES ${principalDebt} principal + KES ${penaltyDebt} penalty`);
+
+    // Skip deficit record for self-inflicted scenario
+    if (isSelfInflicted) {
+      console.log(`ℹ️ Self-inflicted deficit detected — no deficit record created for member ${memberId}`);
+      continue;
+    }
+
+    // Net owed to recipient = principal × (1 - commission_rate)
+    const netOwedToRecipient = principalDebt * (1 - commissionRate);
+
+    const { error: deficitError } = await supabase
+      .from('chama_cycle_deficits')
+      .insert({
+        chama_id: chamaId,
+        cycle_id: cycleId,
+        recipient_member_id: beneficiaryMemberId,
+        non_payer_member_id: memberId,
+        debt_id: debt.id,
+        principal_amount: principalDebt,
+        commission_rate: commissionRate,
+        net_owed_to_recipient: netOwedToRecipient,
+        status: 'outstanding'
+      });
+
+    if (deficitError) {
+      console.error(`Error creating deficit for member ${memberId}:`, deficitError);
+    } else {
+      console.log(`✅ Deficit created: recipient ${beneficiaryMemberId} is owed KES ${netOwedToRecipient.toFixed(2)} from member ${memberId}`);
+    }
+
+    // Notify member of accrued debt
+    const memberPhone = payment.chama_members?.profiles?.phone;
+    if (memberPhone) {
+      const totalOwed = principalDebt + penaltyDebt;
+      await sendSMS(memberPhone,
+        `⚠️ You missed a payment. Debt accrued: KES ${principalDebt} (principal) + KES ${penaltyDebt} (10% penalty) = KES ${totalOwed.toFixed(2)} outstanding. Pay now to clear your balance.`
+      );
+    }
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -173,12 +264,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     console.log('[CRON] Daily payout started at:', new Date().toISOString());
 
-    const today = new Date().toISOString().split('T')[0];
-
-    // Get all active chamas (all frequencies)
     const { data: chamas, error: chamasError } = await supabase
       .from('chama')
-      .select('id, name, contribution_amount, commission_rate, contribution_frequency')
+      .select('id, name, contribution_amount, commission_rate, contribution_frequency, current_cycle_round, created_at')
       .eq('status', 'active');
 
     if (chamasError) {
@@ -194,7 +282,6 @@ Deno.serve(async (req) => {
     let errors = 0;
 
     for (const chama of chamas || []) {
-      // Get up to 5 oldest unprocessed cycles whose end_date has passed (multi-cycle catch-up)
       const now = new Date().toISOString();
       const { data: pendingCycles } = await supabase
         .from('contribution_cycles')
@@ -226,7 +313,6 @@ Deno.serve(async (req) => {
       for (const cycle of pendingCycles) {
         console.log(`  Processing cycle #${cycle.cycle_number} (${cycle.start_date} - ${cycle.end_date})`);
 
-        // ========== ELIGIBILITY CHECK ==========
         const scheduledBeneficiary = cycle.beneficiary;
         const eligibility = await checkMemberEligibility(
           supabase,
@@ -238,18 +324,13 @@ Deno.serve(async (req) => {
 
         let actualBeneficiary = scheduledBeneficiary;
         let wasSkipped = false;
-        let skippedMemberId = null;
-        let skipPayout = false; // Flag: skip payout creation but still track missed payments
+        let skipPayout = false;
 
-        // If scheduled beneficiary is NOT eligible, skip them and find next eligible
         if (!eligibility.isEligible) {
           console.log(`⚠️ Member ${scheduledBeneficiary.member_code} NOT ELIGIBLE for payout.`);
-          console.log(`   Required: ${eligibility.required}, Contributed: ${eligibility.contributed}, Shortfall: ${eligibility.shortfall}`);
 
           wasSkipped = true;
-          skippedMemberId = scheduledBeneficiary.id;
 
-          // Record the skip
           await recordPayoutSkip(
             supabase,
             chama.id,
@@ -262,16 +343,13 @@ Deno.serve(async (req) => {
             `Incomplete cycle payments: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}`
           );
 
-          // Send skip notification SMS
           const skipPhone = scheduledBeneficiary.profiles?.phone;
           if (skipPhone) {
-            const skipMessage = `⚠️ Your chama "${chama.name}" payout was SKIPPED today. Reason: ${eligibility.unpaidCycles} unpaid cycle(s). Outstanding: KES ${eligibility.shortfall}. Please clear your missed payments to be rescheduled.`;
-            await sendSMS(skipPhone, skipMessage);
+            await sendSMS(skipPhone, `⚠️ Your chama "${chama.name}" payout was SKIPPED today. Reason: ${eligibility.unpaidCycles} unpaid cycle(s). Outstanding: KES ${eligibility.shortfall}. Please clear your missed payments.`);
           }
 
           skipsProcessed++;
 
-          // Find next eligible member
           const nextEligible = await findNextEligibleMember(
             supabase,
             chama.id,
@@ -280,9 +358,6 @@ Deno.serve(async (req) => {
           );
 
           if (!nextEligible) {
-            console.log(`No eligible members found for payout in chama ${chama.name}. Marking cycle with no payout but still tracking missed payments.`);
-            
-            // Mark cycle as processed but with no payout
             await supabase
               .from('contribution_cycles')
               .update({
@@ -295,54 +370,44 @@ Deno.serve(async (req) => {
               .eq('id', cycle.id);
 
             skipPayout = true;
-            // DO NOT continue -- fall through to missed payment tracking below
           } else {
             actualBeneficiary = nextEligible.member;
-            console.log(`✅ Next eligible member: ${actualBeneficiary.member_code} (position ${actualBeneficiary.order_index})`);
           }
         }
 
-        // ========== PROCESS PAYOUT (only if not skipped) ==========
-        // Get payment status for the cycle
+        // ========== PAYMENT DATA ==========
         const { data: payments } = await supabase
           .from('member_cycle_payments')
-          .select('*, chama_members!member_id(*)')
+          .select('*, chama_members!member_id(*, profiles!chama_members_user_id_fkey(full_name, phone))')
           .eq('cycle_id', cycle.id);
 
         const totalMembers = payments?.length || 0;
-        // On-time paid members (fully paid, not late)
         const paidOnTimeMembers = payments?.filter((p: any) => p.fully_paid && !p.is_late_payment) || [];
-        // Late paid members (fully paid with 10% penalty already deducted at payment time)
         const paidLateMembers = payments?.filter((p: any) => p.fully_paid && p.is_late_payment) || [];
-        // All fully paid members
         const allFullyPaidMembers = payments?.filter((p: any) => p.fully_paid) || [];
         const paidCount = allFullyPaidMembers.length;
-        // Unpaid members — each obligation is STRICTLY INDEPENDENT (no cross-subsidization)
+        // STRICT OVERPAYMENT RULE: each member's obligation is independent
         const unpaidMembers = payments?.filter((p: any) => !p.fully_paid) || [];
 
         if (!skipPayout) {
-          // STRICT OVERPAYMENT RULE: only sum payments from members who fully paid their own obligation
-          // An overpaying member's extra NEVER covers another member's unpaid obligation
+          // STRICT: only sum from members who fully paid their own obligation
           const collectedFromOnTime = paidOnTimeMembers.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
           const collectedFromLate = paidLateMembers.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
           const collectedAmount = collectedFromOnTime + collectedFromLate;
-          // Late penalties were already deducted at payment time (10% from gross)
-          // so amount_paid for late members already reflects the net after penalty
+
+          // Late penalties already deducted at payment time; on-time 5% deducted at payout
+          const onTimeCommission = collectedFromOnTime * 0.05;
           const latePenaltiesCollected = paidLateMembers.reduce((sum: number, p: any) => {
-            // Commission was already deducted: net = gross * 0.90, so penalty = net * 0.10/0.90
             return sum + ((p.amount_paid || 0) * (0.10 / 0.90));
           }, 0);
-          // On-time commission (5%) still needs to be deducted from collected on-time amounts
-          const onTimeCommission = collectedFromOnTime * 0.05;
-          const totalCommission = onTimeCommission; // Late commission already taken at payment
+          const totalCommission = onTimeCommission;
           const payoutAmount = collectedAmount - onTimeCommission;
 
           const isFullPayout = paidCount === totalMembers;
           const payoutType = wasSkipped ? 'partial' : (isFullPayout ? 'full' : 'partial');
 
-          console.log(`Processing ${payoutType} payout for ${chama.name}: ${paidCount}/${totalMembers} paid, amount: ${payoutAmount}`);
+          console.log(`Processing ${payoutType} payout for ${chama.name}: ${paidCount}/${totalMembers} paid, net: KES ${payoutAmount}`);
 
-          // Get beneficiary payment method
           const { data: paymentMethod } = await supabase
             .from('payment_methods')
             .select('*')
@@ -353,19 +418,13 @@ Deno.serve(async (req) => {
           if (!paymentMethod && payoutAmount > 0) {
             console.error(`No payment method for beneficiary ${actualBeneficiary.member_code}`);
             errors++;
-            // Still track missed payments even if payout fails
           } else {
-            // Create withdrawal request
             if (payoutAmount > 0) {
               const canAutoApprove = paymentMethod?.method_type === 'mpesa' && 
                                      !actualBeneficiary.requires_admin_verification &&
                                      (actualBeneficiary.missed_payments_count || 0) === 0;
               
               const withdrawalStatus = canAutoApprove ? 'approved' : 'pending';
-              
-              const withdrawalNotes = wasSkipped 
-                ? `Redirected payout - Original recipient (${scheduledBeneficiary.member_code}) skipped due to incomplete contributions. ${payoutType} (${paidCount}/${totalMembers} members paid)`
-                : `Daily payout - ${payoutType} (${paidCount}/${totalMembers} members paid)`;
 
               const { data: newWithdrawal, error: withdrawalError } = await supabase
                 .from('withdrawals')
@@ -378,7 +437,7 @@ Deno.serve(async (req) => {
                   status: withdrawalStatus,
                   payment_method_id: paymentMethod?.id,
                   payment_method_type: paymentMethod?.method_type,
-                  notes: `${withdrawalNotes} | Late penalties: KES ${latePenaltiesCollected.toFixed(2)}`,
+                  notes: `${wasSkipped ? `Redirected payout (${scheduledBeneficiary.member_code} skipped). ` : ''}${payoutType} (${paidCount}/${totalMembers} paid) | Late penalties collected: KES ${latePenaltiesCollected.toFixed(2)}`,
                   requested_at: new Date().toISOString(),
                   b2c_attempt_count: 0,
                   ...(withdrawalStatus === 'approved' ? { reviewed_at: new Date().toISOString() } : {})
@@ -390,18 +449,14 @@ Deno.serve(async (req) => {
                 console.error('Error creating withdrawal:', withdrawalError);
                 errors++;
               } else {
-                // Record commission earning (on-time commission only; late penalties already recorded at payment time)
                 await supabase.rpc('record_company_earning', {
                   p_source: 'chama_commission',
                   p_amount: totalCommission,
                   p_group_id: chama.id,
-                  p_description: `Daily payout commission - ${chama.name}. On-time: KES ${onTimeCommission.toFixed(2)}, Late penalties already deducted: KES ${latePenaltiesCollected.toFixed(2)}`
+                  p_description: `Payout commission - ${chama.name} cycle #${cycle.cycle_number}. On-time: KES ${onTimeCommission.toFixed(2)}`
                 });
 
-                // ========== TRIGGER AUTOMATIC B2C PAYOUT ==========
                 if (canAutoApprove && newWithdrawal && paymentMethod?.phone_number) {
-                  console.log(`🚀 Triggering automatic B2C payout for ${actualBeneficiary.member_code}`);
-                  
                   const beneficiaryPhone = actualBeneficiary.profiles?.phone || paymentMethod.phone_number;
                   if (beneficiaryPhone) {
                     await sendSMS(beneficiaryPhone, 
@@ -424,11 +479,7 @@ Deno.serve(async (req) => {
                     });
 
                     const b2cResult = await b2cResponse.json();
-                    
-                    if (b2cResponse.ok && b2cResult.success) {
-                      console.log(`✅ B2C initiated: ${b2cResult.conversation_id}`);
-                    } else {
-                      console.error(`⚠️ B2C failed, will be retried:`, b2cResult);
+                    if (!b2cResponse.ok || !b2cResult.success) {
                       await supabase
                         .from('withdrawals')
                         .update({
@@ -438,6 +489,8 @@ Deno.serve(async (req) => {
                           b2c_error_details: { error: b2cResult.error || 'B2C initiation failed' }
                         })
                         .eq('id', newWithdrawal.id);
+                    } else {
+                      console.log(`✅ B2C initiated: ${b2cResult.conversation_id}`);
                     }
                   } catch (b2cError: any) {
                     console.error(`⚠️ B2C request error:`, b2cError);
@@ -455,7 +508,6 @@ Deno.serve(async (req) => {
               }
             }
 
-            // Update cycle — track total expected, collected, and penalties separately
             const totalExpected = totalMembers * chama.contribution_amount;
             await supabase
               .from('contribution_cycles')
@@ -471,26 +523,38 @@ Deno.serve(async (req) => {
               })
               .eq('id', cycle.id);
 
-            // Send payout notification to actual beneficiary
             const beneficiaryPhone = actualBeneficiary.profiles?.phone;
             if (beneficiaryPhone) {
               const isFullPayout2 = paidCount === totalMembers;
               const message = wasSkipped
-                ? `🎉 Great news! You're receiving the chama "${chama.name}" payout of KES ${payoutAmount.toFixed(2)} today! The original recipient was skipped due to incomplete contributions. ${actualBeneficiary.requires_admin_verification ? 'Pending admin approval.' : "You'll receive it shortly."}`
+                ? `🎉 You're receiving the chama "${chama.name}" payout of KES ${payoutAmount.toFixed(2)} today! (Redirected payout)`
                 : isFullPayout2
-                  ? `Your chama "${chama.name}" payout of KES ${payoutAmount.toFixed(2)} has been processed. Full payout - all members contributed! ${actualBeneficiary.requires_admin_verification ? 'Pending admin approval.' : "You'll receive it shortly."}`
-                  : `Your chama "${chama.name}" payout of KES ${payoutAmount.toFixed(2)} has been processed. Partial payout (${paidCount}/${totalMembers} members paid). ${actualBeneficiary.requires_admin_verification ? 'Pending admin approval.' : "You'll receive it shortly."}`;
+                  ? `🎉 Your chama "${chama.name}" payout of KES ${payoutAmount.toFixed(2)} has been processed. Full payout — all members contributed!`
+                  : `Your chama "${chama.name}" payout of KES ${payoutAmount.toFixed(2)} has been processed. Partial payout (${paidCount}/${totalMembers} members paid). ${totalMembers - paidCount} member(s) still owe you.`;
               
               await sendSMS(beneficiaryPhone, message);
             }
           }
         }
 
-        // ========== ALWAYS TRACK MISSED PAYMENTS (runs regardless of payout outcome) ==========
+        // ========== PHASE I: ACCRUE DEBTS FOR NON-PAYERS ==========
+        // This runs REGARDLESS of payout outcome
+        const commissionRate = chama.commission_rate || 0.05;
+        await accrueDebtsForCycle(
+          supabase,
+          chama.id,
+          cycle.id,
+          cycle.cycle_number,
+          scheduledBeneficiary.id,  // original beneficiary, not redirected
+          unpaidMembers,
+          chama.contribution_amount,
+          commissionRate
+        );
+
+        // ========== TRACK MISSED PAYMENTS + AUTO-REMOVE ==========
         for (const unpaid of unpaidMembers) {
           const member = unpaid.chama_members;
           const newMissedCount = (member.missed_payments_count || 0) + 1;
-
           const totalOutstanding = newMissedCount * chama.contribution_amount;
 
           await supabase
@@ -502,81 +566,55 @@ Deno.serve(async (req) => {
             })
             .eq('id', member.id);
 
-          const memberPhone = member.profiles?.phone;
-
-          if (memberPhone && newMissedCount >= 1) {
-            const warningMessage = newMissedCount === 1
-              ? `⚠️ You missed a payment for "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. Please pay to stay in the group.`
-              : newMissedCount === 2
-              ? `🚨 WARNING: You have missed ${newMissedCount} consecutive payments for "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. You will be REMOVED if you miss one more payment!`
-              : '';
-            if (warningMessage) {
-              await sendSMS(memberPhone, warningMessage);
-            }
-          }
-
-          // AUTO-REMOVE after 3 consecutive missed payments
           if (newMissedCount >= 3) {
-            console.log(`🚫 AUTO-REMOVING member ${member.member_code} from chama ${chama.name} - 3 consecutive missed payments`);
+            console.log(`🚫 AUTO-REMOVING member ${member.member_code} - 3 consecutive missed payments`);
 
-            await supabase
-              .from('chama_member_removals')
-              .insert({
-                chama_id: chama.id,
-                member_id: member.id,
-                user_id: member.user_id,
-                removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}`,
-                chama_name: chama.name,
-                member_name: member.profiles?.full_name,
-                member_phone: memberPhone,
-                was_manager: member.is_manager || false,
-                removed_at: new Date().toISOString()
-              });
+            await supabase.from('chama_member_removals').insert({
+              chama_id: chama.id,
+              member_id: member.id,
+              user_id: member.user_id,
+              removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}`,
+              chama_name: chama.name,
+              member_name: member.profiles?.full_name,
+              member_phone: member.profiles?.phone,
+              was_manager: member.is_manager || false,
+              removed_at: new Date().toISOString()
+            });
 
-            await supabase
-              .from('chama_members')
-              .update({
-                status: 'removed',
-                removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}`,
-                removed_at: new Date().toISOString()
-              })
-              .eq('id', member.id);
+            await supabase.from('chama_members').update({
+              status: 'removed',
+              removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}`,
+              removed_at: new Date().toISOString()
+            }).eq('id', member.id);
 
+            const memberPhone = member.profiles?.phone;
             if (memberPhone) {
               await sendSMS(memberPhone,
-                `❌ You have been removed from "${chama.name}" after ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}. Contact customer care for assistance.`
-              );
-            }
-
-            const { data: manager } = await supabase
-              .from('chama_members')
-              .select('profiles!chama_members_user_id_fkey(phone)')
-              .eq('chama_id', chama.id)
-              .eq('is_manager', true)
-              .eq('status', 'active')
-              .maybeSingle();
-
-            if (manager?.profiles?.phone) {
-              await sendSMS(manager.profiles.phone,
-                `🚫 Member ${member.profiles?.full_name} (${member.member_code}) has been AUTO-REMOVED from "${chama.name}" after 3 consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}.`
+                `❌ You have been removed from "${chama.name}" after ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}.`
               );
             }
 
             if (member.user_id) {
-              await supabase
-                .from('notifications')
-                .insert({
-                  user_id: member.user_id,
-                  title: 'Removed from Chama',
-                  message: `You were removed from "${chama.name}" due to ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}.`,
-                  type: 'warning',
-                  category: 'chama',
-                  related_entity_id: chama.id,
-                  related_entity_type: 'chama'
-                });
+              await supabase.from('notifications').insert({
+                user_id: member.user_id,
+                title: 'Removed from Chama',
+                message: `You were removed from "${chama.name}" due to ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}.`,
+                type: 'warning',
+                category: 'chama',
+                related_entity_id: chama.id,
+                related_entity_type: 'chama'
+              });
             }
 
             continue;
+          }
+
+          const memberPhone = member.profiles?.phone;
+          if (memberPhone && newMissedCount >= 1) {
+            const warningMessage = newMissedCount === 1
+              ? `⚠️ You missed a payment for "${chama.name}". Total outstanding: KES ${totalOutstanding.toLocaleString()}. Pay immediately to avoid penalties.`
+              : `🚨 WARNING: ${newMissedCount} consecutive missed payments for "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. You will be REMOVED after 1 more!`;
+            await sendSMS(memberPhone, warningMessage);
           }
 
           if (newMissedCount === 2) {
@@ -589,14 +627,14 @@ Deno.serve(async (req) => {
               .maybeSingle();
 
             if (manager?.profiles?.phone) {
-              const alertMessage = `⚠️ URGENT: Member ${member.profiles?.full_name} (${member.member_code}) has missed ${newMissedCount} consecutive payments in "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. They will be auto-removed after 1 more missed payment.`;
-              await sendSMS(manager.profiles.phone, alertMessage);
+              await sendSMS(manager.profiles.phone,
+                `⚠️ URGENT: Member ${member.profiles?.full_name} (${member.member_code}) has missed ${newMissedCount} payments in "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. Auto-removal after 1 more miss.`
+              );
             }
           }
         }
 
-        // ========== AUTO-CREATE NEXT CYCLE (only for the last processed cycle) ==========
-        // Check if full cycle is complete
+        // ========== AUTO-CREATE NEXT CYCLE ==========
         const { data: allCycles } = await supabase
           .from('contribution_cycles')
           .select('id')
@@ -613,47 +651,28 @@ Deno.serve(async (req) => {
         if (allCycles && allMembers && allCycles.length >= allMembers.length) {
           console.log(`🎉 Full cycle complete for chama ${chama.name}`);
 
-          const { error: historyError } = await supabase
-            .from('chama_cycle_history')
-            .insert({
-              chama_id: chama.id,
-              cycle_round: chama.current_cycle_round || 1,
-              started_at: chama.created_at,
-              completed_at: new Date().toISOString(),
-              total_members: allMembers.length,
-              total_payouts_made: allCycles.length
-            });
+          await supabase.from('chama_cycle_history').insert({
+            chama_id: chama.id,
+            cycle_round: chama.current_cycle_round || 1,
+            started_at: chama.created_at,
+            completed_at: new Date().toISOString(),
+            total_members: allMembers.length,
+            total_payouts_made: allCycles.length
+          });
 
-          if (historyError) {
-            console.error('Error recording cycle history:', historyError);
+          await supabase.from('chama').update({
+            last_cycle_completed_at: new Date().toISOString(),
+            accepting_rejoin_requests: true,
+            status: 'cycle_complete'
+          }).eq('id', chama.id);
+
+          try {
+            await supabase.functions.invoke('chama-cycle-complete', { body: { chamaId: chama.id } });
+          } catch (invokeError) {
+            console.error('Error invoking cycle-complete:', invokeError);
           }
-
-          const { error: statusError } = await supabase
-            .from('chama')
-            .update({
-              last_cycle_completed_at: new Date().toISOString(),
-              accepting_rejoin_requests: true,
-              status: 'cycle_complete'
-            })
-            .eq('id', chama.id);
-
-          if (statusError) {
-            console.error('Error updating chama status:', statusError);
-          } else {
-            try {
-              await supabase.functions.invoke('chama-cycle-complete', {
-                body: { chamaId: chama.id }
-              });
-              console.log('Triggered cycle completion notifications');
-            } catch (invokeError) {
-              console.error('Error invoking cycle-complete function:', invokeError);
-            }
-          }
-          break; // Stop processing more cycles for this chama since it's complete
+          break;
         } else {
-          // Auto-create next cycle
-          console.log(`📅 Auto-creating next cycle for chama ${chama.name}`);
-          
           try {
             const createCycleResponse = await fetch(`${supabaseUrl}/functions/v1/cycle-auto-create`, {
               method: 'POST',
@@ -661,16 +680,12 @@ Deno.serve(async (req) => {
                 'Authorization': `Bearer ${supabaseServiceKey}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({
-                chamaId: chama.id,
-                lastCycleId: cycle.id
-              })
+              body: JSON.stringify({ chamaId: chama.id, lastCycleId: cycle.id })
             });
 
             const createCycleResult = await createCycleResponse.json();
-            
             if (createCycleResponse.ok && createCycleResult.success) {
-              console.log(`✅ Next cycle created for ${chama.name}. Beneficiary: ${createCycleResult.beneficiary?.name}`);
+              console.log(`✅ Next cycle created for ${chama.name}`);
             } else {
               console.error(`⚠️ Failed to create next cycle:`, createCycleResult);
             }
@@ -680,8 +695,9 @@ Deno.serve(async (req) => {
         }
 
         payoutsProcessed++;
-      } // end of pendingCycles loop
+      }
     }
+
     console.log(`[CRON] Daily payout completed. Processed: ${payoutsProcessed}, Skipped: ${skipsProcessed}, Errors: ${errors}`);
 
     return new Response(JSON.stringify({
