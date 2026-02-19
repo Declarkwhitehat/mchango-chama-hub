@@ -156,6 +156,87 @@ export type Database = {
           },
         ]
       }
+      chama_cycle_deficits: {
+        Row: {
+          chama_id: string
+          commission_rate: number
+          created_at: string | null
+          cycle_id: string
+          debt_id: string
+          id: string
+          net_owed_to_recipient: number
+          non_payer_member_id: string
+          paid_at: string | null
+          principal_amount: number
+          recipient_member_id: string
+          status: string
+        }
+        Insert: {
+          chama_id: string
+          commission_rate?: number
+          created_at?: string | null
+          cycle_id: string
+          debt_id: string
+          id?: string
+          net_owed_to_recipient: number
+          non_payer_member_id: string
+          paid_at?: string | null
+          principal_amount: number
+          recipient_member_id: string
+          status?: string
+        }
+        Update: {
+          chama_id?: string
+          commission_rate?: number
+          created_at?: string | null
+          cycle_id?: string
+          debt_id?: string
+          id?: string
+          net_owed_to_recipient?: number
+          non_payer_member_id?: string
+          paid_at?: string | null
+          principal_amount?: number
+          recipient_member_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_cycle_deficits_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_cycle_deficits_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "contribution_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_cycle_deficits_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "chama_member_debts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_cycle_deficits_non_payer_member_id_fkey"
+            columns: ["non_payer_member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_cycle_deficits_recipient_member_id_fkey"
+            columns: ["recipient_member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chama_cycle_history: {
         Row: {
           chama_id: string
@@ -251,6 +332,73 @@ export type Database = {
             columns: ["used_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chama_member_debts: {
+        Row: {
+          chama_id: string
+          cleared_at: string | null
+          created_at: string | null
+          cycle_id: string
+          id: string
+          member_id: string
+          payment_allocations: Json | null
+          penalty_debt: number
+          penalty_remaining: number
+          principal_debt: number
+          principal_remaining: number
+          status: string
+        }
+        Insert: {
+          chama_id: string
+          cleared_at?: string | null
+          created_at?: string | null
+          cycle_id: string
+          id?: string
+          member_id: string
+          payment_allocations?: Json | null
+          penalty_debt: number
+          penalty_remaining: number
+          principal_debt: number
+          principal_remaining: number
+          status?: string
+        }
+        Update: {
+          chama_id?: string
+          cleared_at?: string | null
+          created_at?: string | null
+          cycle_id?: string
+          id?: string
+          member_id?: string
+          payment_allocations?: Json | null
+          penalty_debt?: number
+          penalty_remaining?: number
+          principal_debt?: number
+          principal_remaining?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_member_debts_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_member_debts_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "contribution_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_member_debts_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
             referencedColumns: ["id"]
           },
         ]
@@ -622,6 +770,7 @@ export type Database = {
           contribution_date: string
           created_at: string
           id: string
+          idempotency_key: string | null
           member_id: string
           mpesa_receipt_number: string | null
           paid_by_member_id: string | null
@@ -635,6 +784,7 @@ export type Database = {
           contribution_date?: string
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           member_id: string
           mpesa_receipt_number?: string | null
           paid_by_member_id?: string | null
@@ -648,6 +798,7 @@ export type Database = {
           contribution_date?: string
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           member_id?: string
           mpesa_receipt_number?: string | null
           paid_by_member_id?: string | null
