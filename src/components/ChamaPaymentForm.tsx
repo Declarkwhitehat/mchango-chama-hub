@@ -9,9 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, CreditCard, Users, TrendingDown, Wallet, Phone } from "lucide-react";
+import { Loader2, CreditCard, Users, Phone } from "lucide-react";
 import { CHAMA_DEFAULT_COMMISSION_RATE, CHAMA_LATE_COMMISSION_RATE, calculateAmountToPay } from "@/utils/commissionCalculator";
 import { AmountToPayCard } from "@/components/chama/AmountToPayCard";
+import { PaymentAllocationPreview } from "@/components/chama/PaymentAllocationPreview";
 
 interface ChamaPaymentFormProps {
   chamaId: string;
@@ -154,6 +155,9 @@ export const ChamaPaymentForm = ({
       const targetMember = members.find(m => m.id === targetMemberId);
       const payerMember = members.find(m => m.id === currentMemberId);
       
+      // Generate idempotency key
+      const idempotencyKey = `${chamaId}-${targetMemberId}-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`;
+
       // Trigger M-Pesa STK Push
       const { data: stkResponse, error: stkError } = await supabase.functions.invoke('mpesa-stk-push', {
         body: {
@@ -162,6 +166,7 @@ export const ChamaPaymentForm = ({
           account_reference: targetMember?.member_code || `CHAMA-${chamaId.substring(0, 8)}`,
           transaction_desc: `Chama contribution`,
           chama_id: chamaId,
+          idempotency_key: idempotencyKey,
           callback_metadata: {
             type: 'chama_contribution',
             chama_id: chamaId,
@@ -170,6 +175,7 @@ export const ChamaPaymentForm = ({
             payer_user_id: session.user.id,
             beneficiary_user_id: targetMember?.user_id || session.user.id,
             notes: notes || null,
+            idempotency_key: idempotencyKey,
           }
         }
       });
@@ -364,35 +370,11 @@ export const ChamaPaymentForm = ({
           </div>
 
           {parseFloat(amount || "0") > 0 && (
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="pt-4 space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Your Payment</span>
-                  <span className="font-semibold">KES {parseFloat(amount).toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
-                    <TrendingDown className="h-3 w-3" />
-                    Commission (5-10%)
-                  </span>
-                  <span className="font-medium text-orange-600 dark:text-orange-400">
-                    Deducted at payment
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t border-primary/20">
-                  <span className="flex items-center gap-1 font-medium text-primary">
-                    <Wallet className="h-4 w-4" />
-                    Net to Chama Pool
-                  </span>
-                  <span className="font-bold text-lg text-primary">
-                    Allocated per cycle
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground italic">
-                  * 5% on-time, 10% late. Commission deducted immediately — only net goes to pool.
-                </p>
-              </CardContent>
-            </Card>
+            <PaymentAllocationPreview
+              chamaId={chamaId}
+              memberId={targetMemberId}
+              grossAmount={parseFloat(amount)}
+            />
           )}
 
           <div className="space-y-2">
