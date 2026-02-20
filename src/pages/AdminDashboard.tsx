@@ -38,6 +38,9 @@ const AdminDashboard = () => {
     pendingCallbacks: 0,
     recentTransactions: 0,
     totalPlatformRevenue: 0,
+    chamasToday: 0,
+    campaignsToday: 0,
+    organizationsToday: 0,
   });
 
   useEffect(() => {
@@ -47,6 +50,7 @@ const AdminDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
 
       // Fetch all data in parallel
       const [
@@ -60,7 +64,10 @@ const AdminDashboard = () => {
         withdrawalsResult,
         callbacksResult,
         transactionsResult,
-        ledgerResult
+        ledgerResult,
+        chamasTodayResult,
+        campaignsTodayResult,
+        organizationsTodayResult
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
@@ -72,8 +79,10 @@ const AdminDashboard = () => {
         supabase.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('customer_callbacks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('transactions').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
-        // Fetch accurate platform revenue from financial_ledger
         supabase.from('financial_ledger').select('commission_amount'),
+        supabase.from('chama').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
+        supabase.from('mchango').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
+        supabase.from('organizations').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
       ]);
 
       const totalRevenue = revenueResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
@@ -91,6 +100,9 @@ const AdminDashboard = () => {
         pendingCallbacks: callbacksResult.count || 0,
         recentTransactions: transactionsResult.count || 0,
         totalPlatformRevenue,
+        chamasToday: chamasTodayResult.count || 0,
+        campaignsToday: campaignsTodayResult.count || 0,
+        organizationsToday: organizationsTodayResult.count || 0,
       });
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -185,6 +197,11 @@ const AdminDashboard = () => {
               <p className="text-sm text-muted-foreground mt-2">
                 {stats.activeChamas} Chamas, {stats.activeOrganizations} Orgs
               </p>
+              {(stats.chamasToday + stats.organizationsToday) > 0 && (
+                <p className="text-xs font-medium text-green-600 dark:text-green-400 mt-1">
+                  +{stats.chamasToday + stats.organizationsToday} today
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -297,6 +314,11 @@ const AdminDashboard = () => {
             <CardContent>
               <div className="text-4xl font-bold mb-2">{stats.activeCampaigns}</div>
               <p className="text-sm text-muted-foreground">Active campaigns</p>
+              {stats.campaignsToday > 0 && (
+                <p className="text-xs font-medium text-green-600 dark:text-green-400 mt-1">
+                  +{stats.campaignsToday} today
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -319,6 +341,11 @@ const AdminDashboard = () => {
             <CardContent>
               <div className="text-4xl font-bold mb-2">{stats.activeOrganizations}</div>
               <p className="text-sm text-muted-foreground">Active organizations</p>
+              {stats.organizationsToday > 0 && (
+                <p className="text-xs font-medium text-green-600 dark:text-green-400 mt-1">
+                  +{stats.organizationsToday} today
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
