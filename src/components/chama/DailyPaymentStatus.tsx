@@ -68,6 +68,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
   const [missedCyclesCount, setMissedCyclesCount] = useState(0);
   const [totalOutstanding, setTotalOutstanding] = useState(0);
   const [cutoffPassed, setCutoffPassed] = useState(false);
+  const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
   const loadPaymentStatus = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -113,6 +114,16 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
         if (session?.user?.id) {
           const userPayment = paymentData.find((p: any) => p.user_id === session.user.id);
           setCurrentUserPaid(userPayment?.is_paid || false);
+
+          // Fetch current user's chama member ID
+          const { data: memberData } = await supabase
+            .from('chama_members')
+            .select('id')
+            .eq('chama_id', chamaId)
+            .eq('user_id', session.user.id)
+            .eq('approval_status', 'approved')
+            .maybeSingle();
+          if (memberData) setCurrentMemberId(memberData.id);
         }
       }
 
@@ -211,8 +222,9 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
       )}
 
       {/* Amount to Pay Card - Always visible before payment */}
-      {!currentUserPaid && (
+      {!currentUserPaid && currentMemberId && (
         <AmountToPayCard
+          memberId={currentMemberId}
           contributionAmount={cycleInfo.due_amount}
           missedCycles={missedCyclesCount}
           currentCycleDue={!cutoffPassed}
