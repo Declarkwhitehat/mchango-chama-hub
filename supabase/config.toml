@@ -28,7 +28,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.contributions-crud]
-verify_jwt = true
+verify_jwt = false
 
 [functions.transactions-crud]
 verify_jwt = true
