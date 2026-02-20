@@ -591,8 +591,10 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     if (authError || !user) {
+      console.error('Auth error:', authError?.message);
       return new Response(JSON.stringify({ error: 'Invalid or expired token', code: 'AUTH_INVALID' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
