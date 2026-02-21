@@ -1,42 +1,32 @@
 
 
-# Admin Dashboard: Daily Growth Indicators
+# Fix PWA Install Flow & Update Branding to "Pamoja"
 
-## Overview
-Enhance the admin dashboard and Platform Statistics component to show **total counts** alongside **today's increase** for Chamas, Campaigns, and Organizations. Each stat card will display a green "+N today" indicator showing how many were created in the last 24 hours.
+## Problem
+1. The "Install App" button on the homepage dispatches a fake `beforeinstallprompt` event, which the browser ignores -- only the browser can fire that event. It should dispatch `triggerPWAInstall` to trigger the saved prompt.
+2. The homepage still says "Install Our Progressive Web App" instead of "Install Pamoja App".
+3. When the browser's install prompt isn't available (e.g., already installed, unsupported browser, or viewing in an iframe), clicking "Install" does nothing with no feedback to the user.
 
 ## Changes
 
-### 1. Update `PlatformStatistics.tsx`
-- Add 3 new parallel queries to count entities created today (using `.gte('created_at', todayStart)` for `chama`, `mchango`, and `organizations` tables)
-- Add `organizations` total and active counts (currently missing from this component)
-- Display "+N today" badge in green below each stat card's total number
+### 1. Fix Index.tsx - Homepage Install Section
+- Change heading from "Install Our Progressive Web App" to "Install Pamoja App"
+- Fix the button's `onClick` to dispatch `triggerPWAInstall` custom event instead of faking `beforeinstallprompt`
+- Add a fallback: if the native prompt isn't available, show the user manual install instructions (e.g., "Use your browser menu > Add to Home Screen")
 
-### 2. Update `AdminDashboard.tsx` (`fetchDashboardData`)
-- Add 3 new parallel queries for today's new counts:
-  - `chama` created today
-  - `mchango` created today  
-  - `organizations` created today
-- Add these to the stats state: `chamasToday`, `campaignsToday`, `organizationsToday`
-- Update the **Key Metrics Grid** "Active Groups" card to show "+N today"
-- Update the **Campaigns Overview** and **Organizations Overview** cards at the bottom to show "+N today"
+### 2. Improve PWAInstallPrompt.tsx - Better Install Handling
+- When "Install" is clicked but `deferredPrompt` is null, show a toast with manual install instructions instead of silently doing nothing
+- This covers Safari (iOS), Firefox, and other browsers that don't support `beforeinstallprompt`
+- The toast will say something like: "To install, tap the share/menu button in your browser and select 'Add to Home Screen'"
 
-### Technical Details
+## Technical Details
 
-**New queries (added to the existing `Promise.all`):**
-```typescript
-supabase.from('chama').select('*', { count: 'exact', head: true })
-  .gte('created_at', new Date(new Date().setHours(0,0,0,0)).toISOString()),
-supabase.from('mchango').select('*', { count: 'exact', head: true })
-  .gte('created_at', new Date(new Date().setHours(0,0,0,0)).toISOString()),
-supabase.from('organizations').select('*', { count: 'exact', head: true })
-  .gte('created_at', new Date(new Date().setHours(0,0,0,0)).toISOString()),
-```
+**Index.tsx** (line 267 and 277-280):
+- Update heading text to "Install Pamoja App"
+- Change onClick from `new Event('beforeinstallprompt')` to `new Event('triggerPWAInstall')`
+- Add fallback behavior using a toast notification for unsupported browsers
 
-**Display format example:**
-- Total: **12** (bold, large)
-- Subtitle: "8 active"
-- Growth badge: "+3 today" (green text, or muted if 0)
-
-No database changes are needed -- this uses existing `created_at` columns on all three tables.
+**PWAInstallPrompt.tsx** (line 69-70):
+- In `handleInstall`, when `deferredPrompt` is null, show a toast with manual installation instructions instead of silently returning
+- Import and use `toast` from sonner
 
