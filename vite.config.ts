@@ -12,8 +12,8 @@ export default defineConfig(({ mode }) => ({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
-        name: 'Chama & Mchango - Build Wealth Together',
-        short_name: 'Chama',
+        name: 'Pamoja - Build Wealth Together',
+        short_name: 'Pamoja',
         description: 'Join thousands building wealth through community savings groups and crowdfunding campaigns',
         theme_color: '#0a0a0a',
         background_color: '#0a0a0a',
