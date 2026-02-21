@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, Download } from "lucide-react";
@@ -10,12 +10,11 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function PWAInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    // Check if already installed as PWA
     const checkIfInstalled = () => {
       const isStandalone = window.matchMedia("(display-mode: standalone)").matches ||
         (window.navigator as any).standalone === true;
@@ -23,7 +22,6 @@ export default function PWAInstallPrompt() {
       return isStandalone;
     };
 
-    // If already installed, don't show anything
     if (checkIfInstalled()) {
       setShowPrompt(false);
       return;
@@ -31,29 +29,33 @@ export default function PWAInstallPrompt() {
 
     const handler = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      deferredPromptRef.current = e as BeforeInstallPromptEvent;
       
-      // Check if user has dismissed the prompt before
       const dismissed = localStorage.getItem("pwa-install-dismissed");
       if (!dismissed && !checkIfInstalled()) {
         setShowPrompt(true);
       }
     };
 
-    // Handle manual install trigger
-    const manualInstallHandler = () => {
+    const manualInstallHandler = async () => {
       if (checkIfInstalled()) return;
-      if (deferredPrompt) {
-        setShowPrompt(true);
+      const prompt = deferredPromptRef.current;
+      if (prompt) {
+        prompt.prompt();
+        const { outcome } = await prompt.userChoice;
+        if (outcome === "accepted") {
+          deferredPromptRef.current = null;
+          setShowPrompt(false);
+          toast.success("Pamoja App installed successfully!");
+        }
       } else {
-        toast.info("To install, tap your browser's menu (⋮ or share icon) and select 'Add to Home Screen'.");
+        toast.info("To install Pamoja, tap your browser's menu (⋮ or share icon) and select 'Add to Home Screen'.", { duration: 6000 });
       }
     };
 
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("triggerPWAInstall", manualInstallHandler);
 
-    // Listen for display mode changes (user installs the app)
     const mediaQuery = window.matchMedia("(display-mode: standalone)");
     const handleDisplayModeChange = () => {
       if (mediaQuery.matches) {
@@ -68,20 +70,21 @@ export default function PWAInstallPrompt() {
       window.removeEventListener("triggerPWAInstall", manualInstallHandler);
       mediaQuery.removeEventListener("change", handleDisplayModeChange);
     };
-  }, [deferredPrompt]);
+  }, []);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) {
-      toast.info("To install, tap your browser's menu (⋮ or share icon) and select 'Add to Home Screen'.");
+    const prompt = deferredPromptRef.current;
+    if (!prompt) {
+      toast.info("To install Pamoja, tap your browser's menu (⋮ or share icon) and select 'Add to Home Screen'.", { duration: 6000 });
       return;
     }
 
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-
+    prompt.prompt();
+    const { outcome } = await prompt.userChoice;
     if (outcome === "accepted") {
-      setDeferredPrompt(null);
+      deferredPromptRef.current = null;
       setShowPrompt(false);
+      toast.success("Pamoja App installed successfully!");
     }
   };
 
@@ -90,19 +93,6 @@ export default function PWAInstallPrompt() {
     localStorage.setItem("pwa-install-dismissed", "true");
   };
 
-  const handleResetAndShow = () => {
-    localStorage.removeItem("pwa-install-dismissed");
-    if (deferredPrompt) {
-      setShowPrompt(true);
-    }
-  };
-
-  // Expose reset function globally for debugging
-  useEffect(() => {
-    (window as any).resetPWAPrompt = handleResetAndShow;
-  }, [deferredPrompt]);
-
-  // Don't show if already installed or prompt is hidden
   if (isInstalled || !showPrompt) return null;
 
   return (
