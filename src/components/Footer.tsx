@@ -36,7 +36,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a href="mailto:support@platform.com" className="text-muted-foreground hover:text-foreground transition-colors">
+                <a href="mailto:support@pamojafunds.com" className="text-muted-foreground hover:text-foreground transition-colors">
                   Contact Support
                 </a>
               </li>
@@ -47,7 +47,7 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold text-lg mb-2">Contact</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>Email: support@platform.com</li>
+              <li>Email: support@pamojafunds.com</li>
               <li>Phone: +254 XXX XXX XXX</li>
               <li>Nairobi, Kenya</li>
             </ul>
