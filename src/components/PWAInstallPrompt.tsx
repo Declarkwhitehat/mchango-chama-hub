@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, Download } from "lucide-react";
+import { toast } from "sonner";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -41,8 +42,11 @@ export default function PWAInstallPrompt() {
 
     // Handle manual install trigger
     const manualInstallHandler = () => {
-      if (deferredPrompt && !checkIfInstalled()) {
+      if (checkIfInstalled()) return;
+      if (deferredPrompt) {
         setShowPrompt(true);
+      } else {
+        toast.info("To install, tap your browser's menu (⋮ or share icon) and select 'Add to Home Screen'.");
       }
     };
 
@@ -67,7 +71,10 @@ export default function PWAInstallPrompt() {
   }, [deferredPrompt]);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      toast.info("To install, tap your browser's menu (⋮ or share icon) and select 'Add to Home Screen'.");
+      return;
+    }
 
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;

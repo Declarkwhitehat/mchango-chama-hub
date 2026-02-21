@@ -264,7 +264,7 @@ const Index = () => {
               </div>
               <div className="flex-1 text-center sm:text-left">
                 <h3 className="text-lg sm:text-xl font-bold text-foreground mb-1">
-                  Install Our Progressive Web App
+                  Install Pamoja App
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Get offline access, faster loading, and instant notifications
@@ -275,8 +275,7 @@ const Index = () => {
                 size="lg"
                 className="whitespace-nowrap"
                 onClick={() => {
-                  const event = new Event('beforeinstallprompt');
-                  window.dispatchEvent(event);
+                  window.dispatchEvent(new Event('triggerPWAInstall'));
                 }}
               >
                 Install App
