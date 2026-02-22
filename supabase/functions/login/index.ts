@@ -163,6 +163,22 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Record login IP in audit_logs using service role client
+    const clientIP = getClientIP(req);
+    try {
+      await supabase
+        .from('audit_logs')
+        .insert({
+          user_id: authData.user.id,
+          table_name: 'auth',
+          action: 'login',
+          ip_address: clientIP,
+          new_values: { event: 'login', ip: clientIP, identifier_type: identifierType }
+        });
+    } catch (auditErr) {
+      console.error('Failed to record login audit log:', auditErr);
+    }
+
     // Login successful - return session (no 2FA)
     return new Response(
       JSON.stringify({ 

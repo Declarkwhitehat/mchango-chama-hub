@@ -520,6 +520,25 @@ const Auth = () => {
       await supabase.auth.setSession(pending2FASession);
     }
     
+    // Capture IP after 2FA login
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.access_token) {
+        fetch(`${supabaseUrl}/functions/v1/capture-login-ip`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ is_signup: false }),
+        }).catch(err => console.error('Failed to capture IP after 2FA:', err));
+      }
+    } catch (err) {
+      console.error('Failed to capture IP after 2FA:', err);
+    }
+
     // Store identifier for next auto-login
     const emailOrPhone = loginForm.getValues('emailOrPhone');
     if (emailOrPhone) {
