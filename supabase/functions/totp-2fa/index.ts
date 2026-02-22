@@ -161,6 +161,25 @@ Deno.serve(async (req) => {
       // Verify TOTP code
       const isValid = await verifyTOTP(totpData.encrypted_secret, token);
 
+      // Fire-and-forget: record failed 2FA for fraud monitoring
+      if (!isValid) {
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+          fetch(`${supabaseUrl}/functions/v1/fraud-monitor`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'record-event',
+              user_id: userId,
+              rule_triggered: 'failed_2fa',
+              risk_points: 10,
+              metadata: { attempt_type: 'totp' },
+            }),
+          }).catch(e => console.error('Fraud monitor call failed:', e));
+        } catch (e) { console.error('Fraud monitoring error:', e); }
+      }
+
       return new Response(
         JSON.stringify({ verified: isValid }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

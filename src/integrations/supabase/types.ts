@@ -924,6 +924,94 @@ export type Database = {
         }
         Relationships: []
       }
+      fraud_config: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          rule_key: string
+          rule_value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          rule_key: string
+          rule_value: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          rule_key?: string
+          rule_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraud_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fraud_events: {
+        Row: {
+          admin_action: string | null
+          created_at: string
+          device_info: Json | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          risk_points_added: number
+          rule_triggered: string
+          total_risk_score: number
+          transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_action?: string | null
+          created_at?: string
+          device_info?: Json | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          risk_points_added?: number
+          rule_triggered: string
+          total_risk_score?: number
+          transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_action?: string | null
+          created_at?: string
+          device_info?: Json | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          risk_points_added?: number
+          rule_triggered?: string
+          total_risk_score?: number
+          transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraud_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mchango: {
         Row: {
           available_balance: number | null
@@ -1912,6 +2000,79 @@ export type Database = {
             foreignKeyName: "user_consents_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_risk_profiles: {
+        Row: {
+          created_at: string
+          frozen_at: string | null
+          frozen_by: string | null
+          id: string
+          is_flagged: boolean
+          is_frozen: boolean
+          last_risk_update: string
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          risk_level: string
+          risk_score: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          frozen_at?: string | null
+          frozen_by?: string | null
+          id?: string
+          is_flagged?: boolean
+          is_frozen?: boolean
+          last_risk_update?: string
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risk_level?: string
+          risk_score?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          frozen_at?: string | null
+          frozen_by?: string | null
+          id?: string
+          is_flagged?: boolean
+          is_frozen?: boolean
+          last_risk_update?: string
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risk_level?: string
+          risk_score?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_risk_profiles_frozen_by_fkey"
+            columns: ["frozen_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_risk_profiles_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_risk_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },

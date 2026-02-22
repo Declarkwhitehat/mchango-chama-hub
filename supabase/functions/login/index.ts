@@ -128,6 +128,29 @@ Deno.serve(async (req) => {
         errorStatus: authError.status,
         errorCode: authError.code
       });
+
+      // Fire-and-forget: record failed login for fraud monitoring
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        // Look up user_id by email for fraud tracking
+        const { data: failedProfile } = await supabase.from('profiles').select('id').eq('email', loginEmail).maybeSingle();
+        if (failedProfile?.id) {
+          fetch(`${supabaseUrl}/functions/v1/fraud-monitor`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'record-event',
+              user_id: failedProfile.id,
+              rule_triggered: 'failed_login',
+              risk_points: 5,
+              ip_address: clientIP,
+              metadata: { identifier_type: identifierType, error: authError.message },
+            }),
+          }).catch(e => console.error('Fraud monitor call failed:', e));
+        }
+      } catch (e) { console.error('Fraud monitoring error:', e); }
+
       return new Response(
         JSON.stringify({ 
           error: 'Invalid credentials - authentication failed',

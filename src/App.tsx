@@ -58,6 +58,9 @@ const AdminLedger = lazy(() => import("./pages/AdminLedger"));
 const AdminVerificationRequests = lazy(() => import("./pages/AdminVerificationRequests"));
 const AdminCommissionAnalytics = lazy(() => import("./pages/AdminCommissionAnalytics"));
 const AdminMpesaSearch = lazy(() => import("./pages/AdminMpesaSearch"));
+const AdminFraudMonitoring = lazy(() => import("./pages/AdminFraudMonitoring"));
+const AdminFraudUserDetail = lazy(() => import("./pages/AdminFraudUserDetail"));
+const AdminFraudConfig = lazy(() => import("./pages/AdminFraudConfig"));
 
 const queryClient = new QueryClient();
 
@@ -125,6 +128,9 @@ const AppContent = () => {
           <Route path="/admin/verification-requests" element={<AdminProtectedRoute><AdminVerificationRequests /></AdminProtectedRoute>} />
           <Route path="/admin/commission-analytics" element={<AdminProtectedRoute><AdminCommissionAnalytics /></AdminProtectedRoute>} />
           <Route path="/admin/mpesa-search" element={<AdminProtectedRoute><AdminMpesaSearch /></AdminProtectedRoute>} />
+          <Route path="/admin/fraud-monitoring" element={<AdminProtectedRoute><AdminFraudMonitoring /></AdminProtectedRoute>} />
+          <Route path="/admin/fraud-user/:userId" element={<AdminProtectedRoute><AdminFraudUserDetail /></AdminProtectedRoute>} />
+          <Route path="/admin/fraud-config" element={<AdminProtectedRoute><AdminFraudConfig /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
