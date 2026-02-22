@@ -15,7 +15,8 @@ import {
   Shield,
   Building2,
   Landmark,
-  BadgeCheck
+  BadgeCheck,
+  ShieldAlert
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -138,6 +139,11 @@ export function AdminSidebar() {
     },
   ];
 
+  const securityItems: MenuItem[] = [
+    { title: "Fraud & Risk", url: "/admin/fraud-monitoring", icon: ShieldAlert },
+    { title: "Fraud Config", url: "/admin/fraud-config", icon: Settings },
+  ];
+
   const systemItems: MenuItem[] = [
     { title: "Audit Logs", url: "/admin/audit", icon: FileText },
     { title: "Data Export", url: "/admin/export", icon: Download },
@@ -234,6 +240,7 @@ export function AdminSidebar() {
         {renderMenuGroup("Users & KYC", usersKycItems)}
         {renderMenuGroup("Groups", groupsItems)}
         {renderMenuGroup("Financial", financialItems)}
+        {renderMenuGroup("Security", securityItems)}
         {renderMenuGroup("Support", supportItems)}
         {renderMenuGroup("System", systemItems)}
       </SidebarContent>

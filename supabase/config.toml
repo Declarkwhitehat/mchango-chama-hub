@@ -131,3 +131,6 @@ verify_jwt = false
 
 [functions.admin-mpesa-search]
 verify_jwt = false
+
+[functions.fraud-monitor]
+verify_jwt = false
