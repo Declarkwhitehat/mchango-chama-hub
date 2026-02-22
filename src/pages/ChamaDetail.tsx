@@ -379,12 +379,13 @@ const ChamaDetail = () => {
     );
   }
 
-  const approvedMembers = chama.chama_members?.filter(m => m.approval_status === 'approved') || [];
-  const isManager = currentUserMembership?.is_manager && currentUserMembership?.approval_status === 'approved';
-  const isMember = currentUserMembership?.approval_status === 'approved';
+  const approvedMembers = chama.chama_members?.filter(m => m.approval_status === 'approved' && m.status !== 'removed') || [];
+  const isManager = currentUserMembership?.is_manager && currentUserMembership?.approval_status === 'approved' && currentUserMembership?.status !== 'removed';
+  const isMember = currentUserMembership?.approval_status === 'approved' && currentUserMembership?.status !== 'removed';
+  const isRemovedMember = currentUserMembership?.status === 'removed';
   const isPending = currentUserMembership?.approval_status === 'pending';
   const isMyTurn = currentUserMembership?.id === currentTurnMemberId;
-  const hasViewAccess = isAdmin || isMember; // Admins can view without being members
+  const hasViewAccess = isAdmin || isMember || isRemovedMember; // Removed members get limited view
   const isPendingStatus = chama.status === 'pending';
   const isActive = chama.status === 'active';
   const isCycleComplete = chama.status === 'cycle_complete';
@@ -739,8 +740,13 @@ const ChamaDetail = () => {
           </div>
         )}
 
-        {/* Tabs - Only visible to approved members and admins */}
-        {hasViewAccess && (
+        {/* Removed member view - show membership ended info */}
+        {isRemovedMember && (
+          <MemberDashboard chamaId={chama.id} />
+        )}
+
+        {/* Tabs - Only visible to active approved members and admins */}
+        {hasViewAccess && !isRemovedMember && (
           <Tabs defaultValue="dashboard" className="w-full">
             <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center">
               <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
@@ -929,7 +935,7 @@ const ChamaDetail = () => {
         )}
 
         {/* Non-member view */}
-        {!hasViewAccess && !isPending && (
+        {!hasViewAccess && !isPending && !isRemovedMember && (
           <Card>
             <CardContent className="pt-6">
               <p className="text-center text-muted-foreground">
