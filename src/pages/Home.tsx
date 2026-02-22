@@ -183,15 +183,14 @@ const Home = () => {
           )
         `)
         .eq('user_id', user.id)
-        .eq('approval_status', 'approved')
-        .neq('chama.created_by', user.id);
+        .eq('approval_status', 'approved');
 
       if (memberChamaError) throw memberChamaError;
       
-      // Filter out nulls and extract chama data
-      const memberChamasData = memberChamas
-        ?.map(m => m.chama)
-        .filter(c => c !== null) as Chama[] || [];
+      // Filter out nulls, extract chama data, and exclude chamas created by the user
+      const memberChamasData = (memberChamas || [])
+        .map(m => m.chama)
+        .filter(c => c !== null && (c as any).created_by !== user.id) as Chama[];
       
       setMemberChamaList(memberChamasData);
 
