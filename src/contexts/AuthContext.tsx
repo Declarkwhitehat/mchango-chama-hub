@@ -120,6 +120,26 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   }, []);
 
 
+  const captureLoginIP = async (isSignup: boolean) => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession?.access_token) return;
+      
+      await fetch(`${supabaseUrl}/functions/v1/capture-login-ip`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ is_signup: isSignup }),
+      });
+    } catch (err) {
+      console.error('Failed to capture login IP:', err);
+    }
+  };
+
   const signIn = async (emailOrPhone: string, password: string): Promise<{ error: any; requires2FA?: boolean; userId?: string; pendingSession?: any }> => {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -177,6 +197,8 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       // Success - set session
       if (responseData.session) {
         await supabase.auth.setSession(responseData.session);
+        // Capture IP after successful login
+        captureLoginIP(false);
       }
       
       return { error: null };
@@ -193,6 +215,10 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
         data: userData,
       },
     });
+    if (!error) {
+      // Capture IP after successful signup
+      captureLoginIP(true);
+    }
     return { error };
   };
 
