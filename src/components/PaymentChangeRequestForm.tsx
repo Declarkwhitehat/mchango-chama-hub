@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Phone, Shield, CheckCircle } from "lucide-react";
 import { z } from "zod";
+import { TwoFactorConfirmDialog } from "./TwoFactorConfirmDialog";
 
 const phoneSchema = z.string()
   .regex(/^\+254(7[0-9]|11[0-1])\d{7}$/, "Please enter a valid Safaricom number (+254XXXXXXXXX)");
@@ -35,7 +36,30 @@ export const PaymentChangeRequestForm = ({
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ phone?: string; reason?: string }>({});
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [show2FAConfirm, setShow2FAConfirm] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const check2FA = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/totp-2fa`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action: 'status' }),
+        });
+        const data = await response.json();
+        setIs2FAEnabled(data.enabled || false);
+      } catch {}
+    };
+    if (open) check2FA();
+  }, [open]);
 
   const validateForm = (): boolean => {
     const newErrors: { phone?: string; reason?: string } = {};
@@ -62,6 +86,16 @@ export const PaymentChangeRequestForm = ({
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
+
+    if (is2FAEnabled) {
+      setShow2FAConfirm(true);
+      return;
+    }
+
+    await executeSubmit();
+  };
+
+  const executeSubmit = async () => {
 
     setLoading(true);
     try {
@@ -113,6 +147,7 @@ export const PaymentChangeRequestForm = ({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
@@ -218,5 +253,14 @@ export const PaymentChangeRequestForm = ({
         )}
       </DialogContent>
     </Dialog>
+
+      <TwoFactorConfirmDialog
+        open={show2FAConfirm}
+        onOpenChange={setShow2FAConfirm}
+        onConfirmed={executeSubmit}
+        title="Verify to Change Payment Number"
+        description="Enter your 2FA code to confirm the payment method change request"
+      />
+    </>
   );
 };
