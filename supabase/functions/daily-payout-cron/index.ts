@@ -283,6 +283,130 @@ Deno.serve(async (req) => {
 
     for (const chama of chamas || []) {
       const now = new Date().toISOString();
+      
+      // ========== GAP RECOVERY: Create missing cycles ==========
+      // If there are no pending cycles, check if cycles should be created
+      const { data: latestCycle } = await supabase
+        .from('contribution_cycles')
+        .select('id, cycle_number, end_date, payout_processed')
+        .eq('chama_id', chama.id)
+        .order('cycle_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestCycle && latestCycle.payout_processed) {
+        // Check if the latest cycle's end_date is in the past and no new cycle exists
+        const latestEndDate = new Date(latestCycle.end_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (latestEndDate < today) {
+          // GAP DETECTED: Create missing cycles up to today (max 50 to avoid timeout)
+          const { data: activeMembers } = await supabase
+            .from('chama_members')
+            .select('id, order_index, carry_forward_credit, next_cycle_credit')
+            .eq('chama_id', chama.id)
+            .eq('approval_status', 'approved')
+            .eq('status', 'active')
+            .order('order_index');
+
+          if (activeMembers && activeMembers.length > 0) {
+            let lastEndDate = latestEndDate;
+            let lastCycleNum = latestCycle.cycle_number;
+            let cyclesCreated = 0;
+            const MAX_CATCHUP_CYCLES = 50;
+
+            while (cyclesCreated < MAX_CATCHUP_CYCLES) {
+              // Calculate next cycle dates
+              const nextStart = new Date(lastEndDate);
+              nextStart.setDate(nextStart.getDate() + 1);
+              nextStart.setHours(0, 0, 0, 0);
+              
+              if (nextStart > today) break; // Don't create future cycles beyond today
+
+              const nextEnd = new Date(nextStart);
+              switch (chama.contribution_frequency) {
+                case 'daily':
+                  nextEnd.setHours(22, 0, 0, 0);
+                  break;
+                case 'weekly':
+                  nextEnd.setDate(nextEnd.getDate() + 6);
+                  nextEnd.setHours(23, 59, 59, 999);
+                  break;
+                case 'monthly':
+                  nextEnd.setMonth(nextEnd.getMonth() + 1);
+                  nextEnd.setDate(0);
+                  nextEnd.setHours(23, 59, 59, 999);
+                  break;
+                case 'every_n_days':
+                  nextEnd.setDate(nextEnd.getDate() + (chama.every_n_days_count || 7) - 1);
+                  nextEnd.setHours(23, 59, 59, 999);
+                  break;
+                default:
+                  nextEnd.setDate(nextEnd.getDate() + 6);
+                  nextEnd.setHours(23, 59, 59, 999);
+              }
+
+              const nextCycleNum = lastCycleNum + 1;
+              const beneficiaryIndex = (nextCycleNum - 1) % activeMembers.length;
+              const beneficiary = activeMembers[beneficiaryIndex];
+
+              // Historical gap cycles are pre-marked as processed (no payout)
+              const { data: newCycle, error: cycleErr } = await supabase
+                .from('contribution_cycles')
+                .insert({
+                  chama_id: chama.id,
+                  cycle_number: nextCycleNum,
+                  start_date: nextStart.toISOString(),
+                  end_date: nextEnd.toISOString(),
+                  due_amount: chama.contribution_amount,
+                  beneficiary_member_id: beneficiary.id,
+                  is_complete: false,
+                  payout_processed: true,
+                  payout_processed_at: nextEnd.toISOString(),
+                  payout_type: 'none',
+                  payout_amount: 0,
+                  members_paid_count: 0,
+                  members_skipped_count: activeMembers.length
+                })
+                .select('id')
+                .single();
+
+              if (cycleErr) {
+                console.error(`Gap recovery: Error creating cycle ${nextCycleNum}:`, cycleErr);
+                break;
+              }
+
+              // Create unpaid payment records for all members
+              const paymentRecords = activeMembers.map(m => ({
+                member_id: m.id,
+                cycle_id: newCycle.id,
+                amount_due: chama.contribution_amount,
+                amount_paid: 0,
+                amount_remaining: chama.contribution_amount,
+                is_paid: false,
+                fully_paid: false,
+                is_late_payment: false,
+                payment_allocations: []
+              }));
+
+              await supabase.from('member_cycle_payments').insert(paymentRecords);
+
+              console.log(`[GAP RECOVERY] Created cycle ${nextCycleNum} for ${chama.name} (${nextStart.toISOString().split('T')[0]})`);
+              
+              lastEndDate = nextEnd;
+              lastCycleNum = nextCycleNum;
+              cyclesCreated++;
+            }
+
+            if (cyclesCreated > 0) {
+              console.log(`[GAP RECOVERY] Created ${cyclesCreated} missing cycles for ${chama.name}`);
+            }
+          }
+        }
+      }
+
+      // ========== NORMAL PROCESSING: Fetch overdue cycles ==========
       const { data: pendingCycles } = await supabase
         .from('contribution_cycles')
         .select(`
@@ -634,8 +758,30 @@ Deno.serve(async (req) => {
           }
         }
 
-        // ========== AUTO-CREATE NEXT CYCLE ==========
-        const { data: allCycles } = await supabase
+        // ========== AUTO-CREATE NEXT CYCLE (always) ==========
+        // Always create the next cycle first, THEN check for cycle completion
+        try {
+          const createCycleResponse = await fetch(`${supabaseUrl}/functions/v1/cycle-auto-create`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ chamaId: chama.id, lastCycleId: cycle.id })
+          });
+
+          const createCycleResult = await createCycleResponse.json();
+          if (createCycleResponse.ok && createCycleResult.success) {
+            console.log(`✅ Next cycle created for ${chama.name}`);
+          } else {
+            console.error(`⚠️ Failed to create next cycle:`, createCycleResult);
+          }
+        } catch (createError: any) {
+          console.error(`⚠️ Error creating next cycle:`, createError);
+        }
+
+        // ========== CHECK CYCLE COMPLETION (after creating next cycle) ==========
+        const { data: allProcessedCycles } = await supabase
           .from('contribution_cycles')
           .select('id')
           .eq('chama_id', chama.id)
@@ -648,16 +794,24 @@ Deno.serve(async (req) => {
           .eq('approval_status', 'approved')
           .eq('status', 'active');
 
-        if (allCycles && allMembers && allCycles.length >= allMembers.length) {
-          console.log(`🎉 Full cycle complete for chama ${chama.name}`);
+        const currentRound = chama.current_cycle_round || 1;
+        const memberCount = allMembers?.length || 0;
+        // A rotation is complete when the latest cycle number is a multiple of member count
+        const latestProcessedCycleNum = cycle.cycle_number;
+        const isRotationComplete = memberCount > 0 && latestProcessedCycleNum > 0 && 
+          latestProcessedCycleNum % memberCount === 0 &&
+          latestProcessedCycleNum === currentRound * memberCount;
+
+        if (allProcessedCycles && allMembers && isRotationComplete) {
+          console.log(`🎉 Full cycle round ${currentRound} complete for chama ${chama.name}`);
 
           await supabase.from('chama_cycle_history').insert({
             chama_id: chama.id,
-            cycle_round: chama.current_cycle_round || 1,
+            cycle_round: currentRound,
             started_at: chama.created_at,
             completed_at: new Date().toISOString(),
             total_members: allMembers.length,
-            total_payouts_made: allCycles.length
+            total_payouts_made: allProcessedCycles.length
           });
 
           await supabase.from('chama').update({
@@ -671,27 +825,7 @@ Deno.serve(async (req) => {
           } catch (invokeError) {
             console.error('Error invoking cycle-complete:', invokeError);
           }
-          break;
-        } else {
-          try {
-            const createCycleResponse = await fetch(`${supabaseUrl}/functions/v1/cycle-auto-create`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${supabaseServiceKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ chamaId: chama.id, lastCycleId: cycle.id })
-            });
-
-            const createCycleResult = await createCycleResponse.json();
-            if (createCycleResponse.ok && createCycleResult.success) {
-              console.log(`✅ Next cycle created for ${chama.name}`);
-            } else {
-              console.error(`⚠️ Failed to create next cycle:`, createCycleResult);
-            }
-          } catch (createError: any) {
-            console.error(`⚠️ Error creating next cycle:`, createError);
-          }
+          // Don't break - allow remaining cycles to be processed
         }
 
         payoutsProcessed++;
