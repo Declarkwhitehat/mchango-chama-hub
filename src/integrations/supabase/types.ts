@@ -629,6 +629,13 @@ export type Database = {
             referencedRelation: "chama_members"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "chama_rejoin_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       chat_messages: {
