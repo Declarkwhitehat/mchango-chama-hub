@@ -187,7 +187,6 @@ Deno.serve(async (req) => {
     }
 
     // Record login IP in audit_logs using service role client
-    const clientIP = getClientIP(req);
     try {
       await supabase
         .from('audit_logs')
