@@ -129,14 +129,15 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && pathParts.length === 1) {
       const chamaId = pathParts[0];
 
-      // Verify user is manager
+      // Verify user is manager (allow removed status for cycle_complete chamas)
       const { data: membership } = await supabase
         .from('chama_members')
         .select('is_manager')
         .eq('chama_id', chamaId)
         .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
+        .eq('is_manager', true)
+        .in('status', ['active', 'removed'])
+        .maybeSingle();
 
       if (!membership?.is_manager) {
         return new Response(
