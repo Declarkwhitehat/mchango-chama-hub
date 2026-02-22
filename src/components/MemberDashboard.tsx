@@ -146,6 +146,56 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
     );
   }
 
+  // Handle removed member state
+  if (dashboardData?.is_removed) {
+    const removedMember = dashboardData.member;
+    const removedChama = dashboardData.chama;
+    return (
+      <div className="space-y-4">
+        <Card className="border-destructive/50">
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex flex-col items-center text-center gap-3">
+              <div className="bg-destructive/10 p-3 rounded-full">
+                <AlertCircle className="h-8 w-8 text-destructive" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-destructive">Membership Ended</p>
+                <p className="text-muted-foreground mt-1">
+                  You are no longer a member of <strong>{removedChama?.name}</strong>
+                </p>
+              </div>
+            </div>
+            <div className="p-4 bg-muted rounded-lg space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Reason</span>
+                <span className="font-medium">{removedMember?.removal_reason}</span>
+              </div>
+              {removedMember?.removed_at && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="font-medium">
+                    {new Date(removedMember.removed_at).toLocaleDateString('en-US', { 
+                      month: 'short', day: 'numeric', year: 'numeric' 
+                    })}
+                  </span>
+                </div>
+              )}
+              {removedMember?.member_code && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Former Member ID</span>
+                  <code className="text-xs">{removedMember.member_code}</code>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              If you believe this was an error, please contact the chama manager or support.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const { member, chama, current_cycle, payment_history, payout_schedule, missed_payments } = dashboardData;
   const netBalance = member.balance_credit - member.balance_deficit;
   const missedCount = member.missed_payments_count || 0;

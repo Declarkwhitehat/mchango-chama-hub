@@ -132,6 +132,46 @@ serve(async (req) => {
       });
     }
 
+    // Check if member was removed (e.g. 3 consecutive missed payments)
+    if (anyMember.status === 'removed') {
+      console.log('Member was removed from chama, reason:', anyMember.removal_reason);
+      
+      // Get removal record for details
+      const { data: removalRecord } = await supabaseClient
+        .from('chama_member_removals')
+        .select('*')
+        .eq('member_id', anyMember.id)
+        .order('removed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Get chama name for context
+      const { data: chamaInfo } = await supabaseClient
+        .from('chama')
+        .select('name')
+        .eq('id', chamaId)
+        .maybeSingle();
+
+      return new Response(JSON.stringify({ 
+        success: true,
+        data: {
+          is_removed: true,
+          member: {
+            id: anyMember.id,
+            full_name: anyMember.profiles?.full_name,
+            member_code: anyMember.member_code,
+            removal_reason: anyMember.removal_reason || removalRecord?.removal_reason || 'Removed due to consecutive missed payments',
+            removed_at: anyMember.removed_at || removalRecord?.removed_at,
+          },
+          chama: {
+            name: chamaInfo?.name || 'Unknown',
+          },
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const member = anyMember;
 
 
