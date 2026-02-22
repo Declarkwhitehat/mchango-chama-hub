@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PhoneVerification } from "@/components/PhoneVerification";
+import { TwoFactorVerification } from "@/components/TwoFactorVerification";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -99,6 +100,9 @@ const Auth = () => {
   const [rateLimitResetTime, setRateLimitResetTime] = useState<Date | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [show2FA, setShow2FA] = useState(false);
+  const [pending2FAUserId, setPending2FAUserId] = useState<string>("");
+  const [pending2FASession, setPending2FASession] = useState<any>(null);
 
   // Check localStorage for rate limit on mount
   useEffect(() => {
@@ -262,7 +266,17 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await signIn(data.emailOrPhone, data.password);
+      const result = await signIn(data.emailOrPhone, data.password);
+      const { error } = result;
+
+      // Check if 2FA is required
+      if (result.requires2FA && result.userId) {
+        setPending2FAUserId(result.userId);
+        setPending2FASession(result.pendingSession);
+        setShow2FA(true);
+        setIsLoading(false);
+        return;
+      }
       
       if (error) {
         // Check for rate limit error and extract reset time
@@ -499,6 +513,58 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  const handle2FAVerified = async () => {
+    // 2FA verified - now set the session
+    if (pending2FASession) {
+      await supabase.auth.setSession(pending2FASession);
+    }
+    
+    // Store identifier for next auto-login
+    const emailOrPhone = loginForm.getValues('emailOrPhone');
+    if (emailOrPhone) {
+      localStorage.setItem('lastLoginIdentifier', emailOrPhone);
+    }
+
+    toast.success("Welcome back!");
+    setShow2FA(false);
+    setPending2FAUserId("");
+    setPending2FASession(null);
+
+    // Check if user is admin
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData.user) {
+      const { data: adminRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userData.user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      navigate(adminRole ? "/admin" : "/home", { replace: true });
+    } else {
+      navigate("/home", { replace: true });
+    }
+  };
+
+  const handle2FACancel = () => {
+    setShow2FA(false);
+    setPending2FAUserId("");
+    setPending2FASession(null);
+  };
+
+  // Show 2FA verification screen
+  if (show2FA && pending2FAUserId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col items-center justify-center px-4">
+        <TwoFactorVerification
+          userId={pending2FAUserId}
+          onVerified={handle2FAVerified}
+          onCancel={handle2FACancel}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col">

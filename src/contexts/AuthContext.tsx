@@ -22,7 +22,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signIn: (emailOrPhone: string, password: string) => Promise<{ error: any }>;
+  signIn: (emailOrPhone: string, password: string) => Promise<{ error: any; requires2FA?: boolean; userId?: string; pendingSession?: any }>;
   signUp: (email: string, password: string, userData: any) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
   refreshProfile: () => Promise<void>;
@@ -120,7 +120,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   }, []);
 
 
-  const signIn = async (emailOrPhone: string, password: string): Promise<{ error: any }> => {
+  const signIn = async (emailOrPhone: string, password: string): Promise<{ error: any; requires2FA?: boolean; userId?: string; pendingSession?: any }> => {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -162,6 +162,16 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
           (error as any).remainingAttempts = responseData.remainingAttempts;
         }
         throw error;
+      }
+
+      // Check if 2FA is required
+      if (responseData.requires2FA) {
+        return { 
+          error: null, 
+          requires2FA: true, 
+          userId: responseData.userId,
+          pendingSession: responseData.pendingSession,
+        };
       }
 
       // Success - set session

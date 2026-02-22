@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { User, Mail, Phone, MapPin, LogOut, Edit, AlertCircle, CheckCircle, Clock, Key, Eye, EyeOff, Wallet, Fingerprint, Trash2, Plus, Shield } from "lucide-react";
+import { TwoFactorSetup } from "@/components/TwoFactorSetup";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,11 +36,35 @@ const Profile = () => {
   const { isLoading: isLoadingCredentials, credentials, listCredentials, deleteCredential } = useWebAuthnManagement();
   const [credentialToDelete, setCredentialToDelete] = useState<string | null>(null);
   const [isAddingBiometric, setIsAddingBiometric] = useState(false);
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+
+  // Check 2FA status
+  const check2FAStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/totp-2fa`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action: 'status' }),
+      });
+      const data = await response.json();
+      setIs2FAEnabled(data.enabled || false);
+    } catch (error) {
+      console.error('Failed to check 2FA status:', error);
+    }
+  };
 
   useEffect(() => {
     if (isWebAuthnSupported()) {
       listCredentials();
     }
+    check2FAStatus();
   }, []);
 
   const handleLogout = async () => {
@@ -432,6 +457,9 @@ const Profile = () => {
                 )}
               </div>
             )}
+
+            {/* Two-Factor Authentication */}
+            <TwoFactorSetup isEnabled={is2FAEnabled} onStatusChange={check2FAStatus} />
           </CardContent>
         </Card>
 
