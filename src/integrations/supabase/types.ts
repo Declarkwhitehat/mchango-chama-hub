@@ -2267,6 +2267,7 @@ export type Database = {
         | "completed"
         | "pending"
         | "cycle_complete"
+        | "deleted"
       contribution_frequency: "daily" | "weekly" | "monthly" | "every_n_days"
       kyc_status: "pending" | "approved" | "rejected"
       mchango_status: "active" | "completed" | "cancelled"
@@ -2410,6 +2411,7 @@ export const Constants = {
         "completed",
         "pending",
         "cycle_complete",
+        "deleted",
       ],
       contribution_frequency: ["daily", "weekly", "monthly", "every_n_days"],
       kyc_status: ["pending", "approved", "rejected"],

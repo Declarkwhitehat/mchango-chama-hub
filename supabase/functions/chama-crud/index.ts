@@ -499,6 +499,67 @@ serve(async (req) => {
     // PUT /chama-crud/:id - Update chama
     if (req.method === 'PUT' && id) {
       const body = await req.json();
+
+      // Check if chama is in cycle_complete status - only allow specific fields
+      const { data: currentChama } = await supabaseClient
+        .from('chama')
+        .select('status')
+        .eq('id', id)
+        .single();
+
+      if (currentChama?.status === 'cycle_complete') {
+        const allowedFields = ['contribution_amount', 'contribution_frequency', 'every_n_days_count', 'whatsapp_link'];
+        const filteredBody: Record<string, any> = {};
+        for (const key of allowedFields) {
+          if (body[key] !== undefined) {
+            filteredBody[key] = body[key];
+          }
+        }
+        filteredBody.updated_at = new Date().toISOString();
+
+        const { data, error } = await supabaseClient
+          .from('chama')
+          .update(filteredBody)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Send SMS to all members about updated terms
+        if (filteredBody.contribution_amount || filteredBody.contribution_frequency) {
+          const { data: members } = await supabaseAdmin
+            .from('chama_members')
+            .select('profiles!chama_members_user_id_fkey(phone)')
+            .eq('chama_id', id);
+
+          const { data: updatedChama } = await supabaseAdmin
+            .from('chama')
+            .select('name, contribution_amount, contribution_frequency')
+            .eq('id', id)
+            .single();
+
+          if (members && updatedChama) {
+            const smsPromises = members.map(async (m: any) => {
+              const phone = m.profiles?.phone;
+              if (!phone) return;
+              const message = `📝 Terms updated for "${updatedChama.name}": KES ${updatedChama.contribution_amount} (${updatedChama.contribution_frequency}). Review and confirm before rejoining.`;
+              try {
+                await supabaseAdmin.functions.invoke('send-transactional-sms', {
+                  body: { phone, message, eventType: 'chama_terms_updated' }
+                });
+              } catch (err) {
+                console.error('SMS error:', err);
+              }
+            });
+            await Promise.all(smsPromises);
+          }
+        }
+
+        return new Response(JSON.stringify({ data }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       
       const { data, error } = await supabaseClient
         .from('chama')
