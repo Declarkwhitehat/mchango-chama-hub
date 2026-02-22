@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { User, Mail, Phone, MapPin, LogOut, Edit, AlertCircle, CheckCircle, Clock, Key, Eye, EyeOff, Wallet, Fingerprint, Trash2, Plus, Shield } from "lucide-react";
 import { TwoFactorSetup } from "@/components/TwoFactorSetup";
+import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,6 +38,7 @@ const Profile = () => {
   const [credentialToDelete, setCredentialToDelete] = useState<string | null>(null);
   const [isAddingBiometric, setIsAddingBiometric] = useState(false);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [show2FAForPassword, setShow2FAForPassword] = useState(false);
 
   // Check 2FA status
   const check2FAStatus = async () => {
@@ -88,6 +90,16 @@ const Profile = () => {
       return;
     }
 
+    // If 2FA is enabled, require verification first
+    if (is2FAEnabled) {
+      setShow2FAForPassword(true);
+      return;
+    }
+
+    await executePasswordUpdate();
+  };
+
+  const executePasswordUpdate = async () => {
     setIsUpdatingPassword(true);
 
     try {
@@ -382,7 +394,15 @@ const Profile = () => {
               </DialogContent>
             </Dialog>
 
-            {/* Biometric Login Section */}
+            {/* 2FA Confirmation for Password Change */}
+            <TwoFactorConfirmDialog
+              open={show2FAForPassword}
+              onOpenChange={setShow2FAForPassword}
+              onConfirmed={executePasswordUpdate}
+              title="Verify to Change Password"
+              description="Enter your 2FA code to confirm password change"
+            />
+
             {isWebAuthnSupported() && (
               <div className="space-y-4 pt-6 border-t border-border">
                 <div className="flex items-center gap-2">

@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Wallet, Loader2, Clock, AlertCircle, Smartphone, Building2 } from "lucide-react";
 import { PAYMENT_METHOD_LIMITS, type PaymentMethodType } from "@/utils/paymentLimits";
+import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 
 interface WithdrawalButtonProps {
   chamaId?: string;
@@ -36,14 +37,38 @@ export const WithdrawalButton = ({
   const [defaultPaymentMethod, setDefaultPaymentMethod] = useState<any>(null);
   const [dailyUsed, setDailyUsed] = useState(0);
   const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(true);
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [show2FAConfirm, setShow2FAConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       loadPendingWithdrawal();
       loadPaymentMethod();
       loadDailyUsage();
+      check2FAStatus();
     }
   }, [isOpen, chamaId, mchangoId]);
+
+  const check2FAStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/totp-2fa`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action: 'status' }),
+      });
+      const data = await response.json();
+      setIs2FAEnabled(data.enabled || false);
+    } catch (error) {
+      console.error('Failed to check 2FA status:', error);
+    }
+  };
 
   // Set up realtime subscription
   useEffect(() => {
@@ -149,7 +174,16 @@ export const WithdrawalButton = ({
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Use full available balance - no manual amount entry
+    // If 2FA is enabled, require verification first
+    if (is2FAEnabled) {
+      setShow2FAConfirm(true);
+      return;
+    }
+
+    await executeWithdraw();
+  };
+
+  const executeWithdraw = async () => {
     const withdrawAmount = totalAvailable;
 
     if (withdrawAmount <= 0) {
@@ -240,6 +274,7 @@ export const WithdrawalButton = ({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="hero" className="w-full">
@@ -430,5 +465,15 @@ export const WithdrawalButton = ({
         )}
       </DialogContent>
     </Dialog>
+
+      {/* 2FA Confirmation for Withdrawal */}
+      <TwoFactorConfirmDialog
+        open={show2FAConfirm}
+        onOpenChange={setShow2FAConfirm}
+        onConfirmed={executeWithdraw}
+        title="Verify to Withdraw"
+        description="Enter your 2FA code to confirm this withdrawal"
+      />
+    </>
   );
 };
