@@ -15,16 +15,11 @@ function shuffleArray<T>(array: T[]): T[] {
 
 function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
   switch (frequency) {
-    case 'daily':
-      return 1;
-    case 'weekly':
-      return 7;
-    case 'monthly':
-      return 30;
-    case 'every_n_days':
-      return everyNDays || 7;
-    default:
-      return 7;
+    case 'daily': return 1;
+    case 'weekly': return 7;
+    case 'monthly': return 30;
+    case 'every_n_days': return everyNDays || 7;
+    default: return 7;
   }
 }
 
@@ -35,7 +30,6 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
-  // Get user from auth header
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
     return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
@@ -56,7 +50,6 @@ Deno.serve(async (req) => {
 
   try {
     const { chamaId } = await req.json();
-
     console.log('Starting new cycle for chama:', chamaId);
 
     // Get chama details
@@ -68,14 +61,15 @@ Deno.serve(async (req) => {
 
     if (chamaError) throw chamaError;
 
-    // Verify user is manager
+    // Verify user is manager (allow 'removed' status since cycle_complete sets all to removed)
     const { data: membership } = await supabase
       .from('chama_members')
       .select('is_manager')
       .eq('chama_id', chamaId)
       .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single();
+      .eq('is_manager', true)
+      .in('status', ['active', 'removed'])
+      .maybeSingle();
 
     if (!membership?.is_manager) {
       return new Response(
@@ -104,20 +98,47 @@ Deno.serve(async (req) => {
 
     console.log(`Creating new cycle with ${approvedRequests.length} members`);
 
-    // Archive old members
+    // ========== CLEAN UP OLD CYCLE DATA ==========
+    console.log('Cleaning up old cycle data...');
+
+    // Get old cycle IDs for cleanup
+    const { data: oldCycles } = await supabase
+      .from('contribution_cycles')
+      .select('id')
+      .eq('chama_id', chamaId);
+
+    const oldCycleIds = oldCycles?.map(c => c.id) || [];
+
+    // Delete old member_cycle_payments (depends on cycle IDs)
+    if (oldCycleIds.length > 0) {
+      await supabase.from('member_cycle_payments').delete().in('cycle_id', oldCycleIds);
+    }
+
+    // Delete old chama_member_debts
+    await supabase.from('chama_member_debts').delete().eq('chama_id', chamaId);
+
+    // Delete old chama_cycle_deficits
+    await supabase.from('chama_cycle_deficits').delete().eq('chama_id', chamaId);
+
+    // Delete old payout_skips
+    await supabase.from('payout_skips').delete().eq('chama_id', chamaId);
+
+    // Delete old contribution_cycles
+    await supabase.from('contribution_cycles').delete().eq('chama_id', chamaId);
+
+    console.log('Old cycle data cleaned up.');
+
+    // ========== ARCHIVE OLD MEMBERS ==========
     const { error: archiveError } = await supabase
       .from('chama_members')
       .update({ status: 'inactive' })
       .eq('chama_id', chamaId)
-      .eq('status', 'active');
+      .in('status', ['active', 'removed']);
 
     if (archiveError) throw archiveError;
 
-    // Find manager ID
-    const managerId = approvedRequests.find(req => {
-      // Check if this user was previously a manager
-      return req.previous_member_id;
-    })?.user_id || user.id;
+    // Find manager ID (the user starting the cycle is the manager)
+    const managerId = user.id;
 
     // Create random order indices
     const memberCount = approvedRequests.length;
@@ -127,10 +148,11 @@ Deno.serve(async (req) => {
     const managerRequestIndex = approvedRequests.findIndex(req => req.user_id === managerId);
     if (managerRequestIndex !== -1) {
       const managerIndexPosition = randomIndices.indexOf(1);
-      [randomIndices[0], randomIndices[managerIndexPosition]] = [randomIndices[managerIndexPosition], randomIndices[0]];
+      [randomIndices[managerRequestIndex], randomIndices[managerIndexPosition]] = 
+        [randomIndices[managerIndexPosition], randomIndices[managerRequestIndex]];
     }
 
-    // Generate unique member codes for each member
+    // Generate unique member codes
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const generateUniqueSuffix = async (existingCodes: Set<string>) => {
       for (let attempt = 0; attempt < 20; attempt++) {
@@ -144,7 +166,6 @@ Deno.serve(async (req) => {
           return fullCode;
         }
       }
-      // Fallback: timestamp-based suffix
       return chama.group_code + Date.now().toString(36).toUpperCase().slice(-4);
     };
 
@@ -153,7 +174,7 @@ Deno.serve(async (req) => {
       approvedRequests.map(() => generateUniqueSuffix(existingCodes))
     );
 
-    // Create new member records with unique codes
+    // Create new member records with clean data
     const newMembers = approvedRequests.map((req, idx) => ({
       chama_id: chamaId,
       user_id: req.user_id,
@@ -161,7 +182,13 @@ Deno.serve(async (req) => {
       is_manager: req.user_id === managerId,
       status: 'active',
       approval_status: 'approved',
-      member_code: memberCodes[idx]
+      member_code: memberCodes[idx],
+      missed_payments_count: 0,
+      balance_deficit: 0,
+      balance_credit: 0,
+      total_contributed: 0,
+      carry_forward_credit: 0,
+      next_cycle_credit: 0
     }));
 
     const { data: insertedMembers, error: insertError } = await supabase
@@ -171,13 +198,18 @@ Deno.serve(async (req) => {
 
     if (insertError) throw insertError;
 
-    // Update chama
+    // ========== RESET CHAMA TO BRAND NEW ==========
     const { error: updateError } = await supabase
       .from('chama')
       .update({
-        current_cycle_round: (chama.current_cycle_round || 1) + 1,
+        current_cycle_round: 1,
         accepting_rejoin_requests: false,
         status: 'active',
+        start_date: new Date().toISOString(),
+        total_gross_collected: 0,
+        total_commission_paid: 0,
+        available_balance: 0,
+        total_withdrawn: 0,
         updated_at: new Date().toISOString()
       })
       .eq('id', chamaId);
@@ -193,7 +225,7 @@ Deno.serve(async (req) => {
 
     if (requestUpdateError) console.error('Error cleaning up requests:', requestUpdateError);
 
-    // Calculate payout dates and send SMS
+    // Send SMS notifications
     const cycleLength = getCycleLengthInDays(chama.contribution_frequency, chama.every_n_days_count);
     
     const smsPromises = insertedMembers
@@ -202,7 +234,7 @@ Deno.serve(async (req) => {
         const payoutDate = new Date();
         payoutDate.setDate(payoutDate.getDate() + (member.order_index - 1) * cycleLength);
 
-        const message = `🔄 New cycle started for "${chama.name}"! You're member #${member.order_index}. Your payout date: ${payoutDate.toLocaleDateString()}. Contributions start now. Good luck! 🎯`;
+        const message = `🔄 New cycle started for "${chama.name}"! You're member #${member.order_index}. Your payout date: ${payoutDate.toLocaleDateString()}. Everything starts fresh. Good luck! 🎯`;
 
         try {
           await supabase.functions.invoke('send-transactional-sms', {
@@ -222,13 +254,13 @@ Deno.serve(async (req) => {
     const smsResults = await Promise.all(smsPromises);
     const successCount = smsResults.filter(r => r.success).length;
 
-    console.log(`New cycle started. Sent ${successCount}/${insertedMembers.length} SMS notifications`);
+    console.log(`New cycle started FRESH. Sent ${successCount}/${insertedMembers.length} SMS notifications`);
 
     return new Response(
       JSON.stringify({ 
         success: true,
         memberCount: insertedMembers.length,
-        cycleRound: (chama.current_cycle_round || 1) + 1,
+        cycleRound: 1,
         notificationsSent: successCount
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

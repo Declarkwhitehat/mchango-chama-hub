@@ -730,6 +730,63 @@ Deno.serve(async (req) => {
               });
             }
 
+            // ========== MANAGER AUTO-REASSIGNMENT ==========
+            if (member.is_manager) {
+              console.log(`👑 Removed member was manager. Finding replacement for chama ${chama.name}`);
+              
+              const { data: bestCandidate } = await supabase
+                .from('chama_members')
+                .select('id, user_id, member_code, profiles!chama_members_user_id_fkey(full_name, phone)')
+                .eq('chama_id', chama.id)
+                .eq('status', 'active')
+                .eq('approval_status', 'approved')
+                .eq('missed_payments_count', 0)
+                .order('order_index', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+              if (bestCandidate) {
+                await supabase.from('chama_members')
+                  .update({ is_manager: true })
+                  .eq('id', bestCandidate.id);
+
+                console.log(`👑 New manager assigned: ${bestCandidate.profiles?.full_name} (${bestCandidate.member_code})`);
+
+                // Notify new manager
+                if (bestCandidate.profiles?.phone) {
+                  await sendSMS(bestCandidate.profiles.phone,
+                    `👑 You are now the manager of "${chama.name}". The previous manager was removed due to missed payments. Log in to manage your group.`
+                  );
+                }
+
+                // Notify all remaining active members about the manager change
+                const { data: remainingMembers } = await supabase
+                  .from('chama_members')
+                  .select('user_id, profiles!chama_members_user_id_fkey(phone)')
+                  .eq('chama_id', chama.id)
+                  .eq('status', 'active')
+                  .eq('approval_status', 'approved')
+                  .neq('id', bestCandidate.id);
+
+                if (remainingMembers) {
+                  for (const rm of remainingMembers) {
+                    if (rm.profiles?.phone) {
+                      await sendSMS(rm.profiles.phone,
+                        `ℹ️ "${chama.name}" has a new manager: ${bestCandidate.profiles?.full_name}. The previous manager was removed due to missed payments.`
+                      );
+                    }
+                  }
+                }
+              } else {
+                console.warn(`⚠️ No eligible replacement manager found for chama ${chama.name}`);
+              }
+            }
+
+            // ========== RESEQUENCE REMAINING MEMBERS ==========
+            console.log(`🔄 Resequencing members for chama ${chama.name} after removal`);
+            await supabase.rpc('resequence_member_order', { p_chama_id: chama.id });
+            await supabase.rpc('calculate_expected_contributions', { p_chama_id: chama.id });
+
             continue;
           }
 
