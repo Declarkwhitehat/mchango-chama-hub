@@ -76,23 +76,22 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     // Listener for ONGOING auth changes - never await Supabase calls here
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return;
       
       setSession(newSession);
       setUser(newSession?.user ?? null);
       
       if (newSession?.user) {
-        // Defer profile fetch to avoid Navigator LockManager deadlock
         setTimeout(() => {
-          if (mounted) {
-            fetchProfile(newSession.user.id);
-          }
+          if (mounted) fetchProfile(newSession.user.id);
         }, 0);
       } else {
         setProfile(null);
+        if (event === 'TOKEN_REFRESHED' && !newSession) {
+          toast.error("Your session has expired. Please log in again.");
+        }
       }
-      // Do NOT set loading here - let initializeAuth control it
     });
 
     // INITIAL load - controls loading state
@@ -120,35 +119,6 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     };
   }, []);
 
-  // Session Timeout Protection
-  useEffect(() => {
-    if (!session) return;
-
-    const checkSessionExpiry = setInterval(async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      if (currentSession?.expires_at) {
-        const expiryTime = new Date(currentSession.expires_at * 1000);
-        const now = new Date();
-        const timeUntilExpiry = expiryTime.getTime() - now.getTime();
-        
-        // Warn user 5 minutes before expiry
-        if (timeUntilExpiry < 5 * 60 * 1000 && timeUntilExpiry > 0) {
-          toast.warning("Your session will expire soon. Please save your work.", {
-            duration: 10000,
-          });
-        }
-        
-        // Force logout on expiry
-        if (timeUntilExpiry <= 0) {
-          await signOut();
-          toast.error("Your session has expired. Please log in again.");
-        }
-      }
-    }, 60000); // Check every minute
-
-    return () => clearInterval(checkSessionExpiry);
-  }, [session]);
 
   const signIn = async (emailOrPhone: string, password: string): Promise<{ error: any }> => {
     try {
