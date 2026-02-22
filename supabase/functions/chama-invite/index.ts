@@ -261,8 +261,9 @@ serve(async (req) => {
         .select('is_manager')
         .eq('chama_id', chamaId)
         .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
+        .eq('is_manager', true)
+        .in('status', ['active', 'removed'])
+        .maybeSingle();
 
       console.log('Manager check for list:', { membership, error: memberError });
 
