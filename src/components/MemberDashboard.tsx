@@ -150,6 +150,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
   const netBalance = member.balance_credit - member.balance_deficit;
   const missedCount = member.missed_payments_count || 0;
   const totalOutstanding = member.total_outstanding || 0;
+  const isCycleComplete = chama.status === 'cycle_complete';
   
   // Calculate total pool for commission display
   const totalContributions = payment_history.reduce((sum: number, payment: any) => 
@@ -158,8 +159,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
 
   return (
     <div className="space-y-6">
-      {/* Missed Payments Warning Banner */}
-      {missedCount >= 2 && (
+      {/* Missed Payments Warning Banner - Only show removal warnings when chama is active */}
+      {!isCycleComplete && missedCount >= 2 && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
@@ -182,7 +183,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         </Card>
       )}
 
-      {missedCount === 1 && (
+      {!isCycleComplete && missedCount === 1 && (
         <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
@@ -200,13 +201,32 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         </Card>
       )}
 
+      {/* Cycle Complete Info Banner */}
+      {isCycleComplete && (
+        <Card className="border-primary bg-primary/10">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-primary">
+                  Cycle Complete
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  This chama's cycle has been completed. A new cycle will start automatically once enough members rejoin.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Outstanding Balance Card - Always visible if there's money owed */}
       {totalOutstanding > 0 && (
         <Card className="border-destructive">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-destructive">
               <CreditCard className="h-5 w-5" />
-              Outstanding Balance
+              {isCycleComplete ? 'Historical Outstanding Balance' : 'Outstanding Balance'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -217,10 +237,13 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                   KES {totalOutstanding.toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  From {missedCount} missed payment{missedCount !== 1 ? 's' : ''}
+                  {isCycleComplete 
+                    ? `From ${missedCount} missed payment${missedCount !== 1 ? 's' : ''} in previous cycle`
+                    : `From ${missedCount} missed payment${missedCount !== 1 ? 's' : ''}`
+                  }
                 </p>
               </div>
-              {onPayNow && (
+              {!isCycleComplete && onPayNow && (
                 <Button variant="destructive" onClick={onPayNow}>
                   Pay Now
                 </Button>
@@ -236,7 +259,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
-              Missed Payments Record
+              {isCycleComplete ? 'Previous Cycle Missed Payments' : 'Missed Payments Record'}
             </CardTitle>
           </CardHeader>
           <CardContent>
