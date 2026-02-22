@@ -51,7 +51,9 @@ Deno.serve(async (req) => {
         .eq('user_id', user.id)
         .order('joined_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
+
+      const isReturningMember = !!previousMember;
 
       // Check if request already exists
       const { data: existingRequest } = await supabase
@@ -59,15 +61,18 @@ Deno.serve(async (req) => {
         .select('id, status')
         .eq('chama_id', chamaId)
         .eq('user_id', user.id)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'approved'])
         .maybeSingle();
 
       if (existingRequest) {
         return new Response(
-          JSON.stringify({ error: 'You already have a pending rejoin request' }),
+          JSON.stringify({ error: 'You already have a pending or approved rejoin request' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
+      // Auto-approve returning members, pending for new members
+      const requestStatus = isReturningMember ? 'approved' : 'pending';
 
       // Create rejoin request
       const { data: request, error: insertError } = await supabase
@@ -76,7 +81,7 @@ Deno.serve(async (req) => {
           chama_id: chamaId,
           user_id: user.id,
           previous_member_id: previousMember?.id,
-          status: 'pending'
+          status: requestStatus
         })
         .select()
         .single();
@@ -108,13 +113,15 @@ Deno.serve(async (req) => {
       if (chama && chama.chama_members[0]) {
         const manager = chama.chama_members[0];
         const managerProfile = manager.profiles as any;
-        const message = `New rejoin request for "${chama.name}" from ${profile?.full_name}. Log in to the app to approve or reject this request.`;
+        const message = isReturningMember
+          ? `✅ ${profile?.full_name} has re-joined "${chama.name}" (auto-approved as returning member).`
+          : `🆕 New member ${profile?.full_name} requests to join "${chama.name}". Log in to approve or reject.`;
         
         await supabase.functions.invoke('send-transactional-sms', {
           body: {
             phone: managerProfile.phone,
             message,
-            eventType: 'rejoin_request_submitted'
+            eventType: isReturningMember ? 'rejoin_auto_approved' : 'rejoin_request_submitted'
           }
         });
       }

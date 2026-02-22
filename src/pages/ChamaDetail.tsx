@@ -526,6 +526,9 @@ const ChamaDetail = () => {
             chamaId={chama.id} 
             chamaName={chama.name}
             userId={currentUserMembership.user_id}
+            contributionAmount={chama.contribution_amount}
+            contributionFrequency={chama.contribution_frequency}
+            minMembers={chama.min_members || 5}
           />
         )}
 
@@ -535,6 +538,9 @@ const ChamaDetail = () => {
             chamaId={chama.id}
             chamaName={chama.name}
             minMembers={chama.min_members || 5}
+            contributionAmount={chama.contribution_amount}
+            contributionFrequency={chama.contribution_frequency}
+            everyNDaysCount={chama.every_n_days_count || undefined}
           />
         )}
 
