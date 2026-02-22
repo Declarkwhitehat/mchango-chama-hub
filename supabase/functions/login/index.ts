@@ -140,7 +140,30 @@ Deno.serve(async (req) => {
 
     console.log('[LOGIN DEBUG] Authentication successful for user:', authData.user.id);
 
-    // Login successful - return session
+    // Check if user has 2FA enabled
+    const { data: totpData } = await supabase
+      .from('totp_secrets')
+      .select('is_enabled')
+      .eq('user_id', authData.user.id)
+      .eq('is_enabled', true)
+      .maybeSingle();
+
+    if (totpData?.is_enabled) {
+      // Don't return session yet - require 2FA verification
+      // Return a temporary token that the client will use after 2FA verification
+      console.log('[LOGIN DEBUG] 2FA required for user:', authData.user.id);
+      return new Response(
+        JSON.stringify({ 
+          requires2FA: true,
+          userId: authData.user.id,
+          // Store session temporarily - will be returned after 2FA verification
+          pendingSession: authData.session,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Login successful - return session (no 2FA)
     return new Response(
       JSON.stringify({ 
         session: authData.session,
