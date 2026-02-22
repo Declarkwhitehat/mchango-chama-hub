@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { PaymentDetailsSetup } from "@/components/PaymentDetailsSetup";
 import { JoinByCodeForm } from "@/components/chama/JoinByCodeForm";
 import { PendingJoinRequests } from "@/components/chama/PendingJoinRequests";
+import { TwoFactorReminder } from "@/components/TwoFactorReminder";
 
 interface Mchango {
   id: string;
@@ -259,6 +260,8 @@ const Home = () => {
         </div>
 
         <div className="space-y-4 sm:space-y-6">
+          {/* 2FA Reminder */}
+          <TwoFactorReminder />
           {/* Profile Summary Card */}
           {profile && (
             <Card>
