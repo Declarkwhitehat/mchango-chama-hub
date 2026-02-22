@@ -73,7 +73,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   useEffect(() => {
     let mounted = true;
 
-    // Set up auth state listener first
+    // Listener for ONGOING auth changes - never await Supabase calls here
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       setUser(newSession?.user ?? null);
       
       if (newSession?.user) {
-        // Defer profile fetch to avoid blocking
+        // Defer profile fetch to avoid Navigator LockManager deadlock
         setTimeout(() => {
           if (mounted) {
             fetchProfile(newSession.user.id);
@@ -92,21 +92,27 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       } else {
         setProfile(null);
       }
-      setLoading(false);
+      // Do NOT set loading here - let initializeAuth control it
     });
 
-    // Then get initial session
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      if (!mounted) return;
-      
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      
-      if (initialSession?.user) {
-        fetchProfile(initialSession.user.id);
+    // INITIAL load - controls loading state
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        if (!mounted) return;
+        
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+        
+        if (initialSession?.user) {
+          await fetchProfile(initialSession.user.id);
+        }
+      } finally {
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
-    });
+    };
+
+    initializeAuth();
 
     return () => {
       mounted = false;
