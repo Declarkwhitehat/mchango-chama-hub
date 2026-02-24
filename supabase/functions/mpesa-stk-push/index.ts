@@ -193,17 +193,17 @@ serve(async (req) => {
     const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`;
     console.log('Using Callback URL:', callbackUrl);
 
-    // --- Step 2: Prepare STK Push Payload (Buy Goods to Till) ---
-    // BusinessShortCode = Store/Head Office number (shortcode)
-    // PartyB = Till number
+    // --- Step 2: Prepare STK Push Payload (Paybill) ---
+    // For Paybill: BusinessShortCode = Paybill number, PartyB = Paybill number
+    // TransactionType = CustomerPayBillOnline
     const payload = {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
-      TransactionType: 'CustomerBuyGoodsOnline',
+      TransactionType: 'CustomerPayBillOnline',
       Amount: body.amount,
       PartyA: normalizedPhone,
-      PartyB: tillNumber,
+      PartyB: shortcode,
       PhoneNumber: normalizedPhone,
       CallBackURL: callbackUrl,
       AccountReference: body.account_reference || 'Donation',
