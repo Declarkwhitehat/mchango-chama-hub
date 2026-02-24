@@ -1,44 +1,43 @@
 
 
-## Analysis: STK Push Accepted but No Prompt (ResultCode 17)
+## Fix: Truncate AccountReference and TransactionDesc to Safaricom Limits
 
-The logs confirm that Safaricom **accepts** the STK push request (ResponseCode 0, "Success. Request accepted for processing"), but the callback returns **ResultCode 17 ("System internal error")**. This means no STK prompt is ever sent to your phone.
+### Root Cause
+Safaricom's Lipa Na M-Pesa Online (STK Push) API has strict character limits:
+- `AccountReference`: maximum **12 characters**
+- `TransactionDesc`: maximum **13 characters**
 
-Since you just updated the passkey, these logs are from the **previous attempt** (before the passkey change). You should try again first to see if the new passkey resolves it.
+The current code passes campaign titles directly without truncation, causing `ResultCode 17` ("System internal error") when the fields exceed these limits.
 
-However, if ResultCode 17 persists after retrying with the new passkey, the most likely causes are:
+### Changes Required
 
-### Likely Root Causes
+**File: `supabase/functions/mpesa-stk-push/index.ts`** (lines 198-210)
 
-1. **Lipa Na M-Pesa Online (STK Push) is not activated for Paybill 4015351.** Having a Paybill number alone does not automatically enable STK Push. You must specifically request Safaricom to activate the "Lipa Na M-Pesa Online" API for your Paybill. This is the most common reason for ResultCode 17 on production Paybill numbers.
+Truncate `AccountReference` to 12 characters and `TransactionDesc` to 13 characters in the STK Push payload:
 
-2. **Passkey mismatch.** The passkey must be the one Safaricom issued specifically for Lipa Na M-Pesa Online on Paybill 4015351. It is different from your consumer key/secret. You receive it from Safaricom after STK Push is activated.
+```text
+AccountReference: (body.account_reference || 'Donation').substring(0, 12)
+TransactionDesc:  (body.transaction_desc || 'Payment').substring(0, 13)
+```
 
-### Recommended Steps (No Code Changes Needed)
-
-1. **Retry the payment now** — the passkey was just updated, so test again to confirm whether the new passkey fixes it.
-
-2. **If it still fails with ResultCode 17**, contact Safaricom Daraja support and confirm:
-   - Is **Lipa Na M-Pesa Online (STK Push)** activated for Paybill **4015351**?
-   - Is the passkey `187d51f...` the correct one issued for this Paybill's STK Push?
-
-3. **No code changes are required.** The STK Push function is correctly configured for Paybill mode (`CustomerPayBillOnline`, `PartyB = shortcode`). The issue is on the Safaricom configuration side.
+**File: `supabase/functions/mpesa-stk-query/index.ts`** — No changes needed, URLs are correct.
 
 ### Technical Detail
 
 ```text
-Current configuration (correct for Paybill):
-  BusinessShortCode = 4015351
-  PartyB            = 4015351
-  TransactionType   = CustomerPayBillOnline
-  Password          = base64(shortcode + passkey + timestamp)
+Current (causes ResultCode 17):
+  AccountReference = "The BB ibechasers"     (18 chars, max 12)
+  TransactionDesc  = "Donation to The BB..." (29 chars, max 13)
 
-Safaricom response flow:
-  1. API accepts request    → ResponseCode: 0 ✓
-  2. Callback returns error → ResultCode: 17 ✗
-  
-This pattern (accept then fail) indicates the API credentials 
-are valid but STK Push processing fails internally, typically 
-because the Paybill is not enabled for Lipa Na M-Pesa Online.
+After fix:
+  AccountReference = "The BB ibech"          (12 chars)
+  TransactionDesc  = "Donation to T"         (13 chars)
+
+All API URLs already match Safaricom production:
+  OAuth:    https://api.safaricom.co.ke/oauth/v1/generate           ✓
+  STK Push: https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest ✓
+  STK Query: https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query    ✓
 ```
+
+This is a single-line fix in the payload construction. No other files need changes.
 
