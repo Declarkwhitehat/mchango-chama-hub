@@ -1,46 +1,42 @@
 
 
-## Diagnosis: Why Your Offline Payment Didn't Update
+## Plan: Fix C2B URL Registration
 
-### Root Cause
+### Root Cause Identified
 
-**The C2B callback URLs have not been registered with Safaricom for your Paybill number (4015351).**
+Your `MPESA_CONSUMER_KEY` and `MPESA_CONSUMER_SECRET` are **sandbox credentials** (the OAuth token they produce is only 28 characters — production tokens are 40+). These sandbox credentials work for getting an OAuth token from the production endpoint, but the token itself is invalid for making actual API calls like C2B URL registration.
 
-Both the `mpesa-c2b-validation` and `mpesa-c2b-callback` backend functions show **zero logs** — meaning Safaricom never sent a payment notification to your system after you paid. The campaign `The BB ibechasers` exists correctly with `paybill_account_id = MCFFFKEB`, and the code to match and record the donation is working. The problem is purely that Safaricom doesn't know where to send the C2B confirmation.
+This is also the same reason your **STK push returns ResultCode 17** — the credentials authenticate but the token cannot authorize any real operations.
 
-### What Needs to Happen
+### What Needs to Change
 
-**You must register C2B URLs with Safaricom.** This is a one-time setup on the Safaricom Daraja portal (not a code fix). Here's what to register:
+**You need to replace your M-Pesa credentials with production ones.** Here's how:
 
-- **Validation URL:** `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-validation`
-- **Confirmation URL:** `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-callback`
-- **ShortCode:** `4015351`
-- **ResponseType:** `Completed`
+1. Go to https://developer.safaricom.co.ke/
+2. Open your **production app** (not sandbox)
+3. If you don't have a production app yet:
+   - Create a new app
+   - Select "Going Live" and follow the process to get production credentials for shortcode 4015351
+   - Safaricom will issue production Consumer Key and Consumer Secret
+4. Copy the **production Consumer Key** and **production Consumer Secret**
 
-You can register via:
-1. **Daraja Portal:** Go to your app → APIs → C2B → Register URLs
-2. **API call:**
-```text
-POST https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl
-{
-  "ShortCode": "4015351",
-  "ResponseType": "Completed",
-  "ConfirmationURL": "https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-callback",
-  "ValidationURL": "https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-validation"
-}
-```
+### Implementation Steps
 
-### Optional Code Enhancement
+1. **Update secrets** — I will prompt you to enter the new production `MPESA_CONSUMER_KEY` and `MPESA_CONSUMER_SECRET`
+2. **Test the registration function** — Call `mpesa-register-c2b-urls` again to verify it works with production credentials
+3. **No code changes needed** — The existing edge function is correctly implemented; only the credentials need updating
 
-Once C2B URLs are registered, I can also build an **edge function to automate C2B URL registration** so you don't need to do it manually via the Daraja portal. This function would use your existing M-Pesa credentials to call the registration API.
+### Why This Fixes Everything
 
-### About the KSh 10 Payment
-
-Since Safaricom processed the payment but never notified your system, the money is in your Paybill account but not reflected in the campaign. After registering the C2B URLs, **future payments will be automatically recorded**. For this specific KSh 10 payment, I can create a manual reconciliation option or you can re-test with a new payment once URLs are registered.
+With production credentials:
+- **C2B URL registration** will succeed (token will be valid)
+- **STK push** will also start working (ResultCode 17 will be resolved)
+- **Offline payments** will flow through once C2B URLs are registered
 
 ### Technical Details
 
-- The `mpesa-c2b-callback` function correctly looks up `paybill_account_id` matching `MCFFFKEB` and would record the donation with 15% commission.
-- JWT verification is already disabled for both C2B endpoints (required since Safaricom sends unauthenticated callbacks).
-- The campaign record exists: `paybill_account_id = 'MCFFFKEB'`, `slug = 'the-bb-ibechasers'`.
+- Current token length: 28 chars (sandbox) vs expected 40+ chars (production)
+- The edge function `mpesa-register-c2b-urls` already exists and is correctly coded
+- Both `mpesa-c2b-validation` and `mpesa-c2b-callback` are deployed with JWT verification disabled
+- The `ShortCode`, `ConfirmationURL`, and `ValidationURL` in the registration payload are all correct
 
