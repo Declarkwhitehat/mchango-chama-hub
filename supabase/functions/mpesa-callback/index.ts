@@ -302,7 +302,11 @@ serve(async (req) => {
         throw donationError;
       }
 
-      console.log('Donation updated with breakdown:', { grossAmount, commissionAmount, netAmount });
+      if (status === 'completed') {
+        console.log('Donation updated with breakdown:', { grossAmount, commissionAmount, netAmount });
+      } else {
+        console.log('Donation payment failed, status set to:', status);
+      }
 
       // If payment successful, credit NET amount to mchango and record commission
       if (status === 'completed') {
