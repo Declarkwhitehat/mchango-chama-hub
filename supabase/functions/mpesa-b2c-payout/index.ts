@@ -251,7 +251,8 @@ serve(async (req) => {
       await supabaseAdmin
         .from('withdrawals')
         .update({
-          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C initiated: ${b2cResult.ConversationID} (attempt ${attemptCount})`
+          payment_reference: b2cResult.ConversationID,
+          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C initiated: ConvID=${b2cResult.ConversationID}, OrigConvID=${b2cResult.OriginatorConversationID} (ref: ${payoutReference}, attempt ${attemptCount})`
         })
         .eq('id', withdrawal_id);
 

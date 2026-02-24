@@ -42,97 +42,121 @@ async function sendSMS(phone: string, message: string) {
 
 async function findWithdrawal(supabaseAdmin: any, result: any) {
   const conversationId = result.ConversationID;
+  const originatorConversationId = result.OriginatorConversationID;
   const occasion = result.Occasion || '';
 
-  console.log('Finding withdrawal:', { conversationId, occasion });
+  console.log('Finding withdrawal:', { conversationId, originatorConversationId, occasion });
 
-  // Method 1: Lookup by payment_reference matching our predictable reference (WD-{uuid})
-  if (occasion && occasion.startsWith('WD-')) {
-    const { data: wd1, error: err1 } = await supabaseAdmin
+  const selectQuery = `
+    *,
+    profiles:requested_by(full_name, phone),
+    chama:chama_id(name),
+    mchango:mchango_id(title)
+  `;
+
+  // Method 1: Lookup by ConversationID in payment_reference (primary - set by payout function)
+  if (conversationId) {
+    const { data: wd1 } = await supabaseAdmin
       .from('withdrawals')
-      .select(`
-        *,
-        profiles:requested_by(full_name, phone),
-        chama:chama_id(name),
-        mchango:mchango_id(title)
-      `)
-      .eq('payment_reference', occasion)
+      .select(selectQuery)
+      .eq('payment_reference', conversationId)
       .maybeSingle();
 
     if (wd1) {
-      console.log('Found withdrawal by payment_reference (Occasion):', wd1.id);
+      console.log('Found withdrawal by ConversationID in payment_reference:', wd1.id);
       return wd1;
     }
+  }
 
-    // Method 2: Extract withdrawal ID from Occasion format WD-{uuid}
+  // Method 2: Lookup by OriginatorConversationID in payment_reference
+  if (originatorConversationId) {
+    const { data: wd2 } = await supabaseAdmin
+      .from('withdrawals')
+      .select(selectQuery)
+      .eq('payment_reference', originatorConversationId)
+      .maybeSingle();
+
+    if (wd2) {
+      console.log('Found withdrawal by OriginatorConversationID in payment_reference:', wd2.id);
+      return wd2;
+    }
+  }
+
+  // Method 3: Occasion-based lookup (WD-{uuid} format)
+  if (occasion && occasion.startsWith('WD-')) {
+    const { data: wd3 } = await supabaseAdmin
+      .from('withdrawals')
+      .select(selectQuery)
+      .eq('payment_reference', occasion)
+      .maybeSingle();
+
+    if (wd3) {
+      console.log('Found withdrawal by Occasion in payment_reference:', wd3.id);
+      return wd3;
+    }
+
+    // Extract withdrawal ID from WD-{uuid}
     const withdrawalId = occasion.substring(3);
     if (withdrawalId && withdrawalId.length > 0) {
-      const { data: wd2, error: err2 } = await supabaseAdmin
+      const { data: wd3b } = await supabaseAdmin
         .from('withdrawals')
-        .select(`
-          *,
-          profiles:requested_by(full_name, phone),
-          chama:chama_id(name),
-          mchango:mchango_id(title)
-        `)
+        .select(selectQuery)
         .eq('id', withdrawalId)
         .maybeSingle();
 
-      if (wd2) {
-        console.log('Found withdrawal by extracted ID from Occasion:', wd2.id);
-        return wd2;
+      if (wd3b) {
+        console.log('Found withdrawal by extracted ID from Occasion:', wd3b.id);
+        return wd3b;
       }
     }
   }
 
-  // Method 3: Fallback - lookup by ConversationID in payment_reference
+  // Method 4: Search notes for ConversationID (in case payment_reference was overwritten)
   if (conversationId) {
-    const { data: wd3, error: err3 } = await supabaseAdmin
+    const { data: wd4list } = await supabaseAdmin
       .from('withdrawals')
-      .select(`
-        *,
-        profiles:requested_by(full_name, phone),
-        chama:chama_id(name),
-        mchango:mchango_id(title)
-      `)
-      .eq('payment_reference', conversationId)
-      .maybeSingle();
+      .select(selectQuery)
+      .eq('status', 'processing')
+      .ilike('notes', `%${conversationId}%`)
+      .limit(1);
 
-    if (wd3) {
-      console.log('Found withdrawal by ConversationID:', wd3.id);
-      return wd3;
+    if (wd4list && wd4list.length > 0) {
+      console.log('Found withdrawal by ConversationID in notes:', wd4list[0].id);
+      return wd4list[0];
     }
   }
 
-  // Method 4: Look for processing withdrawals without ConversationID match (race condition recovery)
-  // Find the most recent processing withdrawal that matches the phone number
+  // Method 5: Phone number match on processing withdrawals (last resort)
   if (result.ResultParameters?.ResultParameter) {
     let recipientPhone = '';
     for (const param of result.ResultParameters.ResultParameter) {
       if (param.Key === 'ReceiverPartyPublicName') {
-        recipientPhone = param.Value.split(' - ')[0] || param.Value;
+        // Format: "254707874790 - DECLARK OKEMWA CHACHA"
+        const parts = String(param.Value).split(' - ');
+        recipientPhone = (parts[0] || '').replace(/\D/g, '');
         break;
       }
     }
 
     if (recipientPhone) {
-      const formattedPhone = recipientPhone.replace(/\D/g, '');
-      const { data: wd4 } = await supabaseAdmin
+      const last9 = recipientPhone.slice(-9);
+      const { data: wd5list } = await supabaseAdmin
         .from('withdrawals')
         .select(`
-          *,
-          profiles:requested_by(full_name, phone),
-          chama:chama_id(name),
-          mchango:mchango_id(title),
+          ${selectQuery},
           payment_methods:payment_method_id(phone_number)
         `)
         .eq('status', 'processing')
         .order('last_b2c_attempt_at', { ascending: false })
-        .limit(5);
+        .limit(10);
 
-      for (const wd of wd4 || []) {
-        const pmPhone = wd.payment_methods?.phone_number?.replace(/\D/g, '') || '';
-        if (pmPhone.endsWith(formattedPhone.slice(-9)) || formattedPhone.endsWith(pmPhone.slice(-9))) {
+      for (const wd of wd5list || []) {
+        const pmPhone = (wd.payment_methods?.phone_number || '').replace(/\D/g, '');
+        const profilePhone = (wd.profiles?.phone || '').replace(/\D/g, '');
+        if (
+          (pmPhone && pmPhone.slice(-9) === last9) ||
+          (profilePhone && profilePhone.slice(-9) === last9)
+        ) {
           console.log('Found withdrawal by phone number match:', wd.id);
           return wd;
         }
