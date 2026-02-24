@@ -27,6 +27,14 @@ export default function PWAInstallPrompt() {
       return;
     }
 
+    // Only show PWA install on mobile devices, never on desktop
+    const isMobileDevice = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) ||
+      (window.innerWidth <= 768);
+    if (!isMobileDevice) {
+      setShowPrompt(false);
+      return;
+    }
+
     const handler = (e: Event) => {
       e.preventDefault();
       deferredPromptRef.current = e as BeforeInstallPromptEvent;
