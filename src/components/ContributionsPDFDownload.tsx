@@ -36,7 +36,7 @@ export const ContributionsPDFDownload = ({
   contributions,
   targetAmount,
   currentAmount,
-  commissionRate = 0.15,
+  commissionRate = 0.07,
 }: ContributionsPDFDownloadProps) => {
   const [period, setPeriod] = useState<PeriodType>("all");
   const [isGenerating, setIsGenerating] = useState(false);

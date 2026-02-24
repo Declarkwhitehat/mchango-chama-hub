@@ -21,7 +21,7 @@ interface DonorsListProps {
   mchangoTitle?: string;
 }
 
-const COMMISSION_RATE = 0.15; // 15%
+const COMMISSION_RATE = 0.07; // 7%
 
 export const DonorsList = ({ mchangoId, totalAmount, targetAmount, mchangoTitle = "Mchango" }: DonorsListProps) => {
   const [donations, setDonations] = useState<Donation[]>([]);

@@ -270,7 +270,7 @@ export const AdminFinancialOverview = () => {
                   </td>
                   <td className="text-right py-3 px-4">
                     <div className="font-mono">{formatCurrency(data.mchango.commission)}</div>
-                    <Badge variant="secondary" className="text-xs">15%</Badge>
+                    <Badge variant="secondary" className="text-xs">7%</Badge>
                   </td>
                   <td className="text-right py-3 px-4 font-mono text-green-600 dark:text-green-400">
                     {formatCurrency(data.mchango.clientFunds)}
