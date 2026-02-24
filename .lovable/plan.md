@@ -1,43 +1,46 @@
 
 
-## Fix: Truncate AccountReference and TransactionDesc to Safaricom Limits
+## Diagnosis: Why Your Offline Payment Didn't Update
 
 ### Root Cause
-Safaricom's Lipa Na M-Pesa Online (STK Push) API has strict character limits:
-- `AccountReference`: maximum **12 characters**
-- `TransactionDesc`: maximum **13 characters**
 
-The current code passes campaign titles directly without truncation, causing `ResultCode 17` ("System internal error") when the fields exceed these limits.
+**The C2B callback URLs have not been registered with Safaricom for your Paybill number (4015351).**
 
-### Changes Required
+Both the `mpesa-c2b-validation` and `mpesa-c2b-callback` backend functions show **zero logs** — meaning Safaricom never sent a payment notification to your system after you paid. The campaign `The BB ibechasers` exists correctly with `paybill_account_id = MCFFFKEB`, and the code to match and record the donation is working. The problem is purely that Safaricom doesn't know where to send the C2B confirmation.
 
-**File: `supabase/functions/mpesa-stk-push/index.ts`** (lines 198-210)
+### What Needs to Happen
 
-Truncate `AccountReference` to 12 characters and `TransactionDesc` to 13 characters in the STK Push payload:
+**You must register C2B URLs with Safaricom.** This is a one-time setup on the Safaricom Daraja portal (not a code fix). Here's what to register:
 
+- **Validation URL:** `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-validation`
+- **Confirmation URL:** `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-callback`
+- **ShortCode:** `4015351`
+- **ResponseType:** `Completed`
+
+You can register via:
+1. **Daraja Portal:** Go to your app → APIs → C2B → Register URLs
+2. **API call:**
 ```text
-AccountReference: (body.account_reference || 'Donation').substring(0, 12)
-TransactionDesc:  (body.transaction_desc || 'Payment').substring(0, 13)
+POST https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl
+{
+  "ShortCode": "4015351",
+  "ResponseType": "Completed",
+  "ConfirmationURL": "https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-callback",
+  "ValidationURL": "https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-validation"
+}
 ```
 
-**File: `supabase/functions/mpesa-stk-query/index.ts`** — No changes needed, URLs are correct.
+### Optional Code Enhancement
 
-### Technical Detail
+Once C2B URLs are registered, I can also build an **edge function to automate C2B URL registration** so you don't need to do it manually via the Daraja portal. This function would use your existing M-Pesa credentials to call the registration API.
 
-```text
-Current (causes ResultCode 17):
-  AccountReference = "The BB ibechasers"     (18 chars, max 12)
-  TransactionDesc  = "Donation to The BB..." (29 chars, max 13)
+### About the KSh 10 Payment
 
-After fix:
-  AccountReference = "The BB ibech"          (12 chars)
-  TransactionDesc  = "Donation to T"         (13 chars)
+Since Safaricom processed the payment but never notified your system, the money is in your Paybill account but not reflected in the campaign. After registering the C2B URLs, **future payments will be automatically recorded**. For this specific KSh 10 payment, I can create a manual reconciliation option or you can re-test with a new payment once URLs are registered.
 
-All API URLs already match Safaricom production:
-  OAuth:    https://api.safaricom.co.ke/oauth/v1/generate           ✓
-  STK Push: https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest ✓
-  STK Query: https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query    ✓
-```
+### Technical Details
 
-This is a single-line fix in the payload construction. No other files need changes.
+- The `mpesa-c2b-callback` function correctly looks up `paybill_account_id` matching `MCFFFKEB` and would record the donation with 15% commission.
+- JWT verification is already disabled for both C2B endpoints (required since Safaricom sends unauthenticated callbacks).
+- The campaign record exists: `paybill_account_id = 'MCFFFKEB'`, `slug = 'the-bb-ibechasers'`.
 
