@@ -1,64 +1,40 @@
 
 
-## Why Offline Payments Are Not Reflecting
+## Plan: Professional Offline Payment Section with Paybill Number
 
-### The Problem
+### What Changes
 
-Your **C2B callback URLs are not registered with Safaricom** for shortcode 4015351. This means when someone pays via Paybill with account number ORGN36K57, Safaricom processes the payment but has **nowhere to send the confirmation** — so your system never knows about it.
+1. **Upgrade `CopyableUniqueId` component** — Add paybill number display (4015351), show only the full composite ID (e.g., `ORGN36K57`, `MC...`, `ACT5MOO1`), and make it a professional, self-contained offline payment instruction card.
 
-Evidence:
-- Zero logs for `mpesa-c2b-callback` — Safaricom has never called this endpoint
-- The automated URL registration via API keeps failing with "Invalid Access Token" error code `401.003.01`
-- The OAuth token (28 chars) works for STK Push but is being rejected by the C2B Register URL API
+2. **Update usage in all 3 detail pages** — Replace the current minimal `CopyableUniqueId` with the enhanced version that includes the paybill number and clear payment steps.
 
-### Why It Fails
+3. **Remove `group_code` display from ChamaDetail** — Currently shows both `group_code` (short code) and `member_code` (full ID). Will only show the full `member_code` in the MemberDashboard.
 
-Your Daraja app likely does not have the **C2B API product** enabled. The same credentials work for STK Push (confirmed working) but the C2B Register URL endpoint rejects the token. This is a Daraja portal configuration issue.
+### Specific Changes
 
-### What Needs To Be Done (Safaricom Daraja Portal)
+**`src/components/CopyableUniqueId.tsx`** — Complete redesign:
+- Add paybill number `4015351` prominently with copy button
+- Show the unique account ID (passed as prop) prominently with copy button
+- Add numbered M-Pesa payment steps (Lipa na M-Pesa → Paybill → Business No → Account No → Amount → PIN)
+- Professional card-style layout with clear visual hierarchy
+- Auto-credit confirmation note
 
-You need to register the C2B URLs **manually through the Daraja portal**:
+**`src/pages/ChamaDetail.tsx`** (line 448-451):
+- Remove the `CopyableUniqueId` that shows `group_code` — this is the short group-only code, not useful for payments
 
-1. Go to https://developer.safaricom.co.ke/
-2. Log in → **My Apps** → select your production app
-3. Check that the **C2B** API product is subscribed/enabled (alongside Lipa Na M-Pesa Online)
-4. Go to **APIs → C2B → Register URL** (or use the API test console)
-5. Register these URLs for shortcode **4015351**:
+**`src/pages/MchangoDetail.tsx`** (line 267-269):
+- Keep `CopyableUniqueId` with `paybill_account_id` — this is already the full ID
 
-   - **Validation URL**: `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-validation`
-   - **Confirmation URL**: `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-callback`
-   - **Response Type**: `Completed`
+**`src/pages/OrganizationDetail.tsx`** (line 218-221):
+- Keep `CopyableUniqueId` with `paybill_account_id` — this is already the full ID
 
-6. If the Daraja portal doesn't have a C2B test console, contact **Safaricom M-Pesa support** and ask them to register these C2B URLs for your shortcode
+**`src/components/MemberDashboard.tsx`** (line 353-373):
+- Update the Member ID Badge section to use the enhanced `CopyableUniqueId` component with paybill number included, replacing the custom card
 
-### How It Works Once Registered
+### Technical Details
 
-```text
-Customer pays via M-Pesa Paybill
-         │
-         ▼
-Safaricom processes payment
-         │
-         ▼
-Safaricom calls your Confirmation URL  ← THIS IS WHAT'S MISSING
-(mpesa-c2b-callback)
-         │
-         ▼
-Your system matches account "ORGN36K57"
-to the organization, records donation,
-updates balance, sends SMS confirmation
-```
-
-### Code Status
-
-Your code is **fully ready** — no changes needed:
-- `mpesa-c2b-callback` correctly handles organization lookups by `paybill_account_id` (e.g., ORGN36K57)
-- `mpesa-c2b-validation` validates incoming payments
-- Commission calculation, financial tracking, and SMS notifications are all implemented
-
-The only missing piece is the Safaricom-side URL registration.
-
-### After Registration — How to Verify
-
-Once you register the URLs, make another test Paybill payment to 4015351 with account ORGN36K57. You should then see logs appear in the `mpesa-c2b-callback` function, and the payment will reflect on the organization's page.
+- Paybill number `4015351` is hardcoded since it's the single business shortcode for the platform
+- The `CopyableUniqueId` component will accept an optional `label` prop to customize whether it says "Account Number", "Member ID", etc.
+- No database changes needed
+- No edge function changes needed
 
