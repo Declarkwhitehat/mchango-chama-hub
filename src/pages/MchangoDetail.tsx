@@ -18,6 +18,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { ExtendCampaignDays } from "@/components/mchango/ExtendCampaignDays";
 import { CopyableUniqueId } from "@/components/CopyableUniqueId";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Campaign {
@@ -154,187 +155,207 @@ const MchangoDetail = () => {
 
   return (
     <Layout showBackButton>
-      <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
-        {/* Expired Campaign Alert for Owner */}
-        {isExpired && isCreator && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Campaign Expired</AlertTitle>
-            <AlertDescription>
-              Your campaign has ended and is no longer visible to the public. Use the "Extend Campaign" option below to reactivate it.
-            </AlertDescription>
-          </Alert>
-        )}
-        {/* Campaign Header */}
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-start mb-2">
-              {campaign.category && <Badge variant="secondary">{campaign.category}</Badge>}
-              <div className="flex gap-2">
-                {daysLeft !== null && (
-                  <Badge variant={daysLeft < 7 ? "destructive" : "default"}>
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {daysLeft} days left
-                  </Badge>
-                )}
-                <Button variant="outline" size="sm" onClick={handleShare}>
-                  <Share2 className="h-3 w-3 mr-1" />
-                  Share
-                </Button>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="text-2xl flex items-center gap-2">
-                {campaign.title}
-                {campaign.is_verified && <VerifiedBadge size="md" />}
-              </CardTitle>
-              <VerificationRequestButton
-                entityType="mchango"
-                entityId={campaign.id}
-                entityName={campaign.title}
-                isVerified={campaign.is_verified}
-                isOwner={isCreator}
-              />
-            </div>
-            <CardDescription>
-              Created on {new Date(campaign.created_at).toLocaleDateString()}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Image Gallery */}
-            {(campaign.image_url || campaign.image_url_2 || campaign.image_url_3) && (
-              <div className="space-y-2">
-                {campaign.image_url && (
-                  <img 
-                    src={campaign.image_url} 
-                    alt={campaign.title}
-                    className="w-full rounded-lg object-cover max-h-[400px]"
-                  />
-                )}
-                {(campaign.image_url_2 || campaign.image_url_3) && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {campaign.image_url_2 && (
-                      <img 
-                        src={campaign.image_url_2} 
-                        alt={`${campaign.title} - Photo 2`}
-                        className="w-full rounded-lg object-cover h-48"
-                      />
-                    )}
-                    {campaign.image_url_3 && (
-                      <img 
-                        src={campaign.image_url_3} 
-                        alt={`${campaign.title} - Photo 3`}
-                        className="w-full rounded-lg object-cover h-48"
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+        <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
+          {/* Expired Campaign Alert for Owner */}
+          {isExpired && isCreator && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Campaign Expired</AlertTitle>
+              <AlertDescription>
+                Your campaign has ended and is no longer visible to the public. Use the "Extend Campaign" option below to reactivate it.
+              </AlertDescription>
+            </Alert>
+          )}
 
-            {/* YouTube Video */}
-            {campaign.youtube_url && (
-              <div className="aspect-video rounded-lg overflow-hidden">
-                <iframe
-                  src={getYoutubeEmbedUrl(campaign.youtube_url)}
-                  title="Campaign Video"
-                  className="w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
+          {/* Campaign Header */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-start mb-2">
+                {campaign.category && <Badge variant="secondary">{campaign.category}</Badge>}
+                <div className="flex gap-2">
+                  {daysLeft !== null && (
+                    <Badge variant={daysLeft < 7 ? "destructive" : "default"}>
+                      <Calendar className="h-3 w-3 mr-1" />
+                      {daysLeft} days left
+                    </Badge>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleShare}>
+                    <Share2 className="h-3 w-3 mr-1" />
+                    Share
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="text-2xl flex items-center gap-2">
+                  {campaign.title}
+                  {campaign.is_verified && <VerifiedBadge size="md" />}
+                </CardTitle>
+                <VerificationRequestButton
+                  entityType="mchango"
+                  entityId={campaign.id}
+                  entityName={campaign.title}
+                  isVerified={campaign.is_verified}
+                  isOwner={isCreator}
                 />
               </div>
-            )}
-            
-            <p className="text-foreground leading-relaxed whitespace-pre-wrap">
-              {campaign.description}
-            </p>
-
-            <div className="space-y-2 pt-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  KES {Number(campaign.current_amount).toLocaleString()} raised
-                </span>
-                <span className="font-semibold text-foreground">
-                  of KES {Number(campaign.target_amount).toLocaleString()}
-                </span>
-              </div>
-              <Progress value={progress} className="h-3" />
-              <div className="text-sm text-muted-foreground">
-                {progress.toFixed(1)}% funded
-              </div>
-              
-              {/* Unique ID for offline payments */}
-              {campaign.paybill_account_id && (
-                <CopyableUniqueId uniqueId={campaign.paybill_account_id} className="mt-4" />
+              <CardDescription>
+                Created on {new Date(campaign.created_at).toLocaleDateString()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Image Gallery */}
+              {(campaign.image_url || campaign.image_url_2 || campaign.image_url_3) && (
+                <div className="space-y-2">
+                  {campaign.image_url && (
+                    <img 
+                      src={campaign.image_url} 
+                      alt={campaign.title}
+                      className="w-full rounded-lg object-cover max-h-[400px]"
+                    />
+                  )}
+                  {(campaign.image_url_2 || campaign.image_url_3) && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {campaign.image_url_2 && (
+                        <img 
+                          src={campaign.image_url_2} 
+                          alt={`${campaign.title} - Photo 2`}
+                          className="w-full rounded-lg object-cover h-48"
+                        />
+                      )}
+                      {campaign.image_url_3 && (
+                        <img 
+                          src={campaign.image_url_3} 
+                          alt={`${campaign.title} - Photo 3`}
+                          className="w-full rounded-lg object-cover h-48"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Commission Display */}
-        <CommissionDisplay 
-          totalCollected={campaign.current_amount}
-          commissionRate={0.07}
-          type="mchango"
-          showBreakdown={true}
-        />
+              {/* YouTube Video */}
+              {campaign.youtube_url && (
+                <div className="aspect-video rounded-lg overflow-hidden">
+                  <iframe
+                    src={getYoutubeEmbedUrl(campaign.youtube_url)}
+                    title="Campaign Video"
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+              
+              <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+                {campaign.description}
+              </p>
 
-        {/* Extend Campaign Days - Only for creators */}
-        {isCreator && (
-          <ExtendCampaignDays
-            campaignId={campaign.id}
-            currentEndDate={campaign.end_date}
-            onSuccess={fetchCampaign}
-          />
-        )}
-
-        {/* Withdrawal Button - Only for creators */}
-        {isCreator && (
-          <WithdrawalButton
-            mchangoId={campaign.id}
-            totalAvailable={campaign.current_amount}
-            commissionRate={0.07}
-            onSuccess={fetchCampaign}
-          />
-        )}
-
-        {/* Withdrawal History - Visible to all */}
-        <WithdrawalHistory mchangoId={campaign.id} />
-
-
-        {/* Two Column Layout: Donate Form & Contributors - Hide if expired */}
-        {!isExpired && (
-          <div className="grid md:grid-cols-2 gap-6">
-            <DonationForm 
-              mchangoId={campaign.id} 
-              mchangoTitle={campaign.title}
-              onSuccess={handleDonationSuccess}
-            />
-          
-            <DonorsList 
-              mchangoId={campaign.id} 
-              totalAmount={campaign.current_amount}
-              targetAmount={campaign.target_amount}
-              mchangoTitle={campaign.title}
-            />
-          </div>
-        )}
-
-        {/* WhatsApp Link */}
-        {campaign.whatsapp_link && (
-          <Card>
-            <CardContent className="pt-6">
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => window.open(campaign.whatsapp_link, '_blank')}
-              >
-                Join WhatsApp Group
-              </Button>
+              <div className="space-y-2 pt-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    KES {Number(campaign.current_amount).toLocaleString()} raised
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    of KES {Number(campaign.target_amount).toLocaleString()}
+                  </span>
+                </div>
+                <Progress value={progress} className="h-3" />
+                <div className="text-sm text-muted-foreground">
+                  {progress.toFixed(1)}% funded
+                </div>
+                
+                {/* Unique ID for offline payments */}
+                {campaign.paybill_account_id && (
+                  <CopyableUniqueId uniqueId={campaign.paybill_account_id} className="mt-4" />
+                )}
+              </div>
             </CardContent>
           </Card>
-        )}
-      </div>
+
+          {/* Tabs for Campaign Details vs Withdrawals */}
+          <Tabs defaultValue="details">
+            <TabsList>
+              <TabsTrigger value="details">Campaign</TabsTrigger>
+              <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details" className="space-y-6">
+              {/* Commission Display */}
+              <CommissionDisplay 
+                totalCollected={campaign.current_amount}
+                commissionRate={0.07}
+                type="mchango"
+                showBreakdown={true}
+              />
+
+              {/* Extend Campaign Days - Only for creators */}
+              {isCreator && (
+                <ExtendCampaignDays
+                  campaignId={campaign.id}
+                  currentEndDate={campaign.end_date}
+                  onSuccess={fetchCampaign}
+                />
+              )}
+
+              {/* Withdrawal Button - Only for creators */}
+              {isCreator && (
+                <WithdrawalButton
+                  mchangoId={campaign.id}
+                  totalAvailable={campaign.current_amount}
+                  commissionRate={0.07}
+                  onSuccess={fetchCampaign}
+                />
+              )}
+
+              {/* Two Column Layout: Donate Form & Contributors - Hide if expired */}
+              {!isExpired && (
+                <div className="grid md:grid-cols-2 gap-6">
+                  <DonationForm 
+                    mchangoId={campaign.id} 
+                    mchangoTitle={campaign.title}
+                    onSuccess={handleDonationSuccess}
+                  />
+                
+                  <DonorsList 
+                    mchangoId={campaign.id} 
+                    totalAmount={campaign.current_amount}
+                    targetAmount={campaign.target_amount}
+                    mchangoTitle={campaign.title}
+                  />
+                </div>
+              )}
+
+              {/* WhatsApp Link */}
+              {campaign.whatsapp_link && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => window.open(campaign.whatsapp_link, '_blank')}
+                    >
+                      Join WhatsApp Group
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="withdrawals" className="space-y-6">
+              {/* Withdrawal Button - Also available here for creators */}
+              {isCreator && (
+                <WithdrawalButton
+                  mchangoId={campaign.id}
+                  totalAvailable={campaign.current_amount}
+                  commissionRate={0.07}
+                  onSuccess={fetchCampaign}
+                />
+              )}
+              <WithdrawalHistory mchangoId={campaign.id} />
+            </TabsContent>
+          </Tabs>
+        </div>
     </Layout>
   );
 };
