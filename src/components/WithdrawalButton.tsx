@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ export const WithdrawalButton = ({
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notes, setNotes] = useState("");
+  const [customAmount, setCustomAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [pendingWithdrawal, setPendingWithdrawal] = useState<any>(null);
   const [defaultPaymentMethod, setDefaultPaymentMethod] = useState<any>(null);
@@ -41,6 +43,9 @@ export const WithdrawalButton = ({
   const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(true);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [show2FAConfirm, setShow2FAConfirm] = useState(false);
+
+  // For campaigns and organizations, allow custom amount; for chamas, use full balance
+  const allowCustomAmount = !chamaId && (!!mchangoId || !!organizationId);
 
   useEffect(() => {
     if (isOpen) {
@@ -188,9 +193,9 @@ export const WithdrawalButton = ({
   };
 
   const executeWithdraw = async () => {
-    const withdrawAmount = totalAvailable;
+    const withdrawAmount = allowCustomAmount && customAmount ? Number(customAmount) : totalAvailable;
 
-    if (withdrawAmount <= 0) {
+    if (withdrawAmount <= 0 || isNaN(withdrawAmount)) {
       toast({
         title: "No Funds Available",
         description: "There are no funds available to withdraw",
@@ -240,6 +245,7 @@ export const WithdrawalButton = ({
       }
 
       setNotes("");
+      setCustomAmount("");
       setIsOpen(false);
       
       if (onSuccess) {
@@ -263,7 +269,7 @@ export const WithdrawalButton = ({
 
   // No commission deduction at withdrawal - commission was already deducted at contribution time
   // Use full available balance
-  const withdrawAmount = totalAvailable;
+  const withdrawAmount = allowCustomAmount && customAmount ? Number(customAmount) : totalAvailable;
 
   const dailyLimit = defaultPaymentMethod 
     ? PAYMENT_METHOD_LIMITS[defaultPaymentMethod.method_type as PaymentMethodType]?.daily_limit || 0
@@ -417,20 +423,50 @@ export const WithdrawalButton = ({
               </p>
             </div>
 
-            {/* Full balance withdrawal - no amount input needed */}
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="pt-4">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>You'll Receive</span>
-                  <span className="text-primary">
-                    KES {withdrawAmount.toLocaleString()}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Full balance withdrawal • Commission was already deducted when payments were received
-                </p>
-              </CardContent>
-            </Card>
+            {allowCustomAmount ? (
+              <div className="space-y-2">
+                <Label htmlFor="withdraw-amount">Amount to Withdraw (KES)</Label>
+                <Input
+                  id="withdraw-amount"
+                  type="number"
+                  min="1"
+                  max={totalAvailable}
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  placeholder={`Enter amount (max ${totalAvailable.toLocaleString()})`}
+                />
+                {customAmount && Number(customAmount) > totalAvailable && (
+                  <p className="text-xs text-destructive">Amount exceeds available balance</p>
+                )}
+                <Card className="bg-primary/5 border-primary/20">
+                  <CardContent className="pt-4">
+                    <div className="flex justify-between text-lg font-bold">
+                      <span>You'll Receive</span>
+                      <span className="text-primary">
+                        KES {(Number(customAmount) || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Commission was already deducted when payments were received
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="pt-4">
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>You'll Receive</span>
+                    <span className="text-primary">
+                      KES {withdrawAmount.toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Full balance withdrawal • Commission was already deducted when payments were received
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
@@ -454,7 +490,13 @@ export const WithdrawalButton = ({
 
             <Button 
               type="submit" 
-              disabled={isLoading || !defaultPaymentMethod || withdrawAmount > remainingLimit || withdrawAmount <= 0} 
+              disabled={
+                isLoading || 
+                !defaultPaymentMethod || 
+                withdrawAmount > remainingLimit || 
+                withdrawAmount <= 0 ||
+                (allowCustomAmount && (!customAmount || Number(customAmount) > totalAvailable || Number(customAmount) <= 0))
+              } 
               className="w-full"
             >
               {isLoading ? (
@@ -462,6 +504,8 @@ export const WithdrawalButton = ({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Requesting...
                 </>
+              ) : allowCustomAmount ? (
+                `Withdraw KES ${(Number(customAmount) || 0).toLocaleString()}`
               ) : (
                 `Withdraw Full Balance (KES ${withdrawAmount.toLocaleString()})`
               )}
