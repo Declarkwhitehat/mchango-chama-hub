@@ -205,8 +205,8 @@ serve(async (req) => {
       PartyB: shortcode,
       PhoneNumber: normalizedPhone,
       CallBackURL: callbackUrl,
-      AccountReference: body.account_reference || 'Donation',
-      TransactionDesc: body.transaction_desc || 'Donation Payment',
+      AccountReference: (body.account_reference || 'Donation').substring(0, 12),
+      TransactionDesc: (body.transaction_desc || 'Payment').substring(0, 13),
     };
 
     console.log('STK Push payload:', { ...payload, Password: '****' });
