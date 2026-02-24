@@ -134,3 +134,6 @@ verify_jwt = false
 
 [functions.fraud-monitor]
 verify_jwt = false
+
+[functions.mpesa-register-c2b-urls]
+verify_jwt = false
