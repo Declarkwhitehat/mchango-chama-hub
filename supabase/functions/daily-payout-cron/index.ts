@@ -142,16 +142,6 @@ async function recordPayoutSkip(
     console.error('Error recording payout skip:', error);
   }
 
-  await supabase
-    .from('chama_members')
-    .update({
-      was_skipped: true,
-      skipped_at: new Date().toISOString(),
-      skip_reason: reason,
-      contribution_status: 'skipped'
-    })
-    .eq('id', memberId);
-
   return !error;
 }
 
@@ -418,6 +408,7 @@ Deno.serve(async (req) => {
             order_index,
             missed_payments_count,
             requires_admin_verification,
+            payout_deferred_count,
             profiles!chama_members_user_id_fkey(full_name, phone)
           )
         `)
@@ -455,25 +446,92 @@ Deno.serve(async (req) => {
 
           wasSkipped = true;
 
+          // ========== REORDERING: Move ineligible member to end of queue ==========
+          // Get the current max order_index in the chama
+          const { data: maxOrderResult } = await supabase
+            .from('chama_members')
+            .select('order_index')
+            .eq('chama_id', chama.id)
+            .eq('status', 'active')
+            .eq('approval_status', 'approved')
+            .order('order_index', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const lastPosition = maxOrderResult?.order_index || scheduledBeneficiary.order_index;
+          const newPosition = lastPosition + 1;
+
+          // Record the skip with the new position
           await recordPayoutSkip(
             supabase,
             chama.id,
             scheduledBeneficiary.id,
             cycle.id,
             scheduledBeneficiary.order_index,
-            null,
+            newPosition,
             eligibility.shortfall,
             eligibility.contributed,
-            `Incomplete cycle payments: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}`
+            `Incomplete cycle payments: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}. Moved to position ${newPosition}.`
           );
 
+          // Move member to end of queue and increment deferred count
+          const currentDeferredCount = scheduledBeneficiary.payout_deferred_count || 0;
+          await supabase
+            .from('chama_members')
+            .update({
+              was_skipped: true,
+              skipped_at: new Date().toISOString(),
+              skip_reason: `Payout deferred: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}`,
+              contribution_status: 'skipped',
+              rescheduled_to_position: newPosition,
+              payout_deferred_count: currentDeferredCount + 1
+            })
+            .eq('id', scheduledBeneficiary.id);
+
+          // Resequence remaining members to fill the gap
+          await supabase.rpc('resequence_member_order', { p_chama_id: chama.id });
+          await supabase.rpc('calculate_expected_contributions', { p_chama_id: chama.id });
+
+          console.log(`🔄 Member ${scheduledBeneficiary.member_code} moved from position ${scheduledBeneficiary.order_index} → ${newPosition} (deferred ${currentDeferredCount + 1} time(s))`);
+
+          // Log audit trail
+          await supabase.from('audit_logs').insert({
+            action: 'PAYOUT_DEFERRED',
+            table_name: 'chama_members',
+            record_id: scheduledBeneficiary.id,
+            old_values: {
+              order_index: scheduledBeneficiary.order_index,
+              payout_deferred_count: currentDeferredCount
+            },
+            new_values: {
+              rescheduled_to_position: newPosition,
+              payout_deferred_count: currentDeferredCount + 1,
+              skip_reason: `${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}`
+            }
+          });
+
+          // Notify member
           const skipPhone = scheduledBeneficiary.profiles?.phone;
           if (skipPhone) {
-            await sendSMS(skipPhone, `⚠️ Your chama "${chama.name}" payout was SKIPPED today. Reason: ${eligibility.unpaidCycles} unpaid cycle(s). Outstanding: KES ${eligibility.shortfall}. Please clear your missed payments.`);
+            await sendSMS(skipPhone, `⚠️ Your chama "${chama.name}" payout was POSTPONED today. Reason: ${eligibility.unpaidCycles} unpaid cycle(s). Outstanding: KES ${eligibility.shortfall}. You've been moved to position ${newPosition} in the queue. Clear your payments to restore eligibility.`);
+          }
+
+          // In-app notification
+          if (scheduledBeneficiary.user_id) {
+            await supabase.from('notifications').insert({
+              user_id: scheduledBeneficiary.user_id,
+              title: 'Payout Postponed',
+              message: `Your payout for "${chama.name}" was postponed. You've been moved to position ${newPosition}. Outstanding: KES ${eligibility.shortfall}. Clear your payments to be eligible.`,
+              type: 'warning',
+              category: 'chama',
+              related_entity_id: chama.id,
+              related_entity_type: 'chama'
+            });
           }
 
           skipsProcessed++;
 
+          // Find next eligible member for THIS cycle's payout
           const nextEligible = await findNextEligibleMember(
             supabase,
             chama.id,
