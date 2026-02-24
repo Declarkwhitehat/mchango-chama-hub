@@ -274,7 +274,7 @@ const MchangoDetail = () => {
         {/* Commission Display */}
         <CommissionDisplay 
           totalCollected={campaign.current_amount}
-          commissionRate={0.15}
+          commissionRate={0.07}
           type="mchango"
           showBreakdown={true}
         />
@@ -293,7 +293,7 @@ const MchangoDetail = () => {
           <WithdrawalButton
             mchangoId={campaign.id}
             totalAvailable={campaign.current_amount}
-            commissionRate={0.15}
+            commissionRate={0.07}
             onSuccess={fetchCampaign}
           />
         )}

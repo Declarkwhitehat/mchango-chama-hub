@@ -26,7 +26,7 @@ export const CommissionDisplay = ({
           Balance & Commission
         </CardTitle>
         <CardDescription>
-          {type === 'mchango' ? '15%' : '5%'} commission deducted at payment
+          {type === 'mchango' ? '7%' : '5%'} commission deducted at payment
         </CardDescription>
       </CardHeader>
       <CardContent>

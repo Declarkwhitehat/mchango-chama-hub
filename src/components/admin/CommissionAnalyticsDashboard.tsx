@@ -258,7 +258,7 @@ export const CommissionAnalyticsDashboard = () => {
     doc.text("COMMISSION BY SOURCE", 20, y); y += 8;
 
     const sources = [
-      { name: "Mchango (Campaigns)", rate: "15%", gross: summary.mchangoGross, commission: summary.mchangoCommission },
+      { name: "Mchango (Campaigns)", rate: "7%", gross: summary.mchangoGross, commission: summary.mchangoCommission },
       { name: "Chama (Groups)", rate: "5-10%", gross: summary.chamaGross, commission: summary.chamaCommission },
       { name: "Organizations (NGOs)", rate: "5%", gross: summary.orgGross, commission: summary.orgCommission },
     ];

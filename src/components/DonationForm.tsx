@@ -219,7 +219,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
                     <TrendingDown className="h-3 w-3" />
-                    Commission (15%)
+                    Commission (7%)
                   </span>
                   <span className="font-medium text-orange-600 dark:text-orange-400">
                     - KES {calculateCommission(parseFloat(amount), MCHANGO_COMMISSION_RATE).toLocaleString()}
