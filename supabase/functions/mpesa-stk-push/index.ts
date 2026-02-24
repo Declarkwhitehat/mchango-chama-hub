@@ -196,13 +196,13 @@ serve(async (req) => {
     // For Paybill: BusinessShortCode = Paybill number, PartyB = Paybill number
     // TransactionType = CustomerPayBillOnline
     const payload = {
-      BusinessShortCode: tillNumber,
-      Password: btoa(tillNumber + passkey + timestamp),
+      BusinessShortCode: shortcode,
+      Password: btoa(shortcode + passkey + timestamp),
       Timestamp: timestamp,
-      TransactionType: 'CustomerBuyGoodsOnline',
+      TransactionType: 'CustomerPayBillOnline',
       Amount: body.amount,
       PartyA: normalizedPhone,
-      PartyB: tillNumber,
+      PartyB: shortcode,
       PhoneNumber: normalizedPhone,
       CallBackURL: callbackUrl,
       AccountReference: body.account_reference || 'Donation',
