@@ -477,6 +477,7 @@ export type Database = {
           next_due_date: string | null
           order_index: number | null
           original_order_index: number | null
+          payout_deferred_count: number | null
           position_swapped_at: string | null
           removal_reason: string | null
           removed_at: string | null
@@ -510,6 +511,7 @@ export type Database = {
           next_due_date?: string | null
           order_index?: number | null
           original_order_index?: number | null
+          payout_deferred_count?: number | null
           position_swapped_at?: string | null
           removal_reason?: string | null
           removed_at?: string | null
@@ -543,6 +545,7 @@ export type Database = {
           next_due_date?: string | null
           order_index?: number | null
           original_order_index?: number | null
+          payout_deferred_count?: number | null
           position_swapped_at?: string | null
           removal_reason?: string | null
           removed_at?: string | null
