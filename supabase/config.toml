@@ -137,3 +137,6 @@ verify_jwt = false
 
 [functions.mpesa-register-c2b-urls]
 verify_jwt = false
+
+[functions.totp-2fa]
+verify_jwt = false
