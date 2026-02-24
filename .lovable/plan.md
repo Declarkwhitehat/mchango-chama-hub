@@ -1,25 +1,23 @@
 
 
-## Plan: Restrict PWA to Mobile Only — No Service Worker or Install on Desktop
+## Plan: Fix Admin Analytics Password Field — Add Visibility Toggle & Fix Blank Screen
 
-### What Changes
+### Issues Found
 
-The PWA (service worker registration, caching, install prompt) will only activate on mobile devices. Desktop browsers will get the regular web app with no PWA features.
+1. **No password visibility toggle** — The privilege code input on `AdminCommissionAnalytics` (line 46) uses `type="password"` with no eye icon to show/hide what you're typing
+2. **Potential blank screen** — The `CommissionAnalyticsDashboard` component may fail to render after unlock, causing a white screen
 
-### Specific Changes
+### Changes
 
-**`src/registerSW.ts`** — Wrap the entire service worker registration in a mobile device check:
-- Check `navigator.userAgent` for mobile patterns AND `window.innerWidth <= 768`
-- If desktop: skip `registerSW()` entirely, and unregister any existing service workers (cleanup for users who previously had it installed on desktop)
-- If mobile: register as normal
+**`src/pages/AdminCommissionAnalytics.tsx`**:
 
-**`src/components/PWAInstallPrompt.tsx`** — Already has a mobile check (from the last edit), no changes needed.
+- Add a `showCode` boolean state to toggle password visibility
+- Change the input `type` from hardcoded `"password"` to `showCode ? "text" : "password"`
+- Add an eye/eye-off icon button inside the input field (like the auth page already has) so the admin can see what they're typing
+- Import `Eye` and `EyeOff` from lucide-react
+- Wrap the `CommissionAnalyticsDashboard` render in error boundary logic (try/catch with a fallback UI) to prevent blank screens if the dashboard component throws
 
-**`vite.config.ts`** — No changes. The manifest and workbox config stay — they're just static files. The runtime guard in `registerSW.ts` prevents desktop from using them.
+### No other files changed
 
-### Technical Details
-
-- The mobile check uses the same pattern already in `PWAInstallPrompt.tsx`: user agent regex + viewport width
-- On desktop, any previously registered service workers will be unregistered to clean up stale caches
-- The manifest file will still be served (it's just a JSON file) but won't matter since no service worker will be active on desktop
+The fix is entirely within `AdminCommissionAnalytics.tsx`.
 
