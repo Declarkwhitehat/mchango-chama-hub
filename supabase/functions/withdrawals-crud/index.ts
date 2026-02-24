@@ -58,6 +58,7 @@ serve(async (req) => {
       const withdrawalSchema = z.object({
         chama_id: z.string().uuid().optional(),
         mchango_id: z.string().uuid().optional(),
+        organization_id: z.string().uuid().optional(),
         amount: z.number()
           .positive('Amount must be positive')
           .min(10, 'Minimum withdrawal is KES 10')
@@ -67,8 +68,8 @@ serve(async (req) => {
           .max(500, 'Notes must be under 500 characters')
           .optional()
       }).refine(
-        data => data.chama_id || data.mchango_id,
-        'Either chama_id or mchango_id required'
+        data => data.chama_id || data.mchango_id || data.organization_id,
+        'Either chama_id, mchango_id, or organization_id required'
       );
       
       try {
@@ -83,7 +84,7 @@ serve(async (req) => {
         });
       }
       
-      const { chama_id, mchango_id, amount, notes } = body;
+      const { chama_id, mchango_id, organization_id, amount, notes } = body;
 
       console.log('Creating withdrawal request:', body);
       
@@ -314,6 +315,22 @@ serve(async (req) => {
 
         isCreator = mchango.created_by === user.id;
         totalAvailable = Number(mchango.current_amount);
+      } else if (organization_id) {
+        const { data: org, error: orgError } = await supabaseClient
+          .from('organizations')
+          .select('created_by, available_balance')
+          .eq('id', organization_id)
+          .single();
+
+        if (orgError || !org) {
+          return new Response(JSON.stringify({ error: 'Organization not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        isCreator = org.created_by === user.id;
+        totalAvailable = Number(org.available_balance) || 0;
       }
 
       if (!isCreator && !isManager) {
@@ -325,10 +342,16 @@ serve(async (req) => {
 
       // Check for any in-progress or failed withdrawals (block new requests)
       // Statuses that block: pending, approved, processing, pending_retry, failed
+      // Build the filter for blocking withdrawals
+      const filterParts = [];
+      if (chama_id) filterParts.push(`chama_id.eq.${chama_id}`);
+      if (mchango_id) filterParts.push(`mchango_id.eq.${mchango_id}`);
+      if (organization_id) filterParts.push(`organization_id.eq.${organization_id}`);
+      
       const { data: blockingWithdrawal } = await supabaseClient
         .from('withdrawals')
         .select('id, status')
-        .or(`chama_id.eq.${chama_id},mchango_id.eq.${mchango_id}`)
+        .or(filterParts.join(','))
         .in('status', ['pending', 'approved', 'processing', 'pending_retry', 'failed'])
         .order('created_at', { ascending: false })
         .limit(1)
@@ -362,10 +385,10 @@ serve(async (req) => {
       }
 
       // Determine if auto-approval is allowed
-      // Auto-approve ONLY for Mchango withdrawals by creators with M-Pesa
+      // Auto-approve for Mchango AND Organization withdrawals by creators with M-Pesa
       // All Chama withdrawals require admin approval (no auto-approve)
       const canAutoApprove = defaultPaymentMethod.method_type === 'mpesa' && 
-        mchango_id && isCreator;
+        (mchango_id || organization_id) && isCreator;
       const initialStatus = canAutoApprove ? 'approved' : 'pending';
 
       console.log('Auto-approval check:', { 
@@ -383,6 +406,7 @@ serve(async (req) => {
         .insert({
           chama_id,
           mchango_id,
+          organization_id,
           requested_by: user.id,
           amount,
           commission_amount: commissionAmount,
@@ -416,6 +440,13 @@ serve(async (req) => {
           .eq('id', mchango_id)
           .single();
         entityName = mchangoInfo?.title || 'Campaign';
+      } else if (organization_id) {
+        const { data: orgInfo } = await supabaseAdmin
+          .from('organizations')
+          .select('name')
+          .eq('id', organization_id)
+          .single();
+        entityName = orgInfo?.name || 'Organization';
       }
 
       // Create notification for withdrawal request
@@ -429,7 +460,7 @@ serve(async (req) => {
 
       // If auto-approved and M-Pesa, trigger B2C payout immediately
       if (canAutoApprove && defaultPaymentMethod.phone_number) {
-        const withdrawalType = chama_id ? 'Chama' : 'Mchango';
+        const withdrawalType = chama_id ? 'Chama' : mchango_id ? 'Mchango' : 'Organization';
         console.log(`Auto-approved ${withdrawalType} withdrawal, triggering M-Pesa B2C payout`);
         
         const supabaseUrl = Deno.env.get('SUPABASE_URL');

@@ -16,6 +16,7 @@ import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 interface WithdrawalButtonProps {
   chamaId?: string;
   mchangoId?: string;
+  organizationId?: string;
   totalAvailable: number;
   // Commission rate is no longer used for chamas - commission is deducted at contribution time
   commissionRate?: number;
@@ -25,6 +26,7 @@ interface WithdrawalButtonProps {
 export const WithdrawalButton = ({ 
   chamaId, 
   mchangoId, 
+  organizationId,
   totalAvailable, 
   commissionRate = 0, // Default to 0 - commission already deducted at payment time
   onSuccess 
@@ -47,7 +49,7 @@ export const WithdrawalButton = ({
       loadDailyUsage();
       check2FAStatus();
     }
-  }, [isOpen, chamaId, mchangoId]);
+  }, [isOpen, chamaId, mchangoId, organizationId]);
 
   const check2FAStatus = async () => {
     try {
@@ -80,7 +82,7 @@ export const WithdrawalButton = ({
           event: '*',
           schema: 'public',
           table: 'withdrawals',
-          filter: chamaId ? `chama_id=eq.${chamaId}` : `mchango_id=eq.${mchangoId}`
+        filter: chamaId ? `chama_id=eq.${chamaId}` : mchangoId ? `mchango_id=eq.${mchangoId}` : `organization_id=eq.${organizationId}`
         },
         () => {
           console.log('Withdrawal status changed, reloading...');
@@ -92,7 +94,7 @@ export const WithdrawalButton = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chamaId, mchangoId]);
+  }, [chamaId, mchangoId, organizationId]);
 
   const loadPendingWithdrawal = async () => {
     try {
@@ -107,6 +109,8 @@ export const WithdrawalButton = ({
         query = query.eq('chama_id', chamaId);
       } else if (mchangoId) {
         query = query.eq('mchango_id', mchangoId);
+      } else if (organizationId) {
+        query = query.eq('organization_id', organizationId);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle();
@@ -213,6 +217,7 @@ export const WithdrawalButton = ({
         body: {
           chama_id: chamaId,
           mchango_id: mchangoId,
+          organization_id: organizationId,
           amount: withdrawAmount,
           notes: notes.trim() ? notes.trim() : undefined,
         },
@@ -286,7 +291,7 @@ export const WithdrawalButton = ({
         <DialogHeader>
           <DialogTitle>Withdraw Funds</DialogTitle>
           <DialogDescription>
-            Request to withdraw funds from your {chamaId ? 'chama' : 'mchango'}
+            Request to withdraw funds from your {chamaId ? 'chama' : mchangoId ? 'mchango' : 'organization'}
           </DialogDescription>
         </DialogHeader>
 

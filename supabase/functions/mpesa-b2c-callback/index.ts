@@ -291,6 +291,39 @@ serve(async (req) => {
         }
       }
 
+      // Update organization balance atomically using database function
+      if (withdrawal.organization_id && transactionAmount > 0) {
+        const { error: orgError } = await supabaseAdmin.rpc('update_organization_withdrawn', {
+          p_organization_id: withdrawal.organization_id,
+          p_amount: transactionAmount
+        });
+        
+        if (orgError) {
+          console.error('Failed to update organization withdrawn:', orgError);
+          // Fallback to direct update
+          const { data: org } = await supabaseAdmin
+            .from('organizations')
+            .select('current_amount, available_balance')
+            .eq('id', withdrawal.organization_id)
+            .single();
+
+          if (org) {
+            await supabaseAdmin
+              .from('organizations')
+              .update({
+                current_amount: Math.max(0, Number(org.current_amount) - transactionAmount),
+                available_balance: Math.max(0, Number(org.available_balance) - transactionAmount)
+              })
+              .eq('id', withdrawal.organization_id);
+          }
+        } else {
+          console.log('Updated organization balance atomically:', {
+            organization_id: withdrawal.organization_id,
+            amount: transactionAmount
+          });
+        }
+      }
+
       // Send success SMS
       if (recipientPhone) {
         const successMessage = `🎉 Your ${groupName} payout of KES ${transactionAmount.toFixed(2)} has been sent to your M-Pesa. Transaction: ${transactionId}. Thank you for being a valued member!`;
@@ -299,12 +332,14 @@ serve(async (req) => {
 
       // Record commission as company earning
       if (withdrawal.commission_amount > 0) {
+        const sourceType = withdrawal.chama_id ? 'chama_withdrawal' : withdrawal.mchango_id ? 'mchango_withdrawal' : 'organization_withdrawal';
+        const sourceLabel = withdrawal.chama_id ? 'Chama' : withdrawal.mchango_id ? 'Mchango' : 'Organization';
         await supabaseAdmin.rpc('record_company_earning', {
-          p_source: withdrawal.chama_id ? 'chama_withdrawal' : 'mchango_withdrawal',
+          p_source: sourceType,
           p_amount: withdrawal.commission_amount,
           p_group_id: null,
           p_reference_id: withdrawal.id,
-          p_description: `Withdrawal commission from ${withdrawal.chama_id ? 'Chama' : 'Mchango'}`
+          p_description: `Withdrawal commission from ${sourceLabel}`
         });
       }
 

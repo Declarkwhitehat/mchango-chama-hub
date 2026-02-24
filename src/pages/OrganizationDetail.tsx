@@ -15,6 +15,7 @@ import { OrganizationDonationForm } from "@/components/OrganizationDonationForm"
 import { OrganizationDonorsList } from "@/components/OrganizationDonorsList";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
+import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Organization {
@@ -313,12 +314,15 @@ const OrganizationDetail = () => {
             {/* Withdrawal Button - Only for creators */}
             {isCreator && (
               <WithdrawalButton
-                mchangoId={organization.id}
+                organizationId={organization.id}
                 totalAvailable={organization.available_balance || 0}
                 commissionRate={0.05}
                 onSuccess={fetchOrganization}
               />
             )}
+
+            {/* Withdrawal History */}
+            <WithdrawalHistory organizationId={organization.id} />
           </TabsContent>
 
           <TabsContent value="donate">
