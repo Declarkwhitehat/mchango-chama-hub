@@ -1,44 +1,44 @@
 
 
-## Diagnosis: M-Pesa STK Push Returns ResultCode 17
+## Analysis: STK Push Accepted but No Prompt (ResultCode 17)
 
-The STK push request is accepted by Safaricom (ResponseCode 0), but the actual payment fails with **ResultCode 17 ("System internal error")**. This means the credentials authenticate fine, but the transaction configuration is wrong.
+The logs confirm that Safaricom **accepts** the STK push request (ResponseCode 0, "Success. Request accepted for processing"), but the callback returns **ResultCode 17 ("System internal error")**. This means no STK prompt is ever sent to your phone.
 
-### Root Cause
+Since you just updated the passkey, these logs are from the **previous attempt** (before the passkey change). You should try again first to see if the new passkey resolves it.
 
-From the logs, your shortcode is `4015351` and the code uses `TransactionType: 'CustomerPayBillOnline'` with `PartyB: shortcode`. 
+However, if ResultCode 17 persists after retrying with the new passkey, the most likely causes are:
 
-Based on a previous fix documented for this project: **if your M-Pesa number is a Till (Buy Goods) number rather than a Paybill number, the transaction type and party configuration are wrong.** This mismatch causes ResultCode 17.
+### Likely Root Causes
 
-### Key Question
+1. **Lipa Na M-Pesa Online (STK Push) is not activated for Paybill 4015351.** Having a Paybill number alone does not automatically enable STK Push. You must specifically request Safaricom to activate the "Lipa Na M-Pesa Online" API for your Paybill. This is the most common reason for ResultCode 17 on production Paybill numbers.
 
-Before implementing, I need to confirm: **Is 4015351 a Paybill number or a Till (Buy Goods) number?**
+2. **Passkey mismatch.** The passkey must be the one Safaricom issued specifically for Lipa Na M-Pesa Online on Paybill 4015351. It is different from your consumer key/secret. You receive it from Safaricom after STK Push is activated.
 
-### Plan (assuming Till/Buy Goods)
+### Recommended Steps (No Code Changes Needed)
 
-Modify `supabase/functions/mpesa-stk-push/index.ts`:
+1. **Retry the payment now** — the passkey was just updated, so test again to confirm whether the new passkey fixes it.
 
-1. Change `TransactionType` from `'CustomerPayBillOnline'` to `'CustomerBuyGoodsOnline'`
-2. Change `PartyB` from `shortcode` to `tillNumber` (which is the actual Till number)
-3. Use `tillNumber` as `BusinessShortCode` as well
+2. **If it still fails with ResultCode 17**, contact Safaricom Daraja support and confirm:
+   - Is **Lipa Na M-Pesa Online (STK Push)** activated for Paybill **4015351**?
+   - Is the passkey `187d51f...` the correct one issued for this Paybill's STK Push?
 
-These three changes align with the documented fix pattern for Till-based M-Pesa integrations.
-
-### If it is a Paybill
-
-If 4015351 is genuinely a Paybill, the issue is likely with the **Passkey** not matching the shortcode. The passkey must be the one specifically generated for Lipa Na M-Pesa Online for that exact Paybill number.
+3. **No code changes are required.** The STK Push function is correctly configured for Paybill mode (`CustomerPayBillOnline`, `PartyB = shortcode`). The issue is on the Safaricom configuration side.
 
 ### Technical Detail
 
 ```text
-Current (Paybill mode):
-  BusinessShortCode = shortcode (4015351)
-  PartyB            = shortcode (4015351)
+Current configuration (correct for Paybill):
+  BusinessShortCode = 4015351
+  PartyB            = 4015351
   TransactionType   = CustomerPayBillOnline
+  Password          = base64(shortcode + passkey + timestamp)
 
-Fix for Till mode:
-  BusinessShortCode = tillNumber (4015351)
-  PartyB            = tillNumber (4015351)
-  TransactionType   = CustomerBuyGoodsOnline
+Safaricom response flow:
+  1. API accepts request    → ResponseCode: 0 ✓
+  2. Callback returns error → ResultCode: 17 ✗
+  
+This pattern (accept then fail) indicates the API credentials 
+are valid but STK Push processing fails internally, typically 
+because the Paybill is not enabled for Lipa Na M-Pesa Online.
 ```
 
