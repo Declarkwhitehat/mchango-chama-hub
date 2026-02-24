@@ -1,63 +1,63 @@
 
 
-## Plan: Add Monthly Date Selection for Chama Contribution Frequency
+## Root Cause: Double-Counting Donations
 
-### What This Changes
-When a creator selects "Monthly" frequency, they can now choose **which day(s)** of the month contributions are due. Options include a single date (e.g., the 1st, 15th, or 30th) or twice a month (e.g., 1st and 15th).
+The campaign "The BB ibechasers" shows KES 185 instead of the correct KES 85 because **two separate systems are both updating the balance** when a donation completes:
+
+1. **Database trigger** (`update_mchango_on_donation`): Fires when donation status changes to `completed` and adds the **gross amount** (KES 100) to `current_amount`
+2. **M-Pesa callback code** (`mpesa-callback/index.ts` line 324): Also adds the **net amount** (KES 85) to `current_amount`
+
+Combined: 0 + 100 + 85 = **KES 185** (should be KES 85)
+
+The trigger also uses the wrong amount — it adds `amount` (gross) instead of `net_amount`.
 
 ---
 
-### Technical Design
+## Fix Plan
 
-#### 1. Database Migration
-Add two new columns to the `chama` table and a new enum value:
+### 1. Fix the database trigger to use net amount only
+Update `update_mchango_on_donation()` to add `net_amount` instead of `amount`:
 
 ```sql
--- Add 'twice_monthly' to the contribution_frequency enum
-ALTER TYPE contribution_frequency ADD VALUE IF NOT EXISTS 'twice_monthly';
-
--- Store which day(s) of the month contributions are due
-ALTER TABLE chama ADD COLUMN monthly_contribution_day INTEGER DEFAULT NULL;
-ALTER TABLE chama ADD COLUMN monthly_contribution_day_2 INTEGER DEFAULT NULL;
+IF NEW.payment_status = 'completed' AND (OLD.payment_status IS NULL OR OLD.payment_status != 'completed') THEN
+    UPDATE public.mchango
+    SET current_amount = current_amount + COALESCE(NEW.net_amount, NEW.amount)
+    WHERE id = NEW.mchango_id;
+END IF;
 ```
 
-- `monthly_contribution_day`: Primary day (1-31), used when frequency is `monthly` or `twice_monthly`
-- `monthly_contribution_day_2`: Second day, used only when frequency is `twice_monthly`
+### 2. Remove the duplicate update from mpesa-callback
+Remove lines 321-329 in `mpesa-callback/index.ts` that update `current_amount`, `total_gross_collected`, `total_commission_paid`, and `available_balance` on the mchango table — since the trigger already handles `current_amount`. Or alternatively, keep only the callback code and drop the trigger.
 
-#### 2. Frontend Changes (`src/pages/ChamaCreate.tsx`)
-- When frequency = `monthly`: show a dropdown to pick the contribution day (1-28, with a note about months with fewer days)
-- Add new frequency option `twice_monthly` ("Twice a Month")
-- When frequency = `twice_monthly`: show two dropdowns for first and second contribution days
-- Validate that the two dates are different
+**Recommended approach**: Keep the callback code (which tracks all 4 financial fields properly) and **remove the trigger**, since the callback already calculates gross/commission/net correctly and updates all financial columns.
 
-New UI flow:
-```text
-Frequency: [Monthly ▼]
-  → Contribution Day: [15th ▼]
+### 3. Fix the current incorrect data
+Run a data correction to set the campaign balance to the correct value based on actual completed donations:
 
-Frequency: [Twice a Month ▼]  
-  → First Contribution Day:  [1st ▼]
-  → Second Contribution Day: [15th ▼]
+```sql
+UPDATE mchango SET
+  current_amount = 85,
+  available_balance = 85,
+  total_gross_collected = 100,
+  total_commission_paid = 15
+WHERE id = 'a8723f41-5a12-468b-a87f-53d46cc81f82';
 ```
 
-#### 3. Backend Changes (`supabase/functions/chama-crud/index.ts`)
-- Accept `monthly_contribution_day` and `monthly_contribution_day_2` in the POST body
-- Validate: day must be 1-28 (to avoid edge cases with 29/30/31)
-- Validate: for `twice_monthly`, both days required and must differ
-- Store both values in the chama record
+### 4. Fix all other affected campaigns
+Check and correct any other campaigns with the same double-count issue.
 
-#### 4. Cycle Engine Updates (`supabase/functions/chama-start/index.ts` and `daily-payout-cron`)
-- `calculateCycleEndDate()`: For `monthly`, use `monthly_contribution_day` to set exact cycle boundaries
-- For `twice_monthly`: cycle length = days between the two selected dates (alternating)
-- `getCycleLengthInDays()`: Handle `twice_monthly` by calculating gap between the two dates
+---
 
-#### 5. Files to Modify
-| File | Change |
-|------|--------|
-| `supabase/migrations/new.sql` | Add columns + enum value |
-| `src/pages/ChamaCreate.tsx` | Add day picker dropdowns, new frequency option |
-| `supabase/functions/chama-crud/index.ts` | Accept + validate new fields |
-| `supabase/functions/chama-start/index.ts` | Update cycle date calculations |
-| `supabase/functions/daily-payout-cron/index.ts` | Handle `twice_monthly` cycle creation |
-| `supabase/functions/cycle-auto-create/index.ts` | Handle next cycle date for new frequencies |
+## Technical Details
+
+| Step | File/Object | Change |
+|------|-------------|--------|
+| Drop trigger | `update_mchango_on_donation` trigger | Remove entirely via migration |
+| Keep callback logic | `supabase/functions/mpesa-callback/index.ts` | No change needed (already correct) |
+| Data fix | Migration SQL | Correct "The BB ibechasers" balance from 185 to 85 |
+| Audit other campaigns | Migration SQL | Recalculate all mchango balances from completed donations |
+
+### Files to modify
+- **New migration**: Drop the `on_donation_completed` trigger and fix data
+- No edge function changes needed
 
