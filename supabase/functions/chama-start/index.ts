@@ -204,7 +204,7 @@ serve(async (req) => {
     // ============================================
     // CREATE FIRST CONTRIBUTION CYCLE
     // ============================================
-    const cycleEndDate = calculateCycleEndDate(startDate, chama.contribution_frequency, chama.every_n_days_count);
+    const cycleEndDate = calculateCycleEndDate(startDate, chama.contribution_frequency, chama.every_n_days_count, chama.monthly_contribution_day, chama.monthly_contribution_day_2);
     
     const { data: firstCycle, error: cycleError } = await supabaseClient
       .from('contribution_cycles')
@@ -321,16 +321,43 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
     case 'daily': return 1;
     case 'weekly': return 7;
     case 'monthly': return 30;
+    case 'twice_monthly': return 15;
     case 'every_n_days': return everyNDays || 7;
     default: return 7;
   }
 }
 
-function calculateCycleEndDate(startDate: Date, frequency: string, everyNDays?: number): Date {
+function calculateCycleEndDate(
+  startDate: Date, 
+  frequency: string, 
+  everyNDays?: number,
+  monthlyDay?: number | null,
+  monthlyDay2?: number | null
+): Date {
   const endDate = new Date(startDate);
   if (frequency === 'daily') {
-    // Daily cycle ends same day at 23:59:59
     endDate.setHours(23, 59, 59, 999);
+  } else if (frequency === 'monthly' && monthlyDay) {
+    // Cycle runs from monthlyDay of current month to (monthlyDay - 1) of next month
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(monthlyDay - 1);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (frequency === 'twice_monthly' && monthlyDay && monthlyDay2) {
+    const day1 = Math.min(monthlyDay, monthlyDay2);
+    const day2 = Math.max(monthlyDay, monthlyDay2);
+    const currentDay = startDate.getDate();
+    if (currentDay >= day1 && currentDay < day2) {
+      // Current half: day1 to day2-1
+      endDate.setDate(day2 - 1);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Second half: day2 to day1-1 of next month
+      if (currentDay >= day2) {
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
+      endDate.setDate(day1 - 1);
+      endDate.setHours(23, 59, 59, 999);
+    }
   } else {
     const cycleDays = getCycleLengthInDays(frequency, everyNDays);
     endDate.setDate(endDate.getDate() + cycleDays - 1);

@@ -256,7 +256,7 @@ Deno.serve(async (req) => {
 
     const { data: chamas, error: chamasError } = await supabase
       .from('chama')
-      .select('id, name, contribution_amount, commission_rate, contribution_frequency, current_cycle_round, created_at')
+      .select('id, name, contribution_amount, commission_rate, contribution_frequency, current_cycle_round, created_at, every_n_days_count, monthly_contribution_day, monthly_contribution_day_2')
       .eq('status', 'active');
 
     if (chamasError) {
@@ -324,8 +324,29 @@ Deno.serve(async (req) => {
                   nextEnd.setHours(23, 59, 59, 999);
                   break;
                 case 'monthly':
-                  nextEnd.setMonth(nextEnd.getMonth() + 1);
-                  nextEnd.setDate(0);
+                  if (chama.monthly_contribution_day) {
+                    nextEnd.setMonth(nextEnd.getMonth() + 1);
+                    nextEnd.setDate(chama.monthly_contribution_day - 1);
+                  } else {
+                    nextEnd.setMonth(nextEnd.getMonth() + 1);
+                    nextEnd.setDate(0);
+                  }
+                  nextEnd.setHours(23, 59, 59, 999);
+                  break;
+                case 'twice_monthly':
+                  if (chama.monthly_contribution_day && chama.monthly_contribution_day_2) {
+                    const d1 = Math.min(chama.monthly_contribution_day, chama.monthly_contribution_day_2);
+                    const d2 = Math.max(chama.monthly_contribution_day, chama.monthly_contribution_day_2);
+                    const curDay = nextStart.getDate();
+                    if (curDay >= d1 && curDay < d2) {
+                      nextEnd.setDate(d2 - 1);
+                    } else {
+                      if (curDay >= d2) nextEnd.setMonth(nextEnd.getMonth() + 1);
+                      nextEnd.setDate(d1 - 1);
+                    }
+                  } else {
+                    nextEnd.setDate(nextEnd.getDate() + 14);
+                  }
                   nextEnd.setHours(23, 59, 59, 999);
                   break;
                 case 'every_n_days':

@@ -77,6 +77,8 @@ export type Database = {
           last_cycle_completed_at: string | null
           max_members: number
           min_members: number | null
+          monthly_contribution_day: number | null
+          monthly_contribution_day_2: number | null
           name: string
           payout_order: string | null
           slug: string
@@ -106,6 +108,8 @@ export type Database = {
           last_cycle_completed_at?: string | null
           max_members?: number
           min_members?: number | null
+          monthly_contribution_day?: number | null
+          monthly_contribution_day_2?: number | null
           name: string
           payout_order?: string | null
           slug: string
@@ -135,6 +139,8 @@ export type Database = {
           last_cycle_completed_at?: string | null
           max_members?: number
           min_members?: number | null
+          monthly_contribution_day?: number | null
+          monthly_contribution_day_2?: number | null
           name?: string
           payout_order?: string | null
           slug?: string
@@ -2484,7 +2490,12 @@ export type Database = {
         | "pending"
         | "cycle_complete"
         | "deleted"
-      contribution_frequency: "daily" | "weekly" | "monthly" | "every_n_days"
+      contribution_frequency:
+        | "daily"
+        | "weekly"
+        | "monthly"
+        | "every_n_days"
+        | "twice_monthly"
       kyc_status: "pending" | "approved" | "rejected"
       mchango_status: "active" | "completed" | "cancelled"
       member_status: "active" | "inactive" | "left" | "removed"
@@ -2629,7 +2640,13 @@ export const Constants = {
         "cycle_complete",
         "deleted",
       ],
-      contribution_frequency: ["daily", "weekly", "monthly", "every_n_days"],
+      contribution_frequency: [
+        "daily",
+        "weekly",
+        "monthly",
+        "every_n_days",
+        "twice_monthly",
+      ],
       kyc_status: ["pending", "approved", "rejected"],
       mchango_status: ["active", "completed", "cancelled"],
       member_status: ["active", "inactive", "left", "removed"],

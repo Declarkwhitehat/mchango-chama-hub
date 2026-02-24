@@ -44,6 +44,8 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
       return 7;
     case 'monthly':
       return 30;
+    case 'twice_monthly':
+      return 15;
     case 'every_n_days':
       return everyNDays || 7;
     default:
@@ -54,7 +56,9 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
 function calculateNextCycleDates(
   lastEndDate: Date, 
   frequency: string, 
-  everyNDays?: number
+  everyNDays?: number,
+  monthlyDay?: number | null,
+  monthlyDay2?: number | null
 ): { startDate: Date; endDate: Date } {
   const startDate = new Date(lastEndDate);
   startDate.setDate(startDate.getDate() + 1);
@@ -64,7 +68,6 @@ function calculateNextCycleDates(
   
   switch (frequency) {
     case 'daily':
-      // Daily cycle: ends at 10:00 PM (22:00) — payout trigger time
       endDate.setHours(22, 0, 0, 0);
       break;
     case 'weekly':
@@ -72,9 +75,36 @@ function calculateNextCycleDates(
       endDate.setHours(23, 59, 59, 999);
       break;
     case 'monthly':
-      endDate.setMonth(endDate.getMonth() + 1);
-      endDate.setDate(0); // Last day of month
-      endDate.setHours(23, 59, 59, 999);
+      if (monthlyDay) {
+        // Next cycle ends on the day before monthlyDay of the following month
+        endDate.setMonth(endDate.getMonth() + 1);
+        endDate.setDate(monthlyDay - 1);
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        endDate.setMonth(endDate.getMonth() + 1);
+        endDate.setDate(0);
+        endDate.setHours(23, 59, 59, 999);
+      }
+      break;
+    case 'twice_monthly':
+      if (monthlyDay && monthlyDay2) {
+        const day1 = Math.min(monthlyDay, monthlyDay2);
+        const day2 = Math.max(monthlyDay, monthlyDay2);
+        const currentDay = startDate.getDate();
+        if (currentDay >= day1 && currentDay < day2) {
+          endDate.setDate(day2 - 1);
+          endDate.setHours(23, 59, 59, 999);
+        } else {
+          if (currentDay >= day2) {
+            endDate.setMonth(endDate.getMonth() + 1);
+          }
+          endDate.setDate(day1 - 1);
+          endDate.setHours(23, 59, 59, 999);
+        }
+      } else {
+        endDate.setDate(endDate.getDate() + 14);
+        endDate.setHours(23, 59, 59, 999);
+      }
       break;
     case 'every_n_days':
       endDate.setDate(endDate.getDate() + (everyNDays || 7) - 1);
@@ -178,7 +208,9 @@ Deno.serve(async (req) => {
     const { startDate, endDate } = calculateNextCycleDates(
       lastEndDate,
       chama.contribution_frequency,
-      chama.every_n_days_count
+      chama.every_n_days_count,
+      chama.monthly_contribution_day,
+      chama.monthly_contribution_day_2
     );
 
     // Create new cycle
