@@ -445,6 +445,36 @@ serve(async (req) => {
         });
       }
 
+      // Validate monthly contribution day(s)
+      if ((body.contribution_frequency === 'monthly' || body.contribution_frequency === 'twice_monthly') && body.monthly_contribution_day) {
+        if (body.monthly_contribution_day < 1 || body.monthly_contribution_day > 28) {
+          return new Response(JSON.stringify({ error: 'Monthly contribution day must be between 1 and 28' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      if (body.contribution_frequency === 'twice_monthly') {
+        if (!body.monthly_contribution_day || !body.monthly_contribution_day_2) {
+          return new Response(JSON.stringify({ error: 'Both contribution days are required for twice monthly frequency' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (body.monthly_contribution_day_2 < 1 || body.monthly_contribution_day_2 > 28) {
+          return new Response(JSON.stringify({ error: 'Second contribution day must be between 1 and 28' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (body.monthly_contribution_day === body.monthly_contribution_day_2) {
+          return new Response(JSON.stringify({ error: 'The two contribution days must be different' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       // Validate required fields and generate a safe slug
       if (!body?.name || typeof body.name !== 'string') {
         return new Response(JSON.stringify({ error: 'name is required' }), {
@@ -470,6 +500,8 @@ serve(async (req) => {
           contribution_amount: body.contribution_amount,
           contribution_frequency: body.contribution_frequency,
           every_n_days_count: body.every_n_days_count,
+          monthly_contribution_day: body.monthly_contribution_day || null,
+          monthly_contribution_day_2: body.monthly_contribution_day_2 || null,
           min_members: minMembers,
           max_members: maxMembers,
           is_public: body.is_public !== undefined ? body.is_public : true,
@@ -477,7 +509,7 @@ serve(async (req) => {
           commission_rate: body.commission_rate || 0.05,
           whatsapp_link: body.whatsapp_link,
           created_by: user.id,
-          status: 'pending', // New chamas start in pending state
+          status: 'pending',
         })
         .select()
         .single();
