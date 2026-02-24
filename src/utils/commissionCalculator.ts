@@ -1,7 +1,7 @@
 /**
  * Commission rate constants
  */
-export const MCHANGO_COMMISSION_RATE = 0.15; // 15%
+export const MCHANGO_COMMISSION_RATE = 0.07; // 7%
 export const CHAMA_DEFAULT_COMMISSION_RATE = 0.05; // 5% on-time
 export const CHAMA_LATE_COMMISSION_RATE = 0.10; // 10% late
 export const ORGANIZATION_COMMISSION_RATE = 0.05; // 5%
