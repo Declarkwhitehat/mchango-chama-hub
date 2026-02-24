@@ -241,7 +241,7 @@ const Auth = () => {
   // and to prevent redirect loops
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const [didRedirect, setDidRedirect] = useState(false);
-  if (user && !didRedirect) {
+  if (user && !didRedirect && !show2FA) {
     // defer redirect until after paint
     setTimeout(async () => {
       if (didRedirect) return;
