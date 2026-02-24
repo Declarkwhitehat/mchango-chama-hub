@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
+import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
 import { CheckCircle2, TrendingUp, Calendar, CreditCard, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -350,27 +351,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         onPayNow={onPayNow}
       />
 
-      {/* Member ID Badge - Prominent Display */}
-      <Card className="border-primary bg-gradient-to-r from-primary/10 via-primary/5 to-background">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex-1">
-              <p className="text-sm text-muted-foreground mb-1">Your Member ID</p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <code className="text-4xl font-bold text-primary tracking-wider bg-background/80 px-4 py-2 rounded-lg border-2 border-primary/30">
-                  {member.member_code}
-                </code>
-                <Badge variant="secondary" className="text-xs">
-                  Use for offline payments
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Use this ID as account number when making M-Pesa payments
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Member ID - Offline Payment Instructions */}
+      <CopyableUniqueId uniqueId={member.member_code} label="Member ID (Account No.)" />
 
       {/* Commission Display - Show chama-wide commission info */}
       <CommissionDisplay
