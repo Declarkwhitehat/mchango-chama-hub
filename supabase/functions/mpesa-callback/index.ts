@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { COMMISSION_RATES } from "../_shared/commissionRates.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -277,8 +278,8 @@ serve(async (req) => {
       const donation = donations[0];
       const grossAmount = paidAmount || donation.amount;
       
-      // Calculate commission immediately (15%)
-      const commissionRate = 0.15;
+      // Calculate commission using shared constant (7%)
+      const commissionRate = COMMISSION_RATES.MCHANGO;
       const commissionAmount = grossAmount * commissionRate;
       const netAmount = grossAmount - commissionAmount;
       
@@ -338,7 +339,7 @@ serve(async (req) => {
             source: 'mchango_donation',
             amount: commissionAmount,
             reference_id: donation.id,
-            description: `15% commission on donation of KES ${grossAmount}. Net credited: KES ${netAmount}`
+            description: `${(commissionRate * 100)}% commission on donation of KES ${grossAmount}. Net credited: KES ${netAmount}`
           });
         
         if (mchangoEarningsError) {
@@ -390,7 +391,7 @@ serve(async (req) => {
       console.log('Found organization donation record:', orgDonation.id);
 
       const grossAmount = paidAmount || orgDonation.amount;
-      const commissionRate = 0.05;
+      const commissionRate = COMMISSION_RATES.ORGANIZATION;
       const commissionAmount = grossAmount * commissionRate;
       const netAmount = grossAmount - commissionAmount;
 
