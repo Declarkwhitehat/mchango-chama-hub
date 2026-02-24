@@ -188,7 +188,6 @@ serve(async (req) => {
       .toISOString()
       .replace(/[-T:.Z]/g, '')
       .slice(0, 14);
-    const password = btoa(shortcode + passkey + timestamp);
 
     const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`;
     console.log('Using Callback URL:', callbackUrl);
@@ -197,13 +196,13 @@ serve(async (req) => {
     // For Paybill: BusinessShortCode = Paybill number, PartyB = Paybill number
     // TransactionType = CustomerPayBillOnline
     const payload = {
-      BusinessShortCode: shortcode,
-      Password: password,
+      BusinessShortCode: tillNumber,
+      Password: btoa(tillNumber + passkey + timestamp),
       Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
+      TransactionType: 'CustomerBuyGoodsOnline',
       Amount: body.amount,
       PartyA: normalizedPhone,
-      PartyB: shortcode,
+      PartyB: tillNumber,
       PhoneNumber: normalizedPhone,
       CallBackURL: callbackUrl,
       AccountReference: body.account_reference || 'Donation',
