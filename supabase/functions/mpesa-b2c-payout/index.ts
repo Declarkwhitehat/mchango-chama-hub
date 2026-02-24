@@ -78,7 +78,7 @@ serve(async (req) => {
     // Validate withdrawal exists and is in approved or processing status
     const { data: withdrawal, error: withdrawalError } = await supabaseAdmin
       .from('withdrawals')
-      .select('*')
+      .select('*, chama:chama_id(name), mchango:mchango_id(title), organization:organization_id(name)')
       .eq('id', withdrawal_id)
       .single();
 
@@ -158,6 +158,25 @@ serve(async (req) => {
     // Get access token
     const accessToken = await getMpesaAccessToken();
 
+    // Determine entity name and type for descriptive remarks
+    let entityName = '';
+    let entityType = '';
+    if (withdrawal.chama?.name) {
+      entityName = withdrawal.chama.name;
+      entityType = 'Chama';
+    } else if (withdrawal.mchango?.title) {
+      entityName = withdrawal.mchango.title;
+      entityType = 'Campaign';
+    } else if (withdrawal.organization?.name) {
+      entityName = withdrawal.organization.name;
+      entityType = 'Org';
+    }
+
+    // Build remarks - M-Pesa limits to 100 chars
+    const remarks = entityName
+      ? `${entityType} "${entityName}" payout`.substring(0, 100)
+      : `Withdrawal ${withdrawal_id.substring(0, 8)}`;
+
     // Make B2C payment request
     const b2cPayload = {
       InitiatorName: initiatorName,
@@ -166,7 +185,7 @@ serve(async (req) => {
       Amount: Math.floor(amount), // M-Pesa B2C requires whole numbers
       PartyA: shortcode,
       PartyB: formattedPhone,
-      Remarks: `Withdrawal ${withdrawal_id.substring(0, 8)}`,
+      Remarks: remarks,
       QueueTimeOutURL: `${supabaseUrl}/functions/v1/mpesa-b2c-callback`,
       ResultURL: `${supabaseUrl}/functions/v1/mpesa-b2c-callback`,
       Occasion: payoutReference // Use our predictable reference for callback lookup
