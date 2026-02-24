@@ -1,47 +1,64 @@
 
 
-## Analysis: STK Push Returning ResultCode 17
+## Why Offline Payments Are Not Reflecting
 
-### What's Happening
+### The Problem
 
-Looking at your latest logs, the flow is:
+Your **C2B callback URLs are not registered with Safaricom** for shortcode 4015351. This means when someone pays via Paybill with account number ORGN36K57, Safaricom processes the payment but has **nowhere to send the confirmation** — so your system never knows about it.
 
-1. **STK Push request** → Safaricom accepts it (ResponseCode "0", CheckoutRequestID assigned)
-2. **Callback from Safaricom** → Returns **ResultCode 17** ("System internal error")
-3. **Your callback function** correctly sets status to `'failed'` — but confusingly logs "Donation updated with breakdown" regardless
+Evidence:
+- Zero logs for `mpesa-c2b-callback` — Safaricom has never called this endpoint
+- The automated URL registration via API keeps failing with "Invalid Access Token" error code `401.003.01`
+- The OAuth token (28 chars) works for STK Push but is being rejected by the C2B Register URL API
 
-So the STK prompt may or may not appear on your phone, but Safaricom's backend cannot complete the transaction.
+### Why It Fails
 
-### Root Cause: Safaricom-Side Issue with Shortcode 4015351
+Your Daraja app likely does not have the **C2B API product** enabled. The same credentials work for STK Push (confirmed working) but the C2B Register URL endpoint rejects the token. This is a Daraja portal configuration issue.
 
-ResultCode 17 after a successful ResponseCode 0 means Safaricom accepted the request but their internal processing failed. This is **not a code bug** — your edge functions are working correctly. Common causes:
+### What Needs To Be Done (Safaricom Daraja Portal)
 
-- **Lipa Na M-Pesa Online not activated** for shortcode 4015351 on Safaricom's production backend (even if your Daraja app shows "Production")
-- **Temporary Safaricom outage** for this shortcode
-- **Shortcode configuration mismatch** — e.g., the shortcode is registered as a Paybill but the passkey doesn't match what Safaricom has on file
+You need to register the C2B URLs **manually through the Daraja portal**:
 
-### What You Need to Do (Safaricom Side)
+1. Go to https://developer.safaricom.co.ke/
+2. Log in → **My Apps** → select your production app
+3. Check that the **C2B** API product is subscribed/enabled (alongside Lipa Na M-Pesa Online)
+4. Go to **APIs → C2B → Register URL** (or use the API test console)
+5. Register these URLs for shortcode **4015351**:
 
-1. **Contact Safaricom M-Pesa support** (or your M-Pesa organization admin) and confirm:
-   - Is "Lipa Na M-Pesa Online" (STK Push) activated for shortcode **4015351**?
-   - Is the passkey you're using the correct one issued for this shortcode?
-   - Has anything changed on the shortcode configuration recently?
+   - **Validation URL**: `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-validation`
+   - **Confirmation URL**: `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-callback`
+   - **Response Type**: `Completed`
 
-2. If you previously had a **different shortcode** that was working, check whether the credentials/passkey match that shortcode instead.
+6. If the Daraja portal doesn't have a C2B test console, contact **Safaricom M-Pesa support** and ask them to register these C2B URLs for your shortcode
 
-### Code Fix: Bug in Callback Logging
+### How It Works Once Registered
 
-There is one real bug worth fixing — your `mpesa-callback` function logs "Donation updated with breakdown" even when the payment **failed** (ResultCode 17). The donation gets status `'failed'` in the database correctly, but the log is misleading. I'll fix the log to only show the breakdown message on successful payments.
+```text
+Customer pays via M-Pesa Paybill
+         │
+         ▼
+Safaricom processes payment
+         │
+         ▼
+Safaricom calls your Confirmation URL  ← THIS IS WHAT'S MISSING
+(mpesa-c2b-callback)
+         │
+         ▼
+Your system matches account "ORGN36K57"
+to the organization, records donation,
+updates balance, sends SMS confirmation
+```
 
-### Implementation Steps
+### Code Status
 
-1. Fix the misleading log in `mpesa-callback/index.ts` — move the breakdown log inside the `if (status === 'completed')` block
-2. No other code changes needed — the issue is on Safaricom's end
+Your code is **fully ready** — no changes needed:
+- `mpesa-c2b-callback` correctly handles organization lookups by `paybill_account_id` (e.g., ORGN36K57)
+- `mpesa-c2b-validation` validates incoming payments
+- Commission calculation, financial tracking, and SMS notifications are all implemented
 
-### Technical Details
+The only missing piece is the Safaricom-side URL registration.
 
-- `ResponseCode: "0"` = Safaricom queue accepted the request
-- `ResultCode: 17` = Safaricom's internal processing failed (not your code)
-- Your `AccountReference` (12 chars) and `TransactionDesc` (13 chars) are within Safaricom's limits
-- The callback correctly writes `status: 'failed'` to the database
+### After Registration — How to Verify
+
+Once you register the URLs, make another test Paybill payment to 4015351 with account ORGN36K57. You should then see logs appear in the `mpesa-c2b-callback` function, and the payment will reflect on the organization's page.
 
