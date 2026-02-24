@@ -24,7 +24,7 @@ import { ChamaEndDate } from "@/components/chama/ChamaEndDate";
 import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
-import { CopyableUniqueId } from "@/components/CopyableUniqueId";
+
 import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -445,10 +445,6 @@ const ChamaDetail = () => {
               </div>
             </div>
 
-            {/* Unique ID for offline payments */}
-            {chama.group_code && (
-              <CopyableUniqueId uniqueId={chama.group_code} />
-            )}
 
             <div className="flex items-center gap-2 pt-2 border-t border-border text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
