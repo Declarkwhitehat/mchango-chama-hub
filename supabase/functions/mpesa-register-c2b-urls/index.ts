@@ -21,6 +21,15 @@ serve(async (req) => {
       throw new Error('M-Pesa credentials not configured');
     }
 
+    // Debug: log credential lengths and first/last 4 chars to verify correct secrets are loaded
+    console.log('🔑 Credential debug:', {
+      keyLength: consumerKey.length,
+      secretLength: consumerSecret.length,
+      keyPreview: consumerKey.substring(0, 4) + '...' + consumerKey.substring(consumerKey.length - 4),
+      secretPreview: consumerSecret.substring(0, 4) + '...' + consumerSecret.substring(consumerSecret.length - 4),
+      areIdentical: consumerKey === consumerSecret,
+    });
+
     // Step 1: Get OAuth token
     const authString = btoa(`${consumerKey}:${consumerSecret}`);
     const tokenRes = await fetch(
