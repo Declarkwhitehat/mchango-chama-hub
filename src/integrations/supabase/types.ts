@@ -2191,6 +2191,7 @@ export type Database = {
           mchango_id: string | null
           net_amount: number
           notes: string | null
+          organization_id: string | null
           payment_method_id: string | null
           payment_method_type:
             | Database["public"]["Enums"]["payment_method_type"]
@@ -2217,6 +2218,7 @@ export type Database = {
           mchango_id?: string | null
           net_amount: number
           notes?: string | null
+          organization_id?: string | null
           payment_method_id?: string | null
           payment_method_type?:
             | Database["public"]["Enums"]["payment_method_type"]
@@ -2243,6 +2245,7 @@ export type Database = {
           mchango_id?: string | null
           net_amount?: number
           notes?: string | null
+          organization_id?: string | null
           payment_method_id?: string | null
           payment_method_type?:
             | Database["public"]["Enums"]["payment_method_type"]
@@ -2269,6 +2272,13 @@ export type Database = {
             columns: ["mchango_id"]
             isOneToOne: false
             referencedRelation: "mchango"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "withdrawals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {
@@ -2455,6 +2465,10 @@ export type Database = {
       }
       update_mchango_withdrawn: {
         Args: { p_amount: number; p_mchango_id: string }
+        Returns: undefined
+      }
+      update_organization_withdrawn: {
+        Args: { p_amount: number; p_organization_id: string }
         Returns: undefined
       }
     }

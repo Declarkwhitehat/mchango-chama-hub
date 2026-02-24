@@ -11,9 +11,10 @@ import { formatPaymentMethodLabel } from "@/utils/paymentLimits";
 interface WithdrawalHistoryProps {
   chamaId?: string;
   mchangoId?: string;
+  organizationId?: string;
 }
 
-export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps) => {
+export const WithdrawalHistory = ({ chamaId, mchangoId, organizationId }: WithdrawalHistoryProps) => {
   const navigate = useNavigate();
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,7 +31,7 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
           event: '*',
           schema: 'public',
           table: 'withdrawals',
-          filter: chamaId ? `chama_id=eq.${chamaId}` : `mchango_id=eq.${mchangoId}`
+          filter: chamaId ? `chama_id=eq.${chamaId}` : mchangoId ? `mchango_id=eq.${mchangoId}` : `organization_id=eq.${organizationId}`
         },
         () => {
           console.log('Withdrawal changed, reloading...');
@@ -42,7 +43,7 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chamaId, mchangoId]);
+  }, [chamaId, mchangoId, organizationId]);
 
   const loadWithdrawals = async () => {
     try {
@@ -59,6 +60,9 @@ export const WithdrawalHistory = ({ chamaId, mchangoId }: WithdrawalHistoryProps
       }
       if (mchangoId) {
         query = query.eq('mchango_id', mchangoId);
+      }
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
       }
 
       const { data, error } = await query;
