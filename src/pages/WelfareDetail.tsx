@@ -242,7 +242,9 @@ const WelfareDetail = () => {
                     <div key={member.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
                       <div>
                         <p className="font-medium text-sm">{member.profiles?.full_name || 'Unknown'}</p>
-                        <p className="text-xs text-muted-foreground">{member.member_code}</p>
+                        {member.user_id === user?.id && (
+                          <p className="text-xs text-muted-foreground">{member.member_code}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
