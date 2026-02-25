@@ -75,17 +75,31 @@ serve(async (req) => {
       return new Response(JSON.stringify({ data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // PUT - Assign roles (Chairman only)
+    // PUT - Assign roles (Chairman or Admin)
     if (req.method === 'PUT') {
       const body = await req.json();
-      const { member_id, role } = body;
+      const { member_id, role, admin_action } = body;
 
       if (!member_id || !role) {
         return new Response(JSON.stringify({ error: 'member_id and role required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      if (!['secretary', 'treasurer', 'member'].includes(role)) {
-        return new Response(JSON.stringify({ error: 'Invalid role. Use: secretary, treasurer, member' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      // Check if user is admin
+      const { data: adminRole } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      const isAdmin = !!adminRole;
+
+      // Admins can assign any role including chairman
+      const allowedRoles = isAdmin 
+        ? ['chairman', 'secretary', 'treasurer', 'member']
+        : ['secretary', 'treasurer', 'member'];
+
+      if (!allowedRoles.includes(role)) {
+        return new Response(JSON.stringify({ error: `Invalid role. Use: ${allowedRoles.join(', ')}` }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       // Get the target member's welfare_id
@@ -99,17 +113,29 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Member not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Verify requester is chairman
-      const { data: requesterMember } = await supabaseAdmin
-        .from('welfare_members')
-        .select('role')
-        .eq('welfare_id', targetMember.welfare_id)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
+      if (!isAdmin) {
+        // Verify requester is chairman
+        const { data: requesterMember } = await supabaseAdmin
+          .from('welfare_members')
+          .select('role')
+          .eq('welfare_id', targetMember.welfare_id)
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .single();
 
-      if (!requesterMember || requesterMember.role !== 'chairman') {
-        return new Response(JSON.stringify({ error: 'Only the Chairman can assign roles' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        if (!requesterMember || requesterMember.role !== 'chairman') {
+          return new Response(JSON.stringify({ error: 'Only the Chairman or Admin can assign roles' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // If assigning chairman, demote current chairman to member
+      if (role === 'chairman') {
+        await supabaseAdmin
+          .from('welfare_members')
+          .update({ role: 'member' })
+          .eq('welfare_id', targetMember.welfare_id)
+          .eq('role', 'chairman')
+          .neq('id', member_id);
       }
 
       // If assigning secretary/treasurer, remove that role from current holder
@@ -171,10 +197,19 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Chairman remove flow
+      // Chairman or Admin remove flow
       if (!memberId) {
         return new Response(JSON.stringify({ error: 'member_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+
+      // Check if user is admin
+      const { data: adminRoleDel } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      const isAdminDel = !!adminRoleDel;
 
       const { data: targetMember } = await supabaseAdmin
         .from('welfare_members')
@@ -186,21 +221,24 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Member not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      if (targetMember.role === 'chairman') {
+      // Only admin can remove chairman
+      if (targetMember.role === 'chairman' && !isAdminDel) {
         return new Response(JSON.stringify({ error: 'Cannot remove the Chairman' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Verify requester is chairman
-      const { data: requesterMember } = await supabaseAdmin
-        .from('welfare_members')
-        .select('role')
-        .eq('welfare_id', targetMember.welfare_id)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
+      if (!isAdminDel) {
+        // Verify requester is chairman
+        const { data: requesterMember } = await supabaseAdmin
+          .from('welfare_members')
+          .select('role')
+          .eq('welfare_id', targetMember.welfare_id)
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .single();
 
-      if (!requesterMember || requesterMember.role !== 'chairman') {
-        return new Response(JSON.stringify({ error: 'Only the Chairman can remove members' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        if (!requesterMember || requesterMember.role !== 'chairman') {
+          return new Response(JSON.stringify({ error: 'Only the Chairman or Admin can remove members' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
       }
 
       const { error } = await supabaseAdmin
