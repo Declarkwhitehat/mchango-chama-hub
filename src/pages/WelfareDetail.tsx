@@ -27,10 +27,23 @@ const WelfareDetail = () => {
   const [myRole, setMyRole] = useState<string | null>(null);
   const [myMemberId, setMyMemberId] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (id) fetchWelfare();
-  }, [id]);
+    if (user) checkAdmin();
+  }, [id, user]);
+
+  const checkAdmin = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    setIsAdmin(!!data);
+  };
 
   const fetchWelfare = async () => {
     try {
@@ -211,6 +224,7 @@ const WelfareDetail = () => {
               members={activeMembers}
               welfareId={welfare.id}
               isChairman={isChairman}
+              isAdmin={isAdmin}
               onRoleAssigned={fetchWelfare}
             />
 
