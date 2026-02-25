@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Link, useNavigate } from "react-router-dom";
-import { TrendingUp, Users, Plus, Calendar, CheckCircle, AlertCircle, Clock, User as UserIcon, Mail, Phone, LogOut, Building } from "lucide-react";
+import { TrendingUp, Users, Plus, Calendar, CheckCircle, AlertCircle, Clock, User as UserIcon, Mail, Phone, LogOut, Building, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -48,12 +48,23 @@ interface Organization {
   created_at: string;
 }
 
+interface Welfare {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  available_balance: number;
+  created_at: string;
+  status: string;
+}
+
 const Home = () => {
   const [activeTab, setActiveTab] = useState("mchango");
   const [mchangoList, setMchangoList] = useState<Mchango[]>([]);
   const [chamaList, setChamaList] = useState<Chama[]>([]);
   const [memberChamaList, setMemberChamaList] = useState<Chama[]>([]);
   const [organizationList, setOrganizationList] = useState<Organization[]>([]);
+  const [welfareList, setWelfareList] = useState<Welfare[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentSetup, setShowPaymentSetup] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -205,6 +216,18 @@ const Home = () => {
 
       if (organizationError) throw organizationError;
       setOrganizationList(organizations || []);
+
+      // Fetch user's welfares via edge function
+      try {
+        const { data: welfareData, error: welfareError } = await supabase.functions.invoke('welfare-crud', {
+          method: 'GET',
+        });
+        if (!welfareError && welfareData?.data) {
+          setWelfareList(welfareData.data);
+        }
+      } catch (e) {
+        console.error('Error fetching welfares:', e);
+      }
     } catch (error: any) {
       console.error('Error fetching user data:', error);
       toast.error("Failed to load your data");
@@ -248,6 +271,7 @@ const Home = () => {
     groupsCreated: chamaList.length,
     activeCampaigns: mchangoList.length,
     organizationsCount: organizationList.length,
+    welfareCount: welfareList.length,
   };
 
   return (
@@ -398,7 +422,7 @@ const Home = () => {
           {user && <PendingJoinRequests userId={user.id} onRefresh={fetchUserData} />}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
+            <TabsList className="grid w-full grid-cols-4 mb-4 sm:mb-6">
               <TabsTrigger value="mchango" className="gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
                 <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Mchango</span>
@@ -413,6 +437,11 @@ const Home = () => {
                 <Building className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Organizations</span>
                 <span className="sm:hidden">Orgs</span>
+              </TabsTrigger>
+              <TabsTrigger value="welfare" className="gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+                <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Welfare</span>
+                <span className="sm:hidden">Welfare</span>
               </TabsTrigger>
             </TabsList>
 
@@ -678,6 +707,72 @@ const Home = () => {
                         <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground pt-2 border-t border-border">
                           <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           Created: {new Date(org.created_at).toLocaleDateString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="welfare" className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground">My Welfare Groups</h2>
+              <Link to="/welfare/create" className="w-full sm:w-auto">
+                <Button variant="hero" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">
+                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                  Create Welfare
+                </Button>
+              </Link>
+            </div>
+
+            {loading ? (
+              <Card>
+                <CardContent className="py-6 sm:py-8 text-center">
+                  <p className="text-sm sm:text-base text-muted-foreground">Loading welfare groups...</p>
+                </CardContent>
+              </Card>
+            ) : welfareList.length === 0 ? (
+              <Card>
+                <CardContent className="py-6 sm:py-8 text-center space-y-3 sm:space-y-4">
+                  <p className="text-sm sm:text-base text-muted-foreground">You haven't joined any welfare groups yet</p>
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                    <Link to="/welfare/create" className="w-full sm:w-auto">
+                      <Button variant="hero" className="w-full sm:w-auto text-xs sm:text-sm">
+                        <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                        Create Your First Welfare
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {welfareList.map((welfare) => (
+                  <Link key={welfare.id} to={`/welfare/${welfare.id}`}>
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-base sm:text-lg break-words">{welfare.name}</CardTitle>
+                            <CardDescription className="text-xs sm:text-sm break-words">{welfare.description}</CardDescription>
+                          </div>
+                          <Badge variant="secondary" className="text-xs self-start sm:self-auto flex-shrink-0 capitalize">
+                            {welfare.status}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2 text-xs sm:text-sm">
+                          <span className="text-muted-foreground">Available Balance</span>
+                          <span className="font-semibold text-foreground">
+                            KES {Number(welfare.available_balance || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground pt-2 border-t border-border">
+                          <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          Created: {new Date(welfare.created_at).toLocaleDateString()}
                         </div>
                       </CardContent>
                     </Card>

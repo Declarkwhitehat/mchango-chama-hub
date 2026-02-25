@@ -35,6 +35,10 @@ const Activity = lazy(() => import("./pages/Activity"));
 const KYCUpload = lazy(() => import("./pages/KYCUpload"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AboutUs = lazy(() => import("./pages/AboutUs"));
+const WelfareCreate = lazy(() => import("./pages/WelfareCreate"));
+const WelfareList = lazy(() => import("./pages/WelfareList"));
+const WelfareDetail = lazy(() => import("./pages/WelfareDetail"));
+const WelfareJoin = lazy(() => import("./pages/WelfareJoin"));
 
 // Admin pages - lazy loaded
 const AdminKYC = lazy(() => import("./pages/AdminKYC"));
@@ -106,6 +110,12 @@ const AppContent = () => {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
           
+          {/* Welfare Routes */}
+          <Route path="/welfare" element={<WelfareList />} />
+          <Route path="/welfare/create" element={<ProtectedRoute requireKYC><WelfareCreate /></ProtectedRoute>} />
+          <Route path="/welfare/join/:slug" element={<WelfareJoin />} />
+          <Route path="/welfare/:id" element={<WelfareDetail />} />
+
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
           <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />

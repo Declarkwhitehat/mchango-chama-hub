@@ -8,4 +8,6 @@ export const COMMISSION_RATES = {
   MCHANGO: 0.07,
   /** Organizations - 5% commission */
   ORGANIZATION: 0.05,
+  /** Welfare groups - 5% commission */
+  WELFARE: 0.05,
 } as const;

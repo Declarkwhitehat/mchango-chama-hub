@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X, LogIn, UserPlus, Users, Heart, User, LogOut, Activity, Settings, ChevronDown, LayoutDashboard, Building2 } from "lucide-react";
+import { Menu, X, LogIn, UserPlus, Users, Heart, User, LogOut, Activity, Settings, ChevronDown, LayoutDashboard, Building2, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -111,6 +111,14 @@ export const Header = () => {
                 >
                   <Building2 className="h-4 w-4" />
                   Organizations
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => navigate('/welfare')}
+                  className="gap-2"
+                >
+                  <Shield className="h-4 w-4" />
+                  Welfare
                 </Button>
               </>
             )}
@@ -248,6 +256,17 @@ export const Header = () => {
                   >
                     <Building2 className="h-4 w-4" />
                     Organizations
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      navigate('/welfare');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <Shield className="h-4 w-4" />
+                    Welfare
                   </Button>
                 </>
               )}
