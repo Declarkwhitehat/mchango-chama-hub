@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Users, TrendingUp, Building2, DollarSign, Loader2 } from "lucide-react";
+import { Users, TrendingUp, Building2, DollarSign, Loader2, Shield } from "lucide-react";
 
 interface Statistics {
   total_users: number;
@@ -16,6 +16,9 @@ interface Statistics {
   total_organizations: number;
   active_organizations: number;
   organizations_today: number;
+  total_welfares: number;
+  active_welfares: number;
+  welfares_today: number;
   total_transactions: number;
   transaction_volume: number;
 }
@@ -45,6 +48,9 @@ export const PlatformStatistics = () => {
         { count: totalOrganizations },
         { count: activeOrganizations },
         { count: organizationsToday },
+        { count: totalWelfares },
+        { count: activeWelfares },
+        { count: welfaresToday },
         { count: totalTransactions },
         { data: transactionData }
       ] = await Promise.all([
@@ -59,6 +65,9 @@ export const PlatformStatistics = () => {
         supabase.from('organizations').select('*', { count: 'exact', head: true }),
         supabase.from('organizations').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('organizations').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
+        supabase.from('welfares').select('*', { count: 'exact', head: true }),
+        supabase.from('welfares').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('welfares').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
         supabase.from('transactions').select('*', { count: 'exact', head: true }),
         supabase.from('transactions').select('amount').eq('status', 'completed')
       ]);
@@ -77,6 +86,9 @@ export const PlatformStatistics = () => {
         total_organizations: totalOrganizations || 0,
         active_organizations: activeOrganizations || 0,
         organizations_today: organizationsToday || 0,
+        total_welfares: totalWelfares || 0,
+        active_welfares: activeWelfares || 0,
+        welfares_today: welfaresToday || 0,
         total_transactions: totalTransactions || 0,
         transaction_volume: transactionVolume
       });
@@ -118,7 +130,7 @@ export const PlatformStatistics = () => {
         <CardDescription>Key statistics across the platform</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Users Stats */}
           <div className="p-4 border rounded-lg space-y-2">
             <div className="flex items-center justify-between">
@@ -168,6 +180,19 @@ export const PlatformStatistics = () => {
               {stats.active_organizations} active
             </p>
             <TodayBadge count={stats.organizations_today} />
+          </div>
+
+          {/* Welfare Stats */}
+          <div className="p-4 border rounded-lg space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Welfare Groups</p>
+              <Shield className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-2xl font-bold">{stats.total_welfares.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">
+              {stats.active_welfares} active
+            </p>
+            <TodayBadge count={stats.welfares_today} />
           </div>
 
           {/* Transaction Stats */}

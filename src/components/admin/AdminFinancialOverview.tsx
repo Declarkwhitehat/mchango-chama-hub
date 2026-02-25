@@ -10,7 +10,8 @@ import {
   Clock, 
   Users,
   Building2,
-  Coins
+  Coins,
+  Shield
 } from "lucide-react";
 
 interface FinancialData {
@@ -26,6 +27,12 @@ interface FinancialData {
     clientFunds: number;
   };
   organizations: {
+    grossCollected: number;
+    commission: number;
+    clientFunds: number;
+    pendingWithdrawals: number;
+  };
+  welfare: {
     grossCollected: number;
     commission: number;
     clientFunds: number;
@@ -58,22 +65,19 @@ export const AdminFinancialOverview = () => {
         chamaContributionsResult,
         organizationsResult,
         orgDonationsResult,
+        welfaresResult,
+        welfareContributionsResult,
         pendingWithdrawalsResult,
         companyEarningsResult
       ] = await Promise.all([
-        // Mchango totals
         supabase.from('mchango').select('total_gross_collected, total_commission_paid, available_balance'),
-        // Mchango donations for accurate totals
         supabase.from('mchango_donations').select('gross_amount, commission_amount, net_amount').eq('payment_status', 'completed'),
-        // Chama contributions
         supabase.from('contributions').select('amount').eq('status', 'completed'),
-        // Organizations totals
         supabase.from('organizations').select('total_gross_collected, total_commission_paid, available_balance'),
-        // Organization donations for accurate totals
         supabase.from('organization_donations').select('gross_amount, commission_amount, net_amount').eq('payment_status', 'completed'),
-        // Pending withdrawals
-        supabase.from('withdrawals').select('net_amount, mchango_id, chama_id').eq('status', 'pending'),
-        // Company earnings by source
+        supabase.from('welfares').select('total_gross_collected, total_commission_paid, available_balance'),
+        supabase.from('welfare_contributions').select('gross_amount, commission_amount, net_amount').eq('payment_status', 'completed'),
+        supabase.from('withdrawals').select('net_amount, mchango_id, chama_id, welfare_id').eq('status', 'pending'),
         supabase.from('company_earnings').select('source, amount')
       ]);
 
@@ -92,13 +96,19 @@ export const AdminFinancialOverview = () => {
       const orgGross = orgDonationsResult.data?.reduce((sum, d) => sum + (d.gross_amount || d.net_amount || 0), 0) || 0;
       const orgCommission = orgDonationsResult.data?.reduce((sum, d) => sum + (d.commission_amount || 0), 0) || 0;
       const orgClient = orgGross - orgCommission;
-      const orgPendingWithdrawals = 0; // Organizations don't have withdrawal tracking yet
+      const orgPendingWithdrawals = 0;
+
+      // Calculate Welfare totals (5% commission)
+      const welfareGross = welfareContributionsResult.data?.reduce((sum, c) => sum + (c.gross_amount || 0), 0) || 0;
+      const welfareCommission = welfareContributionsResult.data?.reduce((sum, c) => sum + (c.commission_amount || 0), 0) || 0;
+      const welfareClient = welfareGross - welfareCommission;
+      const welfarePendingWithdrawals = pendingWithdrawalsResult.data?.filter(w => w.welfare_id).reduce((sum, w) => sum + (w.net_amount || 0), 0) || 0;
 
       // Calculate totals
-      const totalGross = mchangoGross + chamaGross + orgGross;
-      const totalCommission = mchangoCommission + chamaCommission + orgCommission;
-      const totalClient = mchangoClient + chamaClient + orgClient;
-      const totalPending = mchangoPendingWithdrawals + orgPendingWithdrawals + 
+      const totalGross = mchangoGross + chamaGross + orgGross + welfareGross;
+      const totalCommission = mchangoCommission + chamaCommission + orgCommission + welfareCommission;
+      const totalClient = mchangoClient + chamaClient + orgClient + welfareClient;
+      const totalPending = mchangoPendingWithdrawals + orgPendingWithdrawals + welfarePendingWithdrawals +
         (pendingWithdrawalsResult.data?.filter(w => w.chama_id).reduce((sum, w) => sum + (w.net_amount || 0), 0) || 0);
 
       setData({
@@ -118,6 +128,12 @@ export const AdminFinancialOverview = () => {
           commission: orgCommission,
           clientFunds: orgClient,
           pendingWithdrawals: orgPendingWithdrawals,
+        },
+        welfare: {
+          grossCollected: welfareGross,
+          commission: welfareCommission,
+          clientFunds: welfareClient,
+          pendingWithdrawals: welfarePendingWithdrawals,
         },
         totals: {
           grossCollected: totalGross,
@@ -333,6 +349,34 @@ export const AdminFinancialOverview = () => {
                   </td>
                   <td className="text-right py-3 px-4 font-mono text-orange-600 dark:text-orange-400">
                     {formatCurrency(data.organizations.pendingWithdrawals)}
+                  </td>
+                </tr>
+
+                {/* Welfare */}
+                <tr className="hover:bg-muted/30">
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-lg bg-emerald-500/10">
+                        <Shield className="h-4 w-4 text-emerald-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Welfare</p>
+                        <p className="text-xs text-muted-foreground">Community welfare groups</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="text-right py-3 px-4 font-mono">
+                    {formatCurrency(data.welfare.grossCollected)}
+                  </td>
+                  <td className="text-right py-3 px-4">
+                    <div className="font-mono">{formatCurrency(data.welfare.commission)}</div>
+                    <Badge variant="secondary" className="text-xs">5%</Badge>
+                  </td>
+                  <td className="text-right py-3 px-4 font-mono text-green-600 dark:text-green-400">
+                    {formatCurrency(data.welfare.clientFunds)}
+                  </td>
+                  <td className="text-right py-3 px-4 font-mono text-orange-600 dark:text-orange-400">
+                    {formatCurrency(data.welfare.pendingWithdrawals)}
                   </td>
                 </tr>
 

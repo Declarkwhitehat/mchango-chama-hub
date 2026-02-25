@@ -11,7 +11,8 @@ import {
   AlertCircle,
   PhoneCall,
   CreditCard,
-  Building2
+  Building2,
+  Shield
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -33,6 +34,7 @@ const AdminDashboard = () => {
     activeCampaigns: 0,
     activeChamas: 0,
     activeOrganizations: 0,
+    activeWelfares: 0,
     totalRevenue: 0,
     pendingWithdrawals: 0,
     pendingCallbacks: 0,
@@ -41,6 +43,7 @@ const AdminDashboard = () => {
     chamasToday: 0,
     campaignsToday: 0,
     organizationsToday: 0,
+    welfaresToday: 0,
   });
 
   useEffect(() => {
@@ -60,6 +63,7 @@ const AdminDashboard = () => {
         campaignsResult,
         chamasResult,
         organizationsResult,
+        welfaresResult,
         revenueResult,
         withdrawalsResult,
         callbacksResult,
@@ -67,7 +71,8 @@ const AdminDashboard = () => {
         ledgerResult,
         chamasTodayResult,
         campaignsTodayResult,
-        organizationsTodayResult
+        organizationsTodayResult,
+        welfaresTodayResult
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
@@ -75,6 +80,7 @@ const AdminDashboard = () => {
         supabase.from('mchango').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('chama').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('organizations').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('welfares').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('company_earnings').select('amount'),
         supabase.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('customer_callbacks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -83,6 +89,7 @@ const AdminDashboard = () => {
         supabase.from('chama').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
         supabase.from('mchango').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
         supabase.from('organizations').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
+        supabase.from('welfares').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
       ]);
 
       const totalRevenue = revenueResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
@@ -95,6 +102,7 @@ const AdminDashboard = () => {
         activeCampaigns: campaignsResult.count || 0,
         activeChamas: chamasResult.count || 0,
         activeOrganizations: organizationsResult.count || 0,
+        activeWelfares: welfaresResult.count || 0,
         totalRevenue,
         pendingWithdrawals: withdrawalsResult.count || 0,
         pendingCallbacks: callbacksResult.count || 0,
@@ -103,6 +111,7 @@ const AdminDashboard = () => {
         chamasToday: chamasTodayResult.count || 0,
         campaignsToday: campaignsTodayResult.count || 0,
         organizationsToday: organizationsTodayResult.count || 0,
+        welfaresToday: welfaresTodayResult.count || 0,
       });
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -192,14 +201,14 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {(stats.activeChamas + stats.activeOrganizations).toLocaleString()}
+                {(stats.activeChamas + stats.activeOrganizations + stats.activeWelfares).toLocaleString()}
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                {stats.activeChamas} Chamas, {stats.activeOrganizations} Orgs
+                {stats.activeChamas} Chamas, {stats.activeOrganizations} Orgs, {stats.activeWelfares} Welfares
               </p>
-              {(stats.chamasToday + stats.organizationsToday) > 0 && (
+              {(stats.chamasToday + stats.organizationsToday + stats.welfaresToday) > 0 && (
                 <p className="text-xs font-medium text-green-600 dark:text-green-400 mt-1">
-                  +{stats.chamasToday + stats.organizationsToday} today
+                  +{stats.chamasToday + stats.organizationsToday + stats.welfaresToday} today
                 </p>
               )}
             </CardContent>
@@ -344,6 +353,29 @@ const AdminDashboard = () => {
               {stats.organizationsToday > 0 && (
                 <p className="text-xs font-medium text-green-600 dark:text-green-400 mt-1">
                   +{stats.organizationsToday} today
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          {/* Welfare Overview */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Welfare Groups
+                  </CardTitle>
+                  <CardDescription className="mt-1">Community welfare groups</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold mb-2">{stats.activeWelfares}</div>
+              <p className="text-sm text-muted-foreground">Active welfare groups</p>
+              {stats.welfaresToday > 0 && (
+                <p className="text-xs font-medium text-green-600 dark:text-green-400 mt-1">
+                  +{stats.welfaresToday} today
                 </p>
               )}
             </CardContent>
