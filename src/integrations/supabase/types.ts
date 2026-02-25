@@ -2186,6 +2186,305 @@ export type Database = {
         }
         Relationships: []
       }
+      welfare_contribution_cycles: {
+        Row: {
+          amount: number
+          created_at: string
+          end_date: string
+          id: string
+          set_by: string
+          start_date: string
+          status: string
+          welfare_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          end_date: string
+          id?: string
+          set_by: string
+          start_date: string
+          status?: string
+          welfare_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          end_date?: string
+          id?: string
+          set_by?: string
+          start_date?: string
+          status?: string
+          welfare_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_contribution_cycles_welfare_id_fkey"
+            columns: ["welfare_id"]
+            isOneToOne: false
+            referencedRelation: "welfares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      welfare_contributions: {
+        Row: {
+          commission_amount: number | null
+          completed_at: string | null
+          created_at: string
+          cycle_month: string | null
+          gross_amount: number
+          id: string
+          member_id: string
+          mpesa_receipt_number: string | null
+          net_amount: number
+          payment_method: string | null
+          payment_reference: string
+          payment_status: string
+          user_id: string
+          welfare_id: string
+        }
+        Insert: {
+          commission_amount?: number | null
+          completed_at?: string | null
+          created_at?: string
+          cycle_month?: string | null
+          gross_amount: number
+          id?: string
+          member_id: string
+          mpesa_receipt_number?: string | null
+          net_amount: number
+          payment_method?: string | null
+          payment_reference: string
+          payment_status?: string
+          user_id: string
+          welfare_id: string
+        }
+        Update: {
+          commission_amount?: number | null
+          completed_at?: string | null
+          created_at?: string
+          cycle_month?: string | null
+          gross_amount?: number
+          id?: string
+          member_id?: string
+          mpesa_receipt_number?: string | null
+          net_amount?: number
+          payment_method?: string | null
+          payment_reference?: string
+          payment_status?: string
+          user_id?: string
+          welfare_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_contributions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "welfare_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "welfare_contributions_welfare_id_fkey"
+            columns: ["welfare_id"]
+            isOneToOne: false
+            referencedRelation: "welfares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      welfare_members: {
+        Row: {
+          created_at: string
+          id: string
+          is_eligible_for_withdrawal: boolean | null
+          joined_at: string
+          member_code: string | null
+          role: string
+          status: string
+          total_contributed: number | null
+          user_id: string
+          welfare_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_eligible_for_withdrawal?: boolean | null
+          joined_at?: string
+          member_code?: string | null
+          role?: string
+          status?: string
+          total_contributed?: number | null
+          user_id: string
+          welfare_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_eligible_for_withdrawal?: boolean | null
+          joined_at?: string
+          member_code?: string | null
+          role?: string
+          status?: string
+          total_contributed?: number | null
+          user_id?: string
+          welfare_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_members_welfare_id_fkey"
+            columns: ["welfare_id"]
+            isOneToOne: false
+            referencedRelation: "welfares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      welfare_withdrawal_approvals: {
+        Row: {
+          approver_id: string
+          approver_role: string
+          created_at: string
+          decided_at: string | null
+          decision: string
+          id: string
+          rejection_reason: string | null
+          welfare_id: string
+          withdrawal_id: string
+        }
+        Insert: {
+          approver_id: string
+          approver_role: string
+          created_at?: string
+          decided_at?: string | null
+          decision?: string
+          id?: string
+          rejection_reason?: string | null
+          welfare_id: string
+          withdrawal_id: string
+        }
+        Update: {
+          approver_id?: string
+          approver_role?: string
+          created_at?: string
+          decided_at?: string | null
+          decision?: string
+          id?: string
+          rejection_reason?: string | null
+          welfare_id?: string
+          withdrawal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_withdrawal_approvals_approver_id_fkey"
+            columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "welfare_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "welfare_withdrawal_approvals_welfare_id_fkey"
+            columns: ["welfare_id"]
+            isOneToOne: false
+            referencedRelation: "welfares"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "welfare_withdrawal_approvals_withdrawal_id_fkey"
+            columns: ["withdrawal_id"]
+            isOneToOne: false
+            referencedRelation: "withdrawals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      welfares: {
+        Row: {
+          available_balance: number | null
+          commission_rate: number | null
+          contribution_amount: number | null
+          contribution_deadline_days: number | null
+          contribution_frequency: string | null
+          created_at: string
+          created_by: string
+          current_amount: number | null
+          description: string | null
+          frozen_at: string | null
+          frozen_reason: string | null
+          group_code: string | null
+          id: string
+          is_frozen: boolean | null
+          is_public: boolean | null
+          is_verified: boolean | null
+          min_contribution_period_months: number | null
+          name: string
+          paybill_account_id: string | null
+          slug: string
+          status: string
+          total_commission_paid: number | null
+          total_gross_collected: number | null
+          total_withdrawn: number | null
+          updated_at: string
+          whatsapp_link: string | null
+        }
+        Insert: {
+          available_balance?: number | null
+          commission_rate?: number | null
+          contribution_amount?: number | null
+          contribution_deadline_days?: number | null
+          contribution_frequency?: string | null
+          created_at?: string
+          created_by: string
+          current_amount?: number | null
+          description?: string | null
+          frozen_at?: string | null
+          frozen_reason?: string | null
+          group_code?: string | null
+          id?: string
+          is_frozen?: boolean | null
+          is_public?: boolean | null
+          is_verified?: boolean | null
+          min_contribution_period_months?: number | null
+          name: string
+          paybill_account_id?: string | null
+          slug: string
+          status?: string
+          total_commission_paid?: number | null
+          total_gross_collected?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string
+          whatsapp_link?: string | null
+        }
+        Update: {
+          available_balance?: number | null
+          commission_rate?: number | null
+          contribution_amount?: number | null
+          contribution_deadline_days?: number | null
+          contribution_frequency?: string | null
+          created_at?: string
+          created_by?: string
+          current_amount?: number | null
+          description?: string | null
+          frozen_at?: string | null
+          frozen_reason?: string | null
+          group_code?: string | null
+          id?: string
+          is_frozen?: boolean | null
+          is_public?: boolean | null
+          is_verified?: boolean | null
+          min_contribution_period_months?: number | null
+          name?: string
+          paybill_account_id?: string | null
+          slug?: string
+          status?: string
+          total_commission_paid?: number | null
+          total_gross_collected?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string
+          whatsapp_link?: string | null
+        }
+        Relationships: []
+      }
       withdrawals: {
         Row: {
           amount: number
@@ -2213,6 +2512,7 @@ export type Database = {
           reviewed_by: string | null
           status: string
           updated_at: string
+          welfare_id: string | null
         }
         Insert: {
           amount: number
@@ -2240,6 +2540,7 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           updated_at?: string
+          welfare_id?: string | null
         }
         Update: {
           amount?: number
@@ -2267,6 +2568,7 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           updated_at?: string
+          welfare_id?: string | null
         }
         Relationships: [
           {
@@ -2295,6 +2597,13 @@ export type Database = {
             columns: ["payment_method_id"]
             isOneToOne: false
             referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "withdrawals_welfare_id_fkey"
+            columns: ["welfare_id"]
+            isOneToOne: false
+            referencedRelation: "welfares"
             referencedColumns: ["id"]
           },
         ]
@@ -2426,6 +2735,12 @@ export type Database = {
         Args: { p_group_id: string; p_member_number: number }
         Returns: string
       }
+      generate_welfare_code: { Args: never; Returns: string }
+      generate_welfare_member_code: {
+        Args: { p_welfare_id: string }
+        Returns: string
+      }
+      generate_welfare_paybill_account_id: { Args: never; Returns: string }
       get_member_payout_position: {
         Args: { p_member_id: string }
         Returns: {
@@ -2435,6 +2750,10 @@ export type Database = {
         }[]
       }
       get_next_order_index: { Args: { p_chama_id: string }; Returns: number }
+      get_welfare_role: {
+        Args: { _user_id: string; _welfare_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2452,6 +2771,18 @@ export type Database = {
       }
       is_savings_group_manager: {
         Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_welfare_chairman: {
+        Args: { _user_id: string; _welfare_id: string }
+        Returns: boolean
+      }
+      is_welfare_member: {
+        Args: { _user_id: string; _welfare_id: string }
+        Returns: boolean
+      }
+      is_welfare_secretary: {
+        Args: { _user_id: string; _welfare_id: string }
         Returns: boolean
       }
       record_company_earning: {
@@ -2478,6 +2809,10 @@ export type Database = {
       }
       update_organization_withdrawn: {
         Args: { p_amount: number; p_organization_id: string }
+        Returns: undefined
+      }
+      update_welfare_withdrawn: {
+        Args: { p_amount: number; p_welfare_id: string }
         Returns: undefined
       }
     }

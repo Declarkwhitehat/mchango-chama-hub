@@ -51,7 +51,8 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     *,
     profiles:requested_by(full_name, phone),
     chama:chama_id(name),
-    mchango:mchango_id(title)
+    mchango:mchango_id(title),
+    welfares:welfare_id(name)
   `;
 
   // --- Extract recipient phone from callback for phone-based lookups ---
@@ -197,7 +198,7 @@ serve(async (req) => {
       });
     }
 
-    const groupName = withdrawal.chama?.name || withdrawal.mchango?.title || 'your group';
+    const groupName = withdrawal.chama?.name || withdrawal.mchango?.title || withdrawal.welfares?.name || 'your group';
     const recipientPhone = withdrawal.profiles?.phone;
 
     if (resultCode === 0) {
@@ -313,7 +314,6 @@ serve(async (req) => {
         
         if (orgError) {
           console.error('Failed to update organization withdrawn:', orgError);
-          // Fallback to direct update
           const { data: org } = await supabaseAdmin
             .from('organizations')
             .select('current_amount, available_balance')
@@ -337,6 +337,39 @@ serve(async (req) => {
         }
       }
 
+      // Update welfare balance atomically using database function
+      if (withdrawal.welfare_id && transactionAmount > 0) {
+        const { error: welfareError } = await supabaseAdmin.rpc('update_welfare_withdrawn', {
+          p_welfare_id: withdrawal.welfare_id,
+          p_amount: transactionAmount
+        });
+        
+        if (welfareError) {
+          console.error('Failed to update welfare withdrawn:', welfareError);
+          const { data: wf } = await supabaseAdmin
+            .from('welfares')
+            .select('current_amount, available_balance, total_withdrawn')
+            .eq('id', withdrawal.welfare_id)
+            .single();
+
+          if (wf) {
+            await supabaseAdmin
+              .from('welfares')
+              .update({
+                current_amount: Math.max(0, Number(wf.current_amount) - transactionAmount),
+                available_balance: Math.max(0, Number(wf.available_balance) - transactionAmount),
+                total_withdrawn: (Number(wf.total_withdrawn) || 0) + transactionAmount
+              })
+              .eq('id', withdrawal.welfare_id);
+          }
+        } else {
+          console.log('Updated welfare balance atomically:', {
+            welfare_id: withdrawal.welfare_id,
+            amount: transactionAmount
+          });
+        }
+      }
+
       // Send success SMS
       if (recipientPhone) {
         const successMessage = `🎉 Your ${groupName} payout of KES ${transactionAmount.toFixed(2)} has been sent to your M-Pesa. Transaction: ${transactionId}. Thank you for being a valued member!`;
@@ -345,8 +378,8 @@ serve(async (req) => {
 
       // Record commission as company earning
       if (withdrawal.commission_amount > 0) {
-        const sourceType = withdrawal.chama_id ? 'chama_withdrawal' : withdrawal.mchango_id ? 'mchango_withdrawal' : 'organization_withdrawal';
-        const sourceLabel = withdrawal.chama_id ? 'Chama' : withdrawal.mchango_id ? 'Mchango' : 'Organization';
+        const sourceType = withdrawal.chama_id ? 'chama_withdrawal' : withdrawal.mchango_id ? 'mchango_withdrawal' : withdrawal.organization_id ? 'organization_withdrawal' : 'welfare_withdrawal';
+        const sourceLabel = withdrawal.chama_id ? 'Chama' : withdrawal.mchango_id ? 'Mchango' : withdrawal.organization_id ? 'Organization' : 'Welfare';
         await supabaseAdmin.rpc('record_company_earning', {
           p_source: sourceType,
           p_amount: withdrawal.commission_amount,
