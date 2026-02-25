@@ -7,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Shield, Users, Wallet, History, Settings, Loader2, Copy, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { Shield, Users, Wallet, History, Settings, Loader2, Copy, CheckCircle, XCircle, Clock, AlertTriangle, LogOut } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { WelfareExecutivePanel } from "@/components/welfare/WelfareExecutivePanel";
 import { WelfareContributionForm } from "@/components/welfare/WelfareContributionForm";
@@ -25,6 +26,7 @@ const WelfareDetail = () => {
   const [loading, setLoading] = useState(true);
   const [myRole, setMyRole] = useState<string | null>(null);
   const [myMemberId, setMyMemberId] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     if (id) fetchWelfare();
@@ -78,6 +80,22 @@ const WelfareDetail = () => {
   const isSecretary = myRole === 'secretary';
   const isTreasurer = myRole === 'treasurer';
   const isExecutive = isChairman || isSecretary || isTreasurer;
+  const isMember = !!myRole;
+
+  const handleLeave = async () => {
+    setLeaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(`welfare-members?action=leave&welfare_id=${id}`, { method: 'DELETE' });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("You have left the welfare group");
+      navigate('/welfare');
+    } catch (error: any) {
+      toast.error(error.message || "Failed to leave welfare");
+    } finally {
+      setLeaving(false);
+    }
+  };
 
   return (
     <Layout>
@@ -97,6 +115,32 @@ const WelfareDetail = () => {
                 {welfare.is_verified && <Badge className="bg-green-500">Verified</Badge>}
               </div>
             </div>
+            {/* Leave button - not for chairman */}
+            {isMember && !isChairman && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-destructive border-destructive hover:bg-destructive/10">
+                    <LogOut className="h-4 w-4 mr-1" />
+                    Leave
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Leave Welfare Group?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to leave "{welfare.name}"? You will lose access to the group and your membership will end.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleLeave} disabled={leaving} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      {leaving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                      Leave Group
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
 
           {/* Group Code */}

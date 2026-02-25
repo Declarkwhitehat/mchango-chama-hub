@@ -133,11 +133,45 @@ serve(async (req) => {
       return new Response(JSON.stringify({ data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // DELETE - Remove member (Chairman only)
+    // DELETE - Remove member (Chairman) or leave (self)
     if (req.method === 'DELETE') {
       const url = new URL(req.url);
       const memberId = url.searchParams.get('member_id');
+      const action = url.searchParams.get('action'); // 'leave' for self-leave
 
+      // Self-leave flow
+      if (action === 'leave') {
+        const welfareId = url.searchParams.get('welfare_id');
+        if (!welfareId) {
+          return new Response(JSON.stringify({ error: 'welfare_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        const { data: selfMember } = await supabaseAdmin
+          .from('welfare_members')
+          .select('id, role')
+          .eq('welfare_id', welfareId)
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .single();
+
+        if (!selfMember) {
+          return new Response(JSON.stringify({ error: 'You are not a member of this welfare' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        if (selfMember.role === 'chairman') {
+          return new Response(JSON.stringify({ error: 'The Chairman cannot leave. Transfer chairmanship first or dissolve the group.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        const { error } = await supabaseAdmin
+          .from('welfare_members')
+          .update({ status: 'left' })
+          .eq('id', selfMember.id);
+
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Chairman remove flow
       if (!memberId) {
         return new Response(JSON.stringify({ error: 'member_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
