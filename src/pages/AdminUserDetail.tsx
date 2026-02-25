@@ -10,8 +10,9 @@ import { toast } from "@/hooks/use-toast";
 import { 
   Loader2, User, Mail, Phone, CreditCard, Shield, FileText, 
   TrendingUp, Users, Activity, MapPin, Calendar, Download,
-  ExternalLink, Eye, CheckCircle, XCircle, Clock
+  ExternalLink, Eye, CheckCircle, XCircle, Clock, ShieldOff, AlertTriangle
 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 
 interface UserDetail {
@@ -44,6 +45,9 @@ const AdminUserDetail = () => {
 const [withdrawals, setWithdrawals] = useState<any[]>([]);
 const [frontSignedUrl, setFrontSignedUrl] = useState<string | null>(null);
 const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
+  const [has2FA, setHas2FA] = useState(false);
+  const [resetting2FA, setResetting2FA] = useState(false);
+  const [show2FAResetConfirm, setShow2FAResetConfirm] = useState(false);
   useEffect(() => {
     if (userId) {
       loadUserDetails();
@@ -175,6 +179,14 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
         .order('requested_at', { ascending: false });
       setWithdrawals(userWithdrawals || []);
 
+      // Check if user has 2FA enabled
+      const { data: totpData } = await supabase
+        .from('totp_secrets')
+        .select('is_enabled')
+        .eq('user_id', userId!)
+        .maybeSingle();
+      setHas2FA(!!totpData?.is_enabled);
+
     } catch (error: any) {
       console.error('Error loading user details:', error);
       toast({
@@ -218,6 +230,35 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
         description: error.message || "Failed to download document",
         variant: "destructive",
       });
+    }
+  };
+
+  const reset2FA = async () => {
+    if (!userId) return;
+    setResetting2FA(true);
+    try {
+      const { error } = await supabase
+        .from('totp_secrets')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      setHas2FA(false);
+      setShow2FAResetConfirm(false);
+      toast({
+        title: "2FA Reset",
+        description: "Two-factor authentication has been reset for this user. They can set it up again on their next login.",
+      });
+    } catch (error: any) {
+      console.error('Error resetting 2FA:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reset 2FA",
+        variant: "destructive",
+      });
+    } finally {
+      setResetting2FA(false);
     }
   };
 
@@ -327,9 +368,10 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
 
         {/* Detailed Information Tabs */}
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="chamas">Chamas</TabsTrigger>
             <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
@@ -873,7 +915,107 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Security Tab */}
+          <TabsContent value="security">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Security Settings
+                </CardTitle>
+                <CardDescription>
+                  Manage security features for this user
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* 2FA Status */}
+                <div className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-full ${has2FA ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'}`}>
+                        {has2FA ? (
+                          <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <ShieldOff className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">Two-Factor Authentication (2FA)</p>
+                        <p className="text-sm text-muted-foreground">
+                          {has2FA ? 'Enabled — User has TOTP 2FA active' : 'Not enabled — User has not set up 2FA'}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant={has2FA ? 'default' : 'secondary'}>
+                      {has2FA ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+
+                  {has2FA && (
+                    <div className="pt-3 border-t">
+                      <div className="flex items-start gap-3 p-3 bg-destructive/10 rounded-lg">
+                        <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium">Reset 2FA for this user</p>
+                          <p className="text-sm text-muted-foreground">
+                            Use this if the customer has lost access to their authenticator app and backup codes. 
+                            This will remove their 2FA setup completely, allowing them to set it up again.
+                          </p>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setShow2FAResetConfirm(true)}
+                            disabled={resetting2FA}
+                          >
+                            {resetting2FA ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <ShieldOff className="h-4 w-4 mr-2" />
+                            )}
+                            Reset 2FA
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
+
+        {/* 2FA Reset Confirmation Dialog */}
+        <AlertDialog open={show2FAResetConfirm} onOpenChange={setShow2FAResetConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Reset Two-Factor Authentication
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>
+                  You are about to reset 2FA for <strong>{user?.full_name}</strong> ({user?.email}).
+                </p>
+                <p>
+                  This will delete their TOTP secret and backup codes. They will need to set up 2FA again from their profile settings.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={reset2FA}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {resetting2FA ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                Confirm Reset
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );
