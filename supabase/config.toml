@@ -42,10 +42,10 @@ verify_jwt = true
 [functions.admin-export]
 verify_jwt = true
 
-[functions.mpesa-stk-push]
+[functions.payment-stk-push]
 verify_jwt = false
 
-[functions.mpesa-callback]
+[functions.payment-stk-callback]
 verify_jwt = false
 
 [functions.savings-group-invite]
@@ -60,10 +60,10 @@ verify_jwt = true
 [functions.chat-support]
 verify_jwt = false
 
-[functions.mpesa-c2b-callback]
+[functions.c2b-confirm-payment]
 verify_jwt = false
 
-[functions.mpesa-c2b-validation]
+[functions.c2b-validate-payment]
 verify_jwt = false
 
 [functions.daily-cycle-manager]
@@ -102,13 +102,13 @@ verify_jwt = true
 [functions.chama-start-new-cycle]
 verify_jwt = true
 
-[functions.mpesa-b2c-payout]
+[functions.b2c-payout]
 verify_jwt = false
 
-[functions.mpesa-b2c-callback]
+[functions.b2c-callback]
 verify_jwt = false
 
-[functions.mpesa-stk-query]
+[functions.payment-stk-query]
 verify_jwt = false
 
 [functions.withdrawals-crud]
@@ -129,13 +129,13 @@ verify_jwt = false
 [functions.cycle-auto-create]
 verify_jwt = false
 
-[functions.admin-mpesa-search]
+[functions.admin-payment-search]
 verify_jwt = false
 
 [functions.fraud-monitor]
 verify_jwt = false
 
-[functions.mpesa-register-c2b-urls]
+[functions.register-c2b-urls]
 verify_jwt = false
 
 [functions.totp-2fa]
