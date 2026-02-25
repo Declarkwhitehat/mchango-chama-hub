@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity } from "lucide-react";
+import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity, ShieldCheck } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -47,7 +47,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
     { href: "/home", icon: Home, label: "Home" },
     { href: "/mchango", icon: Heart, label: "Campaigns" },
     { href: "/chama", icon: Users, label: "Chamas" },
-    { href: "/activity", icon: Activity, label: "Activity" },
+    { href: "/welfare", icon: ShieldCheck, label: "Welfare" },
     { href: "/profile", icon: User, label: "Profile" },
   ];
 
@@ -110,6 +110,12 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                   <Button variant={isActiveRoute("/chama") ? "secondary" : "ghost"} className="w-full justify-start">
                     <Users className="mr-2 h-4 w-4" />
                     Browse Chamas
+                  </Button>
+                </Link>
+                <Link to="/welfare">
+                  <Button variant={isActiveRoute("/welfare") ? "secondary" : "ghost"} className="w-full justify-start">
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    Welfare Groups
                   </Button>
                 </Link>
                 <Link to="/organizations">
