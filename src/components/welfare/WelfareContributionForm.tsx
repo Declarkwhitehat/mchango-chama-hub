@@ -21,9 +21,10 @@ interface Props {
 type PaymentStatus = "idle" | "sending" | "prompted" | "checking" | "success" | "failed";
 
 export const WelfareContributionForm = ({ welfareId, memberId, contributionAmount, paybillAccountId, onContributed }: Props) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [amount, setAmount] = useState(contributionAmount > 0 ? String(contributionAmount) : "");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(profile?.phone || "");
+  const [name, setName] = useState(profile?.full_name || "");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -33,7 +34,10 @@ export const WelfareContributionForm = ({ welfareId, memberId, contributionAmoun
       toast.error("Enter a valid amount (minimum KES 1)");
       return;
     }
-
+    if (!name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
     const normalized = normalizePhone(phone);
     if (!normalized) {
       toast.error("Enter a valid Safaricom phone number (e.g. 0707874790)");
@@ -254,6 +258,17 @@ export const WelfareContributionForm = ({ welfareId, memberId, contributionAmoun
           )}
 
           <div className="space-y-2">
+            <Label>Full Name</Label>
+            <Input
+              type="text"
+              placeholder="Enter your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={isProcessing}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label>M-Pesa Phone Number</Label>
             <Input
               type="tel"
@@ -288,7 +303,7 @@ export const WelfareContributionForm = ({ welfareId, memberId, contributionAmoun
 
           <Button
             onClick={handleStkPush}
-            disabled={isProcessing || !phone || !amount}
+            disabled={isProcessing || !phone || !amount || !name.trim()}
             className="w-full"
           >
             {isProcessing ? (
