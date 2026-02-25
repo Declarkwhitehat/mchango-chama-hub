@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, X, Heart, Users, Building2 } from "lucide-react";
+import { Plus, X, Heart, Users, Building2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,12 @@ const actions = [
     icon: Building2,
     href: "/organizations/create",
     color: "bg-amber-500 hover:bg-amber-600",
+  },
+  {
+    label: "New Welfare",
+    icon: Shield,
+    href: "/welfare/create",
+    color: "bg-emerald-500 hover:bg-emerald-600",
   },
 ];
 
