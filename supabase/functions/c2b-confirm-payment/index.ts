@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { COMMISSION_RATES } from "../_shared/commissionRates.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -400,8 +401,8 @@ serve(async (req) => {
     if (mchangoData) {
       console.log('Found Mchango campaign:', mchangoData);
 
-      // Calculate commission (15% for mchango)
-      const commissionRate = 0.15;
+      // Calculate commission (7% for mchango - from shared config)
+      const commissionRate = COMMISSION_RATES.MCHANGO;
       const grossAmount = parseFloat(amount);
       const commissionAmount = grossAmount * commissionRate;
       const netAmount = grossAmount - commissionAmount;
@@ -440,7 +441,7 @@ serve(async (req) => {
       const { error: mchangoUpdateError } = await supabase
         .from('mchango')
         .update({
-          current_amount: (mchangoData.current_amount || 0) + grossAmount,
+          current_amount: (mchangoData.current_amount || 0) + netAmount,
           total_gross_collected: (mchangoData.total_gross_collected || 0) + grossAmount,
           total_commission_paid: (mchangoData.total_commission_paid || 0) + commissionAmount,
           available_balance: (mchangoData.available_balance || 0) + netAmount,
@@ -460,7 +461,7 @@ serve(async (req) => {
           source: 'mchango_donation',
           amount: commissionAmount,
           reference_id: donation?.id,
-          description: `15% commission on offline mchango donation of KES ${grossAmount}. Net credited: KES ${netAmount}`
+          description: `${(commissionRate * 100)}% commission on offline mchango donation of KES ${grossAmount}. Net credited: KES ${netAmount}`
         });
 
       // Record in financial ledger
@@ -477,7 +478,7 @@ serve(async (req) => {
           commission_rate: commissionRate,
           payer_name: displayName,
           payer_phone: phoneNumber,
-          description: `Offline mchango donation with 15% commission deducted`
+          description: `Offline mchango donation with ${(commissionRate * 100)}% commission deducted`
         });
 
       // Send SMS notification
