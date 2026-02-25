@@ -56,14 +56,16 @@ serve(async (req) => {
     const [
       { data: existingContribution },
       { data: existingDeposit },
-      { data: existingDonation }
+      { data: existingDonation },
+      { data: existingWelfareContrib }
     ] = await Promise.all([
       supabase.from('contributions').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
       supabase.from('saving_deposits').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
       supabase.from('mchango_donations').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
+      supabase.from('welfare_contributions').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
     ]);
 
-    if (existingContribution || existingDeposit || existingDonation) {
+    if (existingContribution || existingDeposit || existingDonation || existingWelfareContrib) {
       console.log('Duplicate payment detected:', mpesaReceiptNumber);
       return new Response(
         JSON.stringify({ 
@@ -626,11 +628,155 @@ serve(async (req) => {
       );
     }
 
-    // IMPORTANT: No matching entity found - payment is accepted but NOT credited to any account
-    // Customer will be notified to contact support with correct details
+    // Try welfare - matches by paybill_account_id (e.g., WFYWFHXY) or group_code
+    const { data: welfareData } = await supabase
+      .from('welfares')
+      .select('id, name, group_code, paybill_account_id, current_amount, total_gross_collected, total_commission_paid, available_balance, commission_rate')
+      .or(`paybill_account_id.eq.${upperAccountNumber},group_code.eq.${upperAccountNumber}`)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (welfareData) {
+      console.log('Found Welfare group:', welfareData);
+
+      const commissionRate = Number(welfareData.commission_rate) || COMMISSION_RATES.WELFARE;
+      const grossAmount = parseFloat(amount);
+      const commissionAmount = Math.round(grossAmount * commissionRate * 100) / 100;
+      const netAmount = Math.round((grossAmount - commissionAmount) * 100) / 100;
+
+      const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+      const cycleMonth = new Date().toISOString().substring(0, 7);
+
+      // Try to find welfare member by matching phone number in profiles
+      let matchedMember = null;
+      const { data: allMembers } = await supabase
+        .from('welfare_members')
+        .select('id, user_id')
+        .eq('welfare_id', welfareData.id)
+        .eq('status', 'active');
+
+      if (allMembers && phoneNumber) {
+        const phoneSuffix = phoneNumber.replace(/\D/g, '').slice(-9);
+        for (const wm of allMembers) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('phone')
+            .eq('id', wm.user_id)
+            .maybeSingle();
+          if (profile?.phone && profile.phone.replace(/\D/g, '').endsWith(phoneSuffix)) {
+            matchedMember = wm;
+            break;
+          }
+        }
+      }
+
+      if (matchedMember) {
+        // Record welfare contribution for matched member
+        const { data: contribution, error: contribError } = await supabase
+          .from('welfare_contributions')
+          .insert({
+            welfare_id: welfareData.id,
+            member_id: matchedMember.id,
+            user_id: matchedMember.user_id,
+            gross_amount: grossAmount,
+            commission_amount: commissionAmount,
+            net_amount: netAmount,
+            payment_reference: mpesaReceiptNumber,
+            payment_method: 'mpesa_offline',
+            payment_status: 'completed',
+            cycle_month: cycleMonth,
+            completed_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (contribError) {
+          console.error('Error recording welfare contribution:', contribError);
+          throw contribError;
+        }
+
+        // Update member total_contributed
+        const { data: memberData } = await supabase
+          .from('welfare_members')
+          .select('total_contributed')
+          .eq('id', matchedMember.id)
+          .single();
+
+        await supabase
+          .from('welfare_members')
+          .update({ total_contributed: (memberData?.total_contributed || 0) + grossAmount })
+          .eq('id', matchedMember.id);
+
+        // Record company earning
+        await supabase.rpc('record_company_earning', {
+          p_source: 'welfare_contribution',
+          p_amount: commissionAmount,
+          p_group_id: welfareData.id,
+          p_reference_id: contribution?.id,
+          p_description: `Welfare offline contribution commission (${(commissionRate * 100).toFixed(0)}%)`
+        });
+
+        console.log('Welfare contribution recorded for matched member');
+      } else {
+        console.warn('No welfare member matched by phone. Welfare balance updated but no member contribution record created.');
+      }
+
+      // Update welfare financials
+      await supabase
+        .from('welfares')
+        .update({
+          total_gross_collected: (welfareData.total_gross_collected || 0) + grossAmount,
+          total_commission_paid: (welfareData.total_commission_paid || 0) + commissionAmount,
+          available_balance: (welfareData.available_balance || 0) + netAmount,
+          current_amount: (welfareData.current_amount || 0) + netAmount,
+        })
+        .eq('id', welfareData.id);
+
+      // Record in financial ledger
+      await supabase
+        .from('financial_ledger')
+        .insert({
+          transaction_type: 'contribution',
+          source_type: 'welfare',
+          source_id: welfareData.id,
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
+          commission_rate: commissionRate,
+          payer_name: displayName,
+          payer_phone: phoneNumber,
+          description: `Offline welfare contribution with ${(commissionRate * 100).toFixed(0)}% commission deducted`
+        });
+
+      // Send SMS notification
+      try {
+        await supabase.functions.invoke('send-transactional-sms', {
+          body: {
+            phone: phoneNumber,
+            message: `Thank you ${firstName}! Your contribution of KSh ${grossAmount} to "${welfareData.name}" was received. Commission: KSh ${commissionAmount.toFixed(2)} (${(commissionRate * 100).toFixed(0)}%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
+          },
+        });
+      } catch (smsError) {
+        console.error('Error sending welfare SMS:', smsError);
+      }
+
+      return new Response(
+        JSON.stringify({
+          ResultCode: 0,
+          ResultDesc: 'Contribution accepted and recorded for Welfare',
+          type: 'welfare',
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // IMPORTANT: No matching entity found
     console.warn('⚠️ UNMATCHED PAYMENT - Account not found:', accountNumber);
     console.warn('Normalized search value:', upperAccountNumber);
-    console.warn('Searched tables: chama_members.member_code, mchango.paybill_account_id/group_code, organizations.paybill_account_id/group_code');
+    console.warn('Searched tables: chama_members.member_code, mchango.paybill_account_id/group_code, organizations.paybill_account_id/group_code, welfares.paybill_account_id/group_code');
     
     // Send SMS to payer informing them the code was invalid
     if (phoneNumber) {
