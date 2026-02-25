@@ -20,6 +20,7 @@ interface Mchango {
   description: string;
   target_amount: number;
   current_amount: number;
+  total_gross_collected: number | null;
   status: string;
   category: string;
   end_date: string;
@@ -207,8 +208,9 @@ const MchangoList = () => {
                 <h2 className="text-2xl font-semibold">My Campaigns</h2>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {myCampaigns.map((mchango) => {
+                    const allTimeCollected = Number(mchango.total_gross_collected) || Number(mchango.current_amount);
                     const progress = calculateProgress(
-                      Number(mchango.current_amount),
+                      allTimeCollected,
                       Number(mchango.target_amount)
                     );
                     const daysLeft = getDaysLeft(mchango.end_date);
@@ -244,13 +246,13 @@ const MchangoList = () => {
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">
-                                KES {Number(mchango.current_amount).toLocaleString()}
+                                KES {allTimeCollected.toLocaleString()}
                               </span>
                               <span className="font-semibold">
                                 of {Number(mchango.target_amount).toLocaleString()}
                               </span>
                             </div>
-                            <Progress value={progress} className="h-2" />
+                            <Progress value={Math.min(progress, 100)} className="h-2" />
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-muted-foreground">
                                 {progress.toFixed(1)}% funded
@@ -283,8 +285,9 @@ const MchangoList = () => {
                 <h2 className="text-2xl font-semibold">Other Campaigns</h2>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {otherCampaigns.map((mchango) => {
+                    const allTimeCollected = Number(mchango.total_gross_collected) || Number(mchango.current_amount);
                     const progress = calculateProgress(
-                      Number(mchango.current_amount),
+                      allTimeCollected,
                       Number(mchango.target_amount)
                     );
                     const daysLeft = getDaysLeft(mchango.end_date);
@@ -320,13 +323,13 @@ const MchangoList = () => {
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">
-                                KES {Number(mchango.current_amount).toLocaleString()}
+                                KES {allTimeCollected.toLocaleString()}
                               </span>
                               <span className="font-semibold">
                                 of {Number(mchango.target_amount).toLocaleString()}
                               </span>
                             </div>
-                            <Progress value={progress} className="h-2" />
+                            <Progress value={Math.min(progress, 100)} className="h-2" />
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-muted-foreground">
                                 {progress.toFixed(1)}% funded

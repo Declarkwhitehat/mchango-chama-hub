@@ -24,6 +24,7 @@ interface Organization {
   location?: string;
   website_url?: string;
   current_amount: number;
+  total_gross_collected: number | null;
   is_verified: boolean;
   status: string;
   created_at: string;
@@ -151,7 +152,7 @@ const OrganizationList = () => {
           <div className="text-center">
             <p className="text-xs text-muted-foreground mb-1">Total Contributions</p>
             <p className="text-xl font-bold text-primary">
-              KES {Number(org.current_amount).toLocaleString()}
+              KES {Number(org.total_gross_collected || org.current_amount).toLocaleString()}
             </p>
           </div>
         </div>
