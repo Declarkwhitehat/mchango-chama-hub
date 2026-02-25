@@ -317,7 +317,7 @@ const OrganizationDetail = () => {
               type="organization"
               showBreakdown={true}
               availableBalance={Number(organization.available_balance || organization.current_amount || 0)}
-              totalWithdrawn={Math.max(0, Number(organization.total_gross_collected || 0) - Number(organization.total_commission_paid || 0) - Number(organization.available_balance || organization.current_amount || 0))}
+              actualCommission={Number(organization.total_commission_paid || 0)}
             />
 
             {/* Withdrawal Button - Only for creators */}

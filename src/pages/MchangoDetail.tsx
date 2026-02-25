@@ -297,7 +297,7 @@ const MchangoDetail = () => {
                 type="mchango"
                 showBreakdown={true}
                 availableBalance={Number(campaign.available_balance || campaign.current_amount || 0)}
-                totalWithdrawn={Math.max(0, allTimeCollected - Number(campaign.total_commission_paid || 0) - Number(campaign.available_balance || campaign.current_amount || 0))}
+                actualCommission={Number(campaign.total_commission_paid || 0)}
               />
 
               {/* Extend Campaign Days - Only for creators */}
@@ -313,7 +313,7 @@ const MchangoDetail = () => {
               {isCreator && (
                 <WithdrawalButton
                   mchangoId={campaign.id}
-                  totalAvailable={campaign.current_amount}
+                  totalAvailable={Number(campaign.available_balance || campaign.current_amount || 0)}
                   commissionRate={0.07}
                   onSuccess={fetchCampaign}
                 />
@@ -358,7 +358,7 @@ const MchangoDetail = () => {
               {isCreator && (
                 <WithdrawalButton
                   mchangoId={campaign.id}
-                  totalAvailable={campaign.current_amount}
+                  totalAvailable={Number(campaign.available_balance || campaign.current_amount || 0)}
                   commissionRate={0.07}
                   onSuccess={fetchCampaign}
                 />
