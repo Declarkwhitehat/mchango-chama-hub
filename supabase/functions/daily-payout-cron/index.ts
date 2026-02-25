@@ -668,7 +668,7 @@ Deno.serve(async (req) => {
                   }
 
                   try {
-                    const b2cResponse = await fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+                    const b2cResponse = await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
                       method: 'POST',
                       headers: {
                         'Authorization': `Bearer ${supabaseServiceKey}`,

@@ -468,7 +468,7 @@ serve(async (req) => {
         
         // Await B2C call and handle failures properly
         try {
-          const b2cRes = await fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+          const b2cRes = await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${serviceRoleKey}`,
@@ -827,7 +827,7 @@ serve(async (req) => {
                 const supabaseUrl = Deno.env.get('SUPABASE_URL');
                 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
                 
-                fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+                fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Bearer ${serviceRoleKey}`,
@@ -1020,7 +1020,7 @@ serve(async (req) => {
 
           // IMPORTANT: Do NOT fire-and-forget. The edge runtime may terminate the request and cancel
           // the outbound call before it completes, so we await the initiation call here.
-          const payoutRes = await fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+          const payoutRes = await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${serviceRoleKey}`,
@@ -1047,7 +1047,7 @@ serve(async (req) => {
               body: payoutResult,
             });
 
-            // Ensure withdrawal is marked failed if initiation call failed before mpesa-b2c-payout could update it.
+            // Ensure withdrawal is marked failed if initiation call failed before b2c-payout could update it.
             await supabaseAdmin
               .from('withdrawals')
               .update({

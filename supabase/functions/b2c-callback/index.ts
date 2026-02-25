@@ -424,7 +424,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Error in mpesa-b2c-callback:', error);
+    console.error('Error in b2c-callback:', error);
     // Always return success to M-Pesa to avoid retries
     return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

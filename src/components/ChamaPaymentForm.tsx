@@ -159,7 +159,7 @@ export const ChamaPaymentForm = ({
       const idempotencyKey = `${chamaId}-${targetMemberId}-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`;
 
       // Trigger M-Pesa STK Push
-      const { data: stkResponse, error: stkError } = await supabase.functions.invoke('mpesa-stk-push', {
+      const { data: stkResponse, error: stkError } = await supabase.functions.invoke('payment-stk-push', {
         body: {
           phone_number: phoneNumber,
           amount: parseFloat(amount),
