@@ -354,14 +354,12 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
       {/* Member ID - Offline Payment Instructions */}
       <CopyableUniqueId uniqueId={member.member_code} label="Member ID (Account No.)" />
 
-      {/* Commission Display - Show chama-wide commission info */}
+      {/* Commission Display - Show member's own contribution commission info */}
       <CommissionDisplay
         totalCollected={totalContributions}
         commissionRate={chama.commission_rate || 0.05}
         type="chama"
         showBreakdown={true}
-        availableBalance={Number(chama.available_balance || 0)}
-        totalWithdrawn={Number(chama.total_withdrawn || 0)}
       />
 
       {/* Member Info Card */}

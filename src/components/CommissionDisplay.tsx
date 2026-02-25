@@ -8,6 +8,7 @@ interface CommissionDisplayProps {
   showBreakdown?: boolean;
   availableBalance?: number;
   totalWithdrawn?: number;
+  actualCommission?: number;
 }
 
 export const CommissionDisplay = ({ 
@@ -16,12 +17,22 @@ export const CommissionDisplay = ({
   type,
   showBreakdown = true,
   availableBalance,
-  totalWithdrawn = 0,
+  totalWithdrawn,
+  actualCommission,
 }: CommissionDisplayProps) => {
-  const commissionAmount = totalCollected * commissionRate;
+  // Use actual DB commission if provided, otherwise calculate
+  const commissionAmount = actualCommission ?? (totalCollected * commissionRate);
   const netAfterCommission = totalCollected - commissionAmount;
+  
   // Use actual available_balance from DB if provided, otherwise fall back to calculated
-  const netBalance = availableBalance !== undefined ? availableBalance : netAfterCommission;
+  const isCreatorView = availableBalance !== undefined;
+  const netBalance = isCreatorView ? availableBalance : netAfterCommission;
+  
+  // Auto-derive totalWithdrawn so breakdown always sums: Total - Commission - Withdrawn = Available
+  const derivedWithdrawn = isCreatorView
+    ? (totalWithdrawn ?? Math.max(0, totalCollected - commissionAmount - availableBalance))
+    : 0;
+  
   const commissionPercentage = (commissionRate * 100).toFixed(0);
 
   return (
@@ -65,19 +76,23 @@ export const CommissionDisplay = ({
           <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
               <Wallet className="h-4 w-4 text-primary" />
-              <p className="text-sm text-muted-foreground">Net Balance</p>
+              <p className="text-sm text-muted-foreground">
+                {isCreatorView ? 'Available Balance' : 'Net After Commission'}
+              </p>
             </div>
             <p className="text-2xl font-bold text-primary">
               KES {netBalance.toLocaleString()}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Available for payout
-              {totalWithdrawn > 0 && (
-                <span className="block">
-                  (KES {totalWithdrawn.toLocaleString()} withdrawn)
-                </span>
-              )}
-            </p>
+            {isCreatorView && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Available for payout
+                {derivedWithdrawn > 0 && (
+                  <span className="block">
+                    (KES {derivedWithdrawn.toLocaleString()} withdrawn)
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         </div>
 
@@ -97,16 +112,18 @@ export const CommissionDisplay = ({
                   - KES {commissionAmount.toLocaleString()}
                 </span>
               </div>
-              {totalWithdrawn > 0 && (
+              {derivedWithdrawn > 0 && (
                 <div className="flex justify-between">
                   <span>Withdrawn:</span>
                   <span className="font-medium text-orange-600">
-                    - KES {totalWithdrawn.toLocaleString()}
+                    - KES {derivedWithdrawn.toLocaleString()}
                   </span>
                 </div>
               )}
               <div className="flex justify-between pt-2 border-t border-border">
-                <span className="font-medium">Available Balance:</span>
+                <span className="font-medium">
+                  {isCreatorView ? 'Available Balance:' : 'Net After Commission:'}
+                </span>
                 <span className="font-bold text-primary">
                   KES {netBalance.toLocaleString()}
                 </span>
