@@ -19,8 +19,8 @@ export default function AdminPaymentConfig() {
   const [shortcode, setShortcode] = useState("");
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-  const validationUrl = `https://${projectId}.supabase.co/functions/v1/mpesa-c2b-validation`;
-  const confirmationUrl = `https://${projectId}.supabase.co/functions/v1/mpesa-c2b-callback`;
+  const validationUrl = `https://${projectId}.supabase.co/functions/v1/c2b-validate-payment`;
+  const confirmationUrl = `https://${projectId}.supabase.co/functions/v1/c2b-confirm-payment`;
 
   useEffect(() => {
     const checkAdminRole = async () => {

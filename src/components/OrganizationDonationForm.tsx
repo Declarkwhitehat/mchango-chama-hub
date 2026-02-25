@@ -72,7 +72,7 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
       const donorName = isAnonymous ? "Anonymous" : (displayName || "Anonymous");
 
       // Initiate M-Pesa STK Push (server will create the donation row to avoid RLS issues)
-      const { data: stkResponse, error: stkError } = await supabase.functions.invoke("mpesa-stk-push", {
+      const { data: stkResponse, error: stkError } = await supabase.functions.invoke("payment-stk-push", {
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
         body: {
           phone_number: normalized,
@@ -118,7 +118,7 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
       try {
         await new Promise((r) => setTimeout(r, 2500));
 
-        const { data: statusData } = await supabase.functions.invoke("mpesa-stk-query", {
+        const { data: statusData } = await supabase.functions.invoke("payment-stk-query", {
           headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
           body: { checkout_request_id: checkoutRequestId },
         });

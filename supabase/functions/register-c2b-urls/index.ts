@@ -50,8 +50,8 @@ serve(async (req) => {
     console.log('✅ OAuth token obtained, token length:', accessToken?.length, 'expires_in:', tokenData.expires_in);
 
     // Step 2: Register C2B URLs
-    const validationURL = `${supabaseUrl}/functions/v1/mpesa-c2b-validation`;
-    const confirmationURL = `${supabaseUrl}/functions/v1/mpesa-c2b-callback`;
+    const validationURL = `${supabaseUrl}/functions/v1/c2b-validate-payment`;
+    const confirmationURL = `${supabaseUrl}/functions/v1/c2b-confirm-payment`;
 
     const registerPayload = {
       ShortCode: shortcode,

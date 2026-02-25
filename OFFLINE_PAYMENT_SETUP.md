@@ -64,12 +64,12 @@ You need to register two URLs with Safaricom to receive payment notifications:
 
 **Validation URL:**
 ```
-https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-validation
+https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/c2b-validate-payment
 ```
 
 **Confirmation URL:**
 ```
-https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-callback
+https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/c2b-confirm-payment
 ```
 
 #### Using Daraja API Portal:
@@ -88,8 +88,8 @@ curl -X POST "https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl" \
   -d '{
     "ShortCode": "YOUR_TILL_NUMBER",
     "ResponseType": "Completed",
-    "ConfirmationURL": "https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-callback",
-    "ValidationURL": "https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/mpesa-c2b-validation"
+     "ConfirmationURL": "https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/c2b-confirm-payment",
+     "ValidationURL": "https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/c2b-validate-payment"
   }'
 ```
 
@@ -153,20 +153,20 @@ The system uses these key tables:
 
 ## Edge Functions
 
-### 1. mpesa-c2b-validation
+### 1. c2b-validate-payment
 **Purpose**: Validates incoming payments before they're processed
 
-**Location**: `supabase/functions/mpesa-c2b-validation/index.ts`
+**Location**: `supabase/functions/c2b-validate-payment/index.ts`
 
 **What it does**:
 - Validates account number format
 - Validates payment amount
 - Returns accept/reject response to M-Pesa
 
-### 2. mpesa-c2b-callback
+### 2. c2b-confirm-payment
 **Purpose**: Processes confirmed payments and credits member accounts
 
-**Location**: `supabase/functions/mpesa-c2b-callback/index.ts`
+**Location**: `supabase/functions/c2b-confirm-payment/index.ts`
 
 **What it does**:
 - Receives payment confirmation from M-Pesa
@@ -213,7 +213,7 @@ SELECT COUNT(*) FROM chama_members WHERE member_code NOT LIKE '____%';
 **Test 4: C2B Callback Processing**
 ```bash
 # Simulate M-Pesa callback
-curl -X POST "http://localhost:54321/functions/v1/mpesa-c2b-callback" \
+curl -X POST "http://localhost:54321/functions/v1/c2b-confirm-payment" \
   -H "Content-Type: application/json" \
   -d '{
     "TransAmount": "1000",
@@ -230,7 +230,7 @@ curl -X POST "http://localhost:54321/functions/v1/mpesa-c2b-callback" \
 
 **Test 5: Invalid Member ID**
 ```bash
-curl -X POST "http://localhost:54321/functions/v1/mpesa-c2b-callback" \
+curl -X POST "http://localhost:54321/functions/v1/c2b-confirm-payment" \
   -H "Content-Type: application/json" \
   -d '{
     "TransAmount": "1000",
@@ -246,7 +246,7 @@ curl -X POST "http://localhost:54321/functions/v1/mpesa-c2b-callback" \
 **Test 6: Duplicate Payment Prevention**
 ```bash
 # Send same transaction twice
-curl -X POST "http://localhost:54321/functions/v1/mpesa-c2b-callback" \
+curl -X POST "http://localhost:54321/functions/v1/c2b-confirm-payment" \
   -H "Content-Type: application/json" \
   -d '{
     "TransAmount": "1000",
@@ -349,7 +349,7 @@ LIMIT 20;
 **Failed Payment Attempts:**
 Check edge function logs for errors:
 ```bash
-supabase functions logs mpesa-c2b-callback --tail
+supabase functions logs c2b-confirm-payment --tail
 ```
 
 ---

@@ -127,7 +127,7 @@ const AppContent = () => {
           <Route path="/admin/ledger" element={<AdminProtectedRoute><AdminLedger /></AdminProtectedRoute>} />
           <Route path="/admin/verification-requests" element={<AdminProtectedRoute><AdminVerificationRequests /></AdminProtectedRoute>} />
           <Route path="/admin/commission-analytics" element={<AdminProtectedRoute><AdminCommissionAnalytics /></AdminProtectedRoute>} />
-          <Route path="/admin/mpesa-search" element={<AdminProtectedRoute><AdminMpesaSearch /></AdminProtectedRoute>} />
+          <Route path="/admin/payment-search" element={<AdminProtectedRoute><AdminMpesaSearch /></AdminProtectedRoute>} />
           <Route path="/admin/fraud-monitoring" element={<AdminProtectedRoute><AdminFraudMonitoring /></AdminProtectedRoute>} />
           <Route path="/admin/fraud-user/:userId" element={<AdminProtectedRoute><AdminFraudUserDetail /></AdminProtectedRoute>} />
           <Route path="/admin/fraud-config" element={<AdminProtectedRoute><AdminFraudConfig /></AdminProtectedRoute>} />

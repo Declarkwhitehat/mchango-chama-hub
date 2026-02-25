@@ -189,7 +189,7 @@ serve(async (req) => {
       .replace(/[-T:.Z]/g, '')
       .slice(0, 14);
 
-    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`;
+    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-stk-callback`;
     console.log('Using Callback URL:', callbackUrl);
 
     // --- Step 2: Prepare STK Push Payload (Paybill) ---

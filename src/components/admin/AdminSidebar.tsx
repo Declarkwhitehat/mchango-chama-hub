@@ -127,7 +127,7 @@ export function AdminSidebar() {
     { title: "Commission Analytics", url: "/admin/commission-analytics", icon: TrendingUp },
     { title: "Financial Ledger", url: "/admin/ledger", icon: Landmark },
     { title: "Payment Config", url: "/admin/payment-config", icon: Settings },
-    { title: "M-Pesa Search", url: "/admin/mpesa-search", icon: Search },
+    { title: "Payment Search", url: "/admin/payment-search", icon: Search },
   ];
 
   const supportItems: MenuItem[] = [

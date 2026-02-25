@@ -55,7 +55,7 @@ const AdminMpesaSearch = () => {
         return;
       }
 
-      const response = await supabase.functions.invoke("admin-mpesa-search", {
+      const response = await supabase.functions.invoke("admin-payment-search", {
         body: { transaction_id: trimmed },
       });
 

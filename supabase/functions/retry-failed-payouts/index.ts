@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
 
       try {
         // Trigger B2C payout
-        const b2cResponse = await fetch(`${supabaseUrl}/functions/v1/mpesa-b2c-payout`, {
+        const b2cResponse = await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${supabaseServiceKey}`,
@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
 
             finalFailureCount++;
           }
-          // Note: If not final, mpesa-b2c-payout already marked it as pending_retry
+          // Note: If not final, b2c-payout already marked it as pending_retry
         }
       } catch (error: any) {
         console.error(`Error triggering B2C for ${withdrawal.id}:`, error);

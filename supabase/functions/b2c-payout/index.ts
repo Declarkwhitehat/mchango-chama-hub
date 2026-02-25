@@ -186,8 +186,8 @@ serve(async (req) => {
       PartyA: shortcode,
       PartyB: formattedPhone,
       Remarks: remarks,
-      QueueTimeOutURL: `${supabaseUrl}/functions/v1/mpesa-b2c-callback`,
-      ResultURL: `${supabaseUrl}/functions/v1/mpesa-b2c-callback`,
+      QueueTimeOutURL: `${supabaseUrl}/functions/v1/b2c-callback`,
+      ResultURL: `${supabaseUrl}/functions/v1/b2c-callback`,
       Occasion: payoutReference // Use our predictable reference for callback lookup
     };
 
@@ -298,7 +298,7 @@ serve(async (req) => {
     }
 
   } catch (error: any) {
-    console.error('Error in mpesa-b2c-payout:', error);
+    console.error('Error in b2c-payout:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
