@@ -36,6 +36,7 @@ interface Organization {
   current_amount: number;
   available_balance: number;
   total_gross_collected: number;
+  total_commission_paid: number;
   is_verified: boolean;
   is_public: boolean;
   status: string;
@@ -315,6 +316,8 @@ const OrganizationDetail = () => {
               commissionRate={0.05}
               type="organization"
               showBreakdown={true}
+              availableBalance={Number(organization.available_balance || organization.current_amount || 0)}
+              totalWithdrawn={Math.max(0, Number(organization.total_gross_collected || 0) - Number(organization.total_commission_paid || 0) - Number(organization.available_balance || organization.current_amount || 0))}
             />
 
             {/* Withdrawal Button - Only for creators */}

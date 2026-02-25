@@ -29,6 +29,8 @@ interface Campaign {
   target_amount: number;
   current_amount: number;
   total_gross_collected: number;
+  total_commission_paid: number;
+  available_balance: number;
   status: string;
   category: string;
   end_date: string;
@@ -294,6 +296,8 @@ const MchangoDetail = () => {
                 commissionRate={0.07}
                 type="mchango"
                 showBreakdown={true}
+                availableBalance={Number(campaign.available_balance || campaign.current_amount || 0)}
+                totalWithdrawn={Math.max(0, allTimeCollected - Number(campaign.total_commission_paid || 0) - Number(campaign.available_balance || campaign.current_amount || 0))}
               />
 
               {/* Extend Campaign Days - Only for creators */}

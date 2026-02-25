@@ -360,6 +360,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         commissionRate={chama.commission_rate || 0.05}
         type="chama"
         showBreakdown={true}
+        availableBalance={Number(chama.available_balance || 0)}
+        totalWithdrawn={Number(chama.total_withdrawn || 0)}
       />
 
       {/* Member Info Card */}

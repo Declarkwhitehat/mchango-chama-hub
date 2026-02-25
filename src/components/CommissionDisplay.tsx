@@ -6,16 +6,22 @@ interface CommissionDisplayProps {
   commissionRate: number;
   type: 'mchango' | 'chama' | 'organization';
   showBreakdown?: boolean;
+  availableBalance?: number;
+  totalWithdrawn?: number;
 }
 
 export const CommissionDisplay = ({ 
   totalCollected, 
   commissionRate, 
   type,
-  showBreakdown = true 
+  showBreakdown = true,
+  availableBalance,
+  totalWithdrawn = 0,
 }: CommissionDisplayProps) => {
   const commissionAmount = totalCollected * commissionRate;
-  const netBalance = totalCollected - commissionAmount;
+  const netAfterCommission = totalCollected - commissionAmount;
+  // Use actual available_balance from DB if provided, otherwise fall back to calculated
+  const netBalance = availableBalance !== undefined ? availableBalance : netAfterCommission;
   const commissionPercentage = (commissionRate * 100).toFixed(0);
 
   return (
@@ -66,6 +72,11 @@ export const CommissionDisplay = ({
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Available for payout
+              {totalWithdrawn > 0 && (
+                <span className="block">
+                  (KES {totalWithdrawn.toLocaleString()} withdrawn)
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -86,8 +97,16 @@ export const CommissionDisplay = ({
                   - KES {commissionAmount.toLocaleString()}
                 </span>
               </div>
+              {totalWithdrawn > 0 && (
+                <div className="flex justify-between">
+                  <span>Withdrawn:</span>
+                  <span className="font-medium text-orange-600">
+                    - KES {totalWithdrawn.toLocaleString()}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between pt-2 border-t border-border">
-                <span className="font-medium">Net Balance:</span>
+                <span className="font-medium">Available Balance:</span>
                 <span className="font-bold text-primary">
                   KES {netBalance.toLocaleString()}
                 </span>
