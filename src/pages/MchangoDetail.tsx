@@ -28,6 +28,7 @@ interface Campaign {
   description: string;
   target_amount: number;
   current_amount: number;
+  total_gross_collected: number;
   status: string;
   category: string;
   end_date: string;
@@ -149,7 +150,8 @@ const MchangoDetail = () => {
     return null;
   }
 
-  const progress = (Number(campaign.current_amount) / Number(campaign.target_amount)) * 100;
+  const allTimeCollected = Number(campaign.total_gross_collected || 0);
+  const progress = (allTimeCollected / Number(campaign.target_amount)) * 100;
   const daysLeft = getDaysLeft(campaign.end_date);
   const isExpired = daysLeft === 0;
 
@@ -254,16 +256,21 @@ const MchangoDetail = () => {
               <div className="space-y-2 pt-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    KES {Number(campaign.current_amount).toLocaleString()} raised
+                    KES {allTimeCollected.toLocaleString()} raised
                   </span>
                   <span className="font-semibold text-foreground">
                     of KES {Number(campaign.target_amount).toLocaleString()}
                   </span>
                 </div>
-                <Progress value={progress} className="h-3" />
+                <Progress value={Math.min(progress, 100)} className="h-3" />
                 <div className="text-sm text-muted-foreground">
                   {progress.toFixed(1)}% funded
                 </div>
+                {isCreator && Number(campaign.current_amount) !== allTimeCollected && (
+                  <div className="text-xs text-muted-foreground">
+                    Available balance: KES {Number(campaign.current_amount).toLocaleString()}
+                  </div>
+                )}
                 
                 {/* Unique ID for offline payments */}
                 {campaign.paybill_account_id && (
@@ -283,7 +290,7 @@ const MchangoDetail = () => {
             <TabsContent value="details" className="space-y-6">
               {/* Commission Display */}
               <CommissionDisplay 
-                totalCollected={campaign.current_amount}
+                totalCollected={allTimeCollected}
                 commissionRate={0.07}
                 type="mchango"
                 showBreakdown={true}
