@@ -13,9 +13,6 @@ serve(async (req) => {
     const token = authHeader?.replace('Bearer ', '').trim();
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-      global: { headers: authHeader ? { Authorization: `Bearer ${token}` } : {} }, auth: { persistSession: false }
-    });
     const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
     // GET - List contributions
@@ -27,7 +24,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'welfare_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabaseAdmin
         .from('welfare_contributions')
         .select('*, welfare_members!member_id(member_code, role, profiles:user_id(full_name, phone))')
         .eq('welfare_id', welfareId)
@@ -55,10 +52,10 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'welfare_id and positive amount required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Verify welfare is active and not frozen
+      // Select ALL balance fields needed for the update
       const { data: welfare } = await supabaseAdmin
         .from('welfares')
-        .select('id, is_frozen, status, commission_rate')
+        .select('id, is_frozen, status, commission_rate, total_gross_collected, total_commission_paid, available_balance, current_amount')
         .eq('id', welfare_id)
         .single();
 
@@ -70,10 +67,10 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Welfare is frozen. Contact admin.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Get member record
+      // Get member record with total_contributed
       const { data: member } = await supabaseAdmin
         .from('welfare_members')
-        .select('id')
+        .select('id, total_contributed')
         .eq('welfare_id', welfare_id)
         .eq('user_id', userData.user.id)
         .eq('status', 'active')
@@ -83,15 +80,15 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Not a member of this welfare' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Calculate commission
       const commissionRate = Number(welfare.commission_rate) || COMMISSION_RATES.WELFARE;
       const grossAmount = Number(amount);
       const commissionAmount = Math.round(grossAmount * commissionRate * 100) / 100;
       const netAmount = Math.round((grossAmount - commissionAmount) * 100) / 100;
 
-      const cycleMonth = new Date().toISOString().substring(0, 7); // "2026-02"
+      const cycleMonth = new Date().toISOString().substring(0, 7);
 
-      const { data: contribution, error } = await supabaseClient
+      // Use supabaseAdmin for insert
+      const { data: contribution, error } = await supabaseAdmin
         .from('welfare_contributions')
         .insert({
           welfare_id,
@@ -111,21 +108,21 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      // Update welfare balances
+      // Update welfare balances using actual DB values
       await supabaseAdmin
         .from('welfares')
         .update({
-          total_gross_collected: welfare.total_gross_collected + grossAmount,
-          total_commission_paid: welfare.total_commission_paid + commissionAmount,
-          available_balance: welfare.available_balance + netAmount,
-          current_amount: welfare.current_amount + netAmount,
+          total_gross_collected: (welfare.total_gross_collected || 0) + grossAmount,
+          total_commission_paid: (welfare.total_commission_paid || 0) + commissionAmount,
+          available_balance: (welfare.available_balance || 0) + netAmount,
+          current_amount: (welfare.current_amount || 0) + netAmount,
         })
         .eq('id', welfare_id);
 
       // Update member total_contributed
       await supabaseAdmin
         .from('welfare_members')
-        .update({ total_contributed: member.total_contributed + grossAmount })
+        .update({ total_contributed: (member.total_contributed || 0) + grossAmount })
         .eq('id', member.id);
 
       // Record company earning
