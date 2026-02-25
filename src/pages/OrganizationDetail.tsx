@@ -35,6 +35,7 @@ interface Organization {
   youtube_url?: string;
   current_amount: number;
   available_balance: number;
+  total_gross_collected: number;
   is_verified: boolean;
   is_public: boolean;
   status: string;
@@ -212,10 +213,15 @@ const OrganizationDetail = () => {
 
               {/* Stats */}
               <div className="text-center p-6 bg-primary/5 rounded-xl border">
-                <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
+                <p className="text-sm text-muted-foreground mb-1">All-Time Collected</p>
                 <p className="text-3xl font-bold text-primary">
-                  KES {Number(organization.available_balance || 0).toLocaleString()}
+                  KES {Number(organization.total_gross_collected || 0).toLocaleString()}
                 </p>
+                {isCreator && Number(organization.available_balance || 0) !== Number(organization.total_gross_collected || 0) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Available: KES {Number(organization.available_balance || 0).toLocaleString()}
+                  </p>
+                )}
                 {organization.paybill_account_id && (
                   <div className="mt-3 pt-3 border-t border-border">
                     <CopyableUniqueId uniqueId={organization.paybill_account_id} className="p-0 bg-transparent border-0" />
@@ -305,7 +311,7 @@ const OrganizationDetail = () => {
 
             {/* Commission Display */}
             <CommissionDisplay 
-              totalCollected={organization.current_amount}
+              totalCollected={Number(organization.total_gross_collected || 0)}
               commissionRate={0.05}
               type="organization"
               showBreakdown={true}
@@ -336,7 +342,7 @@ const OrganizationDetail = () => {
           <TabsContent value="donors">
             <OrganizationDonorsList 
               organizationId={organization.id} 
-              totalAmount={organization.available_balance || 0}
+              totalAmount={Number(organization.total_gross_collected || 0)}
               organizationName={organization.name}
             />
           </TabsContent>
