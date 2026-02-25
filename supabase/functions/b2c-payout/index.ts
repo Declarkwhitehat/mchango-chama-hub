@@ -246,12 +246,12 @@ serve(async (req) => {
     console.log('B2C response:', b2cResult);
 
     if (b2cResult.ResponseCode === '0') {
-      // B2C request accepted - update with M-Pesa conversation ID
-      // Note: Status stays 'processing' - callback will update to 'completed' or 'failed'
+      // B2C request accepted - store ConversationID in notes only
+      // IMPORTANT: Do NOT overwrite payment_reference here! Keep it as 'WD-<uuid>'
+      // so the callback can find this withdrawal even if it arrives before this code runs.
       await supabaseAdmin
         .from('withdrawals')
         .update({
-          payment_reference: b2cResult.ConversationID,
           notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C initiated: ConvID=${b2cResult.ConversationID}, OrigConvID=${b2cResult.OriginatorConversationID} (ref: ${payoutReference}, attempt ${attemptCount})`
         })
         .eq('id', withdrawal_id);

@@ -54,7 +54,60 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     mchango:mchango_id(title)
   `;
 
-  // Method 1: Lookup by ConversationID in payment_reference (primary - set by payout function)
+  // --- Extract recipient phone from callback for phone-based lookups ---
+  let recipientPhoneLast9 = '';
+  if (result.ResultParameters?.ResultParameter) {
+    for (const param of result.ResultParameters.ResultParameter) {
+      if (param.Key === 'ReceiverPartyPublicName') {
+        const parts = String(param.Value).split(' - ');
+        recipientPhoneLast9 = (parts[0] || '').replace(/\D/g, '').slice(-9);
+        break;
+      }
+    }
+  }
+
+  // Method 0 (PRIMARY): Find processing withdrawal with WD- payment_reference matching by phone
+  // This is the most reliable method because b2c-payout sets payment_reference = 'WD-<uuid>'
+  // BEFORE making the API call, so it's always present when the callback arrives.
+  if (recipientPhoneLast9) {
+    const { data: wd0list } = await supabaseAdmin
+      .from('withdrawals')
+      .select(selectQuery)
+      .eq('status', 'processing')
+      .like('payment_reference', 'WD-%')
+      .order('last_b2c_attempt_at', { ascending: false })
+      .limit(10);
+
+    if (wd0list && wd0list.length > 0) {
+      for (const wd of wd0list) {
+        const profilePhone = (wd.profiles?.phone || '').replace(/\D/g, '').slice(-9);
+        if (profilePhone === recipientPhoneLast9) {
+          console.log('Found withdrawal by WD- prefix + phone match:', wd.id);
+          return wd;
+        }
+      }
+    }
+  }
+
+  // Method 1: Direct ID extraction from WD- payment_reference
+  // Search all processing withdrawals with WD- prefix and extract the UUID to match
+  {
+    const { data: wdProcessing } = await supabaseAdmin
+      .from('withdrawals')
+      .select(selectQuery)
+      .eq('status', 'processing')
+      .like('payment_reference', 'WD-%')
+      .order('last_b2c_attempt_at', { ascending: false })
+      .limit(5);
+
+    if (wdProcessing && wdProcessing.length === 1) {
+      // If only one processing withdrawal exists, it's almost certainly the right one
+      console.log('Found single processing withdrawal with WD- prefix:', wdProcessing[0].id);
+      return wdProcessing[0];
+    }
+  }
+
+  // Method 2: Lookup by ConversationID in payment_reference (legacy fallback)
   if (conversationId) {
     const { data: wd1 } = await supabaseAdmin
       .from('withdrawals')
@@ -68,50 +121,24 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     }
   }
 
-  // Method 2: Lookup by OriginatorConversationID in payment_reference
-  if (originatorConversationId) {
-    const { data: wd2 } = await supabaseAdmin
-      .from('withdrawals')
-      .select(selectQuery)
-      .eq('payment_reference', originatorConversationId)
-      .maybeSingle();
-
-    if (wd2) {
-      console.log('Found withdrawal by OriginatorConversationID in payment_reference:', wd2.id);
-      return wd2;
-    }
-  }
-
-  // Method 3: Occasion-based lookup (WD-{uuid} format)
+  // Method 3: Occasion-based lookup (WD-{uuid} format) - works if Safaricom echoes Occasion
   if (occasion && occasion.startsWith('WD-')) {
-    const { data: wd3 } = await supabaseAdmin
-      .from('withdrawals')
-      .select(selectQuery)
-      .eq('payment_reference', occasion)
-      .maybeSingle();
-
-    if (wd3) {
-      console.log('Found withdrawal by Occasion in payment_reference:', wd3.id);
-      return wd3;
-    }
-
-    // Extract withdrawal ID from WD-{uuid}
     const withdrawalId = occasion.substring(3);
-    if (withdrawalId && withdrawalId.length > 0) {
-      const { data: wd3b } = await supabaseAdmin
+    if (withdrawalId) {
+      const { data: wd3 } = await supabaseAdmin
         .from('withdrawals')
         .select(selectQuery)
         .eq('id', withdrawalId)
         .maybeSingle();
 
-      if (wd3b) {
-        console.log('Found withdrawal by extracted ID from Occasion:', wd3b.id);
-        return wd3b;
+      if (wd3) {
+        console.log('Found withdrawal by extracted ID from Occasion:', wd3.id);
+        return wd3;
       }
     }
   }
 
-  // Method 4: Search notes for ConversationID (in case payment_reference was overwritten)
+  // Method 4: Search notes for ConversationID
   if (conversationId) {
     const { data: wd4list } = await supabaseAdmin
       .from('withdrawals')
@@ -123,44 +150,6 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     if (wd4list && wd4list.length > 0) {
       console.log('Found withdrawal by ConversationID in notes:', wd4list[0].id);
       return wd4list[0];
-    }
-  }
-
-  // Method 5: Phone number match on processing withdrawals (last resort)
-  if (result.ResultParameters?.ResultParameter) {
-    let recipientPhone = '';
-    for (const param of result.ResultParameters.ResultParameter) {
-      if (param.Key === 'ReceiverPartyPublicName') {
-        // Format: "254707874790 - DECLARK OKEMWA CHACHA"
-        const parts = String(param.Value).split(' - ');
-        recipientPhone = (parts[0] || '').replace(/\D/g, '');
-        break;
-      }
-    }
-
-    if (recipientPhone) {
-      const last9 = recipientPhone.slice(-9);
-      const { data: wd5list } = await supabaseAdmin
-        .from('withdrawals')
-        .select(`
-          ${selectQuery},
-          payment_methods:payment_method_id(phone_number)
-        `)
-        .eq('status', 'processing')
-        .order('last_b2c_attempt_at', { ascending: false })
-        .limit(10);
-
-      for (const wd of wd5list || []) {
-        const pmPhone = (wd.payment_methods?.phone_number || '').replace(/\D/g, '');
-        const profilePhone = (wd.profiles?.phone || '').replace(/\D/g, '');
-        if (
-          (pmPhone && pmPhone.slice(-9) === last9) ||
-          (profilePhone && profilePhone.slice(-9) === last9)
-        ) {
-          console.log('Found withdrawal by phone number match:', wd.id);
-          return wd;
-        }
-      }
     }
   }
 
