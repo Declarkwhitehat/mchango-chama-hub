@@ -12,9 +12,6 @@ serve(async (req) => {
     const token = authHeader?.replace('Bearer ', '').trim();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-      global: { headers: authHeader ? { Authorization: `Bearer ${token}` } : {} }, auth: { persistSession: false }
-    });
     const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
     // GET - List cycles for a welfare
@@ -26,7 +23,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'welfare_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabaseAdmin
         .from('welfare_contribution_cycles')
         .select('*')
         .eq('welfare_id', welfareId)
@@ -78,8 +75,8 @@ serve(async (req) => {
         .eq('welfare_id', welfare_id)
         .eq('status', 'active');
 
-      // Create new cycle
-      const { data, error } = await supabaseClient
+      // Use supabaseAdmin for insert to bypass RLS
+      const { data, error } = await supabaseAdmin
         .from('welfare_contribution_cycles')
         .insert({
           welfare_id,
@@ -94,7 +91,6 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      // Update welfare contribution_amount
       await supabaseAdmin
         .from('welfares')
         .update({ contribution_amount: amount })

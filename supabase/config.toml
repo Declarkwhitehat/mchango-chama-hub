@@ -140,3 +140,18 @@ verify_jwt = false
 
 [functions.totp-2fa]
 verify_jwt = false
+
+[functions.welfare-crud]
+verify_jwt = false
+
+[functions.welfare-members]
+verify_jwt = false
+
+[functions.welfare-contributions]
+verify_jwt = false
+
+[functions.welfare-cycles]
+verify_jwt = false
+
+[functions.welfare-withdrawal-approve]
+verify_jwt = false

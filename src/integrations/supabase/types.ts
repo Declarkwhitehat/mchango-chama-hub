@@ -2285,6 +2285,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "welfare_contributions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "welfare_contributions_welfare_id_fkey"
             columns: ["welfare_id"]
             isOneToOne: false
@@ -2331,6 +2338,13 @@ export type Database = {
           welfare_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "welfare_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "welfare_members_welfare_id_fkey"
             columns: ["welfare_id"]
@@ -2483,7 +2497,15 @@ export type Database = {
           updated_at?: string
           whatsapp_link?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "welfares_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       withdrawals: {
         Row: {

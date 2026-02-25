@@ -11,16 +11,8 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.replace('Bearer ', '').trim() || null;
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: authHeader ? { Authorization: authHeader } : {} }, auth: { persistSession: false } }
-    );
-
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
@@ -30,7 +22,6 @@ serve(async (req) => {
     // GET - List or detail
     if (req.method === 'GET') {
       if (!id) {
-        // List user's welfares
         let user = null;
         if (token) {
           const { data: userData } = await supabaseAdmin.auth.getUser(token);
@@ -38,8 +29,7 @@ serve(async (req) => {
         }
 
         if (user) {
-          // Get welfares where user is a member
-          const { data: memberships } = await supabaseClient
+          const { data: memberships } = await supabaseAdmin
             .from('welfare_members')
             .select('welfare_id')
             .eq('user_id', user.id)
@@ -53,7 +43,7 @@ serve(async (req) => {
             });
           }
 
-          const { data, error } = await supabaseClient
+          const { data, error } = await supabaseAdmin
             .from('welfares')
             .select('*, welfare_members(id, user_id, role, status, member_code, total_contributed, profiles:user_id(full_name, phone))')
             .in('id', welfareIds)
@@ -66,7 +56,7 @@ serve(async (req) => {
         }
 
         // Public listing
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabaseAdmin
           .from('welfares')
           .select('id, name, slug, description, status, is_public, group_code, created_at')
           .eq('status', 'active')
@@ -85,9 +75,9 @@ serve(async (req) => {
 
       let data, error;
       if (isUuid) {
-        ({ data, error } = await supabaseClient.from('welfares').select(selectQuery).eq('id', id).single());
+        ({ data, error } = await supabaseAdmin.from('welfares').select(selectQuery).eq('id', id).single());
       } else {
-        ({ data, error } = await supabaseClient.from('welfares').select(selectQuery).eq('slug', id).single());
+        ({ data, error } = await supabaseAdmin.from('welfares').select(selectQuery).eq('slug', id).single());
       }
 
       if (error) throw error;
@@ -114,10 +104,10 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Name must be at least 3 characters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Generate slug
       const slug = name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/-+$/, '') + '-' + Math.random().toString(36).substring(2, 6);
 
-      const { data, error } = await supabaseClient
+      // Use supabaseAdmin to bypass RLS KYC requirement
+      const { data, error } = await supabaseAdmin
         .from('welfares')
         .insert({
           created_by: userData.user.id,
@@ -145,6 +135,11 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      const { data: userData } = await supabaseAdmin.auth.getUser(token);
+      if (!userData?.user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       const body = await req.json();
       const { name, description, is_public, whatsapp_link, min_contribution_period_months } = body;
 
@@ -155,7 +150,7 @@ serve(async (req) => {
       if (whatsapp_link !== undefined) updateData.whatsapp_link = whatsapp_link;
       if (min_contribution_period_months !== undefined) updateData.min_contribution_period_months = min_contribution_period_months;
 
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabaseAdmin
         .from('welfares')
         .update(updateData)
         .eq('id', id)

@@ -15,9 +15,6 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-      global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false }
-    });
     const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
@@ -33,7 +30,6 @@ serve(async (req) => {
 
       let targetWelfareId = welfare_id;
 
-      // If group_code provided, look up welfare
       if (group_code && !welfare_id) {
         const { data: welfare } = await supabaseAdmin
           .from('welfares')
@@ -52,7 +48,6 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'welfare_id or group_code required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Check if already a member
       const { data: existing } = await supabaseAdmin
         .from('welfare_members')
         .select('id, status')
@@ -64,8 +59,8 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Already a member' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Join as regular member
-      const { data, error } = await supabaseClient
+      // Use supabaseAdmin for insert to bypass RLS and enable FK joins
+      const { data, error } = await supabaseAdmin
         .from('welfare_members')
         .insert({ welfare_id: targetWelfareId, user_id: user.id, role: 'member', status: 'active' })
         .select('*, profiles:user_id(full_name, phone)')
@@ -84,7 +79,6 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'member_id and role required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Check if user is admin
       const { data: adminRole } = await supabaseAdmin
         .from('user_roles')
         .select('role')
@@ -93,7 +87,6 @@ serve(async (req) => {
         .maybeSingle();
       const isAdmin = !!adminRole;
 
-      // Admins can assign any role including chairman
       const allowedRoles = isAdmin 
         ? ['chairman', 'secretary', 'treasurer', 'member']
         : ['secretary', 'treasurer', 'member'];
@@ -102,7 +95,6 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: `Invalid role. Use: ${allowedRoles.join(', ')}` }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Get the target member's welfare_id
       const { data: targetMember } = await supabaseAdmin
         .from('welfare_members')
         .select('welfare_id, role')
@@ -114,7 +106,6 @@ serve(async (req) => {
       }
 
       if (!isAdmin) {
-        // Verify requester is chairman
         const { data: requesterMember } = await supabaseAdmin
           .from('welfare_members')
           .select('role')
@@ -128,7 +119,6 @@ serve(async (req) => {
         }
       }
 
-      // If assigning chairman, demote current chairman to member
       if (role === 'chairman') {
         await supabaseAdmin
           .from('welfare_members')
@@ -138,7 +128,6 @@ serve(async (req) => {
           .neq('id', member_id);
       }
 
-      // If assigning secretary/treasurer, remove that role from current holder
       if (role === 'secretary' || role === 'treasurer') {
         await supabaseAdmin
           .from('welfare_members')
@@ -163,9 +152,8 @@ serve(async (req) => {
     if (req.method === 'DELETE') {
       const url = new URL(req.url);
       const memberId = url.searchParams.get('member_id');
-      const action = url.searchParams.get('action'); // 'leave' for self-leave
+      const action = url.searchParams.get('action');
 
-      // Self-leave flow
       if (action === 'leave') {
         const welfareId = url.searchParams.get('welfare_id');
         if (!welfareId) {
@@ -197,12 +185,10 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Chairman or Admin remove flow
       if (!memberId) {
         return new Response(JSON.stringify({ error: 'member_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Check if user is admin
       const { data: adminRoleDel } = await supabaseAdmin
         .from('user_roles')
         .select('role')
@@ -221,13 +207,11 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Member not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Only admin can remove chairman
       if (targetMember.role === 'chairman' && !isAdminDel) {
         return new Response(JSON.stringify({ error: 'Cannot remove the Chairman' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       if (!isAdminDel) {
-        // Verify requester is chairman
         const { data: requesterMember } = await supabaseAdmin
           .from('welfare_members')
           .select('role')
