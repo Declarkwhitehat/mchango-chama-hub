@@ -1,89 +1,245 @@
 
 
-## Plan: Fix Withdrawal Balance Not Updating After Successful B2C Payout
+# Online Welfare System - Full Build Plan
 
-### Root Cause
+## Overview
 
-The B2C callback logs confirm the issue:
+Build a complete Online Welfare System as a new entity type alongside Chama, Mchango, and Organizations. The welfare system features a 3-person executive panel (Chairman, Secretary, Treasurer) with multi-signature withdrawal approval, isolated wallets, flexible contributions set by the Secretary, and comprehensive accountability features.
 
+## Database Schema
+
+### New Tables
+
+**1. `welfares`** - Core welfare entity (similar to `chama` / `mchango`)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| created_by | uuid | Auto becomes Chairman |
+| name | text | |
+| slug | text | Unique |
+| description | text | |
+| group_code | text | Auto-generated 4-char |
+| paybill_account_id | text | For C2B payments |
+| contribution_amount | numeric | Set by Secretary |
+| contribution_frequency | text | monthly/weekly/custom |
+| contribution_deadline_days | integer | Days to pay after cycle starts |
+| min_contribution_period_months | integer | Default 3 - months before withdrawal eligibility |
+| commission_rate | numeric | Default 0.05 (5%) |
+| total_gross_collected | numeric | Default 0 |
+| total_commission_paid | numeric | Default 0 |
+| available_balance | numeric | Default 0 |
+| current_amount | numeric | Default 0 |
+| total_withdrawn | numeric | Default 0 |
+| is_public | boolean | Default true |
+| is_frozen | boolean | Default false |
+| frozen_at | timestamptz | |
+| frozen_reason | text | |
+| whatsapp_link | text | |
+| status | text | active/inactive |
+| created_at / updated_at | timestamptz | |
+
+**2. `welfare_members`** - Member roster with roles
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| welfare_id | uuid FK | |
+| user_id | uuid | |
+| role | text | chairman/secretary/treasurer/member |
+| member_code | text | WelfareCode + random suffix |
+| status | text | active/inactive/removed |
+| joined_at | timestamptz | |
+| total_contributed | numeric | Default 0 |
+| is_eligible_for_withdrawal | boolean | Default false (computed based on min period) |
+| created_at | timestamptz | |
+
+**3. `welfare_contributions`** - Payment records
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| welfare_id | uuid FK | |
+| member_id | uuid FK → welfare_members | |
+| user_id | uuid | |
+| gross_amount | numeric | |
+| commission_amount | numeric | |
+| net_amount | numeric | |
+| payment_reference | text | |
+| payment_method | text | |
+| payment_status | text | pending/completed/failed |
+| mpesa_receipt_number | text | |
+| cycle_month | text | e.g. "2026-02" for tracking |
+| created_at / completed_at | timestamptz | |
+
+**4. `welfare_withdrawal_approvals`** - Multi-sig approval tracking
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| withdrawal_id | uuid FK → withdrawals | |
+| welfare_id | uuid FK | |
+| approver_id | uuid FK → welfare_members | |
+| approver_role | text | secretary/treasurer |
+| decision | text | pending/approved/rejected |
+| decided_at | timestamptz | |
+| rejection_reason | text | |
+| created_at | timestamptz | |
+
+**5. `welfare_contribution_cycles`** - Secretary-defined contribution periods
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| welfare_id | uuid FK | |
+| set_by | uuid | Secretary's user_id |
+| amount | numeric | Amount for this cycle |
+| start_date | date | |
+| end_date | date | |
+| status | text | active/completed |
+| created_at | timestamptz | |
+
+The existing `withdrawals` table will be extended with a `welfare_id` column.
+
+### Withdrawal Flow (Multi-Sig)
+
+```text
+Chairman/Treasurer creates withdrawal request
+        ↓
+   withdrawals.status = 'pending_approval'
+   welfare_withdrawal_approvals rows created for Secretary + Treasurer
+        ↓
+   Secretary gets notification → Approve/Reject
+   Treasurer gets notification → Approve/Reject
+        ↓
+   Both approved? → status = 'approved' → B2C payout
+   Any rejected? → status = 'rejected'
 ```
-Finding withdrawal: { conversationId: "AG_20250225_...", originatorConversationId: "0464-44ca-...", occasion: "" }
-Could not find withdrawal with any method
-Withdrawal not found for callback
-```
 
-The payout of KES 30 was **successfully sent** (TransactionID: UBPF97PELP), but the callback could not match it back to the withdrawal record. Since the balance deduction code only runs after finding the withdrawal, **the mchango balance was never reduced**.
+Key security rules:
+- Chairman CANNOT approve their own withdrawal request (visible but not auto-approved)
+- Leaders cannot withdraw to themselves (recipient phone != requester's phone)
+- Audit logs are immutable (no delete policy for anyone)
+- Auto-freeze if Treasurer role changes (requires admin unfreeze)
 
-### Why All 5 Lookup Methods Failed
+### RLS Policies
 
-There is a **race condition** between `b2c-payout` and `b2c-callback`:
+- Members can view their welfare and contributions
+- Only Secretary can create/update contribution cycles
+- Only Chairman/Treasurer can initiate withdrawals
+- Approvals can only be made by the assigned approver
+- Admin can view/manage everything
+- Audit logs: insert-only, no update/delete for anyone
 
-1. `b2c-payout` sets `payment_reference = 'WD-<uuid>'` and `status = 'processing'`
-2. Makes the B2C API call with `Occasion = 'WD-<uuid>'`
-3. Safaricom processes instantly and sends the callback
-4. **Callback arrives BEFORE `b2c-payout` updates `payment_reference` to the ConversationID** (line 254)
+## Edge Functions
 
-So at callback time:
-- **Method 1** (ConversationID in payment_reference): Fails because payment_reference is still `WD-<uuid>`, not yet updated to ConversationID
-- **Method 2** (OriginatorConversationID in payment_reference): Same reason
-- **Method 3** (Occasion = `WD-<uuid>`): Fails because Safaricom does NOT echo the Occasion field back in the callback (it's empty/undefined)
-- **Method 4** (Search notes for ConversationID): Fails because notes haven't been updated yet either (same race condition)
-- **Method 5** (Phone number match): This SHOULD work but appears to have failed, likely due to the `payment_methods` join returning null
+**1. `welfare-crud/index.ts`** - CRUD for welfares
+- POST: Create welfare (auto-assign creator as Chairman)
+- GET: List/detail
+- PUT: Update (Chairman only)
+- DELETE: Soft delete (Chairman only)
 
-### Fix
+**2. `welfare-members/index.ts`** - Member management
+- POST: Join by code / invite
+- PUT: Assign roles (Chairman assigns Secretary & Treasurer)
+- DELETE: Remove member
 
-Add a new **primary lookup method** to `b2c-callback/findWithdrawal` that searches for the `WD-<uuid>` format directly in `payment_reference`. Since `b2c-payout` sets `payment_reference = 'WD-<uuid>'` BEFORE the API call, this value is guaranteed to be present when the callback arrives.
+**3. `welfare-contributions/index.ts`** - Contribution handling
+- POST: Record contribution (with 5% commission deduction)
+- GET: List contributions with filters
 
-#### Changes to `supabase/functions/b2c-callback/index.ts`
+**4. `welfare-withdrawal-approve/index.ts`** - Multi-sig approval
+- POST: Submit approval/rejection by Secretary or Treasurer
+- Auto-triggers B2C payout when both approve
+- Auto-rejects if either rejects
 
-1. **Add Method 0** (before all others): Look for any `processing` withdrawal where `payment_reference` starts with `WD-` and matches by ConversationID or OriginatorConversationID stored in the notes. But more reliably:
-   - Look for `processing` withdrawals with `payment_reference LIKE 'WD-%'` and match by phone number (this is the most reliable pre-overwrite method)
+**5. Updates to `withdrawals-crud/index.ts`**
+- Add `welfare_id` support
+- When welfare withdrawal: create approval records, notify Secretary + Treasurer
+- Block self-withdrawal (recipient != requester)
+- Check min contribution period eligibility
 
-2. **Better approach**: Since `b2c-payout` sets `Occasion = payoutReference` in the B2C payload but Safaricom doesn't echo it back, we should **stop overwriting `payment_reference`** with the ConversationID. Instead, store the ConversationID in a separate approach:
-   - Before the B2C call, `payment_reference = 'WD-<uuid>'` 
-   - After B2C success, store ConversationID in notes only (don't overwrite payment_reference)
-   - In callback, Method 3 already extracts the UUID from `WD-<uuid>` format and looks up by `id` — but it needs the Occasion field which Safaricom doesn't provide
+**6. Updates to `b2c-callback/index.ts`**
+- Add welfare balance deduction on successful payout
 
-3. **Simplest reliable fix**: In `b2c-payout`, do NOT overwrite `payment_reference` with ConversationID after B2C success. Keep it as `WD-<uuid>`. Then add a new lookup method in the callback that searches for `payment_reference = 'WD-<withdrawal_id>'` by trying all `processing` status withdrawals and matching via ConversationID in notes. 
+**7. `welfare-cycles/index.ts`** - Contribution cycle management
+- POST: Secretary sets amount and duration
+- GET: List cycles
 
-   **Actually, the simplest fix**: Add a lookup that finds any `processing` withdrawal matching the phone number from the callback. Method 5 already does this but may have a bug. Let me propose:
+## Frontend Pages
 
-#### Final Approach (Two Changes)
+| Page | Route | Description |
+|------|-------|-------------|
+| WelfareCreate | /welfare/create | Create new welfare group |
+| WelfareList | /welfare | List user's welfares |
+| WelfareDetail | /welfare/:id | Dashboard with balance, contributions, withdrawals, members |
+| WelfareJoin | /welfare/join/:slug | Join by invite/code |
 
-**Change 1: `b2c-payout/index.ts`** — Stop overwriting `payment_reference` after B2C success. Instead, store both the WD reference AND ConversationID:
-- Line 254: Change from `payment_reference: b2cResult.ConversationID` to storing ConversationID only in notes (keep `payment_reference` as `WD-<uuid>`)
+### Key UI Components
 
-**Change 2: `b2c-callback/index.ts`** — Add a new Method 0 before all others:
-- Look up by extracting withdrawal ID from `payment_reference` pattern. Since we can't get the Occasion, instead: look for any `processing` withdrawal and match by the ConversationID or OriginatorConversationID stored in notes. 
-- BUT notes haven't been updated yet due to the race condition.
+- **WelfareExecutivePanel** - Shows Chairman, Secretary, Treasurer with role badges
+- **WelfareWithdrawalRequest** - Form for Chairman/Treasurer to request withdrawal (recipient phone, amount, reason category)
+- **WelfareApprovalCard** - For Secretary/Treasurer to approve/reject with reason
+- **WelfareContributionForm** - Pay via STK Push or offline (Paybill + welfare ID)
+- **WelfareMemberDashboard** - Total balance, all contributions, all withdrawals, who approved, member payment success rates, missed payments
+- **WelfareContributionCycleManager** - Secretary sets amount and duration
+- **WelfareTransactionLog** - Full audit trail (who requested, who approved, timestamps, M-Pesa codes)
+- **WelfareWithdrawalHistory** - Shows all withdrawals with approval chain
 
-**Actually the cleanest fix**: Store ConversationID in a **separate column** or just don't overwrite payment_reference. Then the callback can find the withdrawal by phone + status = processing (fixing Method 5).
+### Navigation Updates
 
-Let me look at why Method 5 failed specifically — the phone `254707874790` should match. The issue might be that `payment_methods` join syntax is wrong or the data is missing.
+- Add "Welfare" to main navigation alongside Chama, Mchango, Organizations
+- Add welfare routes to App.tsx
+- Add admin welfare management pages
 
-**Root fix — two changes:**
+## Security Features
 
-1. **`b2c-payout/index.ts` (line 253-254)**: Do NOT overwrite `payment_reference`. Store ConversationID in notes only. This ensures `payment_reference` remains `WD-<uuid>` when the callback arrives.
+1. **Min contribution period**: Members must contribute for N months (default 3) before being eligible to receive money
+2. **No self-withdrawal**: Leaders cannot withdraw to their own phone number
+3. **Immutable audit log**: No delete/update RLS on welfare audit entries
+4. **Auto-freeze on Treasurer change**: When Treasurer role is reassigned, welfare freezes automatically; only platform admin can unfreeze
+5. **Chairman visibility**: All chairman-initiated requests are visible to all executives, never silently auto-approved
+6. **Commission**: 5% on all contributions, credited to company_earnings
 
-2. **`b2c-callback/index.ts`**: Add a new Method 1.5 that directly searches for `processing` status withdrawals with `payment_reference` matching `WD-%` pattern and checks if the notes contain the ConversationID or OriginatorConversationID. But since notes may not be updated yet either...
+## Files to Create/Modify
 
-**The truly bulletproof fix**: 
-- In `b2c-payout`, keep `payment_reference = 'WD-<uuid>'` (don't overwrite)
-- In `b2c-callback`, add a new method that finds the withdrawal by `id` extracted from the `payment_reference` pattern on any `processing` withdrawal, matching by phone number
+### New Files (~20)
+- `supabase/functions/welfare-crud/index.ts`
+- `supabase/functions/welfare-members/index.ts`
+- `supabase/functions/welfare-contributions/index.ts`
+- `supabase/functions/welfare-withdrawal-approve/index.ts`
+- `supabase/functions/welfare-cycles/index.ts`
+- `src/pages/WelfareCreate.tsx`
+- `src/pages/WelfareList.tsx`
+- `src/pages/WelfareDetail.tsx`
+- `src/pages/WelfareJoin.tsx`
+- `src/components/welfare/WelfareExecutivePanel.tsx`
+- `src/components/welfare/WelfareWithdrawalRequest.tsx`
+- `src/components/welfare/WelfareApprovalCard.tsx`
+- `src/components/welfare/WelfareContributionForm.tsx`
+- `src/components/welfare/WelfareMemberDashboard.tsx`
+- `src/components/welfare/WelfareContributionCycleManager.tsx`
+- `src/components/welfare/WelfareTransactionLog.tsx`
+- `src/components/welfare/WelfareWithdrawalHistory.tsx`
+- `src/components/welfare/WelfareJoinByCode.tsx`
 
-**Simplest approach that works:**
+### Modified Files
+- `src/App.tsx` - Add welfare routes
+- `src/components/Header.tsx` / navigation - Add Welfare link
+- `src/pages/Home.tsx` - Add welfare section
+- `supabase/functions/withdrawals-crud/index.ts` - Add welfare_id support + multi-sig logic
+- `supabase/functions/b2c-callback/index.ts` - Add welfare balance deduction
+- `supabase/functions/_shared/commissionRates.ts` - Add WELFARE: 0.05
+- `supabase/config.toml` - Add new edge function entries
+- Database migration for all new tables + welfare_id column on withdrawals
 
-1. **`b2c-payout/index.ts`**: Stop overwriting `payment_reference` with ConversationID. Keep it as `WD-<uuid>`. Store ConversationID in a notes append only.
+### Implementation Order
+1. Database migration (all tables + RLS + functions)
+2. Edge functions (welfare-crud, welfare-members, welfare-contributions, welfare-cycles, welfare-withdrawal-approve)
+3. Update existing edge functions (withdrawals-crud, b2c-callback, commissionRates)
+4. Frontend pages (Create, List, Detail, Join)
+5. Frontend components (all welfare/* components)
+6. Navigation and routing updates
 
-2. **`b2c-callback/index.ts`**: Add new lookup after Method 2 — search for `processing` withdrawals where `payment_reference` starts with `WD-` matching the recipient phone number. This is similar to Method 5 but simpler and doesn't rely on the `payment_methods` join.
-
-3. **Data fix**: Update the existing completed withdrawal to deduct the KES 30 from the mchango balance.
-
-### Summary of Changes
-
-| File | Change |
-|------|--------|
-| `supabase/functions/b2c-payout/index.ts` | Stop overwriting `payment_reference` with ConversationID after B2C success — keep it as `WD-<uuid>` so callback can always find it |
-| `supabase/functions/b2c-callback/index.ts` | Add robust phone-based lookup for `processing` withdrawals; fix Method 5 join; add direct `WD-<uuid>` to ID extraction without relying on Occasion |
-| Database (data fix) | Deduct KES 30 from mchango `current_amount` and `available_balance` for the completed withdrawal that was missed |
+Due to the size, this will be implemented across multiple messages. The first message will focus on the database migration and core edge functions.
 
