@@ -1,51 +1,71 @@
 
 
-## Root Cause Analysis
+## Plan: Rename All Edge Functions Containing "mpesa"
 
-The balance never updates because **the M-Pesa B2C callback cannot find the withdrawal record**. Here's why:
+This is a significant renaming effort across 9 edge functions and all files that reference them.
 
-1. **Payout function** sends `Occasion: "WD-{withdrawal_id}"` to Safaricom
-2. **Safaricom returns the callback with `Occasion: ""`** (empty string) — Safaricom does not reliably echo back the Occasion field
-3. The callback's `findWithdrawal` function tries 4 methods, all fail:
-   - **Method 1 & 2** (Occasion-based): Skip because Occasion is empty
-   - **Method 3** (ConversationID in payment_reference): Fails because `payment_reference` still contains `"WD-{id}"`, NOT the ConversationID
-   - **Method 4** (Phone match): Should work but appears to fail for edge cases
+### Rename Mapping
 
-**The critical bug**: After a successful B2C initiation (line 251-256 of payout), the code only updates `notes` — it does **NOT** save the `ConversationID` to `payment_reference`. So when the callback arrives and tries Method 3 (`payment_reference = conversationId`), it finds nothing.
+| Current Name | New Name |
+|---|---|
+| `mpesa-c2b-validation` | `c2b-validate-payment` |
+| `mpesa-c2b-callback` | `c2b-confirm-payment` |
+| `mpesa-stk-push` | `payment-stk-push` |
+| `mpesa-stk-query` | `payment-stk-query` |
+| `mpesa-callback` | `payment-stk-callback` |
+| `mpesa-b2c-payout` | `b2c-payout` |
+| `mpesa-b2c-callback` | `b2c-callback` |
+| `mpesa-register-c2b-urls` | `register-c2b-urls` |
+| `admin-mpesa-search` | `admin-payment-search` |
 
-## Fix Plan
+### Changes Required
 
-### 1. Store ConversationID in `payment_reference` after B2C initiation (mpesa-b2c-payout)
+#### 1. Create new edge function directories (9 new folders)
+Each new function will contain the same code as the old one, copied into the new directory name. The old directories will be deleted.
 
-At line 251-256, change the update to also set `payment_reference` to the ConversationID returned by Safaricom. This way, when the callback arrives and uses Method 3, it will find the withdrawal.
+- `supabase/functions/c2b-validate-payment/index.ts` (from `mpesa-c2b-validation`)
+- `supabase/functions/c2b-confirm-payment/index.ts` (from `mpesa-c2b-callback`)
+- `supabase/functions/payment-stk-push/index.ts` (from `mpesa-stk-push`)
+- `supabase/functions/payment-stk-query/index.ts` (from `mpesa-stk-query`)
+- `supabase/functions/payment-stk-callback/index.ts` (from `mpesa-callback`)
+- `supabase/functions/b2c-payout/index.ts` (from `mpesa-b2c-payout`)
+- `supabase/functions/b2c-callback/index.ts` (from `mpesa-b2c-callback`)
+- `supabase/functions/register-c2b-urls/index.ts` (from `mpesa-register-c2b-urls`)
+- `supabase/functions/admin-payment-search/index.ts` (from `admin-mpesa-search`)
 
-```typescript
-await supabaseAdmin
-  .from('withdrawals')
-  .update({
-    payment_reference: b2cResult.ConversationID,  // <-- ADD THIS
-    notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C initiated: ${b2cResult.ConversationID} (ref: ${payoutReference}, attempt ${attemptCount})`
-  })
-  .eq('id', withdrawal_id);
-```
+#### 2. Update internal cross-references within edge functions
+These edge functions call each other by URL and need updated references:
 
-### 2. Add OriginatorConversationID as fallback lookup (mpesa-b2c-callback)
+- **`payment-stk-push/index.ts`** (was `mpesa-stk-push`): Update callback URL from `mpesa-callback` → `payment-stk-callback`
+- **`b2c-payout/index.ts`** (was `mpesa-b2c-payout`): Update QueueTimeOutURL and ResultURL from `mpesa-b2c-callback` → `b2c-callback`
+- **`c2b-confirm-payment/index.ts`** (was `mpesa-c2b-callback`): Update B2C payout call from `mpesa-b2c-payout` → `b2c-payout`
+- **`register-c2b-urls/index.ts`** (was `mpesa-register-c2b-urls`): Update URLs from `mpesa-c2b-validation` → `c2b-validate-payment` and `mpesa-c2b-callback` → `c2b-confirm-payment`
+- **`supabase/functions/contributions-crud/index.ts`**: Update `mpesa-b2c-payout` → `b2c-payout`
+- **`supabase/functions/daily-payout-cron/index.ts`**: Update `mpesa-b2c-payout` → `b2c-payout`
+- **`supabase/functions/withdrawals-crud/index.ts`**: Update 3 references from `mpesa-b2c-payout` → `b2c-payout`
 
-In `findWithdrawal`, add a lookup by `OriginatorConversationID` as an additional fallback since Safaricom always returns this in callbacks.
+#### 3. Update frontend references (4 files)
+- **`src/components/ChamaPaymentForm.tsx`**: `mpesa-stk-push` → `payment-stk-push`
+- **`src/components/DonationForm.tsx`**: `mpesa-stk-push` → `payment-stk-push`, `mpesa-stk-query` → `payment-stk-query`
+- **`src/components/OrganizationDonationForm.tsx`**: `mpesa-stk-push` → `payment-stk-push`, `mpesa-stk-query` → `payment-stk-query`
+- **`src/pages/AdminMpesaSearch.tsx`**: `admin-mpesa-search` → `admin-payment-search`
+- **`src/pages/AdminPaymentConfig.tsx`**: Update C2B URL references from `mpesa-c2b-validation` → `c2b-validate-payment` and `mpesa-c2b-callback` → `c2b-confirm-payment`
 
-### 3. Improve Method 4 (phone match) reliability
+#### 4. Delete old edge function directories (9 deletions)
+Remove the old named directories after creating the new ones.
 
-The phone match currently uses `ReceiverPartyPublicName` which contains format like `"254707874790 - DECLARK OKEMWA CHACHA"`. Ensure the parsing handles this correctly by also checking the profile phone field.
+#### 5. Update documentation
+- **`OFFLINE_PAYMENT_SETUP.md`**: Update all URL references and function names
 
-### 4. Deploy both updated functions
+### Technical Details
 
-Both `mpesa-b2c-payout` and `mpesa-b2c-callback` need redeployment.
+- The `supabase/config.toml` is auto-managed and cannot be edited directly. The new function entries will be auto-detected when the new directories are created.
+- Old function directories must be deleted to avoid duplicate deployments.
+- The actual function logic remains identical; only directory names and cross-reference strings change.
+- After deployment, you will need to **re-register the new C2B URLs with Safaricom** since the validation and confirmation URLs will change.
 
-### 5. Fix currently stuck withdrawals
-
-Query all withdrawals in `processing` status and manually reconcile them against the callback logs.
-
-## Technical Summary
-
-The fix is small but critical: **save the ConversationID to `payment_reference`** after Safaricom accepts the B2C request, so the callback can find and complete the withdrawal, triggering the balance deduction logic.
+### Important Post-Deployment Step
+After these changes deploy, you **must** re-register the C2B URLs with Safaricom's Daraja API using the new URLs:
+- Validation: `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/c2b-validate-payment`
+- Confirmation: `https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/c2b-confirm-payment`
 
