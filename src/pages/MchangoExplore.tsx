@@ -18,6 +18,7 @@ interface Mchango {
   description: string | null;
   target_amount: number;
   current_amount: number;
+  total_gross_collected: number | null;
   status: string;
   end_date: string | null;
   category: string | null;
@@ -41,7 +42,7 @@ const MchangoExplore = () => {
     try {
       let query = supabase
         .from("mchango")
-        .select("id, title, slug, description, target_amount, current_amount, status, end_date, category, image_url, created_at, is_verified")
+        .select("id, title, slug, description, target_amount, current_amount, total_gross_collected, status, end_date, category, image_url, created_at, is_verified")
         .eq("status", "active")
         .eq("is_public", true);
 
@@ -185,7 +186,8 @@ const MchangoExplore = () => {
           /* Campaign Grid */
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMchangos.map((mchango) => {
-              const progress = calculateProgress(mchango.current_amount, mchango.target_amount);
+              const allTimeCollected = Number(mchango.total_gross_collected) || mchango.current_amount;
+              const progress = calculateProgress(allTimeCollected, mchango.target_amount);
               const daysLeft = getDaysLeft(mchango.end_date);
 
               return (
@@ -220,7 +222,7 @@ const MchangoExplore = () => {
                     <div>
                       <div className="flex justify-between text-sm mb-1">
                         <span className="font-medium">
-                          KES {mchango.current_amount.toLocaleString()}
+                          KES {allTimeCollected.toLocaleString()}
                         </span>
                         <span className="text-muted-foreground">
                           of KES {mchango.target_amount.toLocaleString()}
