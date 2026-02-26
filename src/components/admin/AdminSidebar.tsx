@@ -108,6 +108,7 @@ export function AdminSidebar() {
     { title: "Chama Groups", url: "/admin/chamas", icon: Activity },
     { title: "Campaigns", url: "/admin/campaigns", icon: TrendingUp },
     { title: "Organizations", url: "/admin/organizations", icon: Building2 },
+    { title: "Welfare Groups", url: "/admin/welfares", icon: Shield },
     { 
       title: "Verification Requests", 
       url: "/admin/verification-requests", 

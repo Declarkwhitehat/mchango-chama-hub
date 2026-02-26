@@ -18,7 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface VerificationRequestButtonProps {
-  entityType: 'chama' | 'mchango' | 'organization';
+  entityType: 'chama' | 'mchango' | 'organization' | 'welfare';
   entityId: string;
   entityName: string;
   isVerified: boolean;

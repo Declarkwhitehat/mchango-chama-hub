@@ -16,13 +16,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Loader2, CheckCircle, XCircle, Clock, ExternalLink, Building2, Users, Heart } from "lucide-react";
+import { Search, Loader2, CheckCircle, XCircle, Clock, ExternalLink, Building2, Users, Heart, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
 interface VerificationRequest {
   id: string;
-  entity_type: 'chama' | 'mchango' | 'organization';
+  entity_type: 'chama' | 'mchango' | 'organization' | 'welfare';
   entity_id: string;
   requested_by: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -98,6 +98,16 @@ export const VerificationRequestsManagement = () => {
               entityName = org.name;
               entitySlug = org.slug;
             }
+          } else if (request.entity_type === 'welfare') {
+            const { data: welfare } = await supabase
+              .from('welfares')
+              .select('name, slug')
+              .eq('id', request.entity_id)
+              .maybeSingle();
+            if (welfare) {
+              entityName = welfare.name;
+              entitySlug = welfare.slug;
+            }
           }
 
           // Get requester name
@@ -112,7 +122,7 @@ export const VerificationRequestsManagement = () => {
 
           return {
             ...request,
-            entity_type: request.entity_type as 'chama' | 'mchango' | 'organization',
+            entity_type: request.entity_type as 'chama' | 'mchango' | 'organization' | 'welfare',
             status: request.status as 'pending' | 'approved' | 'rejected',
             entity_name: entityName,
             entity_slug: entitySlug,
@@ -150,7 +160,8 @@ export const VerificationRequestsManagement = () => {
 
       // Update entity verification status
       const table = request.entity_type === 'mchango' ? 'mchango' : 
-                   request.entity_type === 'chama' ? 'chama' : 'organizations';
+                   request.entity_type === 'chama' ? 'chama' : 
+                   request.entity_type === 'welfare' ? 'welfares' : 'organizations';
       
       const { error: entityError } = await supabase
         .from(table)
@@ -161,7 +172,8 @@ export const VerificationRequestsManagement = () => {
 
       // Create notification for the requester
       const entityTypeLabel = request.entity_type === 'mchango' ? 'Campaign' : 
-                              request.entity_type === 'chama' ? 'Chama' : 'Organization';
+                              request.entity_type === 'chama' ? 'Chama' : 
+                              request.entity_type === 'welfare' ? 'Welfare' : 'Organization';
       await supabase
         .from('notifications')
         .insert({
@@ -210,7 +222,8 @@ export const VerificationRequestsManagement = () => {
 
       // Create notification for the requester
       const entityTypeLabel = selectedRequest.entity_type === 'mchango' ? 'Campaign' : 
-                              selectedRequest.entity_type === 'chama' ? 'Chama' : 'Organization';
+                              selectedRequest.entity_type === 'chama' ? 'Chama' : 
+                              selectedRequest.entity_type === 'welfare' ? 'Welfare' : 'Organization';
       await supabase
         .from('notifications')
         .insert({
@@ -248,12 +261,14 @@ export const VerificationRequestsManagement = () => {
     if (request.entity_type === 'chama') return `/chama/${request.entity_slug}`;
     if (request.entity_type === 'mchango') return `/mchango/${request.entity_slug}`;
     if (request.entity_type === 'organization') return `/organizations/${request.entity_slug}`;
+    if (request.entity_type === 'welfare') return `/welfare/${request.entity_id}`;
     return '#';
   };
 
   const getEntityIcon = (type: string) => {
     if (type === 'chama') return <Users className="h-4 w-4" />;
     if (type === 'mchango') return <Heart className="h-4 w-4" />;
+    if (type === 'welfare') return <Shield className="h-4 w-4" />;
     return <Building2 className="h-4 w-4" />;
   };
 
@@ -330,6 +345,7 @@ export const VerificationRequestsManagement = () => {
                 <SelectItem value="chama">Chama</SelectItem>
                 <SelectItem value="mchango">Campaign</SelectItem>
                 <SelectItem value="organization">Organization</SelectItem>
+                <SelectItem value="welfare">Welfare</SelectItem>
               </SelectContent>
             </Select>
           </div>
