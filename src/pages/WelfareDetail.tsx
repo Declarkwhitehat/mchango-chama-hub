@@ -16,6 +16,7 @@ import { WelfareWithdrawalRequest } from "@/components/welfare/WelfareWithdrawal
 import { WelfareApprovalCard } from "@/components/welfare/WelfareApprovalCard";
 import { WelfareContributionCycleManager } from "@/components/welfare/WelfareContributionCycleManager";
 import { WelfareTransactionLog } from "@/components/welfare/WelfareTransactionLog";
+import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 
 
 const WelfareDetail = () => {
@@ -122,10 +123,17 @@ const WelfareDetail = () => {
                 {welfare.name}
               </h1>
               <p className="text-sm text-muted-foreground mt-1">{welfare.description}</p>
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-2 flex-wrap">
                 {myRole && <Badge variant="default" className="capitalize">{myRole}</Badge>}
                 {welfare.is_frozen && <Badge variant="destructive">Frozen</Badge>}
                 {welfare.is_verified && <Badge className="bg-green-500">Verified</Badge>}
+                <VerificationRequestButton
+                  entityType="welfare"
+                  entityId={welfare.id}
+                  entityName={welfare.name}
+                  isVerified={welfare.is_verified}
+                  isOwner={isChairman || welfare.created_by === user?.id}
+                />
               </div>
             </div>
             {/* Leave button - not for chairman */}

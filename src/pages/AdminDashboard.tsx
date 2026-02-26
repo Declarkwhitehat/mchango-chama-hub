@@ -361,13 +361,16 @@ const AdminDashboard = () => {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Welfare Groups
-                  </CardTitle>
-                  <CardDescription className="mt-1">Community welfare groups</CardDescription>
-                </div>
+                 <div>
+                   <CardTitle className="flex items-center gap-2">
+                     <Shield className="h-5 w-5" />
+                     Welfare Groups
+                   </CardTitle>
+                   <CardDescription className="mt-1">Community welfare groups</CardDescription>
+                 </div>
+                 <Button variant="outline" size="sm" onClick={() => navigate("/admin/welfares")}>
+                   View All
+                 </Button>
               </div>
             </CardHeader>
             <CardContent>
