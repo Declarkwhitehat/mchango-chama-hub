@@ -160,7 +160,7 @@ const WelfareDetail = () => {
           {welfare.group_code && (
             <div className="mt-4">
               <CopyableUniqueId
-                label="Welfare Group Code"
+                label="Invite Code (Share with members to join)"
                 uniqueId={welfare.group_code}
               />
             </div>

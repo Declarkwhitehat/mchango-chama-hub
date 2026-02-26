@@ -238,9 +238,9 @@ export const WelfareContributionForm = ({ welfareId, memberId, contributionAmoun
 
   return (
     <div className="space-y-4">
-      {/* Offline Payment Info */}
-      {paybillAccountId && (
-        <CopyableUniqueId label="Welfare Payment ID (for offline payments)" uniqueId={paybillAccountId} />
+      {/* Paybill Account ID for offline payments - only show if it looks like a real paybill ID, not a join code */}
+      {paybillAccountId && paybillAccountId.length > 6 && (
+        <CopyableUniqueId label="Paybill Account ID (for offline M-Pesa payments)" uniqueId={paybillAccountId} />
       )}
 
       <Card>
