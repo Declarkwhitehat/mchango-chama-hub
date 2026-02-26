@@ -16,7 +16,7 @@ import { WelfareWithdrawalRequest } from "@/components/welfare/WelfareWithdrawal
 import { WelfareApprovalCard } from "@/components/welfare/WelfareApprovalCard";
 import { WelfareContributionCycleManager } from "@/components/welfare/WelfareContributionCycleManager";
 import { WelfareTransactionLog } from "@/components/welfare/WelfareTransactionLog";
-import { CopyableUniqueId } from "@/components/CopyableUniqueId";
+
 
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -158,12 +158,46 @@ const WelfareDetail = () => {
 
           {/* Group Code */}
           {welfare.group_code && (
-            <div className="mt-4">
-              <CopyableUniqueId
-                label="Invite Code (Share with members to join)"
-                uniqueId={welfare.group_code}
-              />
-            </div>
+            <Card className="mt-4 border-primary/20 bg-gradient-to-br from-primary/5 to-background">
+              <CardContent className="pt-5 pb-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  <h4 className="font-semibold text-foreground">Invite Code</h4>
+                </div>
+                <div className="p-3 rounded-lg bg-background border-2 border-primary/30 flex items-center justify-between">
+                  <span className="text-2xl font-mono font-bold text-primary tracking-widest">{welfare.group_code}</span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(welfare.group_code);
+                        toast.success("Invite code copied!");
+                      } catch { toast.error("Failed to copy"); }
+                    }}
+                    className="p-1.5 rounded-md hover:bg-accent transition-colors"
+                  >
+                    <Copy className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">How to join</p>
+                  <ol className="grid grid-cols-1 gap-1 text-sm text-foreground">
+                    {[
+                      "Share this code with members you want to invite",
+                      "They go to Welfare → Join Welfare Group",
+                      `Enter code: ${welfare.group_code}`,
+                      "Click 'Join Welfare' to become a member",
+                    ].map((step, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
 
