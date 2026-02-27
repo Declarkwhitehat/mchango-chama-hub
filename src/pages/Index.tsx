@@ -137,7 +137,7 @@ const Index = () => {
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 sm:gap-10 md:gap-12 max-w-6xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 md:gap-12 max-w-7xl mx-auto">
             {/* Mchango */}
             <div className="space-y-4 sm:space-y-6">
               <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-secondary to-secondary-glow rounded-full">
@@ -146,27 +146,21 @@ const Index = () => {
               <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Start a Fundraiser</h3>
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-secondary/20 rounded-full flex items-center justify-center text-secondary font-semibold text-sm sm:text-base">
-                    1
-                  </div>
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-secondary/20 rounded-full flex items-center justify-center text-secondary font-semibold text-sm sm:text-base">1</div>
                   <div>
                     <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Create Campaign</h4>
                     <p className="text-muted-foreground text-sm">Set your goal and share your story</p>
                   </div>
                 </div>
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-secondary/20 rounded-full flex items-center justify-center text-secondary font-semibold text-sm sm:text-base">
-                    2
-                  </div>
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-secondary/20 rounded-full flex items-center justify-center text-secondary font-semibold text-sm sm:text-base">2</div>
                   <div>
                     <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Share & Promote</h4>
                     <p className="text-muted-foreground text-sm">Reach supporters across platforms</p>
                   </div>
                 </div>
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-secondary/20 rounded-full flex items-center justify-center text-secondary font-semibold text-sm sm:text-base">
-                    3
-                  </div>
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-secondary/20 rounded-full flex items-center justify-center text-secondary font-semibold text-sm sm:text-base">3</div>
                   <div>
                     <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Receive Funds</h4>
                     <p className="text-muted-foreground text-sm">Get contributions directly to your account</p>
@@ -180,33 +174,58 @@ const Index = () => {
               <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-primary to-primary-glow rounded-full">
                 <span className="text-primary-foreground font-semibold text-sm sm:text-base">Chama</span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Join a Chama</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Rotating Savings</h3>
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-sm sm:text-base">
-                    1
-                  </div>
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-sm sm:text-base">1</div>
                   <div>
                     <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Create or Join</h4>
                     <p className="text-muted-foreground text-sm">Start a group or join existing chamas</p>
                   </div>
                 </div>
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-sm sm:text-base">
-                    2
-                  </div>
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-sm sm:text-base">2</div>
                   <div>
                     <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Contribute Regularly</h4>
                     <p className="text-muted-foreground text-sm">Make scheduled contributions together</p>
                   </div>
                 </div>
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-sm sm:text-base">
-                    3
-                  </div>
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-semibold text-sm sm:text-base">3</div>
                   <div>
-                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Grow Wealth</h4>
-                    <p className="text-muted-foreground text-sm">Watch your savings multiply over time</p>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Receive Payout</h4>
+                    <p className="text-muted-foreground text-sm">Each cycle, one member receives the pot</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Welfare */}
+            <div className="space-y-4 sm:space-y-6">
+              <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-destructive/80 to-destructive/60 rounded-full">
+                <span className="text-destructive-foreground font-semibold text-sm sm:text-base">Welfare</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Welfare Groups</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-destructive/20 rounded-full flex items-center justify-center text-destructive font-semibold text-sm sm:text-base">1</div>
+                  <div>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Create or Join</h4>
+                    <p className="text-muted-foreground text-sm">Start a welfare group or join with a code</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-destructive/20 rounded-full flex items-center justify-center text-destructive font-semibold text-sm sm:text-base">2</div>
+                  <div>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Pool Contributions</h4>
+                    <p className="text-muted-foreground text-sm">Members contribute to a shared welfare fund</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-destructive/20 rounded-full flex items-center justify-center text-destructive font-semibold text-sm sm:text-base">3</div>
+                  <div>
+                    <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Request Withdrawal</h4>
+                    <p className="text-muted-foreground text-sm">Access funds when you need support most</p>
                   </div>
                 </div>
               </div>
@@ -220,27 +239,21 @@ const Index = () => {
               <h3 className="text-xl sm:text-2xl font-bold text-card-foreground">Support Causes</h3>
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">
-                    1
-                  </div>
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">1</div>
                   <div>
                     <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Register Organization</h4>
                     <p className="text-muted-foreground text-sm">Create a verified organization profile</p>
                   </div>
                 </div>
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">
-                    2
-                  </div>
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">2</div>
                   <div>
                     <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Receive Donations</h4>
                     <p className="text-muted-foreground text-sm">Accept contributions from supporters</p>
                   </div>
                 </div>
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">
-                    3
-                  </div>
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-accent/20 rounded-full flex items-center justify-center text-accent font-semibold text-sm sm:text-base">3</div>
                   <div>
                     <h4 className="font-semibold text-card-foreground text-sm sm:text-base">Make Impact</h4>
                     <p className="text-muted-foreground text-sm">Use funds to drive your mission forward</p>
