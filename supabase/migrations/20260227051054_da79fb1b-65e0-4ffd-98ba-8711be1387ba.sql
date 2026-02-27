@@ -1,0 +1,2 @@
+ALTER TABLE public.verification_requests DROP CONSTRAINT verification_requests_entity_type_check;
+ALTER TABLE public.verification_requests ADD CONSTRAINT verification_requests_entity_type_check CHECK (entity_type = ANY (ARRAY['chama'::text, 'mchango'::text, 'organization'::text, 'welfare'::text]));
