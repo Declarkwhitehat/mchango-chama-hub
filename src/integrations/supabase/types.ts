@@ -2733,6 +2733,10 @@ export type Database = {
           total_periods_owed: number
         }[]
       }
+      check_signup_uniqueness: {
+        Args: { p_email: string; p_id_number: string; p_phone: string }
+        Returns: Json
+      }
       cleanup_expired_otps: { Args: never; Returns: undefined }
       cleanup_old_chat_messages: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }

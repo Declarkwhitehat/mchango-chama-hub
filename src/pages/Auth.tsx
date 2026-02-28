@@ -412,30 +412,31 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      // Check if phone number is already registered
-      const { data: existingPhone } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('phone', data.phone)
-        .maybeSingle();
+      // Check uniqueness using security definer RPC (bypasses RLS for unauthenticated users)
+      const { data: uniqueCheck, error: uniqueError } = await supabase
+        .rpc('check_signup_uniqueness', {
+          p_phone: data.phone,
+          p_id_number: data.id_number,
+          p_email: data.email,
+        });
 
-      if (existingPhone) {
-        toast.error("This phone number is already registered. Please use a different number or log in.");
-        setIsLoading(false);
-        return;
-      }
-
-      // Check if ID number is already registered
-      const { data: existingId } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id_number', data.id_number)
-        .maybeSingle();
-
-      if (existingId) {
-        toast.error("This ID number is already registered. Please contact support if you believe this is an error.");
-        setIsLoading(false);
-        return;
+      if (uniqueCheck) {
+        const check = typeof uniqueCheck === 'string' ? JSON.parse(uniqueCheck) : uniqueCheck;
+        if (check.phone_exists) {
+          toast.error("This phone number is already registered. Please use a different number or log in.");
+          setIsLoading(false);
+          return;
+        }
+        if (check.id_number_exists) {
+          toast.error("This ID number is already registered. Please contact support if you believe this is an error.");
+          setIsLoading(false);
+          return;
+        }
+        if (check.email_exists) {
+          toast.error("This email is already registered. Please log in or use a different email.");
+          setIsLoading(false);
+          return;
+        }
       }
 
       const { error: signUpError } = await signUp(data.email, data.password, {
