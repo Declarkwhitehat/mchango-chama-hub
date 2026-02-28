@@ -135,8 +135,8 @@ const ChamaDetail = () => {
 
       console.log('Loading chama:', id);
       
-      const { data, error } = await supabase.functions.invoke(`chama-crud/${id}`, {
-        method: 'GET'
+      const { data, error } = await supabase.functions.invoke('chama-crud', {
+        body: { chama_id: id }
       });
 
       if (error) {
