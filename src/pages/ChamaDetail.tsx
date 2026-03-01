@@ -135,9 +135,22 @@ const ChamaDetail = () => {
 
       console.log('Loading chama:', id);
       
-      const { data, error } = await supabase.functions.invoke('chama-crud', {
-        body: { chama_id: id }
-      });
+      console.log('Fetching chama with id/slug:', id);
+      
+      // Use POST with chama_id in body for reliable fetching
+      let data, error;
+      try {
+        const response = await supabase.functions.invoke('chama-crud', {
+          method: 'POST',
+          body: { chama_id: id }
+        });
+        data = response.data;
+        error = response.error;
+        console.log('Chama invoke response:', JSON.stringify({ data, error, hasData: !!data }));
+      } catch (invokeError: any) {
+        console.error('Invoke exception:', invokeError);
+        error = invokeError;
+      }
 
       if (error) {
         console.error("Error loading chama:", error);
