@@ -671,8 +671,8 @@ serve(async (req) => {
         });
       }
 
-      // Fetch pending join requests
-      const { data: pendingMembers, error: pendingError } = await supabaseClient
+      // Fetch pending join requests using admin client to avoid RLS duplicate rows
+      const { data: pendingMembers, error: pendingError } = await adminClient
         .from('chama_members')
         .select(`
           *,
