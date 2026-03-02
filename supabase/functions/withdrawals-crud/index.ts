@@ -302,7 +302,7 @@ serve(async (req) => {
       } else if (mchango_id) {
         const { data: mchango, error: mchangoError } = await supabaseClient
           .from('mchango')
-          .select('created_by, current_amount')
+          .select('created_by, current_amount, available_balance')
           .eq('id', mchango_id)
           .single();
 
@@ -314,7 +314,8 @@ serve(async (req) => {
         }
 
         isCreator = mchango.created_by === user.id;
-        totalAvailable = Number(mchango.current_amount);
+        // Use available_balance (which tracks net after commission and withdrawals)
+        totalAvailable = Number(mchango.available_balance ?? mchango.current_amount);
       } else if (organization_id) {
         const { data: org, error: orgError } = await supabaseClient
           .from('organizations')
@@ -423,6 +424,76 @@ serve(async (req) => {
       if (error) throw error;
 
       console.log('Withdrawal request created:', withdrawal);
+
+      // IMMEDIATELY deduct balance to prevent double withdrawals
+      // The balance is deducted NOW, not when the B2C callback arrives
+      if (mchango_id) {
+        const { data: mchangoData } = await supabaseAdmin
+          .from('mchango')
+          .select('current_amount, available_balance')
+          .eq('id', mchango_id)
+          .single();
+
+        if (mchangoData) {
+          const newCurrentAmount = Math.max(0, Number(mchangoData.current_amount) - netAmount);
+          const newAvailableBalance = Math.max(0, Number(mchangoData.available_balance) - netAmount);
+          await supabaseAdmin
+            .from('mchango')
+            .update({
+              current_amount: newCurrentAmount,
+              available_balance: newAvailableBalance,
+            })
+            .eq('id', mchango_id);
+          console.log('Mchango balance deducted immediately:', { 
+            previous: mchangoData.current_amount, 
+            deducted: netAmount, 
+            new: newCurrentAmount 
+          });
+        }
+      } else if (organization_id) {
+        const { data: orgData } = await supabaseAdmin
+          .from('organizations')
+          .select('current_amount, available_balance')
+          .eq('id', organization_id)
+          .single();
+
+        if (orgData) {
+          const newCurrentAmount = Math.max(0, Number(orgData.current_amount) - netAmount);
+          const newAvailableBalance = Math.max(0, Number(orgData.available_balance) - netAmount);
+          await supabaseAdmin
+            .from('organizations')
+            .update({
+              current_amount: newCurrentAmount,
+              available_balance: newAvailableBalance,
+            })
+            .eq('id', organization_id);
+          console.log('Organization balance deducted immediately:', {
+            previous: orgData.current_amount,
+            deducted: netAmount,
+            new: newCurrentAmount
+          });
+        }
+      } else if (chama_id) {
+        const { data: chamaData } = await supabaseAdmin
+          .from('chama')
+          .select('available_balance, total_withdrawn')
+          .eq('id', chama_id)
+          .single();
+
+        if (chamaData) {
+          await supabaseAdmin
+            .from('chama')
+            .update({
+              available_balance: Math.max(0, Number(chamaData.available_balance) - netAmount),
+              total_withdrawn: Number(chamaData.total_withdrawn || 0) + netAmount,
+            })
+            .eq('id', chama_id);
+          console.log('Chama balance deducted immediately:', {
+            previous: chamaData.available_balance,
+            deducted: netAmount,
+          });
+        }
+      }
 
       // Get entity name for notification
       let entityName = 'your account';
