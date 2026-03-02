@@ -414,20 +414,16 @@ serve(async (req) => {
       const nextOrderIndex = (highestOrderMember?.order_index || 0) + 1;
       console.log('Assigning order_index:', nextOrderIndex);
       
-      // Generate a unique member code
-      const memberCode = await generateMemberCode(adminClient, chama_id);
-      console.log('Generated member code:', memberCode);
-      
-      // Create pending membership WITH order_index using admin client to bypass RLS
+      // Create pending membership WITH order_index
+      // member_code is omitted so the DB trigger (update_chama_member_short_code) generates sequential format
       const { data: newMember, error: memberError } = await adminClient
         .from('chama_members')
         .insert({
           chama_id: chama_id,
           user_id: user.id,
-          member_code: memberCode, // Generated unique code
-          order_index: nextOrderIndex, // Assigned at join time per user preference
+          order_index: nextOrderIndex,
           is_manager: false,
-          status: 'inactive', // Inactive until first payment
+          status: 'inactive',
           approval_status: 'pending',
           first_payment_completed: false,
         })
