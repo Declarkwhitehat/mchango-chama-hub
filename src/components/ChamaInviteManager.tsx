@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Copy, Check, X, Link2, Users, Plus, Loader2 } from "lucide-react";
+import { Copy, Check, X, Link2, Plus, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface InviteCode {
@@ -18,16 +18,10 @@ interface InviteCode {
   created_at: string;
 }
 
-interface PendingMember {
-  id: string;
-  joined_at: string;
-  member_code: string;
-  order_index: number;
-  profiles: {
-    full_name: string;
-    email: string;
-    phone: string;
-  };
+interface ChamaInviteManagerProps {
+  chamaId: string;
+  chamaSlug: string;
+  isManager: boolean;
 }
 
 interface ChamaInviteManagerProps {
@@ -37,7 +31,6 @@ interface ChamaInviteManagerProps {
 }
 
 export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInviteManagerProps) => {
-  const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -45,38 +38,9 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
 
   useEffect(() => {
     if (isManager) {
-      loadPendingMembers();
       loadInviteCodes();
     }
   }, [chamaId, isManager]);
-
-  const loadPendingMembers = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-      
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-join/pending/${chamaId}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        console.error("Error loading pending members:", await response.text());
-        return;
-      }
-
-      const data = await response.json();
-      setPendingMembers(data?.data || []);
-    } catch (err) {
-      console.error("Failed to load pending members:", err);
-    }
-  };
 
   const loadInviteCodes = async () => {
     try {
@@ -196,43 +160,6 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
     }
   };
 
-  const handleApproval = async (memberId: string, action: "approve" | "reject") => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast({
-          title: "Error",
-          description: "Please log in to continue",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { error } = await supabase.functions.invoke('chama-join', {
-        method: 'PUT',
-        body: { 
-          member_id: memberId,
-          action: action
-        }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success!",
-        description: `Member ${action}d successfully`,
-      });
-
-      await loadPendingMembers();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || `Failed to ${action} member`,
-        variant: "destructive",
-      });
-    }
-  };
-
   if (!isManager) {
     return null;
   }
@@ -334,7 +261,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
             </div>
           )}
           <Alert>
-            <Users className="h-4 w-4" />
+            <Link2 className="h-4 w-4" />
             <AlertDescription>
               Each code expires after 24 hours and can only be used once. You'll need to approve join requests before members are added.
             </AlertDescription>
@@ -342,56 +269,6 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
         </CardContent>
       </Card>
 
-      {/* Pending Join Requests */}
-      {pendingMembers.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Pending Join Requests ({pendingMembers.length})
-            </CardTitle>
-            <CardDescription>
-              Review and approve members who want to join
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {pendingMembers.map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center justify-between p-4 border rounded-lg"
-              >
-                <div className="space-y-1">
-                  <p className="font-medium">{member.profiles?.full_name || 'Unknown'}</p>
-                  <p className="text-sm text-muted-foreground">{member.profiles?.email || 'No email'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Requested: {format(new Date(member.joined_at), "PPp")}
-                  </p>
-                  <Badge variant="outline">Member Code: {member.member_code}</Badge>
-                  <Badge variant="outline">Position: #{member.order_index}</Badge>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => handleApproval(member.id, "approve")}
-                  >
-                    <Check className="h-4 w-4 mr-1" />
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleApproval(member.id, "reject")}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Reject
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
