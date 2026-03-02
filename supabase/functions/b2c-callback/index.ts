@@ -242,102 +242,16 @@ serve(async (req) => {
         console.error('Failed to update withdrawal:', updateError);
       }
 
-      // Update chama total_withdrawn atomically using database function
-      if (withdrawal.chama_id && transactionAmount > 0) {
-        const { error: chamaError } = await supabaseAdmin.rpc('update_chama_withdrawn', {
-          p_chama_id: withdrawal.chama_id,
-          p_amount: transactionAmount
-        });
-        
-        if (chamaError) {
-          console.error('Failed to update chama withdrawn:', chamaError);
-          // Fallback to direct update
-          const { data: chama } = await supabaseAdmin
-            .from('chama')
-            .select('total_withdrawn')
-            .eq('id', withdrawal.chama_id)
-            .single();
-          
-          if (chama) {
-            await supabaseAdmin
-              .from('chama')
-              .update({ total_withdrawn: (Number(chama.total_withdrawn) || 0) + transactionAmount })
-              .eq('id', withdrawal.chama_id);
-          }
-        } else {
-          console.log('Updated chama total_withdrawn atomically:', { 
-            chama_id: withdrawal.chama_id, 
-            amount: transactionAmount
-          });
-        }
-      }
+      // NOTE: Balance deductions for mchango, organization, and chama are now done
+      // immediately when the withdrawal is created in withdrawals-crud.
+      // The b2c-callback only updates the withdrawal status to 'completed'.
+      // This prevents double-deduction and stops users from withdrawing again
+      // before the callback arrives.
+      
+      console.log('B2C callback processed successfully. Balance was already deducted at withdrawal creation time.');
 
-      // Update mchango balance atomically using database function
-      if (withdrawal.mchango_id && transactionAmount > 0) {
-        const { error: mchangoError } = await supabaseAdmin.rpc('update_mchango_withdrawn', {
-          p_mchango_id: withdrawal.mchango_id,
-          p_amount: transactionAmount
-        });
-        
-        if (mchangoError) {
-          console.error('Failed to update mchango withdrawn:', mchangoError);
-          // Fallback to direct update
-          const { data: mchango } = await supabaseAdmin
-            .from('mchango')
-            .select('current_amount, available_balance')
-            .eq('id', withdrawal.mchango_id)
-            .single();
-
-          if (mchango) {
-            await supabaseAdmin
-              .from('mchango')
-              .update({
-                current_amount: Math.max(0, Number(mchango.current_amount) - transactionAmount),
-                available_balance: Math.max(0, Number(mchango.available_balance) - transactionAmount)
-              })
-              .eq('id', withdrawal.mchango_id);
-          }
-        } else {
-          console.log('Updated mchango balance atomically:', {
-            mchango_id: withdrawal.mchango_id,
-            amount: transactionAmount
-          });
-        }
-      }
-
-      // Update organization balance atomically using database function
-      if (withdrawal.organization_id && transactionAmount > 0) {
-        const { error: orgError } = await supabaseAdmin.rpc('update_organization_withdrawn', {
-          p_organization_id: withdrawal.organization_id,
-          p_amount: transactionAmount
-        });
-        
-        if (orgError) {
-          console.error('Failed to update organization withdrawn:', orgError);
-          const { data: org } = await supabaseAdmin
-            .from('organizations')
-            .select('current_amount, available_balance')
-            .eq('id', withdrawal.organization_id)
-            .single();
-
-          if (org) {
-            await supabaseAdmin
-              .from('organizations')
-              .update({
-                current_amount: Math.max(0, Number(org.current_amount) - transactionAmount),
-                available_balance: Math.max(0, Number(org.available_balance) - transactionAmount)
-              })
-              .eq('id', withdrawal.organization_id);
-          }
-        } else {
-          console.log('Updated organization balance atomically:', {
-            organization_id: withdrawal.organization_id,
-            amount: transactionAmount
-          });
-        }
-      }
-
-      // Update welfare balance atomically using database function
+      // Welfare withdrawals go through a separate approval flow (not withdrawals-crud),
+      // so we still need to deduct balance here for welfare.
       if (withdrawal.welfare_id && transactionAmount > 0) {
         const { error: welfareError } = await supabaseAdmin.rpc('update_welfare_withdrawn', {
           p_welfare_id: withdrawal.welfare_id,
