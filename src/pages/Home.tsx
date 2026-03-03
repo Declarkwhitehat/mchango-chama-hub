@@ -154,33 +154,23 @@ const Home = () => {
   const fetchUserData = useCallback(async () => {
     if (!user?.id) return;
     
-    try {
-      setLoading(true);
+    setLoading(true);
 
-      // Fetch user's mchangos
-      const { data: mchangos, error: mchangoError } = await supabase
+    // Fetch all data in parallel, handling each independently
+    const [mchangoResult, chamaResult, memberChamaResult, orgResult, welfareResult] = await Promise.allSettled([
+      supabase
         .from('mchango')
         .select('*')
         .eq('created_by', user.id)
         .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (mchangoError) throw mchangoError;
-      setMchangoList(mchangos || []);
-
-      // Fetch user's chamas (created by user)
-      const { data: chamas, error: chamaError } = await supabase
+        .order('created_at', { ascending: false }),
+      supabase
         .from('chama')
         .select('*')
         .eq('created_by', user.id)
         .in('status', ['pending', 'active', 'cycle_complete'])
-        .order('created_at', { ascending: false });
-
-      if (chamaError) throw chamaError;
-      setChamaList(chamas || []);
-
-      // Fetch chamas where user is a member (excluding chamas they created)
-      const { data: memberChamas, error: memberChamaError } = await supabase
+        .order('created_at', { ascending: false }),
+      supabase
         .from('chama_members')
         .select(`
           chama:chama_id (
@@ -195,45 +185,55 @@ const Home = () => {
           )
         `)
         .eq('user_id', user.id)
-        .eq('approval_status', 'approved');
-
-      if (memberChamaError) throw memberChamaError;
-      
-      // Filter out nulls, extract chama data, and exclude chamas created by the user
-      const memberChamasData = (memberChamas || [])
-        .map(m => m.chama)
-        .filter(c => c !== null && (c as any).created_by !== user.id) as Chama[];
-      
-      setMemberChamaList(memberChamasData);
-
-      // Fetch user's organizations
-      const { data: organizations, error: organizationError } = await supabase
+        .eq('approval_status', 'approved'),
+      supabase
         .from('organizations')
         .select('*')
         .eq('created_by', user.id)
         .eq('status', 'active')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }),
+      supabase.functions.invoke('welfare-crud', { method: 'GET' }),
+    ]);
 
-      if (organizationError) throw organizationError;
-      setOrganizationList(organizations || []);
-
-      // Fetch user's welfares via edge function
-      try {
-        const { data: welfareData, error: welfareError } = await supabase.functions.invoke('welfare-crud', {
-          method: 'GET',
-        });
-        if (!welfareError && welfareData?.data) {
-          setWelfareList(welfareData.data);
-        }
-      } catch (e) {
-        console.error('Error fetching welfares:', e);
-      }
-    } catch (error: any) {
-      console.error('Error fetching user data:', error);
-      toast.error("Failed to load your data");
-    } finally {
-      setLoading(false);
+    // Process mchango
+    if (mchangoResult.status === 'fulfilled' && !mchangoResult.value.error) {
+      setMchangoList(mchangoResult.value.data || []);
+    } else {
+      console.error('Error fetching mchangos:', mchangoResult.status === 'fulfilled' ? mchangoResult.value.error : mchangoResult.reason);
     }
+
+    // Process chamas
+    if (chamaResult.status === 'fulfilled' && !chamaResult.value.error) {
+      setChamaList(chamaResult.value.data || []);
+    } else {
+      console.error('Error fetching chamas:', chamaResult.status === 'fulfilled' ? chamaResult.value.error : chamaResult.reason);
+    }
+
+    // Process member chamas
+    if (memberChamaResult.status === 'fulfilled' && !memberChamaResult.value.error) {
+      const memberChamasData = (memberChamaResult.value.data || [])
+        .map(m => m.chama)
+        .filter(c => c !== null && (c as any).created_by !== user.id) as Chama[];
+      setMemberChamaList(memberChamasData);
+    } else {
+      console.error('Error fetching member chamas:', memberChamaResult.status === 'fulfilled' ? memberChamaResult.value.error : memberChamaResult.reason);
+    }
+
+    // Process organizations
+    if (orgResult.status === 'fulfilled' && !orgResult.value.error) {
+      setOrganizationList(orgResult.value.data || []);
+    } else {
+      console.error('Error fetching organizations:', orgResult.status === 'fulfilled' ? orgResult.value.error : orgResult.reason);
+    }
+
+    // Process welfares
+    if (welfareResult.status === 'fulfilled' && !welfareResult.value.error && welfareResult.value.data?.data) {
+      setWelfareList(welfareResult.value.data.data);
+    } else {
+      console.error('Error fetching welfares:', welfareResult.status === 'fulfilled' ? welfareResult.value.error : welfareResult.reason);
+    }
+
+    setLoading(false);
   }, [user?.id]);
 
   useEffect(() => {
