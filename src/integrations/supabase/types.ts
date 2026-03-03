@@ -2811,6 +2811,14 @@ export type Database = {
         Args: { _user_id: string; _welfare_id: string }
         Returns: boolean
       }
+      process_withdrawal_completion: {
+        Args: {
+          p_mpesa_receipt: string
+          p_transaction_amount: number
+          p_withdrawal_id: string
+        }
+        Returns: Json
+      }
       record_company_earning: {
         Args: {
           p_amount: number

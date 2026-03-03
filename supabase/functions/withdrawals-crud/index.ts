@@ -349,7 +349,7 @@ serve(async (req) => {
       if (mchango_id) filterParts.push(`mchango_id.eq.${mchango_id}`);
       if (organization_id) filterParts.push(`organization_id.eq.${organization_id}`);
       
-      const { data: blockingWithdrawal } = await supabaseClient
+      const { data: blockingWithdrawal } = await supabaseAdmin
         .from('withdrawals')
         .select('id, status')
         .or(filterParts.join(','))
@@ -425,75 +425,9 @@ serve(async (req) => {
 
       console.log('Withdrawal request created:', withdrawal);
 
-      // IMMEDIATELY deduct balance to prevent double withdrawals
-      // The balance is deducted NOW, not when the B2C callback arrives
-      if (mchango_id) {
-        const { data: mchangoData } = await supabaseAdmin
-          .from('mchango')
-          .select('current_amount, available_balance')
-          .eq('id', mchango_id)
-          .single();
-
-        if (mchangoData) {
-          const newCurrentAmount = Math.max(0, Number(mchangoData.current_amount) - netAmount);
-          const newAvailableBalance = Math.max(0, Number(mchangoData.available_balance) - netAmount);
-          await supabaseAdmin
-            .from('mchango')
-            .update({
-              current_amount: newCurrentAmount,
-              available_balance: newAvailableBalance,
-            })
-            .eq('id', mchango_id);
-          console.log('Mchango balance deducted immediately:', { 
-            previous: mchangoData.current_amount, 
-            deducted: netAmount, 
-            new: newCurrentAmount 
-          });
-        }
-      } else if (organization_id) {
-        const { data: orgData } = await supabaseAdmin
-          .from('organizations')
-          .select('current_amount, available_balance')
-          .eq('id', organization_id)
-          .single();
-
-        if (orgData) {
-          const newCurrentAmount = Math.max(0, Number(orgData.current_amount) - netAmount);
-          const newAvailableBalance = Math.max(0, Number(orgData.available_balance) - netAmount);
-          await supabaseAdmin
-            .from('organizations')
-            .update({
-              current_amount: newCurrentAmount,
-              available_balance: newAvailableBalance,
-            })
-            .eq('id', organization_id);
-          console.log('Organization balance deducted immediately:', {
-            previous: orgData.current_amount,
-            deducted: netAmount,
-            new: newCurrentAmount
-          });
-        }
-      } else if (chama_id) {
-        const { data: chamaData } = await supabaseAdmin
-          .from('chama')
-          .select('available_balance, total_withdrawn')
-          .eq('id', chama_id)
-          .single();
-
-        if (chamaData) {
-          await supabaseAdmin
-            .from('chama')
-            .update({
-              available_balance: Math.max(0, Number(chamaData.available_balance) - netAmount),
-              total_withdrawn: Number(chamaData.total_withdrawn || 0) + netAmount,
-            })
-            .eq('id', chama_id);
-          console.log('Chama balance deducted immediately:', {
-            previous: chamaData.available_balance,
-            deducted: netAmount,
-          });
-        }
-      }
+      // Balance is NOT deducted here — it will be deducted atomically
+      // by process_withdrawal_completion() when the B2C callback confirms success.
+      // This prevents the bug where balance is reduced but status stays "processing".
 
       // Get entity name for notification
       let entityName = 'your account';

@@ -68,8 +68,6 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
   }
 
   // Method 0 (PRIMARY): Find processing withdrawal with WD- payment_reference matching by phone
-  // This is the most reliable method because b2c-payout sets payment_reference = 'WD-<uuid>'
-  // BEFORE making the API call, so it's always present when the callback arrives.
   if (recipientPhoneLast9) {
     const { data: wd0list } = await supabaseAdmin
       .from('withdrawals')
@@ -90,8 +88,7 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     }
   }
 
-  // Method 1: Direct ID extraction from WD- payment_reference
-  // Search all processing withdrawals with WD- prefix and extract the UUID to match
+  // Method 1: Single processing withdrawal with WD- prefix
   {
     const { data: wdProcessing } = await supabaseAdmin
       .from('withdrawals')
@@ -102,13 +99,12 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
       .limit(5);
 
     if (wdProcessing && wdProcessing.length === 1) {
-      // If only one processing withdrawal exists, it's almost certainly the right one
       console.log('Found single processing withdrawal with WD- prefix:', wdProcessing[0].id);
       return wdProcessing[0];
     }
   }
 
-  // Method 2: Lookup by ConversationID in payment_reference (legacy fallback)
+  // Method 2: Lookup by ConversationID in payment_reference (legacy)
   if (conversationId) {
     const { data: wd1 } = await supabaseAdmin
       .from('withdrawals')
@@ -122,7 +118,7 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     }
   }
 
-  // Method 3: Occasion-based lookup (WD-{uuid} format) - works if Safaricom echoes Occasion
+  // Method 3: Occasion-based lookup (WD-{uuid})
   if (occasion && occasion.startsWith('WD-')) {
     const withdrawalId = occasion.substring(3);
     if (withdrawalId) {
@@ -170,7 +166,9 @@ serve(async (req) => {
     );
 
     const callbackData = await req.json();
-    console.log('B2C Callback received:', JSON.stringify(callbackData, null, 2));
+    console.log('=== B2C CALLBACK RECEIVED ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Full payload:', JSON.stringify(callbackData, null, 2));
 
     const result = callbackData.Result;
     
@@ -185,14 +183,23 @@ serve(async (req) => {
     const resultCode = result.ResultCode;
     const resultDesc = result.ResultDesc;
 
-    console.log('B2C Result:', { conversationId, resultCode, resultDesc });
+    console.log('B2C Result:', { conversationId, resultCode, resultDesc, occasion: result.Occasion });
 
     // Find withdrawal using multiple fallback methods
     const withdrawal = await findWithdrawal(supabaseAdmin, result);
 
     if (!withdrawal) {
-      console.error('Withdrawal not found for callback:', { conversationId, occasion: result.Occasion });
-      // Still return success to M-Pesa to prevent retries
+      console.error('CRITICAL: Withdrawal not found for callback:', { conversationId, occasion: result.Occasion });
+      return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Found withdrawal:', { id: withdrawal.id, status: withdrawal.status });
+
+    // Idempotency: skip if already completed
+    if (withdrawal.status === 'completed') {
+      console.log('Withdrawal already completed, skipping:', withdrawal.id);
       return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -202,92 +209,40 @@ serve(async (req) => {
     const recipientPhone = withdrawal.profiles?.phone;
 
     if (resultCode === 0) {
-      // Payment successful
+      // === PAYMENT SUCCESSFUL ===
       let transactionId = '';
       let transactionAmount = 0;
-      let mpesaRecipientPhone = '';
 
-      // Extract result parameters
       if (result.ResultParameters?.ResultParameter) {
         for (const param of result.ResultParameters.ResultParameter) {
-          switch (param.Key) {
-            case 'TransactionID':
-              transactionId = param.Value;
-              break;
-            case 'TransactionAmount':
-              transactionAmount = Number(param.Value);
-              break;
-            case 'ReceiverPartyPublicName':
-              mpesaRecipientPhone = param.Value;
-              break;
-          }
+          if (param.Key === 'TransactionID') transactionId = param.Value;
+          if (param.Key === 'TransactionAmount') transactionAmount = Number(param.Value);
         }
       }
 
-      console.log('B2C Success:', { transactionId, transactionAmount, mpesaRecipientPhone });
+      console.log('B2C Success - calling atomic completion:', { transactionId, transactionAmount, withdrawalId: withdrawal.id });
 
-      // Update withdrawal as completed with M-Pesa transaction ID
-      const { error: updateError } = await supabaseAdmin
-        .from('withdrawals')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          payment_reference: transactionId || conversationId,
-          b2c_error_details: null, // Clear any previous errors
-          notes: (withdrawal.notes || '') + `\n[SYSTEM] B2C completed: ${transactionId}, Amount: ${transactionAmount}`
-        })
-        .eq('id', withdrawal.id);
+      // Use atomic DB function: updates status + deducts balance in one transaction
+      const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('process_withdrawal_completion', {
+        p_withdrawal_id: withdrawal.id,
+        p_mpesa_receipt: transactionId || conversationId,
+        p_transaction_amount: transactionAmount
+      });
 
-      if (updateError) {
-        console.error('Failed to update withdrawal:', updateError);
-      }
-
-      // NOTE: Balance deductions for mchango, organization, and chama are now done
-      // immediately when the withdrawal is created in withdrawals-crud.
-      // The b2c-callback only updates the withdrawal status to 'completed'.
-      // This prevents double-deduction and stops users from withdrawing again
-      // before the callback arrives.
-      
-      console.log('B2C callback processed successfully. Balance was already deducted at withdrawal creation time.');
-
-      // Welfare withdrawals go through a separate approval flow (not withdrawals-crud),
-      // so we still need to deduct balance here for welfare.
-      if (withdrawal.welfare_id && transactionAmount > 0) {
-        const { error: welfareError } = await supabaseAdmin.rpc('update_welfare_withdrawn', {
-          p_welfare_id: withdrawal.welfare_id,
-          p_amount: transactionAmount
-        });
-        
-        if (welfareError) {
-          console.error('Failed to update welfare withdrawn:', welfareError);
-          const { data: wf } = await supabaseAdmin
-            .from('welfares')
-            .select('current_amount, available_balance, total_withdrawn')
-            .eq('id', withdrawal.welfare_id)
-            .single();
-
-          if (wf) {
-            await supabaseAdmin
-              .from('welfares')
-              .update({
-                current_amount: Math.max(0, Number(wf.current_amount) - transactionAmount),
-                available_balance: Math.max(0, Number(wf.available_balance) - transactionAmount),
-                total_withdrawn: (Number(wf.total_withdrawn) || 0) + transactionAmount
-              })
-              .eq('id', withdrawal.welfare_id);
-          }
-        } else {
-          console.log('Updated welfare balance atomically:', {
-            welfare_id: withdrawal.welfare_id,
-            amount: transactionAmount
-          });
-        }
-      }
-
-      // Send success SMS
-      if (recipientPhone) {
-        const successMessage = `🎉 Your ${groupName} payout of KES ${transactionAmount.toFixed(2)} has been sent to your M-Pesa. Transaction: ${transactionId}. Thank you for being a valued member!`;
-        await sendSMS(recipientPhone, successMessage);
+      if (rpcError) {
+        console.error('CRITICAL: Atomic completion RPC failed:', rpcError);
+        // Fallback: at least update the status
+        await supabaseAdmin
+          .from('withdrawals')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            payment_reference: transactionId || conversationId,
+            notes: (withdrawal.notes || '') + `\n[SYSTEM] RPC failed, manual status update: ${rpcError.message}`
+          })
+          .eq('id', withdrawal.id);
+      } else {
+        console.log('Atomic completion result:', rpcResult);
       }
 
       // Record commission as company earning
@@ -303,15 +258,20 @@ serve(async (req) => {
         });
       }
 
+      // Send success SMS
+      if (recipientPhone) {
+        const successMessage = `🎉 Your ${groupName} payout of KES ${transactionAmount.toFixed(2)} has been sent to your M-Pesa. Transaction: ${transactionId}. Thank you!`;
+        await sendSMS(recipientPhone, successMessage);
+      }
+
     } else {
-      // Payment failed
-      console.error('B2C payment failed:', resultDesc);
+      // === PAYMENT FAILED ===
+      console.error('B2C payment failed:', { resultCode, resultDesc });
 
       const attemptCount = (withdrawal.b2c_attempt_count || 0);
       const maxAttempts = 3;
 
       if (attemptCount >= maxAttempts) {
-        // Final failure - mark as failed and notify user
         await supabaseAdmin
           .from('withdrawals')
           .update({
@@ -326,13 +286,10 @@ serve(async (req) => {
           })
           .eq('id', withdrawal.id);
 
-        // Send final failure SMS
         if (recipientPhone) {
-          const failureMessage = `❌ Your ${groupName} payout of KES ${withdrawal.net_amount?.toFixed(2)} failed after multiple attempts. Error: ${resultDesc}. Please update your payment method or contact support.`;
-          await sendSMS(recipientPhone, failureMessage);
+          await sendSMS(recipientPhone, `❌ Your ${groupName} payout of KES ${withdrawal.net_amount?.toFixed(2)} failed after multiple attempts. Error: ${resultDesc}. Please contact support.`);
         }
       } else {
-        // Mark for retry
         await supabaseAdmin
           .from('withdrawals')
           .update({
@@ -346,22 +303,18 @@ serve(async (req) => {
           })
           .eq('id', withdrawal.id);
 
-        // Send retry notification SMS
         if (recipientPhone) {
-          const retryMessage = `⚠️ Your ${groupName} payout of KES ${withdrawal.net_amount?.toFixed(2)} could not be processed. We will retry automatically. If you don't receive it within 1 hour, please contact support.`;
-          await sendSMS(recipientPhone, retryMessage);
+          await sendSMS(recipientPhone, `⚠️ Your ${groupName} payout could not be processed. We will retry automatically. If not received within 1 hour, contact support.`);
         }
       }
     }
 
-    // Return success to M-Pesa
     return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
     console.error('Error in b2c-callback:', error);
-    // Always return success to M-Pesa to avoid retries
     return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
