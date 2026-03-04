@@ -341,33 +341,31 @@ serve(async (req) => {
         });
       }
 
-      // Check for any in-progress or failed withdrawals (block new requests)
-      // Statuses that block: pending, approved, processing, pending_retry, failed
-      // Build the filter for blocking withdrawals
+      // Prevent concurrent withdrawals for the same user and entity while one is active
       const filterParts = [];
       if (chama_id) filterParts.push(`chama_id.eq.${chama_id}`);
       if (mchango_id) filterParts.push(`mchango_id.eq.${mchango_id}`);
       if (organization_id) filterParts.push(`organization_id.eq.${organization_id}`);
-      
+
       const { data: blockingWithdrawal } = await supabaseAdmin
         .from('withdrawals')
         .select('id, status')
+        .eq('requested_by', user.id)
         .or(filterParts.join(','))
-        .in('status', ['pending', 'approved', 'processing', 'pending_retry', 'failed'])
+        .in('status', ['pending', 'approved', 'processing', 'pending_retry'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (blockingWithdrawal) {
         const statusMessages: Record<string, string> = {
-          'pending': 'There is already a pending withdrawal request awaiting admin approval',
+          'pending': 'You already have a pending withdrawal request awaiting approval',
           'approved': 'Your approved withdrawal is being processed',
           'processing': 'A payout is currently being processed via M-Pesa',
-          'pending_retry': 'The system is automatically retrying a previous payout',
-          'failed': 'A previous withdrawal failed. Please contact admin before requesting again'
+          'pending_retry': 'The system is reconciling/retrying your previous payout'
         };
-        return new Response(JSON.stringify({ 
-          error: statusMessages[blockingWithdrawal.status] || 'A withdrawal is already in progress',
+        return new Response(JSON.stringify({
+          error: statusMessages[blockingWithdrawal.status] || 'A withdrawal is already in progress for your account',
           blocking_status: blockingWithdrawal.status
         }), {
           status: 400,

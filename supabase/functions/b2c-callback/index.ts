@@ -67,44 +67,24 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     }
   }
 
-  // Method 0 (PRIMARY): Find processing withdrawal with WD- payment_reference matching by phone
-  if (recipientPhoneLast9) {
-    const { data: wd0list } = await supabaseAdmin
-      .from('withdrawals')
-      .select(selectQuery)
-      .eq('status', 'processing')
-      .like('payment_reference', 'WD-%')
-      .order('last_b2c_attempt_at', { ascending: false })
-      .limit(10);
+  // Method 0 (PRIMARY): Occasion-based lookup (WD-{uuid})
+  if (occasion && occasion.startsWith('WD-')) {
+    const withdrawalId = occasion.substring(3);
+    if (withdrawalId) {
+      const { data: wd0 } = await supabaseAdmin
+        .from('withdrawals')
+        .select(selectQuery)
+        .eq('id', withdrawalId)
+        .maybeSingle();
 
-    if (wd0list && wd0list.length > 0) {
-      for (const wd of wd0list) {
-        const profilePhone = (wd.profiles?.phone || '').replace(/\D/g, '').slice(-9);
-        if (profilePhone === recipientPhoneLast9) {
-          console.log('Found withdrawal by WD- prefix + phone match:', wd.id);
-          return wd;
-        }
+      if (wd0) {
+        console.log('Found withdrawal by Occasion withdrawal ID:', wd0.id);
+        return wd0;
       }
     }
   }
 
-  // Method 1: Single processing withdrawal with WD- prefix
-  {
-    const { data: wdProcessing } = await supabaseAdmin
-      .from('withdrawals')
-      .select(selectQuery)
-      .eq('status', 'processing')
-      .like('payment_reference', 'WD-%')
-      .order('last_b2c_attempt_at', { ascending: false })
-      .limit(5);
-
-    if (wdProcessing && wdProcessing.length === 1) {
-      console.log('Found single processing withdrawal with WD- prefix:', wdProcessing[0].id);
-      return wdProcessing[0];
-    }
-  }
-
-  // Method 2: Lookup by ConversationID in payment_reference (legacy)
+  // Method 1: Lookup by ConversationID in payment_reference (legacy)
   if (conversationId) {
     const { data: wd1 } = await supabaseAdmin
       .from('withdrawals')
@@ -118,20 +98,40 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     }
   }
 
-  // Method 3: Occasion-based lookup (WD-{uuid})
-  if (occasion && occasion.startsWith('WD-')) {
-    const withdrawalId = occasion.substring(3);
-    if (withdrawalId) {
-      const { data: wd3 } = await supabaseAdmin
-        .from('withdrawals')
-        .select(selectQuery)
-        .eq('id', withdrawalId)
-        .maybeSingle();
+  // Method 2: Find processing withdrawal with WD- payment_reference matching by phone
+  if (recipientPhoneLast9) {
+    const { data: wd2list } = await supabaseAdmin
+      .from('withdrawals')
+      .select(selectQuery)
+      .eq('status', 'processing')
+      .like('payment_reference', 'WD-%')
+      .order('last_b2c_attempt_at', { ascending: false })
+      .limit(20);
 
-      if (wd3) {
-        console.log('Found withdrawal by extracted ID from Occasion:', wd3.id);
-        return wd3;
+    if (wd2list && wd2list.length > 0) {
+      for (const wd of wd2list) {
+        const profilePhone = (wd.profiles?.phone || '').replace(/\D/g, '').slice(-9);
+        if (profilePhone === recipientPhoneLast9) {
+          console.log('Found withdrawal by WD- prefix + phone match:', wd.id);
+          return wd;
+        }
       }
+    }
+  }
+
+  // Method 3: Single processing withdrawal with WD- prefix
+  {
+    const { data: wd3Processing } = await supabaseAdmin
+      .from('withdrawals')
+      .select(selectQuery)
+      .eq('status', 'processing')
+      .like('payment_reference', 'WD-%')
+      .order('last_b2c_attempt_at', { ascending: false })
+      .limit(5);
+
+    if (wd3Processing && wd3Processing.length === 1) {
+      console.log('Found single processing withdrawal with WD- prefix:', wd3Processing[0].id);
+      return wd3Processing[0];
     }
   }
 
@@ -229,16 +229,25 @@ serve(async (req) => {
         p_transaction_amount: transactionAmount
       });
 
-      if (rpcError) {
-        console.error('CRITICAL: Atomic completion RPC failed:', rpcError);
-        // Fallback: at least update the status
+      if (rpcError || !rpcResult?.success) {
+        const atomicError = rpcError?.message || rpcResult?.error || 'Atomic completion failed';
+        console.error('CRITICAL: Atomic completion failed, not marking as completed:', {
+          withdrawalId: withdrawal.id,
+          atomicError,
+          rpcResult,
+        });
+
         await supabaseAdmin
           .from('withdrawals')
           .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            payment_reference: transactionId || conversationId,
-            notes: (withdrawal.notes || '') + `\n[SYSTEM] RPC failed, manual status update: ${rpcError.message}`
+            status: 'failed',
+            b2c_error_details: {
+              atomic_completion_failed: true,
+              reason: atomicError,
+              callback_result_code: resultCode,
+              callback_result_desc: resultDesc,
+            },
+            notes: (withdrawal.notes || '') + `\n[SYSTEM] Callback success received but atomic completion failed: ${atomicError}`,
           })
           .eq('id', withdrawal.id);
       } else {

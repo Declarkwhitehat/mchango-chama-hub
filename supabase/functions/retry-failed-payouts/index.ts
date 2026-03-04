@@ -10,7 +10,6 @@ const celcomShortcode = Deno.env.get('CELCOM_SHORTCODE');
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MINUTES = 30; // Minimum time between retries
 const STUCK_APPROVED_THRESHOLD_HOURS = 1; // Hours before approved withdrawal is considered stuck
-const STALLED_PROCESSING_MINUTES = 10; // Minutes before processing withdrawal is considered stalled
 
 async function sendSMS(phone: string, message: string) {
   if (!celcomApiKey || !celcomPartnerId || !celcomShortcode) {
@@ -52,13 +51,12 @@ Deno.serve(async (req) => {
 
     const retryThreshold = new Date(Date.now() - RETRY_DELAY_MINUTES * 60 * 1000).toISOString();
     const stuckApprovedThreshold = new Date(Date.now() - STUCK_APPROVED_THRESHOLD_HOURS * 60 * 60 * 1000).toISOString();
-    const stalledProcessingThreshold = new Date(Date.now() - STALLED_PROCESSING_MINUTES * 60 * 1000).toISOString();
 
     let retriedCount = 0;
-    let successCount = 0;
     let finalFailureCount = 0;
     let stuckApprovedCount = 0;
-    let stalledResetCount = 0;
+    let reconciledProcessingCount = 0;
+    let reconciliationFailedCount = 0;
 
     // 1. Handle stuck "approved" withdrawals (B2C was never triggered or failed silently)
     const { data: stuckApproved, error: stuckError } = await supabase
@@ -92,31 +90,33 @@ Deno.serve(async (req) => {
       stuckApprovedCount++;
     }
 
-    // 2. Handle stalled "processing" withdrawals (stuck for more than threshold)
-    const { data: stalledWithdrawals, error: stalledError } = await supabase
-      .from('withdrawals')
-      .select('id, notes, b2c_attempt_count, last_b2c_attempt_at')
-      .eq('status', 'processing')
-      .lt('last_b2c_attempt_at', stalledProcessingThreshold);
+    // 2. Reconcile all currently processing withdrawals via Transaction Status Query
+    // This keeps the system callback-driven while auto-recovering stuck payouts.
+    try {
+      const reconcileRes = await fetch(`${supabaseUrl}/functions/v1/b2c-status-query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reconcile_all_processing: true,
+          max_records: 500,
+        }),
+      });
 
-    if (stalledError) {
-      console.error('Error fetching stalled withdrawals:', stalledError);
-    }
-
-    console.log(`Found ${stalledWithdrawals?.length || 0} stalled processing withdrawals`);
-
-    for (const stalled of stalledWithdrawals || []) {
-      console.log(`Marking stalled withdrawal ${stalled.id} for retry`);
-      
-      await supabase
-        .from('withdrawals')
-        .update({
-          status: 'pending_retry',
-          notes: (stalled.notes || '') + `\n[SYSTEM] Marked as stalled at ${new Date().toISOString()}`
-        })
-        .eq('id', stalled.id);
-
-      stalledResetCount++;
+      const reconcileJson = await reconcileRes.json();
+      if (reconcileRes.ok) {
+        reconciledProcessingCount = Number(reconcileJson.reconciled || 0);
+        reconciliationFailedCount = Number(reconcileJson.failed_queries || 0);
+        console.log(`[RETRY] Processing reconciliation done:`, reconcileJson);
+      } else {
+        reconciliationFailedCount += 1;
+        console.error(`[RETRY] Processing reconciliation failed:`, reconcileJson);
+      }
+    } catch (reconcileError: any) {
+      reconciliationFailedCount += 1;
+      console.error('[RETRY] Processing reconciliation exception:', reconcileError);
     }
 
     // 3. Find withdrawals that need retry:
@@ -238,15 +238,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[RETRY] Completed. Retried: ${retriedCount}, Final failures: ${finalFailureCount}, Stuck approved recovered: ${stuckApprovedCount}, Stalled reset: ${stalledResetCount}`);
+    console.log(`[RETRY] Completed. Retried: ${retriedCount}, Final failures: ${finalFailureCount}, Stuck approved recovered: ${stuckApprovedCount}, Reconciled processing: ${reconciledProcessingCount}, Reconcile failures: ${reconciliationFailedCount}`);
 
     return new Response(JSON.stringify({
       success: true,
       retried: retriedCount,
       finalFailures: finalFailureCount,
       stuckApprovedRecovered: stuckApprovedCount,
-      stalledReset: stalledResetCount,
-      totalProcessed: (failedWithdrawals?.length || 0) + stuckApprovedCount + stalledResetCount
+      reconciledProcessing: reconciledProcessingCount,
+      reconciliationFailures: reconciliationFailedCount,
+      totalProcessed: (failedWithdrawals?.length || 0) + stuckApprovedCount + reconciledProcessingCount
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
