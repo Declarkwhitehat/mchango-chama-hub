@@ -40,20 +40,34 @@ async function sendSMS(phone: string, message: string) {
   }
 }
 
+function extractOccasion(result: any): string {
+  const directOccasion = result?.Occasion;
+  if (typeof directOccasion === 'string' && directOccasion.trim()) {
+    return directOccasion.trim();
+  }
+
+  const referenceItem = result?.ReferenceData?.ReferenceItem;
+  if (Array.isArray(referenceItem)) {
+    for (const item of referenceItem) {
+      if (item?.Key === 'Occasion' && item?.Value) {
+        return String(item.Value).trim();
+      }
+    }
+  } else if (referenceItem?.Key === 'Occasion' && referenceItem?.Value) {
+    return String(referenceItem.Value).trim();
+  }
+
+  return '';
+}
+
 async function findWithdrawal(supabaseAdmin: any, result: any) {
-  const conversationId = result.ConversationID;
-  const originatorConversationId = result.OriginatorConversationID;
-  const occasion = result.Occasion || '';
+  const conversationId = result?.ConversationID || '';
+  const originatorConversationId = result?.OriginatorConversationID || '';
+  const occasion = extractOccasion(result);
 
   console.log('Finding withdrawal:', { conversationId, originatorConversationId, occasion });
 
-  const selectQuery = `
-    *,
-    profiles:requested_by(full_name, phone),
-    chama:chama_id(name),
-    mchango:mchango_id(title),
-    welfares:welfare_id(name)
-  `;
+  const selectQuery = '*';
 
   // --- Extract recipient phone from callback for phone-based lookups ---
   let recipientPhoneLast9 = '';
@@ -98,6 +112,21 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     }
   }
 
+  // Method 1.5: Lookup by OriginatorConversationID logged in notes
+  if (originatorConversationId) {
+    const { data: wd15list } = await supabaseAdmin
+      .from('withdrawals')
+      .select(selectQuery)
+      .eq('status', 'processing')
+      .ilike('notes', `%OrigConvID=${originatorConversationId}%`)
+      .limit(1);
+
+    if (wd15list && wd15list.length > 0) {
+      console.log('Found withdrawal by OriginatorConversationID in notes:', wd15list[0].id);
+      return wd15list[0];
+    }
+  }
+
   // Method 2: Find processing withdrawal with WD- payment_reference matching by phone
   if (recipientPhoneLast9) {
     const { data: wd2list } = await supabaseAdmin
@@ -135,13 +164,13 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
     }
   }
 
-  // Method 4: Search notes for ConversationID
+  // Method 4: Search notes for conversation IDs
   if (conversationId) {
     const { data: wd4list } = await supabaseAdmin
       .from('withdrawals')
       .select(selectQuery)
       .eq('status', 'processing')
-      .ilike('notes', `%${conversationId}%`)
+      .or(`notes.ilike.%ConvID=${conversationId}%,notes.ilike.%${conversationId}%`)
       .limit(1);
 
     if (wd4list && wd4list.length > 0) {
@@ -182,14 +211,15 @@ serve(async (req) => {
     const conversationId = result.ConversationID;
     const resultCode = result.ResultCode;
     const resultDesc = result.ResultDesc;
+    const callbackOccasion = extractOccasion(result);
 
-    console.log('B2C Result:', { conversationId, resultCode, resultDesc, occasion: result.Occasion });
+    console.log('B2C Result:', { conversationId, resultCode, resultDesc, occasion: callbackOccasion });
 
     // Find withdrawal using multiple fallback methods
     const withdrawal = await findWithdrawal(supabaseAdmin, result);
 
     if (!withdrawal) {
-      console.error('CRITICAL: Withdrawal not found for callback:', { conversationId, occasion: result.Occasion });
+      console.error('CRITICAL: Withdrawal not found for callback:', { conversationId, occasion: callbackOccasion });
       return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
