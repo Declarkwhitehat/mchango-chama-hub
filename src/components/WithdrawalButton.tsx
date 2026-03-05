@@ -218,18 +218,27 @@ export const WithdrawalButton = ({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('withdrawals-crud', {
-        body: {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/withdrawals-crud`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
           chama_id: chamaId,
           mchango_id: mchangoId,
           organization_id: organizationId,
           amount: withdrawAmount,
           notes: notes.trim() ? notes.trim() : undefined,
-        },
-        method: 'POST'
+        }),
       });
 
-      if (error) throw error;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || `Withdrawal failed (${response.status})`);
+      }
 
       // Check if auto-approved from response
       if (data?.auto_approved) {
