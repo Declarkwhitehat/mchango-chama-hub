@@ -625,10 +625,74 @@ serve(async (req) => {
       });
     }
 
-    // PATCH / - Admin approval/rejection
+    // PATCH / - Admin approval/rejection OR user status check
     if (req.method === 'PATCH') {
       const body = await req.json();
-      const { withdrawal_id, status, rejection_reason, payment_reference, skip_to_next } = body;
+      const { withdrawal_id, status, rejection_reason, payment_reference, skip_to_next, action } = body;
+
+      // User-initiated status check for their own stuck withdrawal
+      if (action === 'check_status') {
+        if (!withdrawal_id) {
+          return new Response(JSON.stringify({ error: 'withdrawal_id is required' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Get the withdrawal
+        const { data: wd, error: wdErr } = await supabaseAdmin
+          .from('withdrawals')
+          .select('id, status, requested_by, notes')
+          .eq('id', withdrawal_id)
+          .single();
+
+        if (wdErr || !wd) {
+          return new Response(JSON.stringify({ error: 'Withdrawal not found' }), {
+            status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Only the requester can check their own withdrawal status
+        if (wd.requested_by !== user.id) {
+          return new Response(JSON.stringify({ error: 'You can only check your own withdrawals' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!['processing', 'pending_retry'].includes(wd.status)) {
+          return new Response(JSON.stringify({
+            status: wd.status,
+            message: `Withdrawal is ${wd.status}. Status check is only available for processing or pending_retry withdrawals.`,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        // Call b2c-status-query
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+        try {
+          const statusRes = await fetch(`${supabaseUrl}/functions/v1/b2c-status-query`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${serviceRoleKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ withdrawal_id }),
+          });
+
+          const statusResult = await statusRes.json();
+          return new Response(JSON.stringify({
+            message: 'Status check initiated. Your withdrawal will be updated automatically when the result arrives.',
+            current_status: wd.status,
+            query_result: statusResult,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+        } catch (err: any) {
+          return new Response(JSON.stringify({
+            error: 'Failed to query status',
+            message: err.message,
+          }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
 
       if (!withdrawal_id) {
         return new Response(JSON.stringify({ 
