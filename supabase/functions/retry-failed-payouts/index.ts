@@ -8,8 +8,17 @@ const celcomPartnerId = Deno.env.get('CELCOM_PARTNER_ID');
 const celcomShortcode = Deno.env.get('CELCOM_SHORTCODE');
 
 const MAX_RETRY_ATTEMPTS = 3;
-const RETRY_DELAY_MINUTES = 30; // Minimum time between retries
-const STUCK_APPROVED_THRESHOLD_HOURS = 1; // Hours before approved withdrawal is considered stuck
+const RETRY_DELAY_MINUTES = 30;
+const STUCK_APPROVED_THRESHOLD_HOURS = 1;
+
+function extractConversationId(notes?: string | null): string | null {
+  if (!notes) return null;
+  const convMatch = notes.match(/ConvID=([^,\s]+)/);
+  if (convMatch?.[1]) return convMatch[1];
+  const agMatch = notes.match(/AG_[A-Za-z0-9_]+/);
+  if (agMatch?.[0]) return agMatch[0];
+  return null;
+}
 
 async function sendSMS(phone: string, message: string) {
   if (!celcomApiKey || !celcomPartnerId || !celcomShortcode) {
@@ -57,6 +66,7 @@ Deno.serve(async (req) => {
     let stuckApprovedCount = 0;
     let reconciledProcessingCount = 0;
     let reconciliationFailedCount = 0;
+    let statusQueryCount = 0;
 
     // 1. Handle stuck "approved" withdrawals (B2C was never triggered or failed silently)
     const { data: stuckApproved, error: stuckError } = await supabase
@@ -78,7 +88,6 @@ Deno.serve(async (req) => {
     for (const stuck of stuckApproved || []) {
       console.log(`Recovering stuck approved withdrawal ${stuck.id}`);
       
-      // Mark for retry so normal retry flow picks it up
       await supabase
         .from('withdrawals')
         .update({
@@ -91,7 +100,6 @@ Deno.serve(async (req) => {
     }
 
     // 2. Reconcile all currently processing withdrawals via Transaction Status Query
-    // This keeps the system callback-driven while auto-recovering stuck payouts.
     try {
       const reconcileRes = await fetch(`${supabaseUrl}/functions/v1/b2c-status-query`, {
         method: 'POST',
@@ -119,10 +127,7 @@ Deno.serve(async (req) => {
       console.error('[RETRY] Processing reconciliation exception:', reconcileError);
     }
 
-    // 3. Find withdrawals that need retry:
-    // - Status is 'failed' or 'pending_retry'
-    // - Less than MAX_RETRY_ATTEMPTS
-    // - Last attempt was more than RETRY_DELAY_MINUTES ago (or never attempted)
+    // 3. Find withdrawals that need retry
     const { data: failedWithdrawals, error: fetchError } = await supabase
       .from('withdrawals')
       .select(`
@@ -148,16 +153,65 @@ Deno.serve(async (req) => {
       const paymentMethod = withdrawal.payment_methods;
       const attemptNumber = (withdrawal.b2c_attempt_count || 0) + 1;
 
-      console.log(`Retrying withdrawal ${withdrawal.id} (attempt ${attemptNumber}/${MAX_RETRY_ATTEMPTS})`);
-
       // Only retry M-Pesa payments
       if (paymentMethod?.method_type !== 'mpesa' || !paymentMethod?.phone_number) {
         console.log(`Skipping non-M-Pesa withdrawal: ${withdrawal.id}`);
         continue;
       }
 
+      // KEY FIX: If this withdrawal already has a ConversationID from a previous
+      // B2C attempt, query Safaricom's Transaction Status API FIRST instead of
+      // blindly re-sending money. The original B2C may have succeeded.
+      const existingConvId = extractConversationId(withdrawal.notes);
+
+      if (existingConvId) {
+        console.log(`[RETRY] Withdrawal ${withdrawal.id} has existing ConvID=${existingConvId}. Querying status first instead of re-sending B2C.`);
+
+        try {
+          const statusRes = await fetch(`${supabaseUrl}/functions/v1/b2c-status-query`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ withdrawal_id: withdrawal.id }),
+          });
+
+          const statusJson = await statusRes.json();
+          console.log(`[RETRY] Status query result for ${withdrawal.id}:`, statusJson);
+
+          // Update notes with status query result
+          await supabase
+            .from('withdrawals')
+            .update({
+              notes: (withdrawal.notes || '') + `\n[SYSTEM] Retry status-query at ${new Date().toISOString()} for ConvID=${existingConvId}: ${JSON.stringify(statusJson).substring(0, 250)}`,
+            })
+            .eq('id', withdrawal.id);
+
+          statusQueryCount++;
+          // The b2c-status-query sends a TransactionStatusQuery to Safaricom.
+          // The result will arrive via the b2c-callback, which will complete or
+          // fail the withdrawal automatically. Do NOT re-send B2C here.
+          continue;
+
+        } catch (statusError: any) {
+          console.error(`[RETRY] Status query failed for ${withdrawal.id}:`, statusError);
+          // If status query itself fails, still don't blindly re-send B2C.
+          // Just note it and move on; next retry cycle will try again.
+          await supabase
+            .from('withdrawals')
+            .update({
+              notes: (withdrawal.notes || '') + `\n[SYSTEM] Retry status-query exception at ${new Date().toISOString()}: ${statusError.message}`,
+            })
+            .eq('id', withdrawal.id);
+          continue;
+        }
+      }
+
+      // No existing ConversationID — safe to attempt B2C
+      console.log(`Retrying withdrawal ${withdrawal.id} (attempt ${attemptNumber}/${MAX_RETRY_ATTEMPTS})`);
+
       try {
-        // Trigger B2C payout
         const b2cResponse = await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
           method: 'POST',
           headers: {
@@ -179,9 +233,7 @@ Deno.serve(async (req) => {
         } else {
           console.error(`B2C failed for withdrawal ${withdrawal.id}:`, b2cResult);
 
-          // Check if this is the final attempt
           if (attemptNumber >= MAX_RETRY_ATTEMPTS) {
-            // Mark as final failure
             await supabase
               .from('withdrawals')
               .update({
@@ -195,7 +247,6 @@ Deno.serve(async (req) => {
               })
               .eq('id', withdrawal.id);
 
-            // Send final failure SMS - use payment method phone since we don't join profiles
             const phone = paymentMethod?.phone_number;
             if (phone) {
               const chamaName = withdrawal.chama_id ? 'your Chama' : 'your Mchango';
@@ -205,12 +256,10 @@ Deno.serve(async (req) => {
 
             finalFailureCount++;
           }
-          // Note: If not final, b2c-payout already marked it as pending_retry
         }
       } catch (error: any) {
         console.error(`Error triggering B2C for ${withdrawal.id}:`, error);
 
-        // Mark for retry or final failure
         if (attemptNumber >= MAX_RETRY_ATTEMPTS) {
           await supabase
             .from('withdrawals')
@@ -238,11 +287,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[RETRY] Completed. Retried: ${retriedCount}, Final failures: ${finalFailureCount}, Stuck approved recovered: ${stuckApprovedCount}, Reconciled processing: ${reconciledProcessingCount}, Reconcile failures: ${reconciliationFailedCount}`);
+    console.log(`[RETRY] Completed. Retried: ${retriedCount}, Status queries: ${statusQueryCount}, Final failures: ${finalFailureCount}, Stuck approved recovered: ${stuckApprovedCount}, Reconciled processing: ${reconciledProcessingCount}, Reconcile failures: ${reconciliationFailedCount}`);
 
     return new Response(JSON.stringify({
       success: true,
       retried: retriedCount,
+      statusQueries: statusQueryCount,
       finalFailures: finalFailureCount,
       stuckApprovedRecovered: stuckApprovedCount,
       reconciledProcessing: reconciledProcessingCount,
