@@ -86,13 +86,17 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
 
           {title && <h1 className="text-lg font-semibold text-foreground">{title}</h1>}
 
-          {/* Mobile Menu */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
+          <div className="flex items-center gap-1">
+            {/* Notification Bell */}
+            {user && <NotificationBell />}
+            
+            {/* Mobile Menu */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
             <SheetContent side="right" className="w-72">
               <nav className="flex flex-col gap-2 mt-8">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2">Navigation</p>
