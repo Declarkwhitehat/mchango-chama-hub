@@ -164,9 +164,24 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                     </Link>
                   </>
                 )}
+                
+                <div className="border-t border-border my-3" />
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-destructive hover:text-destructive"
+                  onClick={async () => {
+                    await signOut();
+                    navigate("/auth");
+                    toast.success("Signed out successfully");
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
               </nav>
             </SheetContent>
           </Sheet>
+          </div>
         </div>
       </header>
 
