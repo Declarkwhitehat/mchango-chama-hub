@@ -15,6 +15,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 interface SendOTPRequest {
   phone: string;
+  purpose?: string;
 }
 
 const sendSMS = async (phone: string, message: string): Promise<boolean> => {
@@ -55,7 +56,7 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const { phone }: SendOTPRequest = await req.json();
+    const { phone, purpose }: SendOTPRequest = await req.json();
 
     if (!phone || !/^\+\d{10,15}$/.test(phone)) {
       return new Response(
@@ -89,6 +90,22 @@ serve(async (req) => {
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
       );
+    }
+
+    // For password reset, verify the phone exists in profiles first
+    if (purpose === 'password_reset') {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', phone)
+        .single();
+
+      if (profileError || !profile) {
+        return new Response(
+          JSON.stringify({ error: 'No account found with this phone number' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+        );
+      }
     }
 
     // Clean up expired OTPs
