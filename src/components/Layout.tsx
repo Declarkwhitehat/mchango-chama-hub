@@ -2,7 +2,9 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity, ShieldCheck } from "lucide-react";
+import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity, ShieldCheck, LogOut } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
+import { toast } from "sonner";
 import {
   Sheet,
   SheetContent,
@@ -24,7 +26,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/home";
   const [isAdmin, setIsAdmin] = useState(false);
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     checkAdminStatus();
@@ -84,13 +86,17 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
 
           {title && <h1 className="text-lg font-semibold text-foreground">{title}</h1>}
 
-          {/* Mobile Menu */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
+          <div className="flex items-center gap-1">
+            {/* Notification Bell */}
+            {user && <NotificationBell />}
+            
+            {/* Mobile Menu */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
             <SheetContent side="right" className="w-72">
               <nav className="flex flex-col gap-2 mt-8">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2">Navigation</p>
@@ -158,9 +164,24 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                     </Link>
                   </>
                 )}
+                
+                <div className="border-t border-border my-3" />
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-destructive hover:text-destructive"
+                  onClick={async () => {
+                    await signOut();
+                    navigate("/auth");
+                    toast.success("Signed out successfully");
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
               </nav>
             </SheetContent>
           </Sheet>
+          </div>
         </div>
       </header>
 
