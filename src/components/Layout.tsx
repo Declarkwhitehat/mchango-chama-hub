@@ -2,7 +2,9 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity, ShieldCheck } from "lucide-react";
+import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity, ShieldCheck, LogOut } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
+import { toast } from "sonner";
 import {
   Sheet,
   SheetContent,
