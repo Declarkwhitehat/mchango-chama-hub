@@ -26,7 +26,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/home";
   const [isAdmin, setIsAdmin] = useState(false);
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     checkAdminStatus();
