@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Users, Target, Heart, Shield, Award, CheckCircle, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import declarkPhoto from "@/assets/declark-chacha-ceo.png";
 import { Button } from "@/components/ui/button";
 
 export default function AboutUs() {
@@ -124,36 +125,24 @@ export default function AboutUs() {
           <h2 className="text-3xl font-bold mb-12 text-center text-foreground">
             Our Leadership Team
           </h2>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
             <Card className="p-6 text-center">
-              <div className="w-24 h-24 bg-primary/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <Users className="h-12 w-12 text-primary" />
-              </div>
-               <h4 className="font-bold text-lg mb-1 text-foreground">Declark Okemwa Chacha</h4>
-               <p className="text-sm text-primary mb-2">Chief Executive Officer</p>
-               <p className="text-sm text-muted-foreground">
-                 6+ years in fintech and mobile money solutions
-               </p>
-            </Card>
-            <Card className="p-6 text-center">
-              <div className="w-24 h-24 bg-primary/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <Users className="h-12 w-12 text-primary" />
-              </div>
-              <h4 className="font-bold text-lg mb-1 text-foreground">Grace Wanjiru</h4>
-              <p className="text-sm text-primary mb-2">Chief Technology Officer</p>
+              <img src={declarkPhoto} alt="Declark Okemwa Chacha - CEO" className="w-24 h-24 rounded-full mx-auto mb-4 object-cover" />
+              <h4 className="font-bold text-lg mb-1 text-foreground">Declark Okemwa Chacha</h4>
+              <p className="text-sm text-primary mb-2">Chief Executive Officer</p>
               <p className="text-sm text-muted-foreground">
-                Expert in secure payment systems and blockchain
+                6+ years in fintech and mobile money solutions
               </p>
             </Card>
             <Card className="p-6 text-center">
               <div className="w-24 h-24 bg-primary/20 rounded-full mx-auto mb-4 flex items-center justify-center">
                 <Users className="h-12 w-12 text-primary" />
               </div>
-               <h4 className="font-bold text-lg mb-1 text-foreground">GM</h4>
-               <p className="text-sm text-primary mb-2">Chief Operations Officer</p>
-               <p className="text-sm text-muted-foreground">
-                 Specialist in community-based financial services
-               </p>
+              <h4 className="font-bold text-lg mb-1 text-foreground">GM</h4>
+              <p className="text-sm text-primary mb-2">Chief Operations Officer</p>
+              <p className="text-sm text-muted-foreground">
+                Specialist in community-based financial services
+              </p>
             </Card>
           </div>
         </div>
