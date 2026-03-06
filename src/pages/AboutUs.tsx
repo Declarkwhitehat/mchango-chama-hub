@@ -1,14 +1,26 @@
 import { Card } from "@/components/ui/card";
-import { Users, Target, Heart, Shield, Award, CheckCircle } from "lucide-react";
+import { Users, Target, Heart, Shield, Award, CheckCircle, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 export default function AboutUs() {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Back Navigation */}
+      <div className="container mx-auto px-4 pt-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+      </div>
+
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-primary/10 via-background to-secondary/10 py-20 px-4">
         <div className="container mx-auto max-w-4xl text-center">
           <h1 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
-            About Declark Platforms
+            About PAMOJA NOVA
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Empowering Kenyan communities through innovative financial solutions
@@ -23,7 +35,7 @@ export default function AboutUs() {
           <h2 className="text-3xl font-bold mb-8 text-foreground">Our Story</h2>
           <div className="prose prose-lg max-w-none">
             <p className="text-muted-foreground mb-4">
-              Founded in 2024, Declark Platforms was born from a simple observation: 
+              Founded in August 2025, PAMOJA NOVA was born from a simple observation: 
               traditional savings groups (chamas) and fundraising campaigns (mchango) 
               faced challenges with transparency, security, and accessibility.
             </p>
@@ -117,11 +129,11 @@ export default function AboutUs() {
               <div className="w-24 h-24 bg-primary/20 rounded-full mx-auto mb-4 flex items-center justify-center">
                 <Users className="h-12 w-12 text-primary" />
               </div>
-              <h4 className="font-bold text-lg mb-1 text-foreground">John Kamau</h4>
-              <p className="text-sm text-primary mb-2">Chief Executive Officer</p>
-              <p className="text-sm text-muted-foreground">
-                15+ years in fintech and mobile money solutions
-              </p>
+               <h4 className="font-bold text-lg mb-1 text-foreground">Declark Okemwa Chacha</h4>
+               <p className="text-sm text-primary mb-2">Chief Executive Officer</p>
+               <p className="text-sm text-muted-foreground">
+                 6+ years in fintech and mobile money solutions
+               </p>
             </Card>
             <Card className="p-6 text-center">
               <div className="w-24 h-24 bg-primary/20 rounded-full mx-auto mb-4 flex items-center justify-center">
@@ -137,11 +149,11 @@ export default function AboutUs() {
               <div className="w-24 h-24 bg-primary/20 rounded-full mx-auto mb-4 flex items-center justify-center">
                 <Users className="h-12 w-12 text-primary" />
               </div>
-              <h4 className="font-bold text-lg mb-1 text-foreground">Peter Omondi</h4>
-              <p className="text-sm text-primary mb-2">Chief Operations Officer</p>
-              <p className="text-sm text-muted-foreground">
-                Specialist in community-based financial services
-              </p>
+               <h4 className="font-bold text-lg mb-1 text-foreground">GM</h4>
+               <p className="text-sm text-primary mb-2">Chief Operations Officer</p>
+               <p className="text-sm text-muted-foreground">
+                 Specialist in community-based financial services
+               </p>
             </Card>
           </div>
         </div>
@@ -157,15 +169,11 @@ export default function AboutUs() {
             <div className="space-y-4 text-muted-foreground">
               <div className="flex justify-between border-b border-border pb-3">
                 <span className="font-medium">Registered Name:</span>
-                <span>Declark Platforms Limited</span>
-              </div>
-              <div className="flex justify-between border-b border-border pb-3">
-                <span className="font-medium">Business Registration:</span>
-                <span>PVT-XXXXXXXXX</span>
-              </div>
-              <div className="flex justify-between border-b border-border pb-3">
-                <span className="font-medium">Tax PIN:</span>
-                <span>P051XXXXXXX</span>
+               <span>PAMOJA NOVA Limited</span>
+               </div>
+               <div className="flex justify-between border-b border-border pb-3">
+                 <span className="font-medium">Business Registration:</span>
+                 <span>PVT-BN-RRSK656P</span>
               </div>
               <div className="flex justify-between border-b border-border pb-3">
                 <span className="font-medium">Registered Office:</span>
