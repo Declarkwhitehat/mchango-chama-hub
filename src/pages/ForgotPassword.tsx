@@ -86,38 +86,30 @@ const ForgotPassword = () => {
       setIsPhone(phoneCheck);
 
       if (phoneCheck) {
-        // Phone flow: Send OTP
+        // Phone flow: Send OTP via edge function (bypasses RLS)
         const phone = normalizePhone(data.emailOrPhone);
         setNormalizedPhone(phone);
 
-        // Check if phone exists in database
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('phone', phone)
-          .single();
-
-        if (profileError || !profile) {
-          toast.error("No account found with this phone number");
-          return;
-        }
-
-        // Send OTP with rate limiting
-        const { data: otpData, error: otpError } = await supabase.functions.invoke('send-otp', {
-          body: { phone }
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const response = await fetch(`${supabaseUrl}/functions/v1/send-otp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ phone, purpose: 'password_reset' }),
         });
 
-        if (otpError) {
-          if (otpError.message?.includes('Too many') || otpError.message?.includes('429')) {
-            toast.error(otpError.message || "Too many attempts. Please try again later.");
-          } else {
-            toast.error("Failed to send OTP. Please try again.");
-          }
-          return;
-        }
+        const otpData = await response.json();
 
-        if (otpData?.error) {
-          toast.error(otpData.error);
+        if (!response.ok) {
+          if (response.status === 429) {
+            toast.error(otpData.error || "Too many attempts. Please try again later.");
+          } else if (response.status === 404) {
+            toast.error("No account found with this phone number");
+          } else {
+            toast.error(otpData.error || "Failed to send OTP. Please try again.");
+          }
           return;
         }
 

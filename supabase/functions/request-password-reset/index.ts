@@ -80,6 +80,16 @@ serve(async (req) => {
       );
     }
 
+    // Also send the actual reset email via Supabase (generateLink only creates the link, doesn't send)
+    const { error: sendError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+
+    if (sendError) {
+      console.error('Error sending reset email:', sendError);
+      // Still return success to not reveal account existence
+    }
+
     console.log(`Password reset email sent to ${email}`);
 
     return new Response(
