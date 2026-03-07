@@ -113,9 +113,26 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
 
     initializeAuth();
 
+    // Refresh session when tab regains focus (fixes stale token after idle)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.getSession().then(({ data: { session: refreshedSession } }) => {
+          if (!mounted) return;
+          setSession(refreshedSession);
+          setUser(refreshedSession?.user ?? null);
+          if (refreshedSession?.user) {
+            fetchProfile(refreshedSession.user.id);
+          }
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
