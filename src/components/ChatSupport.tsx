@@ -273,7 +273,7 @@ export function ChatSupport() {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-lg hover:shadow-xl transition-all z-50 bg-primary hover:bg-primary/90 p-0"
+          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-lg hover:shadow-xl transition-all z-50 bg-primary/70 hover:bg-primary/90 backdrop-blur-sm p-0"
         >
           <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
         </Button>

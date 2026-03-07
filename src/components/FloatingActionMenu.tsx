@@ -90,8 +90,8 @@ export const FloatingActionMenu = () => {
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             "h-14 w-14 rounded-full shadow-xl transition-all duration-300",
-            "bg-gradient-to-br from-primary to-primary-glow hover:from-primary/90 hover:to-primary-glow/90",
-            isOpen && "rotate-45"
+            "bg-gradient-to-br from-primary/70 to-primary-glow/70 hover:from-primary/90 hover:to-primary-glow/90 backdrop-blur-sm",
+            isOpen && "rotate-45 from-primary to-primary-glow"
           )}
         >
           {isOpen ? (

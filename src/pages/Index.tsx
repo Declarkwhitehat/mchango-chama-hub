@@ -2,8 +2,12 @@ import { Button } from "@/components/ui/button";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Users, TrendingUp, Heart, Shield, Building2, ChevronDown } from "lucide-react";
+import { Users, TrendingUp, Heart, Shield, Building2, ChevronDown, User, Home, ShieldCheck } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { NotificationBell } from "@/components/NotificationBell";
+import { cn } from "@/lib/utils";
 import {
   Accordion,
   AccordionContent,
@@ -35,8 +39,24 @@ const Index = () => {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
+  const { user } = useAuth();
+  const location = useLocation();
+
+  const navItems = [
+    { href: "/", icon: Home, label: "Home" },
+    { href: "/mchango", icon: Heart, label: "Campaigns" },
+    { href: "/chama", icon: Users, label: "Chamas" },
+    { href: "/welfare", icon: ShieldCheck, label: "Welfare" },
+    { href: "/profile", icon: User, label: "Profile" },
+  ];
+
+  const isActiveRoute = (path: string) => {
+    if (path === "/") return location.pathname === "/";
+    return location.pathname.startsWith(path);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-[calc(var(--bottom-nav-offset)+24px)]">
       {/* Header */}
       <Header />
       
@@ -419,6 +439,32 @@ const Index = () => {
         </div>
       </footer>
       <Footer />
+
+      {/* Bottom Navigation */}
+      {user && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 pb-[env(safe-area-inset-bottom)]">
+          <div className="container flex h-16 items-center justify-around px-2 max-w-lg mx-auto">
+            {navItems.map((item) => {
+              const isActive = isActiveRoute(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg transition-colors min-w-[60px]",
+                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                  <span className={cn("text-[10px]", isActive ? "font-medium" : "font-normal")}>
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   );
 };
