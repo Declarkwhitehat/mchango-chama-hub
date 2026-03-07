@@ -8,7 +8,6 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
 import {
   Accordion,
   AccordionContent,
