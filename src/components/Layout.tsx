@@ -54,6 +54,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   ];
 
   const isActiveRoute = (path: string) => {
+    if (path === "/") return location.pathname === "/";
     if (path === "/home") return location.pathname === "/home";
     return location.pathname.startsWith(path);
   };
