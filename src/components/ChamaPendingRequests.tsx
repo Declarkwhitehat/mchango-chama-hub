@@ -177,7 +177,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
             return (
               <div
                 key={member.id}
-                className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                className="flex flex-col gap-3 p-4 bg-muted/50 rounded-lg"
               >
                 <div className="flex items-center gap-3">
                   <Avatar>
@@ -185,9 +185,9 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
                       {fullName.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="font-medium text-foreground">{fullName}</p>
-                    <p className="text-sm text-muted-foreground">{email}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-foreground truncate">{fullName}</p>
+                    <p className="text-sm text-muted-foreground truncate">{email}</p>
                     <p className="text-xs text-muted-foreground">
                       Requested: {new Date(member.joined_at).toLocaleDateString()}
                     </p>
@@ -200,6 +200,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
                       <Button
                         size="sm"
                         variant="default"
+                        className="flex-1"
                         onClick={() => handleApproval(member.id, true)}
                         disabled={processingId === member.id}
                       >
@@ -215,6 +216,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
                       <Button
                         size="sm"
                         variant="destructive"
+                        className="flex-1"
                         onClick={() => handleApproval(member.id, false)}
                         disabled={processingId === member.id}
                       >

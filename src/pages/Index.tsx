@@ -440,6 +440,32 @@ const Index = () => {
         </div>
       </footer>
       <Footer />
+
+      {/* Bottom Navigation */}
+      {user && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 pb-[env(safe-area-inset-bottom)]">
+          <div className="container flex h-16 items-center justify-around px-2 max-w-lg mx-auto">
+            {navItems.map((item) => {
+              const isActive = isActiveRoute(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg transition-colors min-w-[60px]",
+                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                  <span className={cn("text-[10px]", isActive ? "font-medium" : "font-normal")}>
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   );
 };
