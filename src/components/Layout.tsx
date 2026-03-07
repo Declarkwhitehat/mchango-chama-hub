@@ -101,9 +101,15 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
             <SheetContent side="right" className="w-72">
               <nav className="flex flex-col gap-2 mt-8">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2">Navigation</p>
+                <Link to="/">
+                  <Button variant={isActiveRoute("/") ? "secondary" : "ghost"} className="w-full justify-start">
+                    <Home className="mr-2 h-4 w-4" />
+                    Home
+                  </Button>
+                </Link>
                 <Link to="/home">
                   <Button variant={isActiveRoute("/home") ? "secondary" : "ghost"} className="w-full justify-start">
-                    <Home className="mr-2 h-4 w-4" />
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
                     Dashboard
                   </Button>
                 </Link>
