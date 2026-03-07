@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity, ShieldCheck, LogOut } from "lucide-react";
+import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity, ShieldCheck, LogOut, LayoutDashboard } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 import { toast } from "sonner";
 import {
@@ -46,7 +46,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   };
 
   const navItems = [
-    { href: "/home", icon: Home, label: "Home" },
+    { href: "/", icon: Home, label: "Home" },
     { href: "/mchango", icon: Heart, label: "Campaigns" },
     { href: "/chama", icon: Users, label: "Chamas" },
     { href: "/welfare", icon: ShieldCheck, label: "Welfare" },
@@ -54,6 +54,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   ];
 
   const isActiveRoute = (path: string) => {
+    if (path === "/") return location.pathname === "/";
     if (path === "/home") return location.pathname === "/home";
     return location.pathname.startsWith(path);
   };
@@ -100,9 +101,15 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
             <SheetContent side="right" className="w-72">
               <nav className="flex flex-col gap-2 mt-8">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2">Navigation</p>
+                <Link to="/">
+                  <Button variant={isActiveRoute("/") ? "secondary" : "ghost"} className="w-full justify-start">
+                    <Home className="mr-2 h-4 w-4" />
+                    Home
+                  </Button>
+                </Link>
                 <Link to="/home">
                   <Button variant={isActiveRoute("/home") ? "secondary" : "ghost"} className="w-full justify-start">
-                    <Home className="mr-2 h-4 w-4" />
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
                     Dashboard
                   </Button>
                 </Link>
