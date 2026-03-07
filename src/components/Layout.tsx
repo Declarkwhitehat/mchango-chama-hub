@@ -46,7 +46,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   };
 
   const navItems = [
-    { href: "/home", icon: Home, label: "Home" },
+    { href: "/", icon: Home, label: "Home" },
     { href: "/mchango", icon: Heart, label: "Campaigns" },
     { href: "/chama", icon: Users, label: "Chamas" },
     { href: "/welfare", icon: ShieldCheck, label: "Welfare" },
