@@ -33,6 +33,7 @@ interface Chama {
 
 const ChamaList = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [chamas, setChamas] = useState<Chama[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,12 +42,14 @@ const ChamaList = () => {
 
   useEffect(() => {
     fetchChamas();
-  }, [sortBy]);
+  }, [sortBy, user]);
 
   const fetchChamas = async () => {
     try {
       setLoading(true);
-      let query = supabase
+      
+      // Fetch public chamas
+      let publicQuery = supabase
         .from('chama')
         .select(`
           *,
@@ -56,21 +59,33 @@ const ChamaList = () => {
         .in('status', ['pending', 'active', 'cycle_complete'])
         .eq('is_public', true);
 
-      // Apply sorting
-      switch (sortBy) {
-        case 'newest':
-          query = query.order('created_at', { ascending: false });
-          break;
-        case 'members':
-          query = query.order('created_at', { ascending: false }); // Will sort by member count in frontend
-          break;
+      if (sortBy === 'newest') {
+        publicQuery = publicQuery.order('created_at', { ascending: false });
       }
 
-      const { data, error } = await query;
+      const { data: publicData, error: publicError } = await publicQuery;
+      if (publicError) throw publicError;
 
-      if (error) throw error;
+      let allChamas = publicData || [];
 
-      const unique = Array.from(new Map((data || []).map((c: any) => [c.id, c])).values());
+      // If logged in, also fetch user's own private chamas + chamas they're a member of
+      if (user) {
+        const { data: myChamas, error: myError } = await supabase
+          .from('chama')
+          .select(`
+            *,
+            profiles!chama_created_by_fkey(full_name),
+            chama_members(approval_status)
+          `)
+          .in('status', ['pending', 'active', 'cycle_complete'])
+          .eq('is_public', false);
+
+        if (!myError && myChamas) {
+          allChamas = [...allChamas, ...myChamas];
+        }
+      }
+
+      const unique = Array.from(new Map(allChamas.map((c: any) => [c.id, c])).values());
       setChamas(unique);
     } catch (error: any) {
       console.error('Error fetching chamas:', error);
