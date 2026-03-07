@@ -16,7 +16,7 @@ export const AdminProtectedRoute = ({ children }: AdminProtectedRouteProps) => {
 
   useEffect(() => {
     checkAdminAccess();
-  }, [user]);
+  }, [user, loading]);
 
   const checkAdminAccess = async () => {
     if (loading) return;
