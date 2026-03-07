@@ -40,8 +40,24 @@ const Index = () => {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
+  const { user } = useAuth();
+  const location = useLocation();
+
+  const navItems = [
+    { href: "/", icon: Home, label: "Home" },
+    { href: "/mchango", icon: Heart, label: "Campaigns" },
+    { href: "/chama", icon: Users, label: "Chamas" },
+    { href: "/welfare", icon: ShieldCheck, label: "Welfare" },
+    { href: "/profile", icon: User, label: "Profile" },
+  ];
+
+  const isActiveRoute = (path: string) => {
+    if (path === "/") return location.pathname === "/";
+    return location.pathname.startsWith(path);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-[calc(var(--bottom-nav-offset)+24px)]">
       {/* Header */}
       <Header />
       
