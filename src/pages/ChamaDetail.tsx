@@ -243,37 +243,35 @@ const ChamaDetail = () => {
 
       if (approvedMembers.length === 0) return;
 
-      // Get completed withdrawals for this chama
-      const { data: completedWithdrawals } = await supabase
-        .from('withdrawals')
-        .select('*')
-        .eq('chama_id', chamaData.id)
-        .eq('status', 'completed')
-        .order('completed_at', { ascending: true });
+      // Use start_date (when chama was activated), NOT created_at
+      const baseDate = chamaData.start_date 
+        ? new Date(chamaData.start_date) 
+        : new Date(chamaData.created_at);
+      baseDate.setHours(0, 0, 0, 0);
 
-      const withdrawalCount = completedWithdrawals?.length || 0;
-      const currentTurnIndex = withdrawalCount % approvedMembers.length;
-      const currentTurnMember = approvedMembers[currentTurnIndex];
-      
-      setCurrentTurnMemberId(currentTurnMember.id);
-
-      // Calculate estimated turn dates for each member
-      const turnDates: Record<string, Date> = {};
       const cycleLength = getCycleLengthInDays(chamaData.contribution_frequency, chamaData.every_n_days_count);
-      const createdDate = new Date(chamaData.created_at);
+
+      // Each member's turn date = start_date + (order_index * cycleLength)
+      // For daily chamas: member 0 = start_date, member 1 = start_date + 1, etc.
+      const turnDates: Record<string, Date> = {};
 
       approvedMembers.forEach((member, index) => {
-        // Calculate how many full cycles until this member's turn
-        let turnsUntilMember = index - currentTurnIndex;
-        if (turnsUntilMember < 0) turnsUntilMember += approvedMembers.length;
-        
-        const daysUntilTurn = turnsUntilMember * cycleLength * approvedMembers.length;
-        const memberTurnDate = new Date(createdDate);
-        memberTurnDate.setDate(memberTurnDate.getDate() + daysUntilTurn + (withdrawalCount * cycleLength * approvedMembers.length));
-        
+        const memberTurnDate = new Date(baseDate);
+        memberTurnDate.setDate(memberTurnDate.getDate() + (index * cycleLength));
         turnDates[member.id] = memberTurnDate;
       });
 
+      // Current turn is based on how many days since start
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const daysSinceStart = Math.floor((now.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
+      const currentTurnIndex = Math.min(
+        Math.floor(daysSinceStart / cycleLength) % approvedMembers.length,
+        approvedMembers.length - 1
+      );
+      const currentTurnMember = approvedMembers[currentTurnIndex];
+      
+      setCurrentTurnMemberId(currentTurnMember.id);
       setNextTurnDates(turnDates);
     } catch (error) {
       console.error("Error calculating turns:", error);
