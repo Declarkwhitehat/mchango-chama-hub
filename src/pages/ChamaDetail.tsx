@@ -493,6 +493,25 @@ const ChamaDetail = () => {
               </div>
             </div>
 
+  const handleRunSimulation = async () => {
+    setIsSimulating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('simulate-chama-test', {
+        body: {}
+      });
+      if (error) throw error;
+      setSimResults(data);
+      setShowSimDialog(true);
+    } catch (error: any) {
+      toast({
+        title: "Simulation Failed",
+        description: error.message || "Could not run simulation",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSimulating(false);
+    }
+  };
 
             <div className="flex items-center gap-2 pt-2 border-t border-border text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
