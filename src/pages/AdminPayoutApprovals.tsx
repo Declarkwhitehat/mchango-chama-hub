@@ -569,7 +569,125 @@ export default function AdminPayoutApprovals() {
                 })()}
               </div>
 
-              {/* Admin Notes */}
+              {/* Selected Member Profile */}
+              {chosenMemberId && (
+                <div className="border rounded-lg p-3 space-y-3">
+                  <p className="text-sm font-semibold flex items-center gap-1">
+                    <Info className="h-4 w-4" /> Member Profile — {enrichedMembers.find(m => m.id === chosenMemberId)?.profiles?.full_name}
+                  </p>
+
+                  {loadingProfile ? (
+                    <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                  ) : memberProfile ? (
+                    <div className="space-y-3 text-xs">
+                      {/* Summary badges */}
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline">{memberProfile.summary?.total_chamas || 0} Chamas</Badge>
+                        <Badge variant="outline">{memberProfile.summary?.total_welfares || 0} Welfares</Badge>
+                        <Badge variant="outline">{memberProfile.summary?.total_campaigns || 0} Campaigns</Badge>
+                        <Badge variant="outline">{memberProfile.summary?.manager_roles || 0} Manager Roles</Badge>
+                        {memberProfile.summary?.overall_success_rate !== undefined && (
+                          <Badge variant="outline" className={memberProfile.summary.overall_success_rate >= 80 ? 'text-emerald-600' : memberProfile.summary.overall_success_rate >= 50 ? 'text-amber-600' : 'text-red-600'}>
+                            Overall: {memberProfile.summary.overall_success_rate}% Success
+                          </Badge>
+                        )}
+                        {memberProfile.trust && (
+                          <Badge variant="outline" className={memberProfile.trust.trust_score >= 70 ? 'text-emerald-600' : 'text-amber-600'}>
+                            Trust: {memberProfile.trust.trust_score}/100
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Chama memberships */}
+                      {memberProfile.chamas?.length > 0 && (
+                        <div>
+                          <p className="font-semibold text-xs mb-1">Chama Groups ({memberProfile.chamas.length})</p>
+                          <div className="rounded border overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="text-[10px] py-1">Chama</TableHead>
+                                  <TableHead className="text-[10px] py-1">Role</TableHead>
+                                  <TableHead className="text-[10px] py-1">Status</TableHead>
+                                  <TableHead className="text-[10px] py-1">Contributed</TableHead>
+                                  <TableHead className="text-[10px] py-1">Success</TableHead>
+                                  <TableHead className="text-[10px] py-1">Missed</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {memberProfile.chamas.map((c: any, i: number) => (
+                                  <TableRow key={i}>
+                                    <TableCell className="py-1">
+                                      <div>
+                                        <span className="font-medium">{c.chama_name}</span>
+                                        <span className="text-muted-foreground ml-1 font-mono">({c.group_code})</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-1">
+                                      <Badge variant={c.role === 'Manager' ? 'default' : 'secondary'} className="text-[10px]">
+                                        {c.role}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-1">
+                                      <span className={c.chama_status === 'active' ? 'text-emerald-600' : 'text-muted-foreground'}>
+                                        {c.chama_status}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="py-1 font-mono">KES {c.total_contributed?.toLocaleString()}</TableCell>
+                                    <TableCell className={`py-1 font-bold ${c.success_rate >= 80 ? 'text-emerald-600' : c.success_rate >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                                      {c.success_rate}%
+                                    </TableCell>
+                                    <TableCell className="py-1">
+                                      {c.missed_payments > 0 ? (
+                                        <span className="text-red-600 font-semibold">{c.missed_payments}</span>
+                                      ) : (
+                                        <span className="text-emerald-600">0</span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Welfare memberships */}
+                      {memberProfile.welfares?.length > 0 && (
+                        <div>
+                          <p className="font-semibold text-xs mb-1">Welfare Groups ({memberProfile.welfares.length})</p>
+                          <div className="flex flex-wrap gap-2">
+                            {memberProfile.welfares.map((w: any, i: number) => (
+                              <Badge key={i} variant="outline" className="text-[10px]">
+                                {w.welfare_name} ({w.group_code}) — {w.role}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Campaign involvement */}
+                      {memberProfile.campaigns?.length > 0 && (
+                        <div>
+                          <p className="font-semibold text-xs mb-1">Campaigns ({memberProfile.campaigns.length})</p>
+                          <div className="flex flex-wrap gap-2">
+                            {memberProfile.campaigns.map((c: any, i: number) => (
+                              <Badge key={i} variant="outline" className="text-[10px]">
+                                {c.title} ({c.group_code}) — {c.role} · {c.status}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {memberProfile.chamas?.length === 0 && memberProfile.welfares?.length === 0 && memberProfile.campaigns?.length === 0 && (
+                        <p className="text-muted-foreground italic">No other group memberships found</p>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Admin Notes (optional)</label>
                 <Textarea
