@@ -168,7 +168,6 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
       if (!user) {
         setDisplayName("");
         setPhone("");
-        setEmail("");
       }
       setIsAnonymous(false);
 
