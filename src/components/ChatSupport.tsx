@@ -230,7 +230,7 @@ export function ChatSupport() {
           {/* Floating close button - bottom center for easy thumb reach */}
           <button
             onClick={() => setIsOpen(false)}
-            className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-5 py-2.5 rounded-full bg-muted/80 text-muted-foreground backdrop-blur-md border border-border shadow-md hover:bg-muted active:scale-95 transition-all touch-manipulation"
+            className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-6 py-3 rounded-full bg-destructive text-destructive-foreground shadow-lg hover:bg-destructive/90 active:scale-95 transition-all touch-manipulation"
             aria-label="End chat"
           >
             <X className="h-4 w-4" />
