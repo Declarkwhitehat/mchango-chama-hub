@@ -170,6 +170,10 @@ Deno.serve(async (req) => {
         console.error('Error creating payment records:', paymentError);
       }
 
+      // Track total credit applied so we can add it to the chama's available_balance
+      // Credit was already commission-deducted when originally overpaid, so it goes directly to pool
+      let totalCreditApplied = 0;
+
       // Reset carry-forward and next_cycle_credit for members where it was applied
       for (const member of members) {
         const carryForward = member.carry_forward_credit || 0;
@@ -178,6 +182,7 @@ Deno.serve(async (req) => {
         
         if (totalCredit > 0) {
           const appliedAmount = Math.min(totalCredit, chama.contribution_amount);
+          totalCreditApplied += appliedAmount;
           const remainingCarryForward = Math.max(0, totalCredit - chama.contribution_amount);
           
           await supabase
@@ -187,6 +192,27 @@ Deno.serve(async (req) => {
               next_cycle_credit: 0
             })
             .eq('id', member.id);
+        }
+      }
+
+      // Add applied carry-forward credit to chama's available_balance
+      // This credit was already commission-deducted, so it flows directly into the pool
+      if (totalCreditApplied > 0) {
+        const { data: chamaBalance } = await supabase
+          .from('chama')
+          .select('available_balance')
+          .eq('id', chamaId)
+          .single();
+
+        if (chamaBalance) {
+          await supabase
+            .from('chama')
+            .update({
+              available_balance: (chamaBalance.available_balance || 0) + totalCreditApplied
+            })
+            .eq('id', chamaId);
+          
+          console.log(`Applied ${totalCreditApplied} carry-forward credit to chama pool`);
         }
       }
 
