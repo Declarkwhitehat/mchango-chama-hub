@@ -198,7 +198,8 @@ async function settleDebts(
   memberId: string,
   chamaId: string,
   grossPaymentAmount: number,
-  contributionAmount: number
+  contributionAmount: number,
+  contributionId?: string
 ): Promise<SettleResult> {
   const allocations: AllocationLine[] = [];
   let remaining = grossPaymentAmount;
