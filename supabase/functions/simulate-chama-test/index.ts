@@ -365,6 +365,15 @@ Deno.serve(async (req) => {
       removalTargetIndex: 9, // Member 10
     }));
 
+    // ===== SCENARIO 11: E2E Auto-Payout via B2C =====
+    report.scenarios.push(await runScenarioE2EAutoPayout(supabase, profiles, {
+      name: '11. E2E Auto-Payout — B2C Triggered for Perfect Member',
+      description: 'All 30 pay on time, beneficiary has 0 missed payments + M-Pesa method → daily-payout-cron creates approved withdrawal + calls B2C',
+      memberCount: 30,
+      contribution: CONTRIBUTION,
+      commissionRate: COMMISSION_RATE,
+    }));
+
     // Summary
     report.summary.total = report.scenarios.length;
     report.summary.passed = report.scenarios.filter(s => s.passed).length;
@@ -1091,6 +1100,338 @@ async function checkEligibility(supabase: any, memberId: string, chamaId: string
   return { isEligible, unpaidCycles: unpaidCycles.length, shortfall: totalUnpaid, hasDebts, totalCycles };
 }
 
+// ==================== E2E AUTO-PAYOUT SCENARIO ====================
+
+async function runScenarioE2EAutoPayout(
+  supabase: any,
+  profiles: any[],
+  config: {
+    name: string;
+    description: string;
+    memberCount: number;
+    contribution: number;
+    commissionRate: number;
+  }
+): Promise<ScenarioResult> {
+  const steps: StepResult[] = [];
+  const slug = `sim-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  let chamaId: string | null = null;
+
+  try {
+    // Step 1: Create chama
+    const { data: chama, error: chamaError } = await supabase
+      .from('chama')
+      .insert({
+        name: `[SIM] ${config.name}`,
+        slug,
+        description: config.description,
+        contribution_amount: config.contribution,
+        contribution_frequency: 'daily',
+        max_members: config.memberCount,
+        min_members: 2,
+        status: 'active',
+        created_by: profiles[0].id,
+        commission_rate: config.commissionRate,
+        start_date: new Date(Date.now() - 86400000 * 3).toISOString(),
+      })
+      .select('id, group_code')
+      .single();
+
+    if (chamaError) throw new Error(`Create chama: ${chamaError.message}`);
+    chamaId = chama.id;
+    steps.push({ action: 'Create test chama', result: 'Success', data: { id: chama.id } });
+
+    // Step 2: Get auto-created member + add remaining
+    const { data: autoMember } = await supabase
+      .from('chama_members')
+      .select('id, user_id')
+      .eq('chama_id', chamaId)
+      .eq('user_id', profiles[0].id)
+      .single();
+
+    const memberIds: string[] = [autoMember.id];
+    const beneficiaryUserId = profiles[0].id;
+
+    for (let i = 1; i < config.memberCount; i++) {
+      const profileIdx = i % profiles.length;
+      const memberCode = `${(chama.group_code || 'SIM').slice(0, 4)}M${String(i + 1).padStart(4, '0')}`;
+      const { data: member } = await supabase
+        .from('chama_members')
+        .insert({
+          chama_id: chamaId,
+          user_id: profiles[profileIdx].id,
+          is_manager: false,
+          member_code: memberCode,
+          order_index: i + 1,
+          status: 'active',
+          approval_status: 'approved',
+          first_payment_completed: true,
+          missed_payments_count: 0,
+        })
+        .select('id')
+        .single();
+
+      if (member) memberIds.push(member.id);
+    }
+
+    steps.push({ action: `Add ${config.memberCount} members (all 0 missed payments)`, result: `${memberIds.length} created` });
+
+    // Step 3: Ensure beneficiary has M-Pesa payment method
+    const { data: existingMethod } = await supabase
+      .from('payment_methods')
+      .select('id')
+      .eq('user_id', beneficiaryUserId)
+      .eq('method_type', 'mpesa')
+      .eq('is_default', true)
+      .maybeSingle();
+
+    let paymentMethodId = existingMethod?.id;
+
+    if (!paymentMethodId) {
+      const beneficiaryPhone = profiles[0].phone || '0700000000';
+      const { data: newMethod } = await supabase
+        .from('payment_methods')
+        .insert({
+          user_id: beneficiaryUserId,
+          method_type: 'mpesa',
+          phone_number: beneficiaryPhone,
+          is_default: true,
+          is_verified: true,
+        })
+        .select('id')
+        .single();
+      paymentMethodId = newMethod?.id;
+      steps.push({ action: 'Create M-Pesa payment method for beneficiary', result: `Created: ${paymentMethodId}` });
+    } else {
+      steps.push({ action: 'Beneficiary M-Pesa payment method', result: `Exists: ${paymentMethodId}` });
+    }
+
+    // Step 4: Set available_balance on chama (simulating collected funds)
+    const netPerMember = config.contribution * (1 - config.commissionRate);
+    const totalNetBalance = netPerMember * config.memberCount;
+    await supabase
+      .from('chama')
+      .update({ available_balance: totalNetBalance })
+      .eq('id', chamaId);
+
+    steps.push({
+      action: 'Set chama available_balance',
+      result: `KES ${totalNetBalance} (${config.memberCount} × ${config.contribution} × ${(1 - config.commissionRate) * 100}% net)`,
+    });
+
+    // Step 5: Create expired cycle (beneficiary = Member 1, order_index 1)
+    const cycleStart = new Date(Date.now() - 86400000);
+    const cycleEnd = new Date(Date.now() - 3600000); // Already expired
+
+    const { data: cycle, error: cycleError } = await supabase
+      .from('contribution_cycles')
+      .insert({
+        chama_id: chamaId,
+        cycle_number: 1,
+        start_date: cycleStart.toISOString(),
+        end_date: cycleEnd.toISOString(),
+        due_amount: config.contribution,
+        beneficiary_member_id: memberIds[0],
+        is_complete: false,
+        payout_processed: false,
+      })
+      .select('id')
+      .single();
+
+    if (cycleError) throw new Error(`Create cycle: ${cycleError.message}`);
+    steps.push({ action: 'Create expired cycle', result: 'Success', data: { cycleId: cycle.id, endDate: cycleEnd.toISOString() } });
+
+    // Step 6: All members paid on time
+    for (let i = 0; i < memberIds.length; i++) {
+      await supabase.from('member_cycle_payments').insert({
+        member_id: memberIds[i],
+        cycle_id: cycle.id,
+        amount_due: config.contribution,
+        amount_paid: config.contribution,
+        amount_remaining: 0,
+        is_paid: true,
+        fully_paid: true,
+        is_late_payment: false,
+      });
+    }
+
+    steps.push({ action: 'All members paid on time', result: `${memberIds.length}/${memberIds.length} fully paid` });
+
+    // Step 7: Verify auto-approve conditions
+    const { data: beneficiaryMember } = await supabase
+      .from('chama_members')
+      .select('missed_payments_count, requires_admin_verification')
+      .eq('id', memberIds[0])
+      .single();
+
+    const canAutoApprove = paymentMethodId &&
+      !beneficiaryMember?.requires_admin_verification &&
+      (beneficiaryMember?.missed_payments_count || 0) === 0;
+
+    steps.push({
+      action: 'Auto-approve eligibility check',
+      result: canAutoApprove ? '✅ CAN auto-approve' : '❌ Cannot auto-approve',
+      data: {
+        hasMpesaMethod: !!paymentMethodId,
+        missedPayments: beneficiaryMember?.missed_payments_count || 0,
+        requiresAdminVerification: beneficiaryMember?.requires_admin_verification || false,
+        canAutoApprove,
+        rule: 'mpesa + missed_payments=0 + no admin verification → auto-approved + B2C called',
+      }
+    });
+
+    // Step 8: Call daily-payout-cron (the REAL production function)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    let payoutCronResult: any = null;
+    let payoutCronStatus = 0;
+    try {
+      const cronResponse = await fetch(`${supabaseUrl}/functions/v1/daily-payout-cron`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ time: new Date().toISOString() }),
+      });
+
+      payoutCronStatus = cronResponse.status;
+      payoutCronResult = await cronResponse.json();
+
+      steps.push({
+        action: '🚀 Call daily-payout-cron (REAL production function)',
+        result: payoutCronStatus === 200 ? '✅ Cron executed successfully' : `⚠️ Status ${payoutCronStatus}`,
+        data: {
+          httpStatus: payoutCronStatus,
+          payoutsProcessed: payoutCronResult?.payouts_processed,
+          skipsProcessed: payoutCronResult?.skips_processed,
+          errors: payoutCronResult?.errors,
+        }
+      });
+    } catch (cronError: any) {
+      steps.push({
+        action: '🚀 Call daily-payout-cron',
+        result: `❌ Error: ${cronError.message}`,
+      });
+    }
+
+    // Step 9: Verify withdrawal was created
+    const { data: withdrawals } = await supabase
+      .from('withdrawals')
+      .select('id, status, amount, net_amount, payment_method_type, b2c_attempt_count, last_b2c_attempt_at, b2c_error_details, cycle_id, notes')
+      .eq('chama_id', chamaId)
+      .eq('cycle_id', cycle.id);
+
+    const withdrawal = withdrawals?.[0];
+
+    if (withdrawal) {
+      const wasAutoApproved = withdrawal.status === 'approved' || withdrawal.status === 'processing' || withdrawal.status === 'completed';
+      const b2cWasAttempted = (withdrawal.b2c_attempt_count || 0) > 0 || 
+                               withdrawal.status === 'processing' || 
+                               withdrawal.status === 'completed' ||
+                               withdrawal.status === 'pending_retry';
+
+      steps.push({
+        action: '📋 Withdrawal record created',
+        result: `✅ Status: ${withdrawal.status}, Amount: KES ${withdrawal.net_amount || withdrawal.amount}`,
+        data: {
+          withdrawalId: withdrawal.id,
+          status: withdrawal.status,
+          grossAmount: withdrawal.amount,
+          netAmount: withdrawal.net_amount,
+          paymentMethodType: withdrawal.payment_method_type,
+          wasAutoApproved,
+          notes: withdrawal.notes,
+        }
+      });
+
+      steps.push({
+        action: '📡 B2C payout initiated',
+        result: b2cWasAttempted
+          ? `✅ B2C was called (attempts: ${withdrawal.b2c_attempt_count || 'processing'})`
+          : `❌ B2C was NOT called (status: ${withdrawal.status})`,
+        data: {
+          b2cAttemptCount: withdrawal.b2c_attempt_count,
+          lastB2cAttempt: withdrawal.last_b2c_attempt_at,
+          b2cErrors: withdrawal.b2c_error_details,
+          b2cWasAttempted,
+          explanation: b2cWasAttempted
+            ? 'System auto-approved withdrawal and initiated M-Pesa B2C payout'
+            : 'B2C was not triggered — check payment method or auto-approve conditions',
+        }
+      });
+
+      // Step 10: Verify financial ledger entry
+      const { data: ledgerEntries } = await supabase
+        .from('financial_ledger')
+        .select('*')
+        .eq('source_id', chamaId)
+        .eq('transaction_type', 'payout')
+        .eq('reference_id', withdrawal.id);
+
+      if (ledgerEntries && ledgerEntries.length > 0) {
+        steps.push({
+          action: '📒 Financial ledger entry',
+          result: `✅ Payout recorded: KES ${ledgerEntries[0].net_amount}`,
+          data: {
+            grossAmount: ledgerEntries[0].gross_amount,
+            commission: ledgerEntries[0].commission_amount,
+            netAmount: ledgerEntries[0].net_amount,
+            description: ledgerEntries[0].description,
+          }
+        });
+      } else {
+        steps.push({
+          action: '📒 Financial ledger entry',
+          result: '⚠️ No ledger entry found',
+        });
+      }
+
+      // Final verdict
+      const passed = wasAutoApproved && b2cWasAttempted;
+      
+      await cleanup(supabase, chamaId);
+      steps.push({ action: 'Cleanup', result: 'Success' });
+
+      return {
+        name: config.name,
+        description: config.description,
+        passed,
+        steps,
+        assertion: passed ? undefined : `Expected auto-approved withdrawal with B2C call. Got status: ${withdrawal.status}, b2c_attempts: ${withdrawal.b2c_attempt_count}`,
+      };
+    } else {
+      steps.push({
+        action: '📋 Withdrawal record',
+        result: '❌ No withdrawal found for this cycle',
+        data: { allWithdrawals: withdrawals }
+      });
+
+      await cleanup(supabase, chamaId);
+      steps.push({ action: 'Cleanup', result: 'Success' });
+
+      return {
+        name: config.name,
+        description: config.description,
+        passed: false,
+        steps,
+        assertion: 'No withdrawal was created by daily-payout-cron',
+      };
+    }
+
+  } catch (error) {
+    if (chamaId) await cleanup(supabase, chamaId);
+    return {
+      name: config.name,
+      description: config.description,
+      passed: false,
+      steps,
+      error: (error as any).message,
+    };
+  }
+}
+
 // ==================== CLEANUP ====================
 
 async function cleanup(supabase: any, chamaId: string) {
@@ -1110,6 +1451,9 @@ async function cleanup(supabase: any, chamaId: string) {
       }
     }
 
+    await supabase.from('financial_ledger').delete().eq('source_id', chamaId);
+    await supabase.from('company_earnings').delete().eq('group_id', chamaId);
+    await supabase.from('audit_logs').delete().eq('new_values->>chama_id', chamaId);
     await supabase.from('withdrawals').delete().eq('chama_id', chamaId);
     await supabase.from('contribution_cycles').delete().eq('chama_id', chamaId);
     await supabase.from('contributions').delete().eq('chama_id', chamaId);
