@@ -75,7 +75,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
         user_id: user?.id || null,
         display_name: isAnonymous ? "Anonymous" : (displayName || "Anonymous"),
         phone: phone,
-        email: email || null,
+        email: user ? (profile?.email || null) : null,
         amount: parseFloat(amount),
         is_anonymous: isAnonymous,
         payment_reference: `DON-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
