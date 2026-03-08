@@ -151,6 +151,16 @@ async function handleGetEligibleMembers(supabase: any, body: any) {
       .eq('member_id', m.id)
       .eq('fully_paid', false);
 
+    // All cycle payments for success rate
+    const { data: allPayments } = await supabase
+      .from('member_cycle_payments')
+      .select('id, fully_paid')
+      .eq('member_id', m.id);
+
+    const totalPayments = allPayments?.length || 0;
+    const paidPayments = allPayments?.filter((p: any) => p.fully_paid)?.length || 0;
+    const successRate = totalPayments > 0 ? Math.round((paidPayments / totalPayments) * 100) : 100;
+
     // Debts
     const { data: debts } = await supabase
       .from('chama_member_debts')
@@ -173,11 +183,11 @@ async function handleGetEligibleMembers(supabase: any, body: any) {
     // Round guard
     const receivedThisRound = !allReceivedThisRound && (roundPayouts.get(m.id) || 0) > 0;
 
-    // Trust score
+    // Trust score - use user_id from chama_members
     const { data: trustData } = await supabase
       .from('member_trust_scores')
       .select('trust_score')
-      .eq('user_id', m.profiles?.id || '')
+      .eq('user_id', m.user_id || '')
       .maybeSingle();
 
     membersWithDetails.push({
@@ -189,6 +199,7 @@ async function handleGetEligibleMembers(supabase: any, body: any) {
       total_received_amount: totalReceivedAmount,
       already_received_this_round: receivedThisRound,
       trust_score: trustData?.trust_score ?? null,
+      success_rate: successRate,
     });
   }
 
