@@ -74,10 +74,10 @@ serve(async (req) => {
       
       try {
         withdrawalSchema.parse(body);
-      } catch (validationError: any) {
+      } catch (validationError) {
         return new Response(JSON.stringify({ 
           error: 'Invalid request data',
-          details: validationError.errors
+          details: (validationError as any).errors
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
