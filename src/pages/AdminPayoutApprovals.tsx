@@ -112,6 +112,7 @@ export default function AdminPayoutApprovals() {
     setChosenMemberId("");
     setAdminNotes("");
     setHistoryOpen(false);
+    setMemberProfile(null);
     setLoadingMembers(true);
 
     try {
