@@ -542,12 +542,12 @@ async function settleDebts(
       transaction_type: 'contribution',
       source_type: 'chama',
       source_id: chamaId,
-      gross_amount: grossPaymentAmount,
-      commission_amount: toCompany,
-      net_amount: grossPaymentAmount - toCompany,
-      commission_rate: toCompany / grossPaymentAmount,
+      gross_amount: chamaGross,
+      commission_amount: chamaCommission,
+      net_amount: chamaGross - chamaCommission,
+      commission_rate: chamaGross > 0 ? chamaCommission / chamaGross : ONTIME_RATE,
       reference_id: contributionId || null,
-      description: `FIFO debt settlement. Debts cleared: ${periodsCleared}. Penalty: ${allocations.filter(a => a.type === 'penalty_clearance').reduce((s, a) => s + a.amount, 0).toFixed(2)}`
+      description: `FIFO debt settlement. Debts cleared: ${periodsCleared}. Carry-forward: ${carryForward.toFixed(2)}. Penalty: ${allocations.filter(a => a.type === 'penalty_clearance').reduce((s, a) => s + a.amount, 0).toFixed(2)}`
     });
   }
 
