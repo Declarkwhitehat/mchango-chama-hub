@@ -72,6 +72,8 @@ interface ChamaData {
     removal_reason?: string;
     missed_payments_count?: number;
     balance_deficit?: number;
+    was_skipped?: boolean;
+    rescheduled_to_position?: number | null;
     profiles: {
       full_name: string;
       email: string;
@@ -237,9 +239,13 @@ const ChamaDetail = () => {
 
   const calculateTurns = async (chamaData: ChamaData) => {
     try {
+      // Use effective position: rescheduled_to_position if skipped, otherwise order_index
+      const getEffectivePosition = (m: any) => 
+        (m.was_skipped && m.rescheduled_to_position) ? m.rescheduled_to_position : (m.order_index || 0);
+
       const approvedMembers = chamaData.chama_members
         ?.filter(m => m.approval_status === 'approved' && m.status !== 'removed')
-        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0)) || [];
+        .sort((a, b) => getEffectivePosition(a) - getEffectivePosition(b)) || [];
 
       if (approvedMembers.length === 0) return;
 
@@ -306,7 +312,8 @@ const ChamaDetail = () => {
 
         const turnDates: Record<string, Date> = {};
         approvedMembers.forEach((member) => {
-          const orderIdx = (member.order_index || 1) - 1;
+          const effectivePos = getEffectivePosition(member);
+          const orderIdx = (effectivePos || 1) - 1;
           const memberTurnDate = new Date(baseDate);
           memberTurnDate.setDate(memberTurnDate.getDate() + (orderIdx * cycleLength));
           turnDates[member.id] = memberTurnDate;
@@ -829,7 +836,11 @@ const ChamaDetail = () => {
 
                   <div className="space-y-3">
                      {approvedMembers
-                      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+                      .sort((a, b) => {
+                        const posA = (a.was_skipped && a.rescheduled_to_position) ? a.rescheduled_to_position : (a.order_index || 0);
+                        const posB = (b.was_skipped && b.rescheduled_to_position) ? b.rescheduled_to_position : (b.order_index || 0);
+                        return posA - posB;
+                      })
                       .map((member) => {
                         const hasPaid = memberPaymentStatuses[member.id];
                         const isPaidKnown = member.id in memberPaymentStatuses;
@@ -861,7 +872,7 @@ const ChamaDetail = () => {
                                 )}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {member.member_code} • Position #{member.order_index}
+                                {member.member_code} • Position #{(member.was_skipped && member.rescheduled_to_position) ? member.rescheduled_to_position : member.order_index}
                                 {(member.missed_payments_count || 0) > 0 && (
                                   <span className="text-destructive font-medium ml-2">
                                     • {member.missed_payments_count} missed
