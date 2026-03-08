@@ -332,7 +332,7 @@ export const Header = () => {
                   </Button>
                   <Button 
                     onClick={() => {
-                      navigate('/auth');
+                      navigate('/auth?tab=signup');
                       setMobileMenuOpen(false);
                     }}
                     className="w-full justify-start gap-2"
