@@ -489,14 +489,14 @@ export default function AdminPayoutApprovals() {
                           <TableRow
                             key={m.id}
                             className={`${blocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-muted/50'} ${isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : ''}`}
-                            onClick={() => !blocked && setChosenMemberId(m.id)}
+                            onClick={() => !blocked && selectMember(m.id)}
                           >
                             <TableCell>
                               <input
                                 type="radio"
                                 checked={isSelected}
                                 disabled={blocked}
-                                onChange={() => !blocked && setChosenMemberId(m.id)}
+                                onChange={() => !blocked && selectMember(m.id)}
                                 className="accent-primary"
                               />
                             </TableCell>
