@@ -116,34 +116,58 @@ serve(async (req) => {
       results.users = users || [];
     }
 
-    // Search member codes (limit 50) with comprehensive data
+    // Search member codes (limit 50) with comprehensive data - chama + welfare
     if (searchType === 'all' || searchType === 'member_code') {
-      const { data: members } = await supabaseClient
-        .from('chama_members')
-        .select(`
-          *,
-          profiles (
-            full_name, 
-            email, 
-            phone, 
-            id_number,
-            kyc_status,
-            payment_details_completed
-          ),
-          chama (
-            name, 
-            slug, 
-            group_code,
-            contribution_amount,
-            contribution_frequency,
-            status,
-            max_members
-          )
-        `)
-        .ilike('member_code', `%${sanitizedQuery}%`)
-        .limit(50);
+      const [chamaRes, welfareRes] = await Promise.all([
+        supabaseClient
+          .from('chama_members')
+          .select(`
+            *,
+            profiles (
+              full_name, 
+              email, 
+              phone, 
+              id_number,
+              kyc_status,
+              payment_details_completed
+            ),
+            chama (
+              name, 
+              slug, 
+              group_code,
+              contribution_amount,
+              contribution_frequency,
+              status,
+              max_members
+            )
+          `)
+          .ilike('member_code', `%${sanitizedQuery}%`)
+          .limit(50),
+        supabaseClient
+          .from('welfare_members')
+          .select(`
+            *,
+            profiles:user_id (
+              full_name, 
+              email, 
+              phone, 
+              id_number,
+              kyc_status,
+              payment_details_completed
+            ),
+            welfares:welfare_id (
+              name, 
+              slug, 
+              status
+            )
+          `)
+          .ilike('member_code', `%${sanitizedQuery}%`)
+          .limit(50),
+      ]);
 
-      results.members = members || [];
+      const chamaMembers = (chamaRes.data || []).map((m: any) => ({ ...m, source_type: 'chama' }));
+      const welfareMembers = (welfareRes.data || []).map((m: any) => ({ ...m, source_type: 'welfare' }));
+      results.members = [...chamaMembers, ...welfareMembers];
     }
 
     // Search mchango slugs (limit 50)

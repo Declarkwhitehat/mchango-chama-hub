@@ -161,3 +161,6 @@ verify_jwt = false
 
 [functions.admin-transactions]
 verify_jwt = false
+
+[functions.admin-member-activity]
+verify_jwt = false
