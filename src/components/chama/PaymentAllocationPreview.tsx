@@ -40,7 +40,6 @@ const typeConfig: Record<string, { icon: any; color: string; label: string }> = 
   principal_clearance:     { icon: ArrowRight,    color: 'text-primary',     label: 'Debt Principal' },
   current_cycle_commission:{ icon: Building2,     color: 'text-orange-500',  label: 'Commission' },
   current_cycle:           { icon: Coins,         color: 'text-green-600',   label: 'Current Cycle' },
-  carry_forward_commission:{ icon: Building2,     color: 'text-orange-500',  label: 'Commission' },
   carry_forward:           { icon: PiggyBank,     color: 'text-blue-500',    label: 'Carry-forward' },
   pending_cycle:           { icon: Coins,         color: 'text-green-600',   label: 'Pending Cycle' },
 };
@@ -104,7 +103,7 @@ export function PaymentAllocationPreview({ memberId, chamaId, grossAmount }: Pay
   const penaltyLines = preview.allocations.filter(a => a.type === 'penalty_clearance');
   const principalLines = preview.allocations.filter(a => a.type === 'principal_clearance');
   const commissionLines = preview.allocations.filter(a => 
-    a.type === 'principal_commission' || a.type === 'current_cycle_commission' || a.type === 'carry_forward_commission'
+    a.type === 'principal_commission' || a.type === 'current_cycle_commission'
   );
   const currentCycleLines = preview.allocations.filter(a => a.type === 'current_cycle');
   const carryForwardLines = preview.allocations.filter(a => a.type === 'carry_forward');

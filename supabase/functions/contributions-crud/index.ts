@@ -157,24 +157,15 @@ async function previewAllocation(
     });
   }
 
-  // Phase 3: Carry-forward overage
+  // Phase 3: Carry-forward overage — store full amount, commission deferred to cycle application
   if (remaining > 0) {
-    const commission = remaining * ONTIME_RATE;
-    const net = remaining - commission;
-    toCompany += commission;
-    carryForward += net;
+    carryForward += remaining;
 
     allocations.push({
-      type: 'carry_forward_commission',
-      amount: commission,
-      destination: 'Platform fee',
-      description: `5% commission on overpayment`
-    });
-    allocations.push({
       type: 'carry_forward',
-      amount: net,
+      amount: remaining,
       destination: 'Your credit balance',
-      description: `Credited to your next cycle`
+      description: `Credited to your next cycle (5% commission deducted when applied)`
     });
   }
 
@@ -596,27 +587,18 @@ async function settleDebts(
     }
   }
 
-  // ── STEP 4: Any remaining → carry-forward ──
+  // ── STEP 4: Any remaining → carry-forward (stored at FULL amount, commission deferred) ──
   if (remaining > 0) {
-    const commission = remaining * ONTIME_RATE;
-    const net = remaining - commission;
-    toCompany += commission;
-    carryForward += net;
+    carryForward += remaining;
 
-    allocations.push({
-      type: 'carry_forward_commission',
-      amount: commission,
-      destination: 'Platform fee',
-      description: '5% commission on overpayment'
-    });
     allocations.push({
       type: 'carry_forward',
-      amount: net,
+      amount: remaining,
       destination: 'Your credit balance',
-      description: 'Credited to your next cycle'
+      description: 'Credited to your next cycle (5% commission deducted when applied)'
     });
 
-    // Update carry-forward on member
+    // Update carry-forward on member at full amount (no commission deducted now)
     const { data: memberData } = await supabase
       .from('chama_members')
       .select('carry_forward_credit')
@@ -624,7 +606,7 @@ async function settleDebts(
       .single();
 
     await supabase.from('chama_members').update({
-      carry_forward_credit: (memberData?.carry_forward_credit || 0) + net,
+      carry_forward_credit: (memberData?.carry_forward_credit || 0) + remaining,
       last_payment_date: new Date().toISOString()
     }).eq('id', memberId);
   } else {
@@ -636,10 +618,9 @@ async function settleDebts(
 
   // ── STEP 5: Update chama financial tracking ──
   // Only count the gross that went to the cycle/debts, NOT the carry-forward portion
-  // This ensures total_gross_collected reflects actual money that entered the chama pool
-  const carryForwardGross = carryForward > 0 ? carryForward / (1 - ONTIME_RATE) : 0;
-  const chamaGross = grossPaymentAmount - carryForwardGross;
-  const chamaCommission = toCompany - (carryForward > 0 ? carryForwardGross * ONTIME_RATE : 0);
+  // Carry-forward is stored at full value (no commission), so subtract it directly
+  const chamaGross = grossPaymentAmount - carryForward;
+  const chamaCommission = toCompany;
 
   if (chamaGross > 0 || toCyclePot > 0) {
     const { data: chamaData } = await supabase
