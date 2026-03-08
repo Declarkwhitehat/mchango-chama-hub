@@ -399,7 +399,7 @@ export const WithdrawalsManagement = () => {
                     </TableCell>
                     <TableCell>{withdrawal.requester?.full_name || 'Unknown'}</TableCell>
                     <TableCell>
-                      {withdrawal.chama_id ? 'Chama' : 'Mchango'}
+                      {withdrawal.chama_id ? 'Chama' : withdrawal.mchango_id ? 'Mchango' : withdrawal.welfare_id ? 'Welfare' : withdrawal.organization_id ? 'Organization' : 'Unknown'}
                     </TableCell>
                     <TableCell className="font-medium">
                       KES {Number(withdrawal.amount).toLocaleString()}
@@ -409,7 +409,7 @@ export const WithdrawalsManagement = () => {
                     </TableCell>
                     <TableCell>{getStatusBadge(withdrawal.status)}</TableCell>
                     <TableCell>
-                      {withdrawal.status === 'pending' && (
+                      {['pending', 'pending_retry', 'approved', 'processing'].includes(withdrawal.status) && (
                         <Button
                           size="sm"
                           onClick={() => handleSelectWithdrawal(withdrawal)}
