@@ -392,6 +392,37 @@ const MchangoDetail = () => {
                 </div>
               )}
 
+              {/* Post-donation account creation CTA for guests */}
+              {!user && !isExpired && (
+                <Card className="relative overflow-hidden border-2 border-destructive/40 bg-gradient-to-r from-destructive/10 to-background shadow-lg">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-destructive" />
+                  <CardContent className="pt-6 pb-5 px-6">
+                    <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                      <div className="flex-shrink-0 h-12 w-12 rounded-full bg-destructive/15 flex items-center justify-center border border-destructive/20">
+                        <Shield className="h-6 w-6 text-destructive" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-base font-extrabold text-destructive mb-1">
+                          🔔 Don't Miss Withdrawal Updates!
+                        </h4>
+                        <p className="text-sm font-semibold text-foreground">
+                          Create a free account to <span className="text-destructive font-bold">track how funds are used</span> and receive alerts when withdrawals are made. <span className="text-destructive font-bold">Accountability matters.</span>
+                        </p>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="lg"
+                        className="flex-shrink-0 font-extrabold shadow-md px-6"
+                        onClick={() => navigate('/auth')}
+                      >
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Create Account
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* WhatsApp Link */}
               {campaign.whatsapp_link && (
                 <Card>
