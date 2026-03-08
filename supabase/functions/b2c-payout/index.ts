@@ -170,6 +170,9 @@ serve(async (req) => {
     } else if (withdrawal.organization?.name) {
       entityName = withdrawal.organization.name;
       entityType = 'Org';
+    } else if (withdrawal.welfare?.name) {
+      entityName = withdrawal.welfare.name;
+      entityType = 'Welfare';
     }
 
     // Build remarks - M-Pesa limits to 100 chars
