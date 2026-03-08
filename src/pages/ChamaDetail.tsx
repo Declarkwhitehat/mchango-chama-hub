@@ -400,25 +400,6 @@ const ChamaDetail = () => {
     }
   };
 
-  const handleRunSimulation = async () => {
-    setIsSimulating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('simulate-chama-test', {
-        body: {}
-      });
-      if (error) throw error;
-      setSimResults(data);
-      setShowSimDialog(true);
-    } catch (err: any) {
-      toast({
-        title: "Simulation Failed",
-        description: err.message || "Could not run simulation",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSimulating(false);
-    }
-  };
 
   if (isLoading) {
     return (
