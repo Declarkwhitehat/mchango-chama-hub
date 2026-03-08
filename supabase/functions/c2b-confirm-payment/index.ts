@@ -508,7 +508,7 @@ serve(async (req) => {
       const netAmount = grossAmount - commissionAmount;
 
       // Use the payer's real name from M-Pesa
-      const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+      const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'Anonymous';
 
       // Record organization donation
       const { data: donation, error: donationError } = await supabase
