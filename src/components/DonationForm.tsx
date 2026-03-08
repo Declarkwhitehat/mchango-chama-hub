@@ -293,19 +293,6 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
             </p>
           </div>
 
-          {/* Email - optional, only show for guests */}
-          {!user && (
-            <div className="space-y-2">
-              <Label htmlFor="email">Email (Optional)</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-          )}
 
           <div className="flex items-center space-x-2">
             <Checkbox
