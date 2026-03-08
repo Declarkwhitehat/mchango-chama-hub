@@ -40,6 +40,7 @@ const AdminDashboard = () => {
     pendingWithdrawals: 0,
     pendingCallbacks: 0,
     recentTransactions: 0,
+    pendingExecChanges: 0,
   });
 
   const fetchDashboardData = useCallback(async (isAutoRefresh = false) => {
