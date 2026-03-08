@@ -279,6 +279,9 @@ export default function AdminPayoutApprovals() {
                     <div>
                       <span className="text-muted-foreground">Scheduled For</span>
                       <p className="font-semibold">{req.scheduled_member?.profiles?.full_name || req.scheduled_member?.member_code || '-'}</p>
+                      {req.scheduled_member?.profiles?.phone && (
+                        <p className="text-xs text-muted-foreground font-mono">{req.scheduled_member.profiles.phone}</p>
+                      )}
                     </div>
                     {req.chosen_member_detail && (
                       <div>
