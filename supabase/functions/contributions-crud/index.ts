@@ -577,6 +577,75 @@ serve(async (req) => {
   }
 
   try {
+    // Check for settle-only action FIRST (called by payment callbacks with service role key)
+    if (req.method === 'POST') {
+      const clonedReq = req.clone();
+      try {
+        const peekBody = await clonedReq.json();
+        if (peekBody.action === 'settle-only') {
+          const { member_id, chama_id, amount, contribution_id } = peekBody;
+          if (!member_id || !chama_id || !amount) {
+            return new Response(JSON.stringify({ error: 'member_id, chama_id, amount required' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          const supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          );
+
+          // Idempotency: check if this contribution was already settled
+          if (contribution_id) {
+            const { data: existingLedger } = await supabaseAdmin
+              .from('financial_ledger')
+              .select('id')
+              .eq('reference_id', contribution_id)
+              .eq('source_type', 'chama')
+              .maybeSingle();
+
+            if (existingLedger) {
+              console.log('Settlement already processed for contribution:', contribution_id);
+              return new Response(JSON.stringify({ 
+                success: true, 
+                already_settled: true,
+                message: 'Settlement already processed'
+              }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+          }
+
+          const { data: chamaInfo } = await supabaseAdmin
+            .from('chama')
+            .select('contribution_amount')
+            .eq('id', chama_id)
+            .single();
+
+          const settleResult = await settleDebts(
+            supabaseAdmin,
+            member_id,
+            chama_id,
+            amount,
+            chamaInfo?.contribution_amount || amount
+          );
+
+          console.log('Settle-only complete:', {
+            contribution_id,
+            periodsCleared: settleResult.periods_cleared,
+            toCompany: settleResult.total_to_company,
+            toCyclePot: settleResult.total_to_cycle_pot,
+          });
+
+          return new Response(JSON.stringify({ 
+            success: true,
+            settlement: settleResult
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      } catch (_) {
+        // Not JSON or not settle-only, continue to normal auth flow
+      }
+    }
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing authorization header', code: 'AUTH_REQUIRED' }), {
