@@ -394,6 +394,11 @@ export const WithdrawalsManagement = () => {
                     <TableCell>
                       <div className="font-medium">{withdrawal.requester?.full_name || 'Unknown'}</div>
                       <div className="text-xs text-muted-foreground">{withdrawal.requester?.phone || ''}</div>
+                      {withdrawal.welfare_id && extractRecipientPhone(withdrawal.notes) && (
+                        <div className="text-xs text-primary font-medium mt-0.5">
+                          → Recipient: {extractRecipientPhone(withdrawal.notes)}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-xs font-medium text-muted-foreground">{withdrawal.entity_type}</div>
@@ -404,6 +409,8 @@ export const WithdrawalsManagement = () => {
                     <TableCell>
                       {withdrawal.payment_method?.phone_number ? (
                         <span className="text-xs font-mono">{withdrawal.payment_method.phone_number}</span>
+                      ) : extractRecipientPhone(withdrawal.notes) ? (
+                        <span className="text-xs font-mono">{extractRecipientPhone(withdrawal.notes)}</span>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
