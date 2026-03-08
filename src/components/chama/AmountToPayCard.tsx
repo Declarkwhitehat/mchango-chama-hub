@@ -162,7 +162,7 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
         {debts.length > 0 && (
           <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">
             <ArrowRight className="h-3 w-3 mt-0.5 shrink-0" />
-            <span>Payments clear debts in order: penalty first, then principal (net goes to the member you owed). Then current cycle.</span>
+            <span>Late payments use a 10% commission rate. The commission goes to the platform, and the net amount goes directly to the member who received less on payout day.</span>
           </div>
         )}
       </CardContent>
