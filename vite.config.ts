@@ -53,16 +53,9 @@ export default defineConfig(({ mode }) => ({
         navigateFallback: null, // Disable offline fallback to cached HTML
         runtimeCaching: [
           {
-            // Always fetch HTML from network first
+            // Always fetch HTML from network — never serve stale HTML
             urlPattern: /\/[^.]*$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'html-cache',
-              expiration: {
-                maxAgeSeconds: 0, // Never serve stale HTML
-              },
-              networkTimeoutSeconds: 3, // Fallback to cache only if offline
-            },
+            handler: 'NetworkOnly',
           },
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,

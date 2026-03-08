@@ -1,9 +1,31 @@
 import { registerSW } from 'virtual:pwa-register';
 
-const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) ||
-  window.innerWidth <= 768;
+const isPreviewOrDev =
+  window.location.hostname.includes('lovable.app') ||
+  window.location.hostname.includes('localhost') ||
+  window.location.hostname.includes('127.0.0.1');
 
-if (isMobile) {
+const isMobileUA = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+
+// Only register SW on real mobile devices visiting the published production URL
+const shouldRegisterSW = isMobileUA && !isPreviewOrDev;
+
+function cleanupServiceWorkers() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    });
+  }
+  if ('caches' in window) {
+    caches.keys().then((names) => {
+      names.forEach((name) => caches.delete(name));
+    });
+  }
+}
+
+if (shouldRegisterSW) {
   const updateSW = registerSW({
     onNeedRefresh() {
       if (confirm('New version available. Reload to update?')) {
@@ -16,12 +38,6 @@ if (isMobile) {
     immediate: true
   });
 } else {
-  // Desktop: unregister any existing service workers
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      for (const registration of registrations) {
-        registration.unregister();
-      }
-    });
-  }
+  // Preview, dev, or desktop: always clean up stale SWs and caches
+  cleanupServiceWorkers();
 }
