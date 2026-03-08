@@ -172,13 +172,36 @@ serve(async (req) => {
 
       const { data, error } = await supabaseAdmin
         .from('welfare_withdrawal_approvals')
-        .select('*, withdrawals!withdrawal_id(amount, net_amount, status, notes, requested_at, profiles:requested_by(full_name, phone)), welfares!welfare_id(name)')
+        .select('*, withdrawals!withdrawal_id(amount, net_amount, status, notes, requested_at, requested_by), welfares!welfare_id(name)')
         .in('approver_id', memberIds)
         .eq('decision', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return new Response(JSON.stringify({ data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+      // Separately look up requester profiles
+      const requesterIds = [...new Set((data || []).map((a: any) => a.withdrawals?.requested_by).filter(Boolean))];
+      let profilesMap: Record<string, any> = {};
+      if (requesterIds.length > 0) {
+        const { data: profiles } = await supabaseAdmin
+          .from('profiles')
+          .select('id, full_name, phone')
+          .in('id', requesterIds);
+        for (const p of (profiles || [])) {
+          profilesMap[p.id] = p;
+        }
+      }
+
+      // Attach profile info to each approval
+      const enriched = (data || []).map((a: any) => ({
+        ...a,
+        withdrawals: {
+          ...a.withdrawals,
+          profiles: profilesMap[a.withdrawals?.requested_by] || null,
+        },
+      }));
+
+      return new Response(JSON.stringify({ data: enriched }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
