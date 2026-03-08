@@ -610,7 +610,18 @@ const ChamaDetail = () => {
 
         {/* Manager Tools */}
         {isManager && (
-          <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
+          <div className="space-y-3">
+            <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={handleRunSimulation}
+              disabled={isSimulating}
+            >
+              {isSimulating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
+              {isSimulating ? 'Running Simulation...' : 'Run Payout Simulation'}
+            </Button>
+          </div>
         )}
 
         {/* Pending Join Requests - Visible to all members and admins */}
