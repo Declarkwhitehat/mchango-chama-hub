@@ -1166,7 +1166,7 @@ serve(async (req) => {
           }
           }
         }
-      }
+
 
       return new Response(JSON.stringify({
         data: contributionData,
