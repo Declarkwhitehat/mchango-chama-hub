@@ -26,10 +26,10 @@ Deno.serve(async (req) => {
 
       const { data: chama, error: chamaError } = await supabase
         .from('chama')
-        .select('*, chama_members!inner(*)')
+        .select('*')
         .eq('id', chamaId)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
 
       if (chamaError || !chama) {
         return new Response(JSON.stringify({ error: 'Chama not found' }), {
