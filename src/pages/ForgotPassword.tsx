@@ -406,25 +406,13 @@ const ForgotPassword = () => {
 
             {step === 'success' && (
               <div className="space-y-4">
-                {!isPhone && (
-                  <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                    <p className="text-sm text-muted-foreground text-center">
-                      We've sent a password reset link to <strong>{identifier}</strong>
-                    </p>
-                  </div>
-                )}
                 <div className="text-center space-y-3">
-                  {!isPhone && (
-                    <p className="text-sm text-muted-foreground">
-                      Didn't receive the email? Check your spam folder.
-                    </p>
-                  )}
                   <Button
                     variant="hero"
                     onClick={() => navigate("/auth")}
                     className="w-full"
                   >
-                    {isPhone ? 'Login with New Password' : 'Return to Login'}
+                    Login with New Password
                   </Button>
                 </div>
               </div>
