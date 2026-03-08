@@ -407,9 +407,9 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
 
       {/* Payment Detail Dialog */}
       <Dialog open={!!selectedDetail} onOpenChange={() => setSelectedDetail(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-sm mx-auto">
           <DialogHeader>
-            <DialogTitle className="text-base">Payment Details</DialogTitle>
+            <DialogTitle className="text-base text-center">Payment Details</DialogTitle>
           </DialogHeader>
           {selectedDetail && (
             <div className="space-y-3 text-sm">
@@ -432,9 +432,9 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                 ["Date", format(new Date(selectedDetail.created_at), "MMM d, yyyy 'at' h:mm a")],
                 ...(activeTab === "withdrawals" && selectedDetail.notes ? [["Notes", selectedDetail.notes]] : []),
               ].map(([label, value]) => (
-                <div key={label as string} className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className="font-medium text-right">{value as string}</span>
+                <div key={label as string} className="flex flex-col gap-0.5">
+                  <span className="text-muted-foreground text-xs">{label}</span>
+                  <span className="font-medium break-all">{value as string}</span>
                 </div>
               ))}
             </div>
