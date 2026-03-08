@@ -432,8 +432,9 @@ export default function AdminPayoutApprovals() {
               <div>
                 <p className="text-sm font-medium mb-2 flex items-center gap-1">
                   <Users className="h-4 w-4" /> Select Beneficiary
+                  <span className="text-xs text-muted-foreground ml-2">Click a row to select</span>
                 </p>
-                <div className="rounded-md border max-h-64 overflow-y-auto">
+                <div className="rounded-md border max-h-72 overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -441,9 +442,11 @@ export default function AdminPayoutApprovals() {
                         <TableHead className="text-xs">Name</TableHead>
                         <TableHead className="text-xs">Phone</TableHead>
                         <TableHead className="text-xs">Pos</TableHead>
+                        <TableHead className="text-xs">Success Rate</TableHead>
                         <TableHead className="text-xs">Payouts</TableHead>
                         <TableHead className="text-xs">Missed</TableHead>
                         <TableHead className="text-xs">Credit</TableHead>
+                        <TableHead className="text-xs">Trust</TableHead>
                         <TableHead className="text-xs">Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -451,10 +454,12 @@ export default function AdminPayoutApprovals() {
                       {enrichedMembers.map(m => {
                         const blocked = m.already_received_this_round;
                         const isSelected = chosenMemberId === m.id;
+                        const successRate = m.success_rate ?? 100;
+                        const successColor = successRate >= 80 ? 'text-emerald-600' : successRate >= 50 ? 'text-amber-600' : 'text-red-600';
                         return (
                           <TableRow
                             key={m.id}
-                            className={`${blocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'bg-primary/10' : ''}`}
+                            className={`${blocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-muted/50'} ${isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : ''}`}
                             onClick={() => !blocked && setChosenMemberId(m.id)}
                           >
                             <TableCell>
@@ -463,6 +468,7 @@ export default function AdminPayoutApprovals() {
                                 checked={isSelected}
                                 disabled={blocked}
                                 onChange={() => !blocked && setChosenMemberId(m.id)}
+                                className="accent-primary"
                               />
                             </TableCell>
                             <TableCell>
@@ -471,12 +477,28 @@ export default function AdminPayoutApprovals() {
                                 <p className="text-[10px] text-muted-foreground">{m.member_code}</p>
                               </div>
                             </TableCell>
-                            <TableCell className="text-xs">{m.profiles?.phone || '-'}</TableCell>
-                            <TableCell className="text-xs">#{m.order_index}</TableCell>
+                            <TableCell className="text-xs font-mono">{m.profiles?.phone || '-'}</TableCell>
+                            <TableCell className="text-xs font-semibold">#{m.order_index}</TableCell>
+                            <TableCell className={`text-xs font-bold ${successColor}`}>
+                              {successRate}%
+                            </TableCell>
                             <TableCell className="text-xs">{m.payouts_received}</TableCell>
-                            <TableCell className="text-xs">{m.missed_payments_count || 0}</TableCell>
+                            <TableCell className="text-xs">
+                              {(m.missed_payments_count || 0) > 0 ? (
+                                <span className="text-red-600 font-semibold">{m.missed_payments_count}</span>
+                              ) : (
+                                <span className="text-emerald-600">0</span>
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs">
                               {(m.carry_forward_credit || 0) > 0 ? `KES ${m.carry_forward_credit}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {m.trust_score !== null ? (
+                                <span className={m.trust_score >= 70 ? 'text-emerald-600' : m.trust_score >= 40 ? 'text-amber-600' : 'text-red-600'}>
+                                  {m.trust_score}
+                                </span>
+                              ) : '-'}
                             </TableCell>
                             <TableCell>
                               {blocked ? (
@@ -485,11 +507,11 @@ export default function AdminPayoutApprovals() {
                                 </Badge>
                               ) : m.is_eligible ? (
                                 <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-200">
-                                  Eligible
+                                  ✓ Eligible
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-600 border-red-200">
-                                  {m.has_debts ? 'Debts' : `${m.unpaid_cycles} Unpaid`}
+                                  ⚠ {m.has_debts ? 'Debts' : `${m.unpaid_cycles} Unpaid`}
                                 </Badge>
                               )}
                             </TableCell>
@@ -499,6 +521,23 @@ export default function AdminPayoutApprovals() {
                     </TableBody>
                   </Table>
                 </div>
+
+                {/* Warning if ineligible member selected */}
+                {chosenMemberId && (() => {
+                  const chosen = enrichedMembers.find(m => m.id === chosenMemberId);
+                  if (chosen && !chosen.is_eligible) {
+                    return (
+                      <div className="mt-2 p-2 rounded border border-amber-300 bg-amber-50 dark:bg-amber-900/10 text-xs text-amber-800 dark:text-amber-400 flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Warning:</strong> {chosen.profiles?.full_name} has {chosen.has_debts ? 'outstanding debts' : `${chosen.unpaid_cycles} unpaid cycle(s)`}. 
+                          Selecting them overrides the eligibility check. Please add a note explaining your reason.
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* Admin Notes */}
