@@ -139,7 +139,29 @@ export default function AdminPayoutApprovals() {
     }
   };
 
-  const handleApprove = async () => {
+  const selectMember = async (memberId: string) => {
+    setChosenMemberId(memberId);
+    setMemberProfile(null);
+    
+    // Find the member's user_id from enrichedMembers
+    const member = enrichedMembers.find(m => m.id === memberId);
+    const userId = (member as any)?.user_id;
+    if (!userId) return;
+
+    setLoadingProfile(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('payout-approval', {
+        body: { action: 'get-member-profile', userId },
+      });
+      if (error) throw error;
+      setMemberProfile(data);
+    } catch (err: any) {
+      console.error('Failed to load member profile:', err);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
     if (!selectedRequest || !chosenMemberId) {
       toast.error("Please select a member to receive the payout");
       return;
