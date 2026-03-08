@@ -59,6 +59,7 @@ const AdminDashboard = () => {
         callbacksResult,
         transactionsResult,
         ledgerResult,
+        execChangesResult,
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
@@ -70,6 +71,7 @@ const AdminDashboard = () => {
         supabase.from('customer_callbacks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('transactions').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
         supabase.from('financial_ledger').select('commission_amount'),
+        supabase.from('welfare_executive_changes').select('*', { count: 'exact', head: true }).eq('admin_decision', 'pending'),
       ]);
 
       const totalPlatformRevenue = ledgerResult.data?.reduce((sum, item) => sum + (item.commission_amount || 0), 0) || 0;
