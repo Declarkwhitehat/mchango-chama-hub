@@ -157,24 +157,15 @@ async function previewAllocation(
     });
   }
 
-  // Phase 3: Carry-forward overage
+  // Phase 3: Carry-forward overage — store full amount, commission deferred to cycle application
   if (remaining > 0) {
-    const commission = remaining * ONTIME_RATE;
-    const net = remaining - commission;
-    toCompany += commission;
-    carryForward += net;
+    carryForward += remaining;
 
     allocations.push({
-      type: 'carry_forward_commission',
-      amount: commission,
-      destination: 'Platform fee',
-      description: `5% commission on overpayment`
-    });
-    allocations.push({
       type: 'carry_forward',
-      amount: net,
+      amount: remaining,
       destination: 'Your credit balance',
-      description: `Credited to your next cycle`
+      description: `Credited to your next cycle (5% commission deducted when applied)`
     });
   }
 
