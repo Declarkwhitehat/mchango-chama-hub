@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Languages, ArrowLeft } from 'lucide-react';
+import { X, Languages, ArrowLeft, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import chatBotAvatar from '@/assets/chat-bot-avatar.png';
@@ -48,12 +48,9 @@ export function ChatSupport() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load chat history from database
   useEffect(() => {
     const loadChatHistory = async () => {
       try {
-        const { data: user } = await supabase.auth.getUser();
-        
         const { data, error } = await supabase
           .from('chat_messages')
           .select('*')
@@ -84,11 +81,9 @@ export function ChatSupport() {
     loadChatHistory();
   }, [sessionId]);
 
-  // Save message to database
   const saveMessage = async (message: Message) => {
     try {
       const { data: user } = await supabase.auth.getUser();
-      
       await supabase.from('chat_messages').insert({
         session_id: sessionId,
         user_id: user.user?.id || null,
@@ -117,25 +112,13 @@ export function ChatSupport() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isOpen]);
+  useEffect(() => { scrollToBottom(); }, [messages]);
+  useEffect(() => { if (isOpen && inputRef.current) inputRef.current.focus(); }, [isOpen]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isStreaming) return;
 
-    const userMessage: Message = {
-      role: 'user',
-      content: inputValue,
-      timestamp: new Date()
-    };
-
+    const userMessage: Message = { role: 'user', content: inputValue, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
     saveMessage(userMessage);
     setCurrentQuestion(inputValue);
@@ -150,19 +133,14 @@ export function ChatSupport() {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
         },
         body: JSON.stringify({
-          messages: messages.concat(userMessage).map(m => ({
-            role: m.role,
-            content: m.content
-          })),
-          language: language
+          messages: messages.concat(userMessage).map(m => ({ role: m.role, content: m.content })),
+          language
         })
       });
 
       if (!response.ok || !response.body) {
         const error = await response.json().catch(() => ({ error: 'Failed to get response' }));
-        if (error.needsCallback) {
-          setShowCallbackForm(true);
-        }
+        if (error.needsCallback) setShowCallbackForm(true);
         throw new Error(error.error || 'Failed to get response');
       }
 
@@ -170,85 +148,49 @@ export function ChatSupport() {
       const decoder = new TextDecoder();
       let assistantMessage = '';
       let needsCallback = false;
-
-      // Add empty assistant message to start streaming into
       const assistantMessageTimestamp = new Date();
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '',
-        timestamp: assistantMessageTimestamp
-      }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: '', timestamp: assistantMessageTimestamp }]);
 
       let buffer = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
         for (let line of lines) {
           line = line.trim();
-          if (!line || line.startsWith(':')) continue;
-          if (!line.startsWith('data: ')) continue;
-
+          if (!line || line.startsWith(':') || !line.startsWith('data: ')) continue;
           const data = line.slice(6);
           if (data === '[DONE]') continue;
-
           try {
             const parsed = JSON.parse(data);
-            
-            // Check for tool calls (callback request)
-            if (parsed.choices?.[0]?.delta?.tool_calls) {
-              needsCallback = true;
-              break;
-            }
-
+            if (parsed.choices?.[0]?.delta?.tool_calls) { needsCallback = true; break; }
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               assistantMessage += content;
               setMessages(prev => {
                 const newMessages = [...prev];
-                newMessages[newMessages.length - 1] = {
-                  role: 'assistant',
-                  content: assistantMessage,
-                  timestamp: new Date()
-                };
+                newMessages[newMessages.length - 1] = { role: 'assistant', content: assistantMessage, timestamp: new Date() };
                 return newMessages;
               });
             }
-          } catch (e) {
-            console.error('Parse error:', e);
-          }
+          } catch (e) { console.error('Parse error:', e); }
         }
       }
 
       if (needsCallback) {
         setShowCallbackForm(true);
-        const callbackMessage = {
-          role: 'assistant' as const,
-          content: 'I apologize, but I need to connect you with our support team for this. Would you like them to call you back? Please share your contact details below.',
-          timestamp: new Date()
-        };
+        const callbackMessage = { role: 'assistant' as const, content: 'I apologize, but I need to connect you with our support team for this. Would you like them to call you back? Please share your contact details below.', timestamp: new Date() };
         setMessages(prev => [...prev.slice(0, -1), callbackMessage]);
         saveMessage(callbackMessage);
       } else if (assistantMessage) {
-        // Save the completed assistant message
-        saveMessage({
-          role: 'assistant',
-          content: assistantMessage,
-          timestamp: assistantMessageTimestamp
-        });
+        saveMessage({ role: 'assistant', content: assistantMessage, timestamp: assistantMessageTimestamp });
       }
-
     } catch (error) {
       console.error('Chat error:', error);
-      const errorMessage = {
-        role: 'assistant' as const,
-        content: 'Sorry, I\'m having trouble right now. Would you like our team to call you back?',
-        timestamp: new Date()
-      };
+      const errorMessage = { role: 'assistant' as const, content: 'Sorry, I\'m having trouble right now. Would you like our team to call you back?', timestamp: new Date() };
       setMessages(prev => [...prev, errorMessage]);
       saveMessage(errorMessage);
       setShowCallbackForm(true);
@@ -259,39 +201,27 @@ export function ChatSupport() {
 
   const handleCallbackSuccess = () => {
     setShowCallbackForm(false);
-    const successMessage = {
-      role: 'assistant' as const,
-      content: 'Thank you! Our team will call you within 24 hours. Is there anything else I can help you with?',
-      timestamp: new Date()
-    };
+    const successMessage = { role: 'assistant' as const, content: 'Thank you! Our team will call you within 24 hours. Is there anything else I can help you with?', timestamp: new Date() };
     setMessages(prev => [...prev, successMessage]);
     saveMessage(successMessage);
   };
 
   return (
     <>
-      {/* Chat Button */}
+      {/* Chat trigger — bottom-right, compact */}
       {!isOpen && (
-        <div className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 z-50 flex flex-col items-end gap-2">
-          {/* Label bubble */}
-          <div className="bg-foreground text-background text-xs font-medium px-3 py-1.5 rounded-full shadow-md animate-bounce-gentle flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            Chat with us
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 z-50 group flex items-center gap-2.5 pl-1 pr-4 py-1 rounded-full bg-card border border-border shadow-lg hover:shadow-xl transition-all hover:scale-[1.03] active:scale-[0.98]"
+          aria-label="Open chat"
+        >
+          <div className="relative h-10 w-10 rounded-full overflow-hidden border-2 border-primary/30 flex-shrink-0">
+            <img src={chatBotAvatar} alt="" className="h-full w-full object-cover" />
+            {/* Online dot */}
+            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-card" />
           </div>
-          
-          {/* Bot avatar button */}
-          <button
-            onClick={() => setIsOpen(true)}
-            className="group relative h-14 w-14 sm:h-16 sm:w-16 rounded-full shadow-lg hover:shadow-xl transition-all p-0 overflow-hidden border-2 border-primary/30 hover:border-primary/60 hover:scale-105"
-          >
-            <img src={chatBotAvatar} alt="Chat with us" className="h-full w-full object-cover" />
-            {/* Pulse ring */}
-            <span className="absolute inset-0 rounded-full border-2 border-primary/40 animate-ping opacity-30 pointer-events-none"></span>
-          </button>
-        </div>
+          <span className="text-sm font-medium text-foreground">Chat with us</span>
+        </button>
       )}
 
       {/* Chat Window */}
@@ -299,7 +229,6 @@ export function ChatSupport() {
         <Card className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-[calc(100vw-1rem)] max-md:h-[calc(100vh-1rem)] max-md:bottom-0 max-md:right-0 max-md:rounded-none">
           {/* Header */}
           <div className="border-b bg-primary text-primary-foreground rounded-t-lg max-md:rounded-none">
-            {/* Top bar with back/close */}
             <div className="flex items-center justify-between px-3 pt-2 pb-1">
               <button
                 onClick={() => setIsOpen(false)}
@@ -317,8 +246,6 @@ export function ChatSupport() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
-            {/* Bot identity */}
             <div className="flex items-center gap-3 px-4 pb-2">
               <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-white/30 flex-shrink-0">
                 <img src={chatBotAvatar} alt="AI Assistant" className="h-full w-full object-cover" />
@@ -328,8 +255,6 @@ export function ChatSupport() {
                 <p className="text-xs text-primary-foreground/70">Online • Ready to help</p>
               </div>
             </div>
-            
-            {/* Language Selector */}
             <div className="flex items-center gap-2 px-4 pb-2">
               <Languages className="h-3 w-3" />
               <Select value={language} onValueChange={handleLanguageChange}>
@@ -374,7 +299,7 @@ export function ChatSupport() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Callback Form or Input */}
+          {/* Input */}
           {showCallbackForm ? (
             <CallbackForm 
               question={currentQuestion}
@@ -383,7 +308,7 @@ export function ChatSupport() {
               onCancel={() => setShowCallbackForm(false)}
             />
           ) : (
-            <div className="p-4 border-t">
+            <div className="p-3 border-t">
               <div className="flex gap-2">
                 <input
                   ref={inputRef}
@@ -393,13 +318,15 @@ export function ChatSupport() {
                   onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                   placeholder="Type your message..."
                   disabled={isStreaming}
-                  className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                  className="flex-1 px-3 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-primary bg-background text-sm"
                 />
                 <Button 
+                  size="icon"
                   onClick={handleSendMessage}
                   disabled={!inputValue.trim() || isStreaming}
+                  className="h-10 w-10 rounded-full flex-shrink-0"
                 >
-                  Send
+                  <Send className="h-4 w-4" />
                 </Button>
               </div>
             </div>

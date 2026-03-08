@@ -38,11 +38,9 @@ export const FloatingActionMenu = () => {
   const location = useLocation();
   const { user, profile } = useAuth();
 
-  // Don't show on admin pages, auth pages, or create pages
   const hiddenPaths = ["/admin", "/auth", "/create", "/login", "/register"];
   const shouldHide = hiddenPaths.some(path => location.pathname.includes(path));
   
-  // Only show for authenticated users with approved KYC
   if (!user || profile?.kyc_status !== "approved" || shouldHide) {
     return null;
   }
@@ -54,7 +52,6 @@ export const FloatingActionMenu = () => {
 
   return (
     <>
-      {/* Backdrop */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm"
@@ -62,8 +59,8 @@ export const FloatingActionMenu = () => {
         />
       )}
 
-      {/* FAB Container - positioned above chat button (nav offset + 16px gap + 56px chat button + 12px spacing) */}
-      <div className="fixed bottom-[calc(var(--bottom-nav-offset)+84px)] right-4 z-50 flex flex-col-reverse items-end gap-3">
+      {/* FAB - sits in the floating dock via CSS variable spacing */}
+      <div className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] left-4 z-50 flex flex-col-reverse items-start gap-3">
         {/* Action Buttons */}
         {isOpen && (
           <div className="flex flex-col-reverse gap-2 mb-2 animate-in fade-in slide-in-from-bottom-4 duration-200">
@@ -89,15 +86,15 @@ export const FloatingActionMenu = () => {
           size="icon"
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "h-14 w-14 rounded-full shadow-xl transition-all duration-300",
-            "bg-gradient-to-br from-primary/70 to-primary-glow/70 hover:from-primary/90 hover:to-primary-glow/90 backdrop-blur-sm",
-            isOpen && "rotate-45 from-primary to-primary-glow"
+            "h-12 w-12 rounded-full shadow-xl transition-all duration-300",
+            "bg-gradient-to-br from-primary to-primary-glow hover:from-primary/90 hover:to-primary-glow/90",
+            isOpen && "rotate-45"
           )}
         >
           {isOpen ? (
-            <X className="h-6 w-6" />
+            <X className="h-5 w-5" />
           ) : (
-            <Plus className="h-6 w-6" />
+            <Plus className="h-5 w-5" />
           )}
         </Button>
       </div>
