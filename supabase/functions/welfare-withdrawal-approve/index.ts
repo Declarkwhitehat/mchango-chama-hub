@@ -111,23 +111,24 @@ serve(async (req) => {
       const allApproved = allApprovals?.every(a => a.decision === 'approved');
 
       if (allApproved) {
+        // Get withdrawal details before updating
+        const { data: withdrawal } = await supabaseAdmin
+          .from('withdrawals')
+          .select('requested_by, amount, net_amount, notes')
+          .eq('id', approval.withdrawal_id)
+          .single();
+
         // Both approved → mark withdrawal as approved for B2C payout
         await supabaseAdmin
           .from('withdrawals')
           .update({
             status: 'approved',
             reviewed_at: new Date().toISOString(),
-            notes: 'Multi-sig approved by Secretary and Treasurer',
+            notes: (withdrawal?.notes || '') + '\n[SYSTEM] Multi-sig approved by Secretary and Treasurer',
           })
           .eq('id', approval.withdrawal_id);
 
         // Notify requester
-        const { data: withdrawal } = await supabaseAdmin
-          .from('withdrawals')
-          .select('requested_by, amount')
-          .eq('id', approval.withdrawal_id)
-          .single();
-
         if (withdrawal) {
           await createNotification(supabaseAdmin, {
             user_id: withdrawal.requested_by,
@@ -137,9 +138,39 @@ serve(async (req) => {
             related_entity_type: 'welfare',
             related_entity_id: approval.welfare_id,
           });
+
+          // Extract recipient phone from notes (format: "Recipient: 07XXXXXXXX")
+          const phoneMatch = (withdrawal.notes || '').match(/Recipient:\s*([\d+]+)/);
+          const recipientPhone = phoneMatch?.[1];
+
+          if (recipientPhone) {
+            // Trigger B2C payout
+            console.log('Triggering B2C payout for welfare withdrawal:', approval.withdrawal_id, 'phone:', recipientPhone);
+            try {
+              const b2cResponse = await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  withdrawal_id: approval.withdrawal_id,
+                  phone_number: recipientPhone,
+                  amount: withdrawal.net_amount || withdrawal.amount,
+                }),
+              });
+              const b2cResult = await b2cResponse.json();
+              console.log('B2C payout response:', b2cResult);
+            } catch (b2cError: any) {
+              console.error('B2C payout trigger failed:', b2cError.message);
+              // Don't fail the approval — withdrawal is approved, payout can be retried
+            }
+          } else {
+            console.error('Could not extract recipient phone from withdrawal notes:', withdrawal.notes);
+          }
         }
 
-        return new Response(JSON.stringify({ status: 'approved', message: 'Both approvers agreed. Withdrawal approved for payout.' }), {
+        return new Response(JSON.stringify({ status: 'approved', message: 'Both approvers agreed. Withdrawal approved and payout initiated.' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
