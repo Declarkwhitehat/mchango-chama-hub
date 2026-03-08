@@ -56,6 +56,7 @@ export function AdminSidebar() {
   const [pendingWithdrawals, setPendingWithdrawals] = useState(0);
   const [pendingCallbacks, setPendingCallbacks] = useState(0);
   const [pendingVerifications, setPendingVerifications] = useState(0);
+  const [pendingPayoutApprovals, setPendingPayoutApprovals] = useState(0);
 
   useEffect(() => {
     fetchPendingCounts();
