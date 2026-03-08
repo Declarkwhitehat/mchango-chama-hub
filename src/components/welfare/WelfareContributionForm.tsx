@@ -136,30 +136,14 @@ export const WelfareContributionForm = ({ welfareId, memberId, contributionAmoun
         await new Promise((r) => setTimeout(r, 5000));
 
         try {
-          // Check if contribution was recorded via callback
-          const { data: contributions } = await supabase.functions.invoke("welfare-contributions", {
-            method: "GET",
-            body: { welfare_id: welfareId },
-          });
-
-          // Also re-query STK status
+          // Re-query STK status
           const { data: recheck } = await supabase.functions.invoke("payment-stk-query", {
             headers: { Authorization: `Bearer ${session.access_token}` },
             body: { checkout_request_id: checkoutRequestId },
           });
 
           if (recheck?.ResultCode === "0" || recheck?.ResultCode === 0) {
-            // Record contribution
-            await supabase.functions.invoke("welfare-contributions", {
-              method: "POST",
-              body: {
-                welfare_id: welfareId,
-                amount: numAmount,
-                payment_method: "mpesa",
-                mpesa_receipt_number: recheck?.MpesaReceiptNumber || checkoutRequestId,
-              },
-            });
-
+            // Payment confirmed — C2B callback already records the contribution
             setPaymentStatus("success");
             setStatusMessage(`Payment of KES ${numAmount.toLocaleString()} successful!`);
             toast.success(`Contribution of KES ${numAmount.toLocaleString()} recorded!`);
