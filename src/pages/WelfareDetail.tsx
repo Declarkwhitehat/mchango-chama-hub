@@ -329,12 +329,21 @@ const WelfareDetail = () => {
 
           {isExecutive && (
             <TabsContent value="withdraw">
-              {(isChairman || isTreasurer) && !welfare.is_frozen && (
+              {(isChairman || isTreasurer) && !welfare.is_frozen && !cooldownActive && (
                 <WelfareWithdrawalRequest
                   welfareId={welfare.id}
                   availableBalance={welfare.available_balance}
                   onRequested={fetchWelfare}
                 />
+              )}
+              {cooldownActive && !welfare.is_frozen && (
+                <Card>
+                  <CardContent className="py-8 text-center text-destructive">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                    <p className="font-medium">Withdrawals are blocked</p>
+                    <p className="text-sm text-muted-foreground mt-1">Executive members have recently changed. A security cooldown is active.</p>
+                  </CardContent>
+                </Card>
               )}
               {(isSecretary || isTreasurer) && (
                 <WelfareApprovalCard welfareId={welfare.id} onDecision={fetchWelfare} />

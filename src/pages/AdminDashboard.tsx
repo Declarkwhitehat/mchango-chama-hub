@@ -190,17 +190,28 @@ const AdminDashboard = () => {
                   {stats.pendingWithdrawals} withdrawals pending
                 </Button>
               )}
-              {stats.pendingCallbacks > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
-                  onClick={() => navigate("/admin/callbacks")}
-                >
-                  <PhoneCall className="h-3.5 w-3.5" />
-                  {stats.pendingCallbacks} callbacks pending
-                </Button>
-              )}
+               {stats.pendingCallbacks > 0 && (
+                 <Button
+                   size="sm"
+                   variant="outline"
+                   className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                   onClick={() => navigate("/admin/callbacks")}
+                 >
+                   <PhoneCall className="h-3.5 w-3.5" />
+                   {stats.pendingCallbacks} callbacks pending
+                 </Button>
+               )}
+               {stats.pendingExecChanges > 0 && (
+                 <Button
+                   size="sm"
+                   variant="outline"
+                   className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                   onClick={() => navigate("/admin/welfare-executive-changes")}
+                 >
+                   <AlertCircle className="h-3.5 w-3.5" />
+                   {stats.pendingExecChanges} exec changes pending
+                 </Button>
+               )}
             </div>
           </div>
         )}

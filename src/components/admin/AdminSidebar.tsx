@@ -165,6 +165,12 @@ export function AdminSidebar() {
   const securityItems: MenuItem[] = [
     { title: "Fraud & Risk", url: "/admin/fraud-monitoring", icon: ShieldAlert },
     { title: "Fraud Config", url: "/admin/fraud-config", icon: Settings },
+    { 
+      title: "Exec Changes", 
+      url: "/admin/welfare-executive-changes", 
+      icon: ShieldAlert,
+      badge: pendingExecChanges > 0 ? pendingExecChanges : null
+    },
   ];
 
   const systemItems: MenuItem[] = [
