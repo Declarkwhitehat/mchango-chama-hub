@@ -162,39 +162,39 @@ const MchangoDetail = () => {
         <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
           {/* Account creation banner for non-logged-in users */}
           {!user && (
-            <Card className="relative overflow-hidden border-2 border-destructive/50 bg-gradient-to-br from-destructive/10 via-destructive/5 to-background shadow-xl ring-1 ring-destructive/20">
+            <Card className="relative overflow-hidden border-2 border-amber-500/60 bg-gradient-to-br from-amber-50 via-amber-50/60 to-background dark:from-amber-950/30 dark:via-amber-900/10 shadow-xl ring-1 ring-amber-400/30">
               {/* Decorative accent bar */}
-              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-destructive via-destructive/80 to-destructive/40" />
+              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-300" />
               
               <CardContent className="pt-8 pb-6 px-6">
-                <div className="flex flex-col md:flex-row items-start md:items-center gap-5">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                   {/* Icon */}
-                  <div className="flex-shrink-0 h-16 w-16 rounded-2xl bg-destructive/15 flex items-center justify-center border border-destructive/20">
-                    <Bell className="h-8 w-8 text-destructive animate-pulse" />
+                  <div className="flex-shrink-0 h-18 w-18 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center border-2 border-amber-400/40 p-4">
+                    <Bell className="h-10 w-10 text-amber-600 dark:text-amber-400 animate-pulse" />
                   </div>
                   
                   {/* Content */}
                   <div className="flex-1 space-y-3">
-                    <h3 className="text-xl font-extrabold text-destructive tracking-tight">
-                      ⚠️ Stay Informed — Know Where Your Money Goes
+                    <h3 className="text-2xl font-extrabold text-amber-700 dark:text-amber-400 tracking-tight leading-snug">
+                      🔔 Stay Informed — Know Where Your Money Goes
                     </h3>
-                    <p className="text-sm font-semibold text-foreground leading-relaxed max-w-xl">
-                      Create a free account to receive <span className="text-destructive font-bold">real-time withdrawal notifications</span> and campaign updates. 
-                      Full transparency on every shilling — <span className="text-destructive font-bold">don't donate blindly.</span>
+                    <p className="text-base font-semibold text-foreground leading-relaxed max-w-xl">
+                      Create a free account to receive <span className="text-amber-700 dark:text-amber-400 font-extrabold">real-time withdrawal notifications</span> and campaign updates. 
+                      Full transparency on every shilling — <span className="text-amber-700 dark:text-amber-400 font-extrabold">don't donate blindly.</span>
                     </p>
                     
                     {/* Trust indicators */}
-                    <div className="flex flex-wrap gap-3 pt-1">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-destructive">
-                        <Shield className="h-3.5 w-3.5" />
+                    <div className="flex flex-wrap gap-4 pt-1">
+                      <span className="inline-flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400">
+                        <Shield className="h-4 w-4" />
                         Withdrawal Alerts
                       </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-destructive">
-                        <Eye className="h-3.5 w-3.5" />
+                      <span className="inline-flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400">
+                        <Eye className="h-4 w-4" />
                         Full Transparency
                       </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-destructive">
-                        <UserPlus className="h-3.5 w-3.5" />
+                      <span className="inline-flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400">
+                        <UserPlus className="h-4 w-4" />
                         100% Free
                       </span>
                     </div>
@@ -203,8 +203,7 @@ const MchangoDetail = () => {
                   {/* CTA */}
                   <Button 
                     size="lg" 
-                    variant="destructive"
-                    className="flex-shrink-0 font-extrabold shadow-lg px-8 text-base"
+                    className="flex-shrink-0 font-extrabold shadow-lg px-8 text-base bg-amber-500 hover:bg-amber-600 text-white border-0"
                     onClick={() => navigate('/auth')}
                   >
                     <UserPlus className="h-5 w-5 mr-2" />
@@ -394,45 +393,44 @@ const MchangoDetail = () => {
 
               {/* Post-donation account creation CTA for guests */}
               {!user && !isExpired && (
-                <Card className="relative overflow-hidden border-2 border-destructive/40 bg-gradient-to-r from-destructive/10 to-background shadow-lg">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-destructive" />
+                <Card className="relative overflow-hidden border-2 border-amber-500/60 bg-gradient-to-r from-amber-50 to-background dark:from-amber-950/30 shadow-lg">
+                  <div className="absolute top-0 left-0 right-0 h-2 bg-amber-500" />
                   <CardContent className="pt-6 pb-5 px-6 space-y-4">
-                    <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-full bg-destructive/15 flex items-center justify-center border border-destructive/20">
-                        <Shield className="h-6 w-6 text-destructive" />
+                    <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+                      <div className="flex-shrink-0 h-14 w-14 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center border-2 border-amber-400/40">
+                        <Shield className="h-7 w-7 text-amber-600 dark:text-amber-400" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="text-base font-extrabold text-destructive mb-1">
+                        <h4 className="text-xl font-extrabold text-amber-700 dark:text-amber-400 mb-2">
                           💰 You Donated — You Deserve to Know Where It Goes
                         </h4>
-                        <p className="text-sm font-semibold text-foreground">
-                          Your money, your right. Create a free account to <span className="text-destructive font-bold">get notified the moment a withdrawal happens</span>. 
-                          No surprises, no secrets — <span className="text-destructive font-bold">just full accountability.</span>
+                        <p className="text-base font-semibold text-foreground">
+                          Your money, your right. Create a free account to <span className="text-amber-700 dark:text-amber-400 font-extrabold">get notified the moment a withdrawal happens</span>. 
+                          No surprises, no secrets — <span className="text-amber-700 dark:text-amber-400 font-extrabold">just full accountability.</span>
                         </p>
                       </div>
                       <Button
-                        variant="destructive"
                         size="lg"
-                        className="flex-shrink-0 font-extrabold shadow-md px-6"
+                        className="flex-shrink-0 font-extrabold shadow-md px-8 text-base bg-amber-500 hover:bg-amber-600 text-white border-0"
                         onClick={() => navigate('/auth')}
                       >
-                        <UserPlus className="h-4 w-4 mr-2" />
+                        <UserPlus className="h-5 w-5 mr-2" />
                         Create Account
                       </Button>
                     </div>
                     
                     {/* Persuasive trust points */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-destructive/20">
-                      <div className="flex items-center gap-2 text-xs font-bold text-destructive">
-                        <Bell className="h-3.5 w-3.5 flex-shrink-0" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-amber-400/30">
+                      <div className="flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400">
+                        <Bell className="h-4 w-4 flex-shrink-0" />
                         Instant withdrawal alerts
                       </div>
-                      <div className="flex items-center gap-2 text-xs font-bold text-destructive">
-                        <Eye className="h-3.5 w-3.5 flex-shrink-0" />
+                      <div className="flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400">
+                        <Eye className="h-4 w-4 flex-shrink-0" />
                         See every transaction
                       </div>
-                      <div className="flex items-center gap-2 text-xs font-bold text-destructive">
-                        <Shield className="h-3.5 w-3.5 flex-shrink-0" />
+                      <div className="flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400">
+                        <Shield className="h-4 w-4 flex-shrink-0" />
                         Hold organizers accountable
                       </div>
                     </div>
