@@ -78,7 +78,7 @@ serve(async (req) => {
     // Validate withdrawal exists and is in approved or processing status
     const { data: withdrawal, error: withdrawalError } = await supabaseAdmin
       .from('withdrawals')
-      .select('*, chama:chama_id(name), mchango:mchango_id(title), organization:organization_id(name)')
+      .select('*, chama:chama_id(name), mchango:mchango_id(title), organization:organization_id(name), welfare:welfare_id(name)')
       .eq('id', withdrawal_id)
       .single();
 
