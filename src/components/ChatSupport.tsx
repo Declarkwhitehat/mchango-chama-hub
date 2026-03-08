@@ -227,13 +227,13 @@ export function ChatSupport() {
       {/* Chat Window */}
       {isOpen && (
         <Card className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-[calc(100vw-1rem)] max-md:h-[calc(100vh-1rem)] max-md:bottom-0 max-md:right-0 max-md:rounded-none">
-          {/* Floating close button */}
+          {/* Floating close button - bottom center for easy thumb reach */}
           <button
             onClick={() => setIsOpen(false)}
-            className="absolute top-2 right-2 z-10 h-12 w-12 flex items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground backdrop-blur-sm shadow-lg hover:bg-destructive active:scale-95 transition-all touch-manipulation"
+            className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 h-14 w-14 flex items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground backdrop-blur-sm shadow-lg hover:bg-destructive active:scale-95 transition-all touch-manipulation"
             aria-label="Close chat"
           >
-            <X className="h-6 w-6" />
+            <X className="h-7 w-7" />
           </button>
 
           {/* Header */}
