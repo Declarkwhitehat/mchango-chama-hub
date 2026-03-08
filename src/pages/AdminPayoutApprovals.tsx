@@ -162,6 +162,7 @@ export default function AdminPayoutApprovals() {
     }
   };
 
+  const handleApprove = async () => {
     if (!selectedRequest || !chosenMemberId) {
       toast.error("Please select a member to receive the payout");
       return;
