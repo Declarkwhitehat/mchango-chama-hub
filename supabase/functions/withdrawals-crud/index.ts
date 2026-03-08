@@ -712,7 +712,135 @@ serve(async (req) => {
         }
       }
 
-      if (!withdrawal_id) {
+      // Admin-initiated retry for failed/pending_retry withdrawals
+      if (action === 'retry') {
+        if (!withdrawal_id) {
+          return new Response(JSON.stringify({ error: 'withdrawal_id is required' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const { data: retryAdminRole } = await supabaseClient
+          .from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
+        if (!retryAdminRole) {
+          return new Response(JSON.stringify({ error: 'Admin access required' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const { data: retryWd, error: retryErr } = await supabaseAdmin
+          .from('withdrawals')
+          .select(`*, payment_method:payment_methods(method_type, phone_number)`)
+          .eq('id', withdrawal_id).single();
+
+        if (retryErr || !retryWd) {
+          return new Response(JSON.stringify({ error: 'Withdrawal not found' }), {
+            status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!['failed', 'pending_retry'].includes(retryWd.status)) {
+          return new Response(JSON.stringify({ error: `Cannot retry withdrawal in ${retryWd.status} status` }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const retryPhone = retryWd.payment_method?.phone_number;
+        if (!retryPhone || retryWd.payment_method?.method_type !== 'mpesa') {
+          return new Response(JSON.stringify({ error: 'No M-Pesa phone number on payment method' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        await supabaseAdmin.from('withdrawals').update({
+          status: 'approved',
+          notes: (retryWd.notes || '') + `\n[ADMIN] Retry initiated by admin on ${new Date().toISOString()}`,
+          b2c_attempt_count: (retryWd.b2c_attempt_count || 0) + 1,
+          last_b2c_attempt_at: new Date().toISOString(),
+        }).eq('id', withdrawal_id);
+
+        const retryUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        const retryKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+        try {
+          const b2cRes = await fetch(`${retryUrl}/functions/v1/b2c-payout`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${retryKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawal_id, phone_number: retryPhone, amount: retryWd.net_amount }),
+          });
+          const b2cResult = await b2cRes.json();
+          if (!b2cRes.ok || !b2cResult.success) {
+            await supabaseAdmin.from('withdrawals').update({
+              status: 'failed',
+              b2c_error_details: b2cResult,
+              notes: (retryWd.notes || '') + `\n[ADMIN] Retry failed: ${b2cResult.error || 'Unknown'}`,
+            }).eq('id', withdrawal_id);
+            return new Response(JSON.stringify({ error: 'Retry B2C failed', details: b2cResult }), {
+              status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          return new Response(JSON.stringify({ message: 'M-Pesa retry initiated successfully', data: b2cResult }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (err: any) {
+          await supabaseAdmin.from('withdrawals').update({
+            status: 'pending_retry',
+            notes: (retryWd.notes || '') + `\n[ADMIN] Retry exception: ${err.message}`,
+          }).eq('id', withdrawal_id);
+          return new Response(JSON.stringify({ error: 'Retry failed', message: err.message }), {
+            status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      // Admin force-approve for welfare pending_approval withdrawals
+      if (action === 'force_approve') {
+        if (!withdrawal_id) {
+          return new Response(JSON.stringify({ error: 'withdrawal_id is required' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const { data: faAdminRole } = await supabaseClient
+          .from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
+        if (!faAdminRole) {
+          return new Response(JSON.stringify({ error: 'Admin access required' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const { data: faWd } = await supabaseAdmin
+          .from('withdrawals')
+          .select(`*, payment_method:payment_methods(method_type, phone_number)`)
+          .eq('id', withdrawal_id).single();
+        if (!faWd || faWd.status !== 'pending_approval') {
+          return new Response(JSON.stringify({ error: 'Withdrawal not in pending_approval status' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        await supabaseAdmin.from('withdrawals').update({
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id,
+          notes: (faWd.notes || '') + `\n[ADMIN] Force-approved by admin, bypassing multi-sig`,
+        }).eq('id', withdrawal_id);
+
+        if (faWd.payment_method?.method_type === 'mpesa' && faWd.payment_method?.phone_number) {
+          const faUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const faKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          const b2cRes = await fetch(`${faUrl}/functions/v1/b2c-payout`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${faKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawal_id, phone_number: faWd.payment_method.phone_number, amount: faWd.net_amount }),
+          });
+          const b2cResult = await b2cRes.json();
+          return new Response(JSON.stringify({ message: 'Force-approved and B2C initiated', data: b2cResult }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ message: 'Force-approved. Awaiting manual payment.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
         return new Response(JSON.stringify({ 
           error: 'Missing withdrawal_id',
           details: 'withdrawal_id is required'
