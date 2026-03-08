@@ -1,38 +1,35 @@
 
 
-## Run Chama Simulation Tests
+## Diagnosis
 
-### Problem
-The database has only 1 chama (pending, 1 member, 0 cycles) — nothing to test automatic payouts or member skipping against.
+The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
 
-### Plan
+1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
+2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
+3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
+4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
 
-**Create a `simulate-chama-test` edge function** that:
-1. **Seeds test data** using real user IDs from the database (4 members from existing profiles)
-2. **Creates a test chama** (daily frequency, KES 100, status=active)
-3. **Creates 3 contribution cycles** with mixed payment states:
-   - Cycle 1: All 4 members paid → full payout to Member 1
-   - Cycle 2: Member 2 (beneficiary) did NOT pay → should be skipped, payout redirected to Member 3
-   - Cycle 3: Member 3 (beneficiary) paid but has outstanding debt from cycle 2 → should be skipped
-4. **Runs the payout logic** (calls `daily-payout-cron` internally against the test chama)
-5. **Reads back results**: withdrawals, payout_skips, chama_member_debts, chama_cycle_deficits
-6. **Returns a structured JSON report** showing exactly what happened at each step
-7. **Cleans up** all test data after reporting (deletes the test chama and cascaded records)
+There are 3 total stuck withdrawals across the system with the same pattern.
 
-All B2C/SMS calls will be **skipped** (the function uses `dryRun: true` mode — it replicates the decision logic without triggering real payments).
+## Root Cause
 
-**Add a "Run Simulation" button** in ChamaDetail page (visible only to managers) that calls this function and displays the results in a dialog.
+The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
 
-### Files
-| Action | File |
-|--------|------|
-| Create | `supabase/functions/simulate-chama-test/index.ts` |
-| Edit | `supabase/config.toml` — register the new function |
-| Edit | `src/pages/ChamaDetail.tsx` — add simulation trigger button + results dialog |
+## Fix Plan
 
-### Test Scenarios
-1. **Happy path**: All members pay on time → beneficiary gets full payout
-2. **Beneficiary skip**: Beneficiary hasn't paid → skipped, next eligible member gets payout, debt+deficit created
-3. **No eligible members**: Multiple members haven't paid → no payout, all debts accrued
-4. **Debt blocks payout**: Member has outstanding debt even though current cycle is paid → still ineligible
+### 1. Manually complete stuck withdrawal via RPC
+Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
+
+Also complete `e2ea0312` (KES 10) which has the same pattern.
+
+### 2. Fix retry-failed-payouts to query status before re-sending
+Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
+
+### 3. Add a "check status" path in withdrawals-crud
+Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
+
+### Files to Change
+- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
+- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
+- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
 
