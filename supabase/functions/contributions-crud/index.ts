@@ -1065,10 +1065,16 @@ serve(async (req) => {
                 .single();
 
               if (beneficiaryMember && chamaDetails) {
-                const commissionRate = chamaDetails.commission_rate || 0.05;
-                const grossAmount = chamaDetails.contribution_amount * totalMembers;
-                const commissionAmount = grossAmount * commissionRate;
-                const netPayoutAmount = grossAmount - commissionAmount;
+                // Use available_balance — commission was already deducted per-contribution
+                const { data: chamaBalanceData } = await supabaseAdmin
+                  .from('chama')
+                  .select('available_balance')
+                  .eq('id', body.chama_id)
+                  .single();
+
+                const netPayoutAmount = chamaBalanceData?.available_balance || 0;
+                const commissionAmount = 0; // Already collected per-contribution in settleDebts()
+                const grossAmount = netPayoutAmount; // Pool is already net of commission
 
                 const { data: paymentMethod } = await supabaseClient
                   .from('payment_methods')
