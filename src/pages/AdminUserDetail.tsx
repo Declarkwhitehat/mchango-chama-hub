@@ -274,19 +274,25 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
     setDeletingUser(true);
     try {
       const response = await supabase.functions.invoke('admin-delete-user', {
-        body: { user_id: userId, privilege_code: deletePrivilegeCode },
+        body: { 
+          user_id: userId, 
+          privilege_code: deletePrivilegeCode,
+          confirm_name: deleteConfirmName,
+        },
       });
 
       if (response.error) throw new Error(response.error.message || 'Failed to delete user');
       if (response.data?.error) throw new Error(response.data.error);
 
-      toast({ title: "Success", description: "User account deleted successfully" });
+      toast({ title: "Success", description: response.data?.message || "User account deleted" });
       setShowDeleteConfirm(false);
       navigate('/admin/users');
     } catch (error: any) {
       console.error('Error deleting user:', error);
       if (error.message?.includes('privilege code')) {
         setDeleteCodeError(true);
+      } else if (error.message?.includes('Name confirmation')) {
+        setDeleteNameError(true);
       }
       toast({
         title: "Error",
