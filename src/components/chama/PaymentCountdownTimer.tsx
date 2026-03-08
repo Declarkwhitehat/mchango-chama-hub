@@ -22,6 +22,7 @@ export function PaymentCountdownTimer({
   endDate,
   cutoffHour = 22,
   contributionAmount,
+  totalPayable,
   beneficiaryName,
   paidCount,
   totalCount,
