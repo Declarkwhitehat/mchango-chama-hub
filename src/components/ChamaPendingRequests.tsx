@@ -81,7 +81,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
 
           if (scores) {
             const scoreMap: Record<string, number> = {};
-            (scores as TrustScore[]).forEach(s => { scoreMap[s.user_id] = s.trust_score; });
+            (scores as any[]).forEach((s: any) => { scoreMap[s.user_id] = s.trust_score; });
             setTrustScores(scoreMap);
           }
         }
