@@ -91,11 +91,17 @@ export function AdminSidebar() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
 
+    const { count: execChangesCount } = await supabase
+      .from('welfare_executive_changes')
+      .select('*', { count: 'exact', head: true })
+      .eq('admin_decision', 'pending');
+
     setPendingKyc(kycCount || 0);
     setPendingWithdrawals(withdrawalsCount || 0);
     setPendingCallbacks(callbacksCount || 0);
     setPendingVerifications(verificationsCount || 0);
     setPendingPayoutApprovals(payoutApprovalsCount || 0);
+    setPendingExecChanges(execChangesCount || 0);
   };
 
   const mainMenuItems: MenuItem[] = [
