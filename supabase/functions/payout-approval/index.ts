@@ -90,7 +90,7 @@ async function handleGetEligibleMembers(supabase: any, body: any) {
   const { data: members } = await supabase
     .from('chama_members')
     .select(`
-      id, member_code, order_index, missed_payments_count, was_skipped, carry_forward_credit,
+      id, member_code, order_index, missed_payments_count, was_skipped, carry_forward_credit, user_id,
       profiles!chama_members_user_id_fkey(full_name, phone)
     `)
     .eq('chama_id', chamaId)
