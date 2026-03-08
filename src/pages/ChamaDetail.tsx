@@ -872,7 +872,7 @@ const ChamaDetail = () => {
                                 )}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {member.member_code} • Position #{member.order_index}
+                                {member.member_code} • Position #{(member.was_skipped && member.rescheduled_to_position) ? member.rescheduled_to_position : member.order_index}
                                 {(member.missed_payments_count || 0) > 0 && (
                                   <span className="text-destructive font-medium ml-2">
                                     • {member.missed_payments_count} missed
