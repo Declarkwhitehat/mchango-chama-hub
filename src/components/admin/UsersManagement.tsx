@@ -264,10 +264,14 @@ export const UsersManagement = () => {
 
     const isDeleted = !!user.deleted_at;
     
-    const matchesStatus = 
-      statusFilter === "all" || 
-      statusFilter === "deleted" ? isDeleted :
-      (!isDeleted && (statusFilter === "all" || user.kyc_status === statusFilter));
+    let matchesStatus = true;
+    if (statusFilter === "all") {
+      matchesStatus = true;
+    } else if (statusFilter === "deleted") {
+      matchesStatus = isDeleted;
+    } else {
+      matchesStatus = !isDeleted && user.kyc_status === statusFilter;
+    }
 
     return matchesSearch && matchesStatus;
   });
