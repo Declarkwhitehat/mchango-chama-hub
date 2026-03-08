@@ -590,15 +590,6 @@ const ChamaDetail = () => {
         {isManager && (
           <div className="space-y-3">
             <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={handleRunSimulation}
-              disabled={isSimulating}
-            >
-              {isSimulating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-              {isSimulating ? 'Running Simulation...' : 'Run Payout Simulation'}
-            </Button>
           </div>
         )}
 
