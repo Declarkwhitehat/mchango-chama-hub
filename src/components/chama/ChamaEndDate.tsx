@@ -36,8 +36,9 @@ export const ChamaEndDate = ({
   // Total days = number of members × cycle length (each member gets one payout)
   const totalDays = memberCount * cycleDays;
   
-  // Calculate end date from start date
+  // Calculate end date from start date (not created_at)
   const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
   const endDate = new Date(start);
   endDate.setDate(endDate.getDate() + totalDays);
 
