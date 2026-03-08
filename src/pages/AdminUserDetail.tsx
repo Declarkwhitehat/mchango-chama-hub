@@ -10,9 +10,10 @@ import { toast } from "@/hooks/use-toast";
 import { 
   Loader2, User, Mail, Phone, CreditCard, Shield, FileText, 
   TrendingUp, Users, Activity, MapPin, Calendar, Download,
-  ExternalLink, Eye, CheckCircle, XCircle, Clock, ShieldOff, AlertTriangle
+  ExternalLink, Eye, CheckCircle, XCircle, Clock, ShieldOff, AlertTriangle, Trash2, Key
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 
 interface UserDetail {
