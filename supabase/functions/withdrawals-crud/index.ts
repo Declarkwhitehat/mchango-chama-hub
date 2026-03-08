@@ -523,7 +523,7 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
 
-        } catch (b2cError: any) {
+        } catch (b2cError) {
           console.error('Exception triggering B2C payout:', b2cError);
           
           // Mark for retry so the retry cron picks it up
