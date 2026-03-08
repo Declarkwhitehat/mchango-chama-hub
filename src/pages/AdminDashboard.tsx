@@ -94,8 +94,19 @@ const AdminDashboard = () => {
       });
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      setLastRefreshed(new Date());
     }
-  };
+  }, []);
+
+  // Initial fetch + 30-second auto-refresh interval
+  useEffect(() => {
+    fetchDashboardData();
+    intervalRef.current = setInterval(() => fetchDashboardData(true), 30000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [fetchDashboardData]);
 
   const totalActiveGroups = stats.activeChamas + stats.activeOrganizations + stats.activeWelfares;
   const hasAlerts = stats.pendingKyc > 0 || stats.pendingWithdrawals > 0 || stats.pendingCallbacks > 0;
