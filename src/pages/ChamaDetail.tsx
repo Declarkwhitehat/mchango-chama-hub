@@ -95,6 +95,7 @@ const ChamaDetail = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [memberPaymentStatuses, setMemberPaymentStatuses] = useState<Record<string, boolean>>({});
+  const [memberTrustScores, setMemberTrustScores] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadChama();
