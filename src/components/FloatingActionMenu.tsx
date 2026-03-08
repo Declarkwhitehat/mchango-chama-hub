@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, X, Heart, Users, Building2, Shield } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus, Heart, Users, Building2, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
