@@ -1,82 +1,35 @@
 
 
-## Admin Dashboard Consolidation Plan
+## Diagnosis
 
-### Redundancies Identified
+The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
 
-Here is what is duplicated across the current dashboard:
+1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
+2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
+3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
+4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
 
-```text
-┌─────────────────────────┬──────────────────────────────────────────────┐
-│ Data Point              │ Where it appears (duplicated)                │
-├─────────────────────────┼──────────────────────────────────────────────┤
-│ Total Users / Verified  │ Key Metrics card + PlatformStatistics       │
-│ Active Chamas/Orgs/Welf │ Key Metrics "Active Groups" + Platform      │
-│                         │   Statistics + Bottom Overview cards (x3)   │
-│ Today's new groups      │ Key Metrics + PlatformStatistics + Bottom   │
-│ Platform Revenue        │ Key Metrics card + AdminFinancialOverview   │
-│                         │   + EnhancedAnalytics "Total Revenue" card  │
-│ Pending KYC             │ Key Metrics card + Quick Actions button     │
-│                         │   + Alerts section                          │
-│ Pending Withdrawals     │ Quick Actions button + Alerts section       │
-│ Pending Callbacks       │ Quick Actions button + Alerts section       │
-│ New Users               │ EnhancedAnalytics card (period-based)       │
-│ Campaigns count         │ PlatformStatistics + Bottom card            │
-└─────────────────────────┴──────────────────────────────────────────────┘
-```
+There are 3 total stuck withdrawals across the system with the same pattern.
 
-### Proposed Consolidated Layout
+## Root Cause
 
-Reorganize into **4 clean sections** using Tabs for the detailed views:
+The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
 
-```text
-┌──────────────────────────────────────────────────────┐
-│  Dashboard Header + Action Required Banner           │
-│  (merges Alerts into a compact top banner)            │
-├──────────────────────────────────────────────────────┤
-│  4 Key Metric Cards (Users | Groups | Revenue | Txns)│
-│  (single source of truth for headline numbers)       │
-├──────────────────────────────────────────────────────┤
-│  Tabbed Detail Section                               │
-│  ┌─────────┬────────────┬───────────┬──────────┐     │
-│  │Overview │ Financial  │ Analytics │ System   │     │
-│  └─────────┴────────────┴───────────┴──────────┘     │
-│                                                      │
-│  Overview tab:  Platform Statistics (groups table)    │
-│  Financial tab: AdminFinancialOverview               │
-│  Analytics tab: EnhancedAnalytics (charts only)      │
-│  System tab:    CleanupJobStatus                     │
-└──────────────────────────────────────────────────────┘
-```
+## Fix Plan
 
-### What gets removed/merged
+### 1. Manually complete stuck withdrawal via RPC
+Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
 
-1. **Remove bottom Overview cards** (Campaigns, Organizations, Welfare) -- already shown in PlatformStatistics and Key Metrics "Active Groups" card
+Also complete `e2ea0312` (KES 10) which has the same pattern.
 
-2. **Merge Quick Actions + Alerts** into a single compact "Action Required" banner at the top with inline action buttons. No more separate sections that repeat the same pending counts
+### 2. Fix retry-failed-payouts to query status before re-sending
+Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
 
-3. **Remove duplicate metric cards** from EnhancedAnalytics (Total Revenue, New Users, Failed Payments, Payment Success Rate cards) -- revenue already in Key Metrics; keep only the charts and period selector
+### 3. Add a "check status" path in withdrawals-crud
+Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
 
-4. **Remove PlatformStatistics "Total Users" tile** -- already in Key Metrics card
-
-5. **Wrap detail sections in Tabs** (Overview / Financial / Analytics / System) to reduce vertical scroll while keeping all data accessible
-
-### Technical Changes
-
-**File: `src/pages/AdminDashboard.tsx`**
-- Restructure the return JSX into: Header + Action Banner + Key Metrics + Tabs
-- Remove the 3 bottom overview cards (lines 306-386)
-- Replace separate Alerts section + Quick Actions with a unified banner
-- Add `Tabs` wrapper around `PlatformStatistics`, `AdminFinancialOverview`, `EnhancedAnalytics`, `CleanupJobStatus`
-- Consolidate data fetching (remove redundant queries already done by child components)
-
-**File: `src/components/admin/EnhancedAnalytics.tsx`**
-- Remove the 4 duplicate metric cards (lines 218-288) -- Total Revenue, Payment Success Rate, New Users, Failed Payments
-- Keep period selector and all charts (Revenue Trends, User Growth, Revenue by Source, Top Groups)
-
-**File: `src/components/admin/PlatformStatistics.tsx`**
-- Remove the "Total Users" tile (already in Key Metrics)
-- Keep the 5 remaining tiles (Chamas, Campaigns, Organizations, Welfares, Transaction Volume)
-
-No database changes required. No new dependencies needed -- `Tabs` component already exists.
+### Files to Change
+- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
+- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
+- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
 
