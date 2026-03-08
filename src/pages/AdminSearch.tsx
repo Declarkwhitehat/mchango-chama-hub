@@ -343,7 +343,7 @@ export default function AdminSearch() {
                               </TableCell>
                               <TableCell><Badge variant={getStatusColor(m.status)}>{m.status}</Badge></TableCell>
                               <TableCell className="text-right">
-                                <span className="text-green-600 dark:text-green-400">{formatCurrency(m.balance_credit || 0)}</span>
+                                <span className="text-primary">{formatCurrency(m.balance_credit || 0)}</span>
                                 {m.balance_deficit > 0 && (
                                   <span className="block text-xs text-destructive">-{formatCurrency(m.balance_deficit)}</span>
                                 )}
