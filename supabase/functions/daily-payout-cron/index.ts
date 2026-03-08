@@ -699,13 +699,7 @@ Deno.serve(async (req) => {
                   errors++;
                 }
               } else if (newWithdrawal) {
-                // Record company earning
-                await supabase.rpc('record_company_earning', {
-                  p_source: 'chama_commission',
-                  p_amount: totalCommission,
-                  p_group_id: chama.id,
-                  p_description: `Payout commission - ${chama.name} cycle #${cycle.cycle_number}. On-time: KES ${onTimeCommission.toFixed(2)}`
-                });
+                // Commission already collected per-contribution in settleDebts() — no double-charge
 
                 // ========== PAYOUT LEDGER ENTRY ==========
                 await supabase.from('financial_ledger').insert({

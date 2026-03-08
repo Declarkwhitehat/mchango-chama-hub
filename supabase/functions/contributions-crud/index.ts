@@ -1112,12 +1112,8 @@ serve(async (req) => {
                   if (wdError && wdError.code === '23505') {
                     console.log(`⚠️ Duplicate payout prevented by unique index for cycle ${currentCycle.id}`);
                   } else if (newWithdrawal) {
-                    await supabaseAdmin.rpc('record_company_earning', {
-                      p_source: 'chama_commission',
-                      p_amount: commissionAmount,
-                      p_group_id: body.chama_id,
-                      p_description: `Immediate payout commission — ${chamaDetails.name}`
-                    });
+                    // Commission already collected per-contribution — no double-charge
+                    // Skip record_company_earning here since it was done in settleDebts()
 
                     // Payout ledger entry
                     await supabaseAdmin.from('financial_ledger').insert({
