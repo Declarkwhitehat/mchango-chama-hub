@@ -26,6 +26,9 @@ Deno.serve(async (req) => {
     if (action === 'reject') {
       return handleReject(supabase, body);
     }
+    if (action === 'get-member-profile') {
+      return handleGetMemberProfile(supabase, body);
+    }
 
     return jsonResponse({ error: 'Invalid action' }, 400);
   } catch (error: any) {
