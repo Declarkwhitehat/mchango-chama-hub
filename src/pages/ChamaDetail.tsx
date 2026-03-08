@@ -798,12 +798,6 @@ const ChamaDetail = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="transparency">
-              <PaymentTransparency
-                chamaId={chama.id}
-                contributionAmount={chama.contribution_amount}
-              />
-            </TabsContent>
 
             {isManager && (
               <TabsContent value="payments">
