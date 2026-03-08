@@ -780,11 +780,9 @@ const ChamaDetail = () => {
           <Tabs defaultValue="dashboard" className="w-full">
             <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center">
               <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
-              <TabsTrigger value="transparency" className="text-xs sm:text-sm">Transparency</TabsTrigger>
               {isManager && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               <TabsTrigger value="members" className="text-xs sm:text-sm">Members</TabsTrigger>
               {isMember && <TabsTrigger value="chat" className="text-xs sm:text-sm flex items-center gap-1"><MessageSquare className="h-3 w-3" />Chat</TabsTrigger>}
-              <TabsTrigger value="details" className="text-xs sm:text-sm">Details</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard">
