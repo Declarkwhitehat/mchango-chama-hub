@@ -1010,9 +1010,10 @@ Deno.serve(async (req) => {
             if (member.is_manager) {
               console.log(`👑 Removed member was manager. Finding replacement for chama ${chama.name}`);
               
-              const { data: bestCandidate } = await supabase
+              // First try: member with zero missed payments
+              let { data: bestCandidate } = await supabase
                 .from('chama_members')
-                .select('id, user_id, member_code, profiles!chama_members_user_id_fkey(full_name, phone)')
+                .select('id, user_id, member_code, missed_payments_count, profiles!chama_members_user_id_fkey(full_name, phone)')
                 .eq('chama_id', chama.id)
                 .eq('status', 'active')
                 .eq('approval_status', 'approved')
@@ -1021,17 +1022,60 @@ Deno.serve(async (req) => {
                 .limit(1)
                 .maybeSingle();
 
+              // Fallback: no perfect candidate — pick the most favorable (lowest missed payments)
+              if (!bestCandidate) {
+                console.log(`⚠️ No zero-miss candidate. Selecting most favorable active member for chama ${chama.name}`);
+                const { data: fallbackCandidate } = await supabase
+                  .from('chama_members')
+                  .select('id, user_id, member_code, missed_payments_count, profiles!chama_members_user_id_fkey(full_name, phone)')
+                  .eq('chama_id', chama.id)
+                  .eq('status', 'active')
+                  .eq('approval_status', 'approved')
+                  .order('missed_payments_count', { ascending: true })
+                  .order('order_index', { ascending: true })
+                  .limit(1)
+                  .maybeSingle();
+
+                bestCandidate = fallbackCandidate;
+              }
+
               if (bestCandidate) {
                 await supabase.from('chama_members')
                   .update({ is_manager: true })
                   .eq('id', bestCandidate.id);
 
-                console.log(`👑 New manager assigned: ${bestCandidate.profiles?.full_name} (${bestCandidate.member_code})`);
+                console.log(`👑 New manager assigned: ${bestCandidate.profiles?.full_name} (${bestCandidate.member_code}) [missed: ${bestCandidate.missed_payments_count || 0}]`);
+
+                // Audit log
+                await supabase.from('audit_logs').insert({
+                  action: 'MANAGER_AUTO_REASSIGNED',
+                  table_name: 'chama_members',
+                  record_id: bestCandidate.id,
+                  new_values: {
+                    chama_id: chama.id,
+                    chama_name: chama.name,
+                    new_manager: bestCandidate.member_code,
+                    missed_payments: bestCandidate.missed_payments_count || 0,
+                    reason: 'Previous manager auto-removed. Best available candidate selected.'
+                  }
+                });
 
                 if (bestCandidate.profiles?.phone) {
                   await sendSMS(bestCandidate.profiles.phone,
                     `👑 You are now the manager of "${chama.name}". The previous manager was removed due to missed payments. Log in to manage your group.`
                   );
+                }
+
+                if (bestCandidate.user_id) {
+                  await supabase.from('notifications').insert({
+                    user_id: bestCandidate.user_id,
+                    title: 'You Are Now Manager',
+                    message: `You have been assigned as manager of "${chama.name}" after the previous manager was removed.`,
+                    type: 'info',
+                    category: 'chama',
+                    related_entity_id: chama.id,
+                    related_entity_type: 'chama'
+                  });
                 }
 
                 const { data: remainingMembers } = await supabase
@@ -1052,7 +1096,26 @@ Deno.serve(async (req) => {
                   }
                 }
               } else {
-                console.warn(`⚠️ No eligible replacement manager found for chama ${chama.name}`);
+                // This should be virtually impossible (would mean zero active members)
+                console.error(`🚨 CRITICAL: No active members remain in chama ${chama.name} to assign as manager`);
+                
+                // Notify admins of critical state
+                const { data: adminUsers } = await supabase
+                  .from('user_roles')
+                  .select('user_id')
+                  .eq('role', 'admin');
+
+                for (const admin of (adminUsers || [])) {
+                  await supabase.from('notifications').insert({
+                    user_id: admin.user_id,
+                    title: 'Critical: Chama Has No Members',
+                    message: `Chama "${chama.name}" has no active members remaining after auto-removal. Manual intervention required.`,
+                    type: 'warning',
+                    category: 'admin',
+                    related_entity_id: chama.id,
+                    related_entity_type: 'chama'
+                  });
+                }
               }
             }
 
