@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Loader2, Send } from "lucide-react";
 
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onRequested }: Props) => {
+  const { user } = useAuth();
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [category, setCategory] = useState("");
@@ -24,6 +26,7 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
 
   const handleRequest = async () => {
     const numAmount = Number(amount);
+    if (!user?.id) { toast.error("Please log in again and retry"); return; }
     if (!numAmount || numAmount <= 0) { toast.error("Enter a valid amount"); return; }
     if (numAmount > availableBalance) { toast.error("Insufficient balance"); return; }
     if (!recipientPhone.trim()) { toast.error("Recipient phone required"); return; }
@@ -35,7 +38,7 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
         .from('withdrawals')
         .insert({
           welfare_id: welfareId,
-          requested_by: (await supabase.auth.getUser()).data.user?.id,
+          requested_by: user.id,
           amount: numAmount,
           commission_amount: 0,
           net_amount: numAmount,
@@ -48,24 +51,33 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
       if (error) throw error;
 
       // Create approval records for secretary and treasurer
-      const { data: members } = await supabase
+      const { data: members, error: membersError } = await supabase
         .from('welfare_members')
         .select('id, role')
         .eq('welfare_id', welfareId)
         .in('role', ['secretary', 'treasurer'])
         .eq('status', 'active');
 
-      if (members) {
-        for (const member of members) {
-          await supabase.from('welfare_withdrawal_approvals').insert({
+      if (membersError) throw membersError;
+
+      if (!members || members.length < 2) {
+        throw new Error("Welfare setup is incomplete: secretary and treasurer must be active");
+      }
+
+      const approvalInserts = await Promise.all(
+        members.map((member) =>
+          supabase.from('welfare_withdrawal_approvals').insert({
             withdrawal_id: data.id,
             welfare_id: welfareId,
             approver_id: member.id,
             approver_role: member.role,
             decision: 'pending',
-          });
-        }
-      }
+          })
+        )
+      );
+
+      const approvalError = approvalInserts.find((result) => result.error)?.error;
+      if (approvalError) throw approvalError;
 
       toast.success("Withdrawal request submitted for approval");
       setAmount(""); setReason(""); setCategory(""); setRecipientPhone("");
