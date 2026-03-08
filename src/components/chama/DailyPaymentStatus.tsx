@@ -230,16 +230,6 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
         </Card>
       )}
 
-      {/* Amount to Pay Card - Always visible before payment */}
-      {!currentUserPaid && currentMemberId && (
-        <AmountToPayCard
-          memberId={currentMemberId}
-          contributionAmount={cycleInfo.due_amount}
-          missedCycles={missedCyclesCount}
-          currentCycleDue={!cutoffPassed}
-        />
-      )}
-
       {/* Prominent Countdown Timer */}
       <PaymentCountdownTimer
         endDate={cycleInfo.end_date}
