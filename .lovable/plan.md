@@ -1,52 +1,35 @@
 
 
-## Problem
+## Diagnosis
 
-When a shared mchango link is opened by a guest user and they try to donate, two issues arise:
+The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
 
-1. **Email field adds confusion**: An optional "Email" field is shown to guest users. While technically optional, it creates unnecessary friction and confusion in the donation flow -- guests just need to enter amount, name, and M-Pesa phone number.
+1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
+2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
+3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
+4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
 
-2. **No UPDATE RLS policy for guest donations**: After inserting the donation record, the code updates the `payment_reference` with the M-Pesa `CheckoutRequestID` (line 125-128 in DonationForm.tsx). However, there is **no UPDATE policy** on `mchango_donations` for anon or authenticated users. This means the update silently fails, breaking the callback matching flow -- M-Pesa callbacks won't be able to match the payment to the donation.
+There are 3 total stuck withdrawals across the system with the same pattern.
 
-## Solution
+## Root Cause
 
-### 1. Remove email field from DonationForm (`src/components/DonationForm.tsx`)
-- Remove the email input section entirely (lines 297-309)
-- Remove the `email` state variable and its inclusion in `donationData` -- set it from `profile?.email` for logged-in users, `null` for guests
-- Remove email from the form reset logic
+The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
 
-### 2. Add UPDATE RLS policy on `mchango_donations` (database migration)
-- Create an UPDATE policy allowing anon and authenticated users to update only their own donation records
-- Restrict updates to the `payment_reference` column scenario: where the donor just inserted (match by `id` and ensure `user_id IS NULL` for anon, or `user_id = auth.uid()` for authenticated)
-- This ensures the CheckoutRequestID update succeeds for both guest and logged-in donors
+## Fix Plan
 
-### 3. Streamline the donation data construction
-- For logged-in users, auto-fill email from `profile?.email` without showing a field
-- Remove email from the form state entirely since it's not user-facing anymore
+### 1. Manually complete stuck withdrawal via RPC
+Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
 
-### Technical Details
+Also complete `e2ea0312` (KES 10) which has the same pattern.
 
-**Migration SQL:**
-```sql
-CREATE POLICY "Donors can update their own pending donations"
-ON public.mchango_donations
-FOR UPDATE
-TO anon, authenticated
-USING (
-  (auth.uid() IS NULL AND user_id IS NULL)
-  OR
-  (auth.uid() IS NOT NULL AND user_id = auth.uid())
-)
-WITH CHECK (
-  (auth.uid() IS NULL AND user_id IS NULL)
-  OR
-  (auth.uid() IS NOT NULL AND user_id = auth.uid())
-);
+### 2. Fix retry-failed-payouts to query status before re-sending
+Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
 
-GRANT UPDATE ON mchango_donations TO anon;
-```
+### 3. Add a "check status" path in withdrawals-crud
+Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
 
-**DonationForm changes:**
-- Remove email state, email input UI, and email reset
-- Pass `email: user ? (profile?.email || null) : null` directly in `donationData`
+### Files to Change
+- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
+- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
+- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
 

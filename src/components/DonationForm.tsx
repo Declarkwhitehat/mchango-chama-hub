@@ -28,7 +28,6 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
   const [amount, setAmount] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState(profile?.phone || "");
-  const [email, setEmail] = useState(profile?.email || "");
   const [isAnonymous, setIsAnonymous] = useState(false);
 
   const handleDonate = async (e: React.FormEvent) => {
@@ -76,7 +75,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
         user_id: user?.id || null,
         display_name: isAnonymous ? "Anonymous" : (displayName || "Anonymous"),
         phone: phone,
-        email: email || null,
+        email: user ? (profile?.email || null) : null,
         amount: parseFloat(amount),
         is_anonymous: isAnonymous,
         payment_reference: `DON-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -169,7 +168,6 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
       if (!user) {
         setDisplayName("");
         setPhone("");
-        setEmail("");
       }
       setIsAnonymous(false);
 
@@ -294,19 +292,6 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
             </p>
           </div>
 
-          {/* Email - optional, only show for guests */}
-          {!user && (
-            <div className="space-y-2">
-              <Label htmlFor="email">Email (Optional)</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-          )}
 
           <div className="flex items-center space-x-2">
             <Checkbox
