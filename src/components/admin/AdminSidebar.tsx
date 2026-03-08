@@ -16,7 +16,8 @@ import {
   Building2,
   Landmark,
   BadgeCheck,
-  ShieldAlert
+  ShieldAlert,
+  CheckCircle
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
