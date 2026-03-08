@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { PaymentCountdownTimer } from "./PaymentCountdownTimer";
-import { AmountToPayCard } from "./AmountToPayCard";
+
 
 interface CyclePaymentStatusProps {
   chamaId: string;
@@ -235,6 +235,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
         endDate={cycleInfo.end_date}
         cutoffHour={22}
         contributionAmount={cycleInfo.due_amount}
+        totalPayable={missedCyclesCount > 0 ? totalOutstanding + cycleInfo.due_amount : undefined}
         beneficiaryName={cycleInfo.beneficiary_name}
         paidCount={paidCount}
         totalCount={totalCount}
