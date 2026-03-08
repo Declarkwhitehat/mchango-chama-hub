@@ -249,12 +249,9 @@ const ForgotPassword = () => {
             </CardTitle>
             <CardDescription className="text-center">
               {step === 'identifier' && 'Enter your email or phone number to reset your password'}
-              {step === 'otp' && `Enter the 6-digit code sent to ${identifier}`}
+              {step === 'otp' && `Enter the 6-digit code sent to your registered phone number`}
               {step === 'newPassword' && 'Enter your new password'}
-              {step === 'success' && (isPhone 
-                ? 'Your password has been reset successfully'
-                : `Check your email at ${identifier} for reset instructions`
-              )}
+              {step === 'success' && 'Your password has been reset successfully'}
             </CardDescription>
           </CardHeader>
           <CardContent>
