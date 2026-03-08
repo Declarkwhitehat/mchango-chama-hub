@@ -375,6 +375,14 @@ serve(async (req) => {
 
       // Check for welfare executive change cooldown
       if (body.welfare_id) {
+        // Auto-accept expired pending changes
+        await supabaseAdmin
+          .from('welfare_executive_changes')
+          .update({ admin_decision: 'auto_accepted', admin_decided_at: new Date().toISOString() })
+          .eq('welfare_id', body.welfare_id)
+          .eq('admin_decision', 'pending')
+          .lte('cooldown_ends_at', new Date().toISOString());
+
         const { data: activeCooldown } = await supabaseAdmin
           .from('welfare_executive_changes')
           .select('id, cooldown_ends_at, cooldown_hours')

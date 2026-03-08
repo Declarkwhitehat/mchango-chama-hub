@@ -61,6 +61,14 @@ export const WelfareExecutiveChangeBanner = ({ welfareId, onCooldownActive }: Pr
   }, [changes]);
 
   const fetchChanges = async () => {
+    // Auto-accept expired pending changes
+    await supabase
+      .from('welfare_executive_changes')
+      .update({ admin_decision: 'auto_accepted', admin_decided_at: new Date().toISOString() } as any)
+      .eq('welfare_id', welfareId)
+      .eq('admin_decision', 'pending')
+      .lte('cooldown_ends_at', new Date().toISOString());
+
     const { data } = await supabase
       .from('welfare_executive_changes')
       .select('*')
