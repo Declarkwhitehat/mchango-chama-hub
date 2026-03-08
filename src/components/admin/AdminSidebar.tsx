@@ -126,6 +126,7 @@ export function AdminSidebar() {
   ];
 
   const financialItems: MenuItem[] = [
+    { title: "Revenue", url: "/admin/revenue", icon: TrendingUp },
     { title: "Transactions", url: "/admin/transactions", icon: DollarSign },
     { 
       title: "Withdrawals", 
