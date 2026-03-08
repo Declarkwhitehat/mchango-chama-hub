@@ -27,7 +27,7 @@ import { VerificationRequestButton } from "@/components/VerificationRequestButto
 import { ChamaChatPanel } from "@/components/chama/ChamaChatPanel";
 import { TrustScoreBadge } from "@/components/chama/TrustScoreBadge";
 
-import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, MessageSquare, FlaskConical } from "lucide-react";
+import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -98,9 +98,6 @@ const ChamaDetail = () => {
   const [isStarting, setIsStarting] = useState(false);
   const [memberPaymentStatuses, setMemberPaymentStatuses] = useState<Record<string, boolean>>({});
   const [memberTrustScores, setMemberTrustScores] = useState<Record<string, number>>({});
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simResults, setSimResults] = useState<any>(null);
-  const [showSimDialog, setShowSimDialog] = useState(false);
 
   useEffect(() => {
     loadChama();
@@ -403,25 +400,6 @@ const ChamaDetail = () => {
     }
   };
 
-  const handleRunSimulation = async () => {
-    setIsSimulating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('simulate-chama-test', {
-        body: {}
-      });
-      if (error) throw error;
-      setSimResults(data);
-      setShowSimDialog(true);
-    } catch (err: any) {
-      toast({
-        title: "Simulation Failed",
-        description: err.message || "Could not run simulation",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSimulating(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -612,15 +590,6 @@ const ChamaDetail = () => {
         {isManager && (
           <div className="space-y-3">
             <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={handleRunSimulation}
-              disabled={isSimulating}
-            >
-              {isSimulating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-              {isSimulating ? 'Running Simulation...' : 'Run Payout Simulation'}
-            </Button>
           </div>
         )}
 
@@ -989,95 +958,6 @@ const ChamaDetail = () => {
           </Card>
         )}
 
-        {/* Simulation Results Dialog */}
-        <Dialog open={showSimDialog} onOpenChange={setShowSimDialog}>
-          <DialogContent className="max-w-2xl max-h-[80vh]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <FlaskConical className="h-5 w-5" />
-                Simulation Results (30 Members, 10 Scenarios)
-              </DialogTitle>
-              <DialogDescription>
-                {simResults?.summary && (
-                  <span className={simResults.summary.failed > 0 ? 'text-destructive' : 'text-green-600'}>
-                    {simResults.summary.passed}/{simResults.summary.total} scenarios passed
-                    {simResults.summary.failed > 0 && ` • ${simResults.summary.failed} failed`}
-                  </span>
-                )}
-              </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-[60vh]">
-              <div className="space-y-4 pr-4">
-                {/* Findings Summary */}
-                {simResults?.findings && (
-                  <Card className="border-primary/30 bg-primary/5">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">📊 Findings Summary</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>Platform Revenue: <span className="font-bold">KES {simResults.findings.totalPlatformRevenue?.toLocaleString()}</span></div>
-                        <div>Payouts Disbursed: <span className="font-bold">KES {simResults.findings.totalPayoutsDisbursed?.toLocaleString()}</span></div>
-                        <div>Credits Outstanding: <span className="font-bold">KES {simResults.findings.carryForwardCreditsOutstanding?.toLocaleString()}</span></div>
-                        <div>Debts Created: <span className="font-bold">{simResults.findings.debtRecordsCreated}</span></div>
-                        <div>Members Active: <span className="font-bold">{simResults.findings.membersActive}</span></div>
-                        <div>Members Removed: <span className="font-bold">{simResults.findings.membersRemoved}</span></div>
-                        <div>Skips Recorded: <span className="font-bold">{simResults.findings.skipsRecorded}</span></div>
-                        <div>Deficits Created: <span className="font-bold">{simResults.findings.deficitRecordsCreated}</span></div>
-                      </div>
-                      {simResults.findings.inconsistencies?.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          <p className="text-xs font-semibold text-destructive">⚠️ Inconsistencies:</p>
-                          {simResults.findings.inconsistencies.map((inc: string, i: number) => (
-                            <p key={i} className="text-xs text-destructive">{inc}</p>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Scenarios */}
-                {simResults?.scenarios?.map((scenario: any, idx: number) => (
-                  <Card key={idx} className={scenario.passed ? 'border-green-500/50' : 'border-destructive/50'}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        {scenario.passed ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-destructive" />
-                        )}
-                        {scenario.name}
-                      </CardTitle>
-                      <CardDescription className="text-xs">{scenario.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-1">
-                        {scenario.steps?.map((step: any, sIdx: number) => (
-                          <div key={sIdx} className="text-xs border-l-2 border-muted pl-3 py-1">
-                            <span className="font-medium">{step.action}:</span>{' '}
-                            <span className="text-muted-foreground">{step.result}</span>
-                            {step.data && (
-                              <pre className="mt-1 text-[10px] bg-muted p-1 rounded overflow-x-auto">
-                                {JSON.stringify(step.data, null, 2)}
-                              </pre>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      {scenario.assertion && (
-                        <p className="text-xs text-amber-600 mt-2">Assertion: {scenario.assertion}</p>
-                      )}
-                      {scenario.error && (
-                        <p className="text-xs text-destructive mt-2">Error: {scenario.error}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
       </div>
     </Layout>
   );
