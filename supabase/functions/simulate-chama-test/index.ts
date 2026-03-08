@@ -1441,6 +1441,395 @@ async function runScenarioE2EAutoPayout(
   }
 }
 
+// ==================== ADMIN FALLBACK SCENARIO ====================
+
+async function runScenarioAdminFallback(
+  supabase: any,
+  profiles: any[],
+  config: {
+    name: string;
+    description: string;
+    memberCount: number;
+    contribution: number;
+    commissionRate: number;
+  }
+): Promise<ScenarioResult> {
+  const steps: StepResult[] = [];
+  const slug = `sim-admin-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  let chamaId: string | null = null;
+
+  try {
+    // Step 1: Create chama
+    const { data: chama, error: chamaError } = await supabase
+      .from('chama')
+      .insert({
+        name: `[SIM] ${config.name}`,
+        slug,
+        description: config.description,
+        contribution_amount: config.contribution,
+        contribution_frequency: 'daily',
+        max_members: config.memberCount,
+        min_members: 2,
+        status: 'active',
+        created_by: profiles[0].id,
+        commission_rate: config.commissionRate,
+        start_date: new Date(Date.now() - 86400000 * 3).toISOString(),
+      })
+      .select('id, group_code')
+      .single();
+
+    if (chamaError) throw new Error(`Create chama: ${chamaError.message}`);
+    chamaId = chama.id;
+    steps.push({ action: 'Create test chama', result: 'Success', data: { id: chama.id } });
+
+    // Step 2: Add members - ALL have 1+ missed payment (makes them ineligible)
+    const { data: autoMember } = await supabase
+      .from('chama_members')
+      .select('id, user_id')
+      .eq('chama_id', chamaId)
+      .eq('user_id', profiles[0].id)
+      .single();
+
+    const memberIds: string[] = [autoMember.id];
+    const memberUserIds: string[] = [autoMember.user_id];
+
+    for (let i = 1; i < config.memberCount; i++) {
+      const profileIdx = i % profiles.length;
+      const memberCode = `${(chama.group_code || 'SIM').slice(0, 4)}M${String(i + 1).padStart(4, '0')}`;
+      const { data: member } = await supabase
+        .from('chama_members')
+        .insert({
+          chama_id: chamaId,
+          user_id: profiles[profileIdx].id,
+          is_manager: false,
+          member_code: memberCode,
+          order_index: i + 1,
+          status: 'active',
+          approval_status: 'approved',
+          first_payment_completed: true,
+          missed_payments_count: 0,
+        })
+        .select('id, user_id')
+        .single();
+
+      if (member) {
+        memberIds.push(member.id);
+        memberUserIds.push(member.user_id);
+      }
+    }
+
+    steps.push({ action: `Add ${config.memberCount} members`, result: `${memberIds.length} created` });
+
+    // Step 3: Set available balance
+    const netPerMember = config.contribution * (1 - config.commissionRate);
+    const totalNet = netPerMember * config.memberCount;
+    await supabase.from('chama').update({ available_balance: totalNet }).eq('id', chamaId);
+    steps.push({ action: 'Set available balance', result: `KES ${totalNet}` });
+
+    // Step 4: Create Cycle 1 (past, processed) — beneficiary was member 1, all paid EXCEPT members 2,3
+    const { data: cycle1 } = await supabase
+      .from('contribution_cycles')
+      .insert({
+        chama_id: chamaId,
+        cycle_number: 1,
+        start_date: new Date(Date.now() - 86400000 * 3).toISOString(),
+        end_date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        due_amount: config.contribution,
+        beneficiary_member_id: memberIds[0],
+        is_complete: true,
+        payout_processed: true,
+      })
+      .select('id')
+      .single();
+
+    // Members 2 and 3 (index 1,2) didn't pay cycle 1 → creates unpaid records
+    for (let i = 0; i < memberIds.length; i++) {
+      const didPay = i !== 1 && i !== 2; // Members at index 1,2 didn't pay
+      await supabase.from('member_cycle_payments').insert({
+        member_id: memberIds[i],
+        cycle_id: cycle1.id,
+        amount_due: config.contribution,
+        amount_paid: didPay ? config.contribution : 0,
+        amount_remaining: didPay ? 0 : config.contribution,
+        is_paid: didPay,
+        fully_paid: didPay,
+      });
+    }
+
+    // Create debts for members 1,2 (index 1,2)
+    for (const idx of [1, 2]) {
+      await supabase.from('chama_member_debts').insert({
+        chama_id: chamaId,
+        member_id: memberIds[idx],
+        cycle_id: cycle1.id,
+        principal_debt: config.contribution,
+        penalty_debt: config.contribution * 0.10,
+        principal_remaining: config.contribution,
+        penalty_remaining: config.contribution * 0.10,
+        status: 'outstanding',
+      });
+    }
+
+    steps.push({
+      action: 'Create Cycle 1 — Members 2,3 have debts',
+      result: 'Members at index 1,2 have outstanding debts → ineligible for payout',
+    });
+
+    // Step 5: Create Cycle 2 (expired, NOT processed) — beneficiary = member 2 (index 1, has debt)
+    const cycleStart = new Date(Date.now() - 86400000);
+    const cycleEnd = new Date(Date.now() - 3600000);
+
+    const { data: cycle2 } = await supabase
+      .from('contribution_cycles')
+      .insert({
+        chama_id: chamaId,
+        cycle_number: 2,
+        start_date: cycleStart.toISOString(),
+        end_date: cycleEnd.toISOString(),
+        due_amount: config.contribution,
+        beneficiary_member_id: memberIds[1], // Member 2 (has debt → ineligible)
+        is_complete: false,
+        payout_processed: false,
+      })
+      .select('id')
+      .single();
+
+    // All members paid for cycle 2 (but members 1,2 still have prior debts)
+    for (let i = 0; i < memberIds.length; i++) {
+      await supabase.from('member_cycle_payments').insert({
+        member_id: memberIds[i],
+        cycle_id: cycle2.id,
+        amount_due: config.contribution,
+        amount_paid: config.contribution,
+        amount_remaining: 0,
+        is_paid: true,
+        fully_paid: true,
+      });
+    }
+
+    steps.push({
+      action: 'Create Cycle 2 — beneficiary is Member 2 (has debt)',
+      result: 'All paid current cycle, but Member 2 & 3 have prior debts → both ineligible',
+    });
+
+    // Step 6: Ensure beneficiary has payment method
+    const beneficiaryForApproval = memberUserIds[3]; // Member 4 (index 3) — will be admin's chosen member
+    const { data: existingPM } = await supabase
+      .from('payment_methods')
+      .select('id')
+      .eq('user_id', beneficiaryForApproval)
+      .eq('method_type', 'mpesa')
+      .eq('is_default', true)
+      .maybeSingle();
+
+    if (!existingPM) {
+      const phone = profiles[3 % profiles.length]?.phone || '0700000003';
+      await supabase.from('payment_methods').insert({
+        user_id: beneficiaryForApproval,
+        method_type: 'mpesa',
+        phone_number: phone,
+        is_default: true,
+        is_verified: true,
+      });
+    }
+
+    steps.push({ action: 'Ensure Member 4 has M-Pesa payment method', result: 'Ready' });
+
+    // Step 7: Call daily-payout-cron — should create admin approval request
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    let cronResult: any = null;
+    try {
+      const cronResponse = await fetch(`${supabaseUrl}/functions/v1/daily-payout-cron`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ time: new Date().toISOString() }),
+      });
+
+      cronResult = await cronResponse.json();
+      steps.push({
+        action: '🚀 Call daily-payout-cron',
+        result: cronResponse.status === 200 ? '✅ Executed' : `⚠️ Status ${cronResponse.status}`,
+        data: cronResult,
+      });
+    } catch (e: any) {
+      steps.push({ action: '🚀 Call daily-payout-cron', result: `❌ Error: ${e.message}` });
+    }
+
+    // Step 8: Verify admin approval request was created
+    const { data: approvalRequests } = await supabase
+      .from('payout_approval_requests')
+      .select('*')
+      .eq('chama_id', chamaId)
+      .eq('cycle_id', cycle2.id);
+
+    const approvalReq = approvalRequests?.[0];
+
+    if (!approvalReq) {
+      steps.push({
+        action: '📋 Check admin approval request',
+        result: '❌ No approval request found — payout cron did not create fallback',
+      });
+
+      await cleanup(supabase, chamaId);
+      return {
+        name: config.name,
+        description: config.description,
+        passed: false,
+        steps,
+        assertion: 'Expected admin approval request to be created when no eligible member found',
+      };
+    }
+
+    steps.push({
+      action: '📋 Admin approval request created',
+      result: `✅ Status: ${approvalReq.status}, Amount: KES ${approvalReq.payout_amount}`,
+      data: {
+        requestId: approvalReq.id,
+        status: approvalReq.status,
+        reason: approvalReq.reason,
+        ineligibleCount: (approvalReq.ineligible_members as any[])?.length || 0,
+        payoutAmount: approvalReq.payout_amount,
+      },
+    });
+
+    // Step 9: Admin approves with chosen Member 4 (index 3 — eligible, no debts)
+    let approveResult: any = null;
+    try {
+      const approveResponse = await fetch(`${supabaseUrl}/functions/v1/payout-approval`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'approve',
+          requestId: approvalReq.id,
+          chosenMemberId: memberIds[3], // Member 4
+          adminNotes: 'Simulation: Admin chose Member 4 as eligible replacement',
+          adminUserId: profiles[0].id,
+        }),
+      });
+
+      approveResult = await approveResponse.json();
+
+      steps.push({
+        action: '✅ Admin approves payout → Member 4',
+        result: approveResponse.ok && approveResult.success
+          ? `✅ Approved! Withdrawal: ${approveResult.withdrawal_id}, B2C: ${approveResult.b2c_triggered}`
+          : `❌ Failed: ${approveResult.error || 'Unknown error'}`,
+        data: approveResult,
+      });
+    } catch (e: any) {
+      steps.push({ action: '✅ Admin approve', result: `❌ Error: ${e.message}` });
+    }
+
+    // Step 10: Verify withdrawal was created
+    const { data: withdrawals } = await supabase
+      .from('withdrawals')
+      .select('id, status, amount, net_amount, b2c_attempt_count, payment_method_type, cycle_id')
+      .eq('chama_id', chamaId)
+      .eq('cycle_id', cycle2.id);
+
+    const withdrawal = withdrawals?.[0];
+
+    if (withdrawal) {
+      const b2cAttempted = (withdrawal.b2c_attempt_count || 0) > 0 ||
+        withdrawal.status === 'processing' ||
+        withdrawal.status === 'completed' ||
+        withdrawal.status === 'pending_retry';
+
+      steps.push({
+        action: '📋 Withdrawal created after admin approval',
+        result: `✅ Status: ${withdrawal.status}, Net: KES ${withdrawal.net_amount}`,
+        data: {
+          withdrawalId: withdrawal.id,
+          status: withdrawal.status,
+          netAmount: withdrawal.net_amount,
+          b2cAttempted,
+          b2cAttemptCount: withdrawal.b2c_attempt_count,
+        },
+      });
+
+      steps.push({
+        action: '📡 B2C triggered after admin approval',
+        result: b2cAttempted
+          ? `✅ B2C was called (attempts: ${withdrawal.b2c_attempt_count || 'processing'})`
+          : `❌ B2C not triggered (status: ${withdrawal.status})`,
+        data: { b2cAttempted },
+      });
+    } else {
+      steps.push({ action: '📋 Withdrawal after approval', result: '❌ No withdrawal found' });
+    }
+
+    // Step 11: Verify approval request updated
+    const { data: updatedReq } = await supabase
+      .from('payout_approval_requests')
+      .select('status, chosen_member_id, b2c_triggered, withdrawal_id')
+      .eq('id', approvalReq.id)
+      .single();
+
+    steps.push({
+      action: '📋 Approval request final state',
+      result: `Status: ${updatedReq?.status}, B2C: ${updatedReq?.b2c_triggered}`,
+      data: updatedReq,
+    });
+
+    // Step 12: Verify financial ledger
+    if (withdrawal) {
+      const { data: ledger } = await supabase
+        .from('financial_ledger')
+        .select('*')
+        .eq('reference_id', withdrawal.id)
+        .eq('transaction_type', 'payout');
+
+      steps.push({
+        action: '📒 Financial ledger entry',
+        result: ledger && ledger.length > 0
+          ? `✅ Recorded: KES ${ledger[0].net_amount}`
+          : '⚠️ No ledger entry',
+        data: ledger?.[0],
+      });
+    }
+
+    // Final verdict
+    const passed = !!approvalReq &&
+      approvalReq.status !== 'rejected' &&
+      !!withdrawal &&
+      approveResult?.success === true;
+
+    // Cleanup
+    await supabase.from('payout_approval_requests').delete().eq('chama_id', chamaId);
+    await cleanup(supabase, chamaId);
+    steps.push({ action: 'Cleanup', result: 'Success' });
+
+    return {
+      name: config.name,
+      description: config.description,
+      passed,
+      steps,
+      assertion: passed ? undefined : 'Admin fallback flow did not complete successfully',
+    };
+
+  } catch (error) {
+    if (chamaId) {
+      await supabase.from('payout_approval_requests').delete().eq('chama_id', chamaId);
+      await cleanup(supabase, chamaId);
+    }
+    return {
+      name: config.name,
+      description: config.description,
+      passed: false,
+      steps,
+      error: (error as any).message,
+    };
+  }
+}
+
 // ==================== CLEANUP ====================
 
 async function cleanup(supabase: any, chamaId: string) {
