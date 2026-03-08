@@ -38,6 +38,11 @@ export const UsersManagement = () => {
   const [privilegeCode, setPrivilegeCode] = useState("");
   const [pendingAdminUserId, setPendingAdminUserId] = useState<string | null>(null);
   const [codeError, setCodeError] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletePrivilegeCode, setDeletePrivilegeCode] = useState("");
+  const [pendingDeleteUserId, setPendingDeleteUserId] = useState<string | null>(null);
+  const [deleteCodeError, setDeleteCodeError] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchUsers();
