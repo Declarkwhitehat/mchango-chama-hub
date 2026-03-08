@@ -162,38 +162,38 @@ const MchangoDetail = () => {
         <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
           {/* Account creation banner for non-logged-in users */}
           {!user && (
-            <Card className="relative overflow-hidden border-2 border-primary/40 bg-gradient-to-br from-primary/10 via-primary/5 to-background shadow-lg">
+            <Card className="relative overflow-hidden border-2 border-destructive/50 bg-gradient-to-br from-destructive/10 via-destructive/5 to-background shadow-xl ring-1 ring-destructive/20">
               {/* Decorative accent bar */}
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-primary/80 to-primary/40" />
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-destructive via-destructive/80 to-destructive/40" />
               
               <CardContent className="pt-8 pb-6 px-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center gap-5">
                   {/* Icon */}
-                  <div className="flex-shrink-0 h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center">
-                    <Bell className="h-7 w-7 text-primary" />
+                  <div className="flex-shrink-0 h-16 w-16 rounded-2xl bg-destructive/15 flex items-center justify-center border border-destructive/20">
+                    <Bell className="h-8 w-8 text-destructive animate-pulse" />
                   </div>
                   
                   {/* Content */}
                   <div className="flex-1 space-y-3">
-                    <h3 className="text-lg font-bold text-foreground tracking-tight">
-                      Stay Informed — Know Where Your Money Goes
+                    <h3 className="text-xl font-extrabold text-destructive tracking-tight">
+                      ⚠️ Stay Informed — Know Where Your Money Goes
                     </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
-                      Create a free account to receive real-time withdrawal notifications and campaign updates. 
-                      Full transparency on every shilling.
+                    <p className="text-sm font-semibold text-foreground leading-relaxed max-w-xl">
+                      Create a free account to receive <span className="text-destructive font-bold">real-time withdrawal notifications</span> and campaign updates. 
+                      Full transparency on every shilling — <span className="text-destructive font-bold">don't donate blindly.</span>
                     </p>
                     
                     {/* Trust indicators */}
                     <div className="flex flex-wrap gap-3 pt-1">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-destructive">
                         <Shield className="h-3.5 w-3.5" />
                         Withdrawal Alerts
                       </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-destructive">
                         <Eye className="h-3.5 w-3.5" />
                         Full Transparency
                       </span>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-destructive">
                         <UserPlus className="h-3.5 w-3.5" />
                         100% Free
                       </span>
@@ -203,10 +203,11 @@ const MchangoDetail = () => {
                   {/* CTA */}
                   <Button 
                     size="lg" 
-                    className="flex-shrink-0 font-semibold shadow-md px-6"
+                    variant="destructive"
+                    className="flex-shrink-0 font-extrabold shadow-lg px-8 text-base"
                     onClick={() => navigate('/auth')}
                   >
-                    <UserPlus className="h-4 w-4 mr-2" />
+                    <UserPlus className="h-5 w-5 mr-2" />
                     Create Free Account
                   </Button>
                 </div>
