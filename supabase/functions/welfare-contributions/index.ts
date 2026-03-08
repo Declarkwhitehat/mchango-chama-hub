@@ -110,7 +110,7 @@ serve(async (req) => {
           gross_amount: grossAmount,
           commission_amount: commissionAmount,
           net_amount: netAmount,
-          payment_reference: payment_reference || `WC-${crypto.randomUUID().substring(0, 8)}`,
+          payment_reference: paymentRef,
           payment_method: payment_method || 'mpesa',
           payment_status: 'completed',
           cycle_month: cycleMonth,
