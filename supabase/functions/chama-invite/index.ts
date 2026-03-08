@@ -308,6 +308,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ data, count: data?.length || 0 }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
 
     // List invite codes for a chama
     if (action === 'list') {
