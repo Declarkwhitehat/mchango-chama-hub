@@ -38,18 +38,21 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Check if today's cycle already exists
-      const today = new Date().toISOString().split('T')[0];
-      const { data: existingCycle } = await supabase
+      // Check if today's cycle already exists (robust: check for any cycle overlapping today)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      const { data: existingCycles } = await supabase
         .from('contribution_cycles')
         .select('*')
         .eq('chama_id', chamaId)
-        .gte('start_date', today)
-        .lte('end_date', today)
-        .maybeSingle();
+        .lte('start_date', todayEnd.toISOString())
+        .gte('end_date', todayStart.toISOString());
 
-      if (existingCycle) {
-        return new Response(JSON.stringify({ cycle: existingCycle }), {
+      if (existingCycles && existingCycles.length > 0) {
+        return new Response(JSON.stringify({ cycle: existingCycles[0] }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
