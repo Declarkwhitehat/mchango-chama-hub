@@ -53,7 +53,7 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
       // Create approval records for secretary and treasurer
       const { data: members, error: membersError } = await supabase
         .from('welfare_members')
-        .select('id, role')
+        .select('id, role, user_id')
         .eq('welfare_id', welfareId)
         .in('role', ['secretary', 'treasurer'])
         .eq('status', 'active');
@@ -78,6 +78,21 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
 
       const approvalError = approvalInserts.find((result) => result.error)?.error;
       if (approvalError) throw approvalError;
+
+      // Notify secretary and treasurer about the pending withdrawal
+      await Promise.all(
+        members.map((member) =>
+          supabase.from('notifications').insert({
+            user_id: member.user_id,
+            title: 'Welfare Withdrawal Pending Your Approval',
+            message: `A withdrawal of KES ${numAmount.toLocaleString()} (${category}) requires your approval as ${member.role}.`,
+            category: 'welfare',
+            type: 'action_required',
+            related_entity_type: 'welfare',
+            related_entity_id: welfareId,
+          })
+        )
+      );
 
       toast.success("Withdrawal request submitted for approval");
       setAmount(""); setReason(""); setCategory(""); setRecipientPhone("");
