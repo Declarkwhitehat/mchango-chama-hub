@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Languages } from 'lucide-react';
+import { MessageCircle, X, Languages, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import chatBotAvatar from '@/assets/chat-bot-avatar.png';
 import { ChatMessage } from './ChatMessage';
 import { CallbackForm } from './CallbackForm';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
