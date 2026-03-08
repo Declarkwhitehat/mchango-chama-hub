@@ -222,9 +222,12 @@ Deno.serve(async (req) => {
     // GET CURRENT CYCLE
     if (action === 'current' && req.method === 'POST') {
       const { chamaId } = requestBody;
-      const today = new Date().toISOString().split('T')[0];
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
 
-      const { data: cycle, error } = await supabase
+      const { data: cycles, error } = await supabase
         .from('contribution_cycles')
         .select(`
           *,
@@ -236,9 +239,12 @@ Deno.serve(async (req) => {
           )
         `)
         .eq('chama_id', chamaId)
-        .lte('start_date', today)
-        .gte('end_date', today)
-        .maybeSingle();
+        .lte('start_date', todayEnd.toISOString())
+        .gte('end_date', todayStart.toISOString())
+        .order('cycle_number', { ascending: false })
+        .limit(1);
+
+      const cycle = cycles?.[0] || null;
 
       if (error) {
         console.error('Error fetching cycle:', error);
