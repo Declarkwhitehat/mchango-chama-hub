@@ -988,6 +988,62 @@ const ChamaDetail = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Simulation Results Dialog */}
+        <Dialog open={showSimDialog} onOpenChange={setShowSimDialog}>
+          <DialogContent className="max-w-2xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FlaskConical className="h-5 w-5" />
+                Simulation Results
+              </DialogTitle>
+              <DialogDescription>
+                {simResults?.summary && (
+                  <span>
+                    {simResults.summary.passed}/{simResults.summary.total} scenarios passed
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh]">
+              <div className="space-y-4 pr-4">
+                {simResults?.scenarios?.map((scenario: any, idx: number) => (
+                  <Card key={idx} className={scenario.passed ? 'border-green-500/50' : 'border-destructive/50'}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        {scenario.passed ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        {scenario.name}
+                      </CardTitle>
+                      <CardDescription className="text-xs">{scenario.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-1">
+                        {scenario.steps?.map((step: any, sIdx: number) => (
+                          <div key={sIdx} className="text-xs border-l-2 border-muted pl-3 py-1">
+                            <span className="font-medium">{step.action}:</span>{' '}
+                            <span className="text-muted-foreground">{step.result}</span>
+                            {step.data && (
+                              <pre className="mt-1 text-[10px] bg-muted p-1 rounded overflow-x-auto">
+                                {JSON.stringify(step.data, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {scenario.error && (
+                        <p className="text-xs text-destructive mt-2">Error: {scenario.error}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
