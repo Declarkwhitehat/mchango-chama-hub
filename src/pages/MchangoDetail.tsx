@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Calendar, Share2, Loader2, AlertCircle, UserPlus } from "lucide-react";
+import { Calendar, Share2, Loader2, AlertCircle, UserPlus, Bell, Shield, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DonationForm } from "@/components/DonationForm";
@@ -160,18 +160,58 @@ const MchangoDetail = () => {
   return (
     <Layout showBackButton>
         <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
-          {/* Account creation prompt for non-logged-in users */}
+          {/* Account creation banner for non-logged-in users */}
           {!user && (
-            <Alert className="border-primary/30 bg-primary/5">
-              <UserPlus className="h-4 w-4" />
-              <AlertTitle>Stay Informed</AlertTitle>
-              <AlertDescription className="flex flex-col gap-2">
-                <span>Create an account to receive withdrawal notifications and updates for campaigns you contribute to. This ensures full transparency and accountability.</span>
-                <Button variant="outline" size="sm" className="w-fit" onClick={() => navigate('/auth')}>
-                  Create Account
-                </Button>
-              </AlertDescription>
-            </Alert>
+            <Card className="relative overflow-hidden border-2 border-primary/40 bg-gradient-to-br from-primary/10 via-primary/5 to-background shadow-lg">
+              {/* Decorative accent bar */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-primary/80 to-primary/40" />
+              
+              <CardContent className="pt-8 pb-6 px-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-5">
+                  {/* Icon */}
+                  <div className="flex-shrink-0 h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center">
+                    <Bell className="h-7 w-7 text-primary" />
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="flex-1 space-y-3">
+                    <h3 className="text-lg font-bold text-foreground tracking-tight">
+                      Stay Informed — Know Where Your Money Goes
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
+                      Create a free account to receive real-time withdrawal notifications and campaign updates. 
+                      Full transparency on every shilling.
+                    </p>
+                    
+                    {/* Trust indicators */}
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                        <Shield className="h-3.5 w-3.5" />
+                        Withdrawal Alerts
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                        <Eye className="h-3.5 w-3.5" />
+                        Full Transparency
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                        <UserPlus className="h-3.5 w-3.5" />
+                        100% Free
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* CTA */}
+                  <Button 
+                    size="lg" 
+                    className="flex-shrink-0 font-semibold shadow-md px-6"
+                    onClick={() => navigate('/auth')}
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Create Free Account
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Expired Campaign Alert for Owner */}
