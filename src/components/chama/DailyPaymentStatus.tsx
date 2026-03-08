@@ -73,6 +73,15 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
+      // Auto-advance expired cycles before loading current
+      try {
+        await supabase.functions.invoke('daily-cycle-manager', {
+          body: { action: 'auto-advance', chamaId }
+        });
+      } catch (advanceErr) {
+        console.log('Auto-advance check:', advanceErr);
+      }
+
       // Load current cycle
       const { data, error } = await supabase.functions.invoke('daily-cycle-manager', {
         body: { action: 'current', chamaId }
