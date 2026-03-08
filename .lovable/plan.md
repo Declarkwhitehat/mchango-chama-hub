@@ -1,35 +1,57 @@
 
 
-## Diagnosis
+## Redesign Admin Member Search with Full Activity Log
 
-The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
+### Problem
+The current `AdminSearch` page only searches chama memberships and shows basic profile/group info. It lacks:
+- Searching across welfare and organization memberships
+- Recent withdrawals and payments history
+- Phone number change audit trail
+- Full activity log from `audit_logs`
+- M-Pesa number (from `payment_methods`)
+- ID document photos (`id_front_url`, `id_back_url` from `profiles`)
 
-1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
-2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
-3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
-4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
+### Plan
 
-There are 3 total stuck withdrawals across the system with the same pattern.
+#### 1. New Edge Function: `admin-member-activity`
+Create a comprehensive edge function that, given a `user_id`, fetches all activity data in parallel:
 
-## Root Cause
+- **All memberships**: `chama_members` (with chama name), `welfare_members` (with welfare name)
+- **Payment methods**: `payment_methods` where `method_type = 'mpesa'` to get M-Pesa number
+- **Recent payments**: Union of `welfare_contributions`, `organization_donations`, `mchango_donations`, and chama `contributions` (last 50)
+- **Recent withdrawals**: `withdrawals` table (last 20)
+- **Audit logs**: `audit_logs` where `user_id` matches -- captures phone changes, profile updates, all actions
+- **Profile with ID photos**: `profiles` including `id_front_url`, `id_back_url`
 
-The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
+Returns a single structured response to the frontend.
 
-## Fix Plan
+#### 2. Update `admin-search` Edge Function
+Extend search to also check `welfare_members.member_code` and return the `user_id` so the frontend can call `admin-member-activity`.
 
-### 1. Manually complete stuck withdrawal via RPC
-Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
+#### 3. Redesign `AdminSearch.tsx` Page
+Professional layout with two phases:
 
-Also complete `e2ea0312` (KES 10) which has the same pattern.
+**Phase 1 - Search**: Clean search bar (existing `SearchBar` component, already good).
 
-### 2. Fix retry-failed-payouts to query status before re-sending
-Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
+**Phase 2 - Results Display**: After finding a user, show a professional tabbed dashboard:
 
-### 3. Add a "check status" path in withdrawals-crud
-Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
+- **Header card**: Name, photo placeholder, member code, KYC badge, M-Pesa number, registration date
+- **Tab: Memberships**: All chama + welfare memberships with group names, roles, statuses, balances
+- **Tab: Payments & Withdrawals**: Chronological table of all payments and withdrawals with source, amount, status, M-Pesa receipt
+- **Tab: Activity Log**: Full audit trail from `audit_logs` -- phone changes, profile updates, login history, all actions in a timeline format
+- **Tab: ID Documents**: Display `id_front_url` and `id_back_url` images from the profile, with KYC status and review info
 
-### Files to Change
-- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
-- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
-- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
+#### Files to Edit
+1. **Create** `supabase/functions/admin-member-activity/index.ts` -- new edge function
+2. **Edit** `supabase/functions/admin-search/index.ts` -- add welfare_members member_code search
+3. **Rewrite** `src/pages/AdminSearch.tsx` -- professional redesigned UI
+4. **Edit** `supabase/config.toml` -- register new function
+
+### Technical Details
+
+**Edge function `admin-member-activity`** accepts `{ user_id }` via POST. Uses `supabaseAdmin` (service role) to bypass RLS for admin-only data. Runs 6 parallel queries and returns structured JSON.
+
+**Search flow**: Search returns a `user_id`. Frontend then calls `admin-member-activity` with that `user_id` to load the full dashboard. This two-step approach keeps the search fast and the detail view comprehensive.
+
+**Audit log for phone changes**: The existing `audit_logs` table already captures profile updates. The activity tab will filter and highlight entries where `table_name = 'profiles'` and `old_values`/`new_values` contain phone field changes.
 
