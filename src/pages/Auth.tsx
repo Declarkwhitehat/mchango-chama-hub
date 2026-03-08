@@ -992,8 +992,11 @@ const Auth = () => {
                               onPhoneChange={(phone) => signupForm.setValue('phone', phone)}
                               onVerified={() => {
                                 setPhoneVerified(true);
-                                setSignupStep('details');
-                                toast.success("Phone verified! Complete your registration.");
+                                toast.success("Phone verified! Creating your account...");
+                                // Auto-submit the signup form after OTP verification
+                                setTimeout(() => {
+                                  signupForm.handleSubmit(handleSignup)();
+                                }, 500);
                               }}
                             />
                             <Button
