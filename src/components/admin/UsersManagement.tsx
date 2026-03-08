@@ -403,6 +403,56 @@ export const UsersManagement = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete User Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete User Account
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                This will permanently delete the user's account, profile, memberships, 
+                and all associated data. This action cannot be undone.
+              </p>
+              <div className="space-y-2">
+                <Input
+                  type="password"
+                  placeholder="Enter privilege code to confirm"
+                  value={deletePrivilegeCode}
+                  onChange={(e) => {
+                    setDeletePrivilegeCode(e.target.value);
+                    setDeleteCodeError(false);
+                  }}
+                  className={deleteCodeError ? "border-destructive" : ""}
+                />
+                {deleteCodeError && (
+                  <p className="text-sm text-destructive">Invalid privilege code</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeletePrivilegeCode("");
+              setDeleteCodeError(false);
+              setPendingDeleteUserId(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteUser}
+              disabled={!deletePrivilegeCode || deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Delete User Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
