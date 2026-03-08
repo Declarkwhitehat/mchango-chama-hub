@@ -435,7 +435,11 @@ serve(async (req) => {
           payment_method_id: defaultPaymentMethod.id,
           payment_method_type: defaultPaymentMethod.method_type,
           status: initialStatus,
-          notes: hasPaymentIssues ? (notes || '') + ' [Requires admin review: payment issues detected]' : notes,
+          notes: accountFrozenOrFlagged 
+            ? (notes || '') + ' [Requires admin approval — account is frozen/flagged]'
+            : hasPaymentIssues 
+              ? (notes || '') + ' [Requires admin review: payment issues detected]' 
+              : notes,
           reviewed_at: canAutoApprove ? new Date().toISOString() : null,
         })
         .select()
