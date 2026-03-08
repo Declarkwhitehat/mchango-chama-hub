@@ -130,19 +130,7 @@ export const PlatformStatistics = () => {
         <CardDescription>Key statistics across the platform</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-          {/* Users Stats */}
-          <div className="p-4 border rounded-lg space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Total Users</p>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="text-2xl font-bold">{stats.total_users.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">
-              {stats.verified_users} verified
-            </p>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Chamas Stats */}
           <div className="p-4 border rounded-lg space-y-2">
             <div className="flex items-center justify-between">
