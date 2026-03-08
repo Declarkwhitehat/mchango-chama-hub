@@ -312,7 +312,8 @@ const ChamaDetail = () => {
 
         const turnDates: Record<string, Date> = {};
         approvedMembers.forEach((member) => {
-          const orderIdx = (member.order_index || 1) - 1;
+          const effectivePos = getEffectivePosition(member);
+          const orderIdx = (effectivePos || 1) - 1;
           const memberTurnDate = new Date(baseDate);
           memberTurnDate.setDate(memberTurnDate.getDate() + (orderIdx * cycleLength));
           turnDates[member.id] = memberTurnDate;
