@@ -197,37 +197,9 @@ const ChamaDetail = () => {
         }
       }
 
-      // Use chama's available_balance if set (already net of commission)
-      // Fall back to calculating from contributions if not available
+      // Total Collected = available_balance (net pool balance after commission and withdrawals)
       const chamaAvailableBalance = Number(data.data.available_balance) || 0;
-      const chamaTotalWithdrawn = Number(data.data.total_withdrawn) || 0;
-      
-      if (chamaAvailableBalance > 0 || data.data.total_gross_collected) {
-        // Use the tracked net balance
-        setTotalContributions(Math.max(0, chamaAvailableBalance - chamaTotalWithdrawn));
-      } else {
-        // Fallback: Calculate from contributions with commission deduction
-        const { data: contributionsData } = await supabase
-          .from('contributions')
-          .select('amount')
-          .eq('chama_id', data.data.id)
-          .eq('status', 'completed');
-
-        const { data: withdrawalsData } = await supabase
-          .from('withdrawals')
-          .select('net_amount, status')
-          .eq('chama_id', data.data.id)
-          .in('status', ['approved', 'completed', 'processing']);
-
-        const grossContrib = contributionsData?.reduce((sum, contrib) => sum + Number(contrib.amount), 0) || 0;
-        const totalWithdrawn = withdrawalsData?.reduce((sum, w) => sum + Number(w.net_amount), 0) || 0;
-        
-        // Apply commission rate to get net available
-        const commissionRate = data.data.commission_rate || 0.05;
-        const netContrib = grossContrib * (1 - commissionRate);
-        
-        setTotalContributions(Math.max(0, netContrib - totalWithdrawn));
-      }
+      setTotalContributions(Math.max(0, chamaAvailableBalance));
 
       // Calculate whose turn it is and next turn dates
       await calculateTurns(data.data);
