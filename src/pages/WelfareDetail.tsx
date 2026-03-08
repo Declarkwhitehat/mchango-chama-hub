@@ -17,7 +17,7 @@ import { WelfareApprovalCard } from "@/components/welfare/WelfareApprovalCard";
 import { WelfareContributionCycleManager } from "@/components/welfare/WelfareContributionCycleManager";
 import { WelfareTransactionLog } from "@/components/welfare/WelfareTransactionLog";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
-
+import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecutiveChangeBanner";
 
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
