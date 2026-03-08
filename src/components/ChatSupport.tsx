@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Languages, ArrowLeft, Send } from 'lucide-react';
+import { X, Languages, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import chatBotAvatar from '@/assets/chat-bot-avatar.png';
@@ -227,25 +227,17 @@ export function ChatSupport() {
       {/* Chat Window */}
       {isOpen && (
         <Card className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-[calc(100vw-1rem)] max-md:h-[calc(100vh-1rem)] max-md:bottom-0 max-md:right-0 max-md:rounded-none">
+          {/* Floating close button */}
+          <button
+            onClick={() => setIsOpen(false)}
+            className="absolute top-2 right-2 z-10 h-12 w-12 flex items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground backdrop-blur-sm shadow-lg hover:bg-destructive active:scale-95 transition-all touch-manipulation"
+            aria-label="Close chat"
+          >
+            <X className="h-6 w-6" />
+          </button>
+
           {/* Header */}
-          <div className="border-b bg-primary text-primary-foreground rounded-t-lg max-md:rounded-none">
-            <div className="flex items-center justify-between px-3 pt-2 pb-1">
-              <button
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-1 px-2 py-2 min-h-[44px] rounded-lg hover:bg-white/15 active:bg-white/25 transition-colors touch-manipulation"
-                aria-label="Close chat"
-              >
-                <ArrowLeft className="h-5 w-5" />
-                <span className="text-sm font-medium">Back</span>
-              </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-white/15 active:bg-white/25 transition-colors touch-manipulation"
-                aria-label="Close chat"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+          <div className="border-b bg-primary text-primary-foreground rounded-t-lg max-md:rounded-none pt-3">
             <div className="flex items-center gap-3 px-4 pb-2">
               <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-white/30 flex-shrink-0">
                 <img src={chatBotAvatar} alt="AI Assistant" className="h-full w-full object-cover" />
