@@ -92,19 +92,21 @@ export const SkippedMemberAlert = ({ chamaId, memberId, contributionAmount }: Sk
     });
   };
 
+  const isFullyPaid = skipInfo.amountPaid >= skipInfo.amountOwed && skipInfo.amountOwed > 0;
+
   return (
-    <Card className="border-destructive bg-destructive/5">
+    <Card className={isFullyPaid ? "border-green-500 bg-green-500/5" : "border-destructive bg-destructive/5"}>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-destructive">
+        <CardTitle className={`flex items-center gap-2 ${isFullyPaid ? "text-green-600" : "text-destructive"}`}>
           <AlertTriangle className="h-5 w-5" />
-          Your Payout Was Skipped
+          {isFullyPaid ? "Payout Rescheduled – Dues Cleared" : "Your Payout Was Skipped"}
         </CardTitle>
         <CardDescription>
           {skipInfo.skippedAt && `Skipped on ${formatDate(skipInfo.skippedAt)}`}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert variant="destructive">
+        <Alert variant={isFullyPaid ? "default" : "destructive"}>
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Reason</AlertTitle>
           <AlertDescription>{skipInfo.skipReason}</AlertDescription>
@@ -113,13 +115,13 @@ export const SkippedMemberAlert = ({ chamaId, memberId, contributionAmount }: Sk
         <div className="grid grid-cols-2 gap-4">
           <div className="p-3 bg-background rounded-lg border">
             <p className="text-sm text-muted-foreground">Amount Due</p>
-            <p className="text-lg font-bold text-destructive">
+            <p className={`text-lg font-bold ${isFullyPaid ? "text-green-600" : "text-destructive"}`}>
               KES {skipInfo.amountOwed.toLocaleString()}
             </p>
           </div>
           <div className="p-3 bg-background rounded-lg border">
             <p className="text-sm text-muted-foreground">Amount Paid</p>
-            <p className="text-lg font-bold">
+            <p className="text-lg font-bold text-green-600">
               KES {skipInfo.amountPaid.toLocaleString()}
             </p>
           </div>
@@ -135,16 +137,25 @@ export const SkippedMemberAlert = ({ chamaId, memberId, contributionAmount }: Sk
         )}
 
         <div className="pt-2">
-          <p className="text-sm text-muted-foreground mb-3">
-            <strong>How to get your payout:</strong> Complete your outstanding contributions 
-            to be rescheduled in the payout queue. Once you've paid the required amount, 
-            you'll be eligible for the next available payout slot.
-          </p>
-          
-          <Button className="w-full gap-2" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            Make a Contribution
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+          {isFullyPaid ? (
+            <p className="text-sm text-green-700 font-medium">
+              ✅ You've cleared your outstanding dues. You are now rescheduled 
+              {skipInfo.newPosition ? ` to position #${skipInfo.newPosition}` : ''} in the payout queue. 
+              Your payout will be processed when your turn comes.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground mb-3">
+                <strong>How to get your payout:</strong> Complete your outstanding contributions 
+                to be rescheduled in the payout queue. Once you've paid the required amount, 
+                you'll be eligible for the next available payout slot.
+              </p>
+              <Button className="w-full gap-2" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                Make a Contribution
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>
