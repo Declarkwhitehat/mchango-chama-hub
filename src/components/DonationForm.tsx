@@ -65,17 +65,18 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
     setLoading(true);
 
     try {
-      // Get session if user is logged in (optional for guest donations)
+      // Get active session (works for both logged-in and guest flows)
       const { data: { session } } = await supabase.auth.getSession();
+      const activeUserId = session?.user?.id ?? user?.id ?? null;
+      const activeUserEmail = session?.user?.email ?? profile?.email ?? null;
       
       // Create pending donation record
-      // For guests, use anon key (no user_id)
       const donationData = {
         mchango_id: mchangoId,
-        user_id: user?.id || null,
+        user_id: activeUserId,
         display_name: isAnonymous ? "Anonymous" : (displayName || "Anonymous"),
         phone: phone,
-        email: user ? (profile?.email || null) : null,
+        email: activeUserId ? activeUserEmail : null,
         amount: parseFloat(amount),
         is_anonymous: isAnonymous,
         payment_reference: `DON-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
