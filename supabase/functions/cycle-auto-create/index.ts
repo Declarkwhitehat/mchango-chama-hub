@@ -240,25 +240,40 @@ Deno.serve(async (req) => {
     console.log(`Created cycle ${nextCycleNumber} for chama ${chama.name}, beneficiary: ${beneficiary.member_code}`);
 
     // Create payment records for all members, applying carry-forward credits
+    // Commission is deducted NOW when credit is consumed (deferred from overpayment time)
+    const COMMISSION_RATE = 0.05;
+    let totalCreditCommission = 0;
+    let totalNetCreditApplied = 0;
+
     const paymentRecords = members.map(member => {
       const carryForward = member.carry_forward_credit || 0;
       const nextCycleCredit = member.next_cycle_credit || 0;
       const totalCredit = carryForward + nextCycleCredit;
-      const amountDue = Math.max(0, chama.contribution_amount - totalCredit);
-      const amountApplied = Math.min(totalCredit, chama.contribution_amount);
-      const isFullyPaid = amountDue <= 0;
+      const creditToUse = Math.min(totalCredit, chama.contribution_amount);
+      const commission = creditToUse * COMMISSION_RATE;
+      const netFromCredit = creditToUse - commission;
+      const amountRemaining = Math.max(0, chama.contribution_amount - netFromCredit);
+      const isFullyPaid = amountRemaining <= 0;
+
+      if (creditToUse > 0) {
+        totalCreditCommission += commission;
+        totalNetCreditApplied += netFromCredit;
+      }
       
       return {
         member_id: member.id,
         cycle_id: newCycle.id,
         amount_due: chama.contribution_amount,
-        amount_paid: amountApplied,
-        amount_remaining: amountDue,
+        amount_paid: netFromCredit,
+        amount_remaining: amountRemaining,
         is_paid: isFullyPaid,
         fully_paid: isFullyPaid,
         is_late_payment: false,
-        payment_allocations: amountApplied > 0 ? [{
-          amount: amountApplied,
+        payment_allocations: creditToUse > 0 ? [{
+          amount: netFromCredit,
+          gross_credit_used: creditToUse,
+          commission,
+          commission_rate: COMMISSION_RATE,
           timestamp: new Date().toISOString(),
           source: 'carry_forward'
         }] : []
@@ -278,7 +293,8 @@ Deno.serve(async (req) => {
       const totalCredit = (member.carry_forward_credit || 0) + (member.next_cycle_credit || 0);
       
       if (totalCredit > 0) {
-        const remainingCredit = Math.max(0, totalCredit - chama.contribution_amount);
+        const creditUsed = Math.min(totalCredit, chama.contribution_amount);
+        const remainingCredit = Math.max(0, totalCredit - creditUsed);
         
         await supabase
           .from('chama_members')
@@ -288,6 +304,31 @@ Deno.serve(async (req) => {
           })
           .eq('id', member.id);
       }
+    }
+
+    // Record commission from carry-forward credit application
+    if (totalCreditCommission > 0) {
+      const { data: chamaData } = await supabase
+        .from('chama')
+        .select('total_commission_paid, available_balance')
+        .eq('id', chamaId)
+        .single();
+
+      if (chamaData) {
+        await supabase.from('chama').update({
+          total_commission_paid: (chamaData.total_commission_paid || 0) + totalCreditCommission,
+          available_balance: (chamaData.available_balance || 0) + totalNetCreditApplied
+        }).eq('id', chamaId);
+      }
+
+      await supabase.from('company_earnings').insert({
+        source: 'chama_commission',
+        amount: totalCreditCommission,
+        group_id: chamaId,
+        description: `Commission on carry-forward credit applied to Cycle #${nextCycleNumber}`
+      });
+
+      console.log(`[CYCLE-AUTO-CREATE] Carry-forward commission: ${totalCreditCommission}, net to pool: ${totalNetCreditApplied}`);
     }
 
     // Format dates for SMS

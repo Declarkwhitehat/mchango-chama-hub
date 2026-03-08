@@ -618,10 +618,9 @@ async function settleDebts(
 
   // ── STEP 5: Update chama financial tracking ──
   // Only count the gross that went to the cycle/debts, NOT the carry-forward portion
-  // This ensures total_gross_collected reflects actual money that entered the chama pool
-  const carryForwardGross = carryForward > 0 ? carryForward / (1 - ONTIME_RATE) : 0;
-  const chamaGross = grossPaymentAmount - carryForwardGross;
-  const chamaCommission = toCompany - (carryForward > 0 ? carryForwardGross * ONTIME_RATE : 0);
+  // Carry-forward is stored at full value (no commission), so subtract it directly
+  const chamaGross = grossPaymentAmount - carryForward;
+  const chamaCommission = toCompany;
 
   if (chamaGross > 0 || toCyclePot > 0) {
     const { data: chamaData } = await supabase

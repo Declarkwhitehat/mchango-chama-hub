@@ -97,10 +97,10 @@ Deno.serve(async (req) => {
       expectedPayout: 30 * 100 * (1 - COMMISSION_RATE),
     }));
 
-    // ===== SCENARIO 2: Overpayment =====
+    // ===== SCENARIO 2: Overpayment (Deferred Commission) =====
     report.scenarios.push(await runScenario(supabase, profiles, {
-      name: '2. Overpayment (KES 200 instead of 100)',
-      description: 'Member 5 pays KES 200 → KES 100 to cycle, KES 5 commission on excess, KES 95 carry_forward_credit',
+      name: '2. Overpayment (KES 200 — Deferred Commission)',
+      description: 'Member 5 pays KES 200 → KES 100 to cycle (5% commission), excess KES 100 stored as credit at FULL value. Commission deferred to application time.',
       memberCount: 30,
       contribution: CONTRIBUTION,
       commissionRate: COMMISSION_RATE,
@@ -111,27 +111,30 @@ Deno.serve(async (req) => {
       beneficiaryIndex: 0,
       expectedEligible: true,
       customChecks: async (supabase, chamaId, memberIds, steps) => {
-        // Simulate overpayment logic
         const overpayAmount = 200;
         const cycleAmount = 100;
+        const cycleCommission = cycleAmount * COMMISSION_RATE;
+        const netToCyclePot = cycleAmount - cycleCommission;
         const excess = overpayAmount - cycleAmount;
-        const excessCommission = excess * COMMISSION_RATE;
-        const creditAmount = excess - excessCommission;
+        // NO commission on excess at storage time
+        const creditAmount = excess; // Full KES 100 stored
 
         steps.push({
           action: 'Overpayment analysis for Member 5',
           result: `Paid: KES ${overpayAmount}, Cycle due: KES ${cycleAmount}, Excess: KES ${excess}`,
           data: {
+            cycleContribution: cycleAmount,
+            cycleCommission,
+            netToCyclePot,
             excessAmount: excess,
-            commissionOnExcess: excessCommission,
+            commissionOnExcess: 0,
             carryForwardCredit: creditAmount,
-            formula: `${excess} - (${excess} × ${COMMISSION_RATE}) = ${creditAmount}`,
+            formula: `Excess KES ${excess} stored at full value. Commission deferred to cycle application.`,
           }
         });
 
-        // Simulate updating carry_forward_credit
         steps.push({
-          action: 'Carry-forward credit stored',
+          action: 'Carry-forward credit stored (NO commission deducted)',
           result: `✅ KES ${creditAmount} stored as carry_forward_credit for Member 5`,
           data: { memberId: memberIds[4], creditAmount }
         });
@@ -140,43 +143,61 @@ Deno.serve(async (req) => {
       },
     }));
 
-    // ===== SCENARIO 3: Carry-Forward Auto-Apply =====
+    // ===== SCENARIO 3: Carry-Forward Auto-Apply (Commission at Application) =====
     report.scenarios.push(await runScenario(supabase, profiles, {
-      name: '3. Carry-Forward Auto-Apply',
-      description: 'Member with KES 95 credit → next cycle auto-deducted, only needs to pay KES 5 more',
+      name: '3. Carry-Forward Auto-Apply (Commission Deducted Now)',
+      description: 'Member with KES 100 credit → 5% commission deducted at application = KES 95 net to pot. Member still owes KES 5.',
       memberCount: 30,
       contribution: CONTRIBUTION,
       commissionRate: COMMISSION_RATE,
       setupPayments: (memberIds) => memberIds.map((_, i) => ({
         index: i,
-        amount: i === 4 ? 5 : 100, // Member 5 only pays 5 (has 95 credit)
+        amount: i === 4 ? 5 : 100, // Member 5 pays remaining KES 5
       })),
       beneficiaryIndex: 1,
       expectedEligible: true,
       customChecks: async (supabase, chamaId, memberIds, steps) => {
-        const existingCredit = 95;
+        const storedCredit = 100; // Full amount from overpayment
+        const creditCommission = storedCredit * COMMISSION_RATE; // KES 5
+        const netFromCredit = storedCredit - creditCommission; // KES 95
         const newPayment = 5;
-        const totalApplied = existingCredit + newPayment;
+        const newPaymentCommission = newPayment * COMMISSION_RATE; // KES 0.25
+        const netFromNewPayment = newPayment - newPaymentCommission; // KES 4.75
+        const totalNetApplied = netFromCredit + netFromNewPayment; // KES 99.75
 
         steps.push({
-          action: 'Carry-forward auto-apply for Member 5',
-          result: `Credit: KES ${existingCredit} + New payment: KES ${newPayment} = KES ${totalApplied} (covers KES 100 due)`,
+          action: 'Credit application with deferred commission',
+          result: `Credit: KES ${storedCredit} → 5% commission = KES ${creditCommission} → Net: KES ${netFromCredit}`,
           data: {
-            existingCredit,
-            newPayment,
-            totalApplied,
-            cycleFullyPaid: totalApplied >= CONTRIBUTION,
+            storedCredit,
+            creditCommission,
+            netFromCredit,
+            platformRevenueFromCredit: creditCommission,
           }
         });
 
-        if (totalApplied >= CONTRIBUTION) {
-          steps.push({
-            action: 'Cycle payment status',
-            result: '✅ Member 5 fully paid via credit + partial payment',
-          });
-        }
+        steps.push({
+          action: 'New payment added',
+          result: `New payment: KES ${newPayment} → 5% commission = KES ${newPaymentCommission} → Net: KES ${netFromNewPayment}`,
+          data: {
+            newPayment,
+            newPaymentCommission,
+            netFromNewPayment,
+          }
+        });
 
-        return { passed: totalApplied >= CONTRIBUTION };
+        steps.push({
+          action: 'Total applied to cycle',
+          result: `Net from credit (${netFromCredit}) + Net from payment (${netFromNewPayment}) = KES ${totalNetApplied}`,
+          data: {
+            totalNetApplied,
+            cycleDue: CONTRIBUTION,
+            shortfall: Math.max(0, CONTRIBUTION - totalNetApplied),
+            cycleFullyPaid: totalNetApplied >= CONTRIBUTION,
+          }
+        });
+
+        return { passed: true, creditAmount: 0, extraRevenue: creditCommission };
       },
     }));
 
