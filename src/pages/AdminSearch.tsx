@@ -509,12 +509,12 @@ export default function AdminSearch() {
                           return (
                             <div key={log.id} className={`flex gap-3 p-3 rounded-lg border ${isPhoneChange ? 'border-yellow-500/30 bg-yellow-500/5' : 'bg-card'}`}>
                               <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                isPhoneChange ? 'bg-yellow-500/10' : 'bg-muted'
+                                isPhoneChange ? 'bg-accent' : 'bg-muted'
                               }`}>
                                 {isPhoneChange ? (
-                                  <Phone className="h-4 w-4 text-yellow-600" />
+                                  <Phone className="h-4 w-4 text-accent-foreground" />
                                 ) : log.action === 'INSERT' ? (
-                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                  <CheckCircle2 className="h-4 w-4 text-primary" />
                                 ) : log.action === 'DELETE' ? (
                                   <XCircle className="h-4 w-4 text-destructive" />
                                 ) : (
