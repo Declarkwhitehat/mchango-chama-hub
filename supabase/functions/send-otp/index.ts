@@ -172,11 +172,16 @@ serve(async (req) => {
 
     console.log(`OTP sent successfully to ${phone}`);
 
+    // Mask phone for display (e.g., +254****5678)
+    const maskedPhone = phone.substring(0, 4) + '****' + phone.substring(phone.length - 4);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'OTP sent successfully',
-        expiresIn: 300 // 5 minutes in seconds
+        expiresIn: 300,
+        maskedPhone,
+        phone, // needed for OTP verification
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
