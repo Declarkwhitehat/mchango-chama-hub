@@ -87,6 +87,7 @@ const AdminDashboard = () => {
         pendingWithdrawals: withdrawalsResult.count || 0,
         pendingCallbacks: callbacksResult.count || 0,
         recentTransactions: transactionsResult.count || 0,
+        pendingExecChanges: execChangesResult.count || 0,
       });
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
