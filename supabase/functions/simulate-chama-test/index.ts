@@ -383,6 +383,15 @@ Deno.serve(async (req) => {
       commissionRate: COMMISSION_RATE,
     }));
 
+    // ===== SCENARIO 13: Double-Payout Prevention =====
+    report.scenarios.push(await runScenarioDoublePayoutGuard(supabase, profiles, {
+      name: '13. Double-Payout Prevention — Admin Cannot Select Same Member Twice',
+      description: 'Member who received in cycle 1 is blocked from admin selection in cycle 2 (same round). After all members receive, guard resets.',
+      memberCount: 3,
+      contribution: CONTRIBUTION,
+      commissionRate: COMMISSION_RATE,
+    }));
+
     // Summary
     report.summary.total = report.scenarios.length;
     report.summary.passed = report.scenarios.filter(s => s.passed).length;
