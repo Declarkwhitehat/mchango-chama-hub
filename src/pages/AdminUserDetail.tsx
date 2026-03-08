@@ -356,7 +356,9 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
               size="sm"
               onClick={() => {
                 setDeletePrivilegeCode("");
+                setDeleteConfirmName("");
                 setDeleteCodeError(false);
+                setDeleteNameError(false);
                 setShowDeleteConfirm(true);
               }}
             >
