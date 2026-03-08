@@ -1,35 +1,38 @@
 
 
-## Diagnosis
+## Problem
 
-The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
+The `welfare-withdrawal-approve` edge function's GET endpoint crashes with error:
+```
+Could not find a relationship between 'withdrawals' and 'requested_by' in the schema cache
+```
 
-1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
-2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
-3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
-4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
+This happens because the query on line 175 attempts a PostgREST embedded join (`profiles:requested_by(full_name, phone)`) but there is **no foreign key** from `withdrawals.requested_by` to `profiles.id`. The function returns a 500 error, so the frontend always shows "No pending approvals."
 
-There are 3 total stuck withdrawals across the system with the same pattern.
+The approval records DO exist in the database (confirmed: 4 pending approval records for this welfare group).
 
-## Root Cause
+## Solution
 
-The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
+Two options:
 
-## Fix Plan
+**Option A (recommended)**: Fix the edge function query to avoid the embedded join. Instead, fetch approvals without the profile join, then separately look up requester names.
 
-### 1. Manually complete stuck withdrawal via RPC
-Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
+**Option B**: Add a FK from `withdrawals.requested_by` to `profiles.id` via migration. This is riskier since `requested_by` references `auth.users` and adding a FK to `profiles` could cause insert failures if the profile doesn't exist yet.
 
-Also complete `e2ea0312` (KES 10) which has the same pattern.
+### Plan — Option A
 
-### 2. Fix retry-failed-payouts to query status before re-sending
-Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
+**File: `supabase/functions/welfare-withdrawal-approve/index.ts`**
 
-### 3. Add a "check status" path in withdrawals-crud
-Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
+Change the GET query (line 173-178) from:
+```typescript
+.select('*, withdrawals!withdrawal_id(amount, net_amount, status, notes, requested_at, profiles:requested_by(full_name, phone)), welfares!welfare_id(name)')
+```
+To:
+```typescript
+.select('*, withdrawals!withdrawal_id(amount, net_amount, status, notes, requested_at, requested_by), welfares!welfare_id(name)')
+```
 
-### Files to Change
-- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
-- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
-- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
+Then after fetching, do a separate lookup for each unique `requested_by` user ID against the `profiles` table to get `full_name` and `phone`, and attach the profile info to each approval record before returning.
+
+This avoids the FK dependency entirely while still providing requester info to the frontend.
 
