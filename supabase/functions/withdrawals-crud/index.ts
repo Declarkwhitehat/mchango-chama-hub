@@ -74,10 +74,10 @@ serve(async (req) => {
       
       try {
         withdrawalSchema.parse(body);
-      } catch (validationError: any) {
+      } catch (validationError) {
         return new Response(JSON.stringify({ 
           error: 'Invalid request data',
-          details: validationError.errors
+          details: (validationError as any).errors
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -523,7 +523,7 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
 
-        } catch (b2cError: any) {
+        } catch (b2cError) {
           console.error('Exception triggering B2C payout:', b2cError);
           
           // Mark for retry so the retry cron picks it up
@@ -532,10 +532,10 @@ serve(async (req) => {
             .update({
               status: 'pending_retry',
               b2c_error_details: { 
-                error: b2cError.message || 'Network error',
+                error: (b2cError as any).message || 'Network error',
                 auto_approval_failure: true 
               },
-              notes: (notes || '') + `\n[SYSTEM] Auto-approval B2C exception: ${b2cError.message}`
+              notes: (notes || '') + `\n[SYSTEM] Auto-approval B2C exception: ${(b2cError as any).message}`
             })
             .eq('id', withdrawal.id);
 
@@ -704,10 +704,10 @@ serve(async (req) => {
             query_result: statusResult,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-        } catch (err: any) {
+        } catch (err) {
           return new Response(JSON.stringify({
             error: 'Failed to query status',
-            message: err.message,
+            message: (err as any).message,
           }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }
@@ -782,12 +782,12 @@ serve(async (req) => {
           return new Response(JSON.stringify({ message: 'M-Pesa retry initiated successfully', data: b2cResult }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
-        } catch (err: any) {
+        } catch (err) {
           await supabaseAdmin.from('withdrawals').update({
             status: 'pending_retry',
-            notes: (retryWd.notes || '') + `\n[ADMIN] Retry exception: ${err.message}`,
+            notes: (retryWd.notes || '') + `\n[ADMIN] Retry exception: ${(err as any).message}`,
           }).eq('id', withdrawal_id);
-          return new Response(JSON.stringify({ error: 'Retry failed', message: err.message }), {
+          return new Response(JSON.stringify({ error: 'Retry failed', message: (err as any).message }), {
             status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
@@ -1353,18 +1353,19 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as any;
     console.error('Error in withdrawals-crud:', {
-      message: error.message,
-      code: error.code,
-      details: error.details
+      message: err.message,
+      code: err.code,
+      details: err.details
     });
     
     // Return safe error messages
     let safeMessage = 'An error occurred processing your request';
-    if (error.code === '23505') safeMessage = 'Duplicate record';
-    else if (error.code === '23503') safeMessage = 'Referenced record not found';
-    else if (error.code === '42501') safeMessage = 'Permission denied';
+    if (err.code === '23505') safeMessage = 'Duplicate record';
+    else if (err.code === '23503') safeMessage = 'Referenced record not found';
+    else if (err.code === '42501') safeMessage = 'Permission denied';
     
     return new Response(JSON.stringify({ error: safeMessage }), {
       status: 500,
