@@ -27,9 +27,18 @@ export default function PWAInstallPrompt() {
       return;
     }
 
-    // Only show PWA install on mobile devices, never on desktop
-    const isMobileDevice = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) ||
-      (window.innerWidth <= 768);
+    // Never show PWA install in preview/dev environments
+    const isPreviewOrDev =
+      window.location.hostname.includes('lovable.app') ||
+      window.location.hostname.includes('localhost') ||
+      window.location.hostname.includes('127.0.0.1');
+    if (isPreviewOrDev) {
+      setShowPrompt(false);
+      return;
+    }
+
+    // Only show PWA install on real mobile devices
+    const isMobileDevice = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
     if (!isMobileDevice) {
       setShowPrompt(false);
       return;
