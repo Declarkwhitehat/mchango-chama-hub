@@ -918,8 +918,6 @@ const ChamaDetail = () => {
               </Card>
             </TabsContent>
 
-            </TabsContent>
-
             {isMember && (
               <TabsContent value="chat">
                 <ChamaChatPanel chamaId={chama.id} isManager={isManager} />
