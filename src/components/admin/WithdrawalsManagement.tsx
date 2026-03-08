@@ -308,6 +308,12 @@ export const WithdrawalsManagement = () => {
   const canReview = (status: string) =>
     ['pending', 'pending_approval', 'pending_retry', 'approved', 'processing', 'failed'].includes(status);
 
+  const extractRecipientPhone = (notes: string | null): string | null => {
+    if (!notes) return null;
+    const match = notes.match(/Recipient:\s*([\d+]+)/);
+    return match?.[1] || null;
+  };
+
   const isMpesaPayment = selectedWithdrawal?.payment_method?.method_type === 'mpesa';
   const isRetryable = selectedWithdrawal && ['failed', 'pending_retry'].includes(selectedWithdrawal.status);
   const isPendingApproval = selectedWithdrawal?.status === 'pending_approval';
