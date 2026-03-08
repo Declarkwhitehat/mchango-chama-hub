@@ -390,7 +390,7 @@ serve(async (req) => {
       const netAmount = grossAmount - commissionAmount;
 
       // Create donor display name
-      const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+      const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'Anonymous';
 
       // Record mchango donation with full financial tracking
       const { data: donation, error: donationError } = await supabase
