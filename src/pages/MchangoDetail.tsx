@@ -396,17 +396,18 @@ const MchangoDetail = () => {
               {!user && !isExpired && (
                 <Card className="relative overflow-hidden border-2 border-destructive/40 bg-gradient-to-r from-destructive/10 to-background shadow-lg">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-destructive" />
-                  <CardContent className="pt-6 pb-5 px-6">
+                  <CardContent className="pt-6 pb-5 px-6 space-y-4">
                     <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
                       <div className="flex-shrink-0 h-12 w-12 rounded-full bg-destructive/15 flex items-center justify-center border border-destructive/20">
                         <Shield className="h-6 w-6 text-destructive" />
                       </div>
                       <div className="flex-1">
                         <h4 className="text-base font-extrabold text-destructive mb-1">
-                          🔔 Don't Miss Withdrawal Updates!
+                          💰 You Donated — You Deserve to Know Where It Goes
                         </h4>
                         <p className="text-sm font-semibold text-foreground">
-                          Create a free account to <span className="text-destructive font-bold">track how funds are used</span> and receive alerts when withdrawals are made. <span className="text-destructive font-bold">Accountability matters.</span>
+                          Your money, your right. Create a free account to <span className="text-destructive font-bold">get notified the moment a withdrawal happens</span>. 
+                          No surprises, no secrets — <span className="text-destructive font-bold">just full accountability.</span>
                         </p>
                       </div>
                       <Button
@@ -418,6 +419,22 @@ const MchangoDetail = () => {
                         <UserPlus className="h-4 w-4 mr-2" />
                         Create Account
                       </Button>
+                    </div>
+                    
+                    {/* Persuasive trust points */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-destructive/20">
+                      <div className="flex items-center gap-2 text-xs font-bold text-destructive">
+                        <Bell className="h-3.5 w-3.5 flex-shrink-0" />
+                        Instant withdrawal alerts
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-destructive">
+                        <Eye className="h-3.5 w-3.5 flex-shrink-0" />
+                        See every transaction
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-destructive">
+                        <Shield className="h-3.5 w-3.5 flex-shrink-0" />
+                        Hold organizers accountable
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
