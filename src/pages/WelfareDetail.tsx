@@ -210,6 +210,9 @@ const WelfareDetail = () => {
           )}
         </div>
 
+        {/* Executive Change Security Banner */}
+        <WelfareExecutiveChangeBanner welfareId={welfare.id} onCooldownActive={setCooldownActive} />
+
         {/* Frozen Warning */}
         {welfare.is_frozen && (
           <Card className="mb-4 border-destructive">
