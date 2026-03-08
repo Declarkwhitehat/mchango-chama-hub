@@ -10,6 +10,7 @@ interface PaymentCountdownTimerProps {
   endDate: string;
   cutoffHour?: number;
   contributionAmount: number;
+  totalPayable?: number;
   beneficiaryName: string;
   paidCount: number;
   totalCount: number;
