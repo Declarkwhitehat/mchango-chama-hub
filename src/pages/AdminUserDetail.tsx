@@ -51,7 +51,9 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
   const [show2FAResetConfirm, setShow2FAResetConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePrivilegeCode, setDeletePrivilegeCode] = useState("");
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [deleteCodeError, setDeleteCodeError] = useState(false);
+  const [deleteNameError, setDeleteNameError] = useState(false);
   const [deletingUser, setDeletingUser] = useState(false);
   useEffect(() => {
     if (userId) {
@@ -272,19 +274,25 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
     setDeletingUser(true);
     try {
       const response = await supabase.functions.invoke('admin-delete-user', {
-        body: { user_id: userId, privilege_code: deletePrivilegeCode },
+        body: { 
+          user_id: userId, 
+          privilege_code: deletePrivilegeCode,
+          confirm_name: deleteConfirmName,
+        },
       });
 
       if (response.error) throw new Error(response.error.message || 'Failed to delete user');
       if (response.data?.error) throw new Error(response.data.error);
 
-      toast({ title: "Success", description: "User account deleted successfully" });
+      toast({ title: "Success", description: response.data?.message || "User account deleted" });
       setShowDeleteConfirm(false);
       navigate('/admin/users');
     } catch (error: any) {
       console.error('Error deleting user:', error);
       if (error.message?.includes('privilege code')) {
         setDeleteCodeError(true);
+      } else if (error.message?.includes('Name confirmation')) {
+        setDeleteNameError(true);
       }
       toast({
         title: "Error",
@@ -348,7 +356,9 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
               size="sm"
               onClick={() => {
                 setDeletePrivilegeCode("");
+                setDeleteConfirmName("");
                 setDeleteCodeError(false);
+                setDeleteNameError(false);
                 setShowDeleteConfirm(true);
               }}
             >
@@ -1073,23 +1083,45 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
               </AlertDialogTitle>
               <AlertDialogDescription className="space-y-4">
                 <p>
-                  This will permanently delete <strong>{user.full_name}</strong>'s account, 
-                  profile, memberships, and all associated data. This action cannot be undone.
+                  This will delete <strong>{user.full_name}</strong>'s account. 
+                  The account will remain visible for <strong>45 days</strong> before permanent removal. 
+                  You can restore it during that period.
                 </p>
-                <div className="space-y-2">
-                  <Input
-                    type="password"
-                    placeholder="Enter privilege code to confirm"
-                    value={deletePrivilegeCode}
-                    onChange={(e) => {
-                      setDeletePrivilegeCode(e.target.value);
-                      setDeleteCodeError(false);
-                    }}
-                    className={deleteCodeError ? "border-destructive" : ""}
-                  />
-                  {deleteCodeError && (
-                    <p className="text-sm text-destructive">Invalid privilege code</p>
-                  )}
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Type the user's full name to confirm:</p>
+                    <p className="text-sm text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
+                      {user.full_name}
+                    </p>
+                    <Input
+                      placeholder="Type full name exactly as shown above"
+                      value={deleteConfirmName}
+                      onChange={(e) => {
+                        setDeleteConfirmName(e.target.value);
+                        setDeleteNameError(false);
+                      }}
+                      className={deleteNameError ? "border-destructive" : ""}
+                    />
+                    {deleteNameError && (
+                      <p className="text-sm text-destructive">Name does not match</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Enter privilege code:</p>
+                    <Input
+                      type="password"
+                      placeholder="Enter privilege code"
+                      value={deletePrivilegeCode}
+                      onChange={(e) => {
+                        setDeletePrivilegeCode(e.target.value);
+                        setDeleteCodeError(false);
+                      }}
+                      className={deleteCodeError ? "border-destructive" : ""}
+                    />
+                    {deleteCodeError && (
+                      <p className="text-sm text-destructive">Invalid privilege code</p>
+                    )}
+                  </div>
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -1097,11 +1129,11 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDeleteUser}
-                disabled={!deletePrivilegeCode || deletingUser}
+                disabled={!deletePrivilegeCode || !deleteConfirmName || deletingUser}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {deletingUser ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                Delete User Permanently
+                Delete User
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
