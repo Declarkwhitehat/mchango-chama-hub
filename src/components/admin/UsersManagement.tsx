@@ -167,6 +167,48 @@ export const UsersManagement = () => {
     }
   };
 
+  const handleDeleteClick = (userId: string) => {
+    setPendingDeleteUserId(userId);
+    setDeletePrivilegeCode("");
+    setDeleteCodeError(false);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!pendingDeleteUserId) return;
+    setDeleting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: pendingDeleteUserId, privilege_code: deletePrivilegeCode },
+      });
+
+      if (response.error) throw new Error(response.error.message || 'Failed to delete user');
+      if (response.data?.error) throw new Error(response.data.error);
+
+      toast({ title: "Success", description: "User account deleted successfully" });
+      setDeleteDialogOpen(false);
+      await fetchUsers();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      if (error.message?.includes('privilege code')) {
+        setDeleteCodeError(true);
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+      setPendingDeleteUserId(null);
+      setDeletePrivilegeCode("");
+    }
+  };
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
