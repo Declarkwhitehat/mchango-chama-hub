@@ -840,7 +840,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-
+      if (!withdrawal_id) {
         return new Response(JSON.stringify({ 
           error: 'Missing withdrawal_id',
           details: 'withdrawal_id is required'
