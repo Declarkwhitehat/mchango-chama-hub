@@ -1,35 +1,54 @@
 
+Root cause identified:
+- The insert path in `DonationForm` uses `.insert(...).select().single()`.
+- For guest donors, `mchango_donations` currently has no SELECT policy that allows anon to read inserted rows.
+- Result: the INSERT can be valid, but the forced RETURNING/SELECT fails with RLS and surfaces as:
+  `new row violates row-level security policy for table mchango_donations`.
 
-## Diagnosis
+Implementation plan:
 
-The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
+1) Fix guest insert flow (frontend)
+- File: `src/components/DonationForm.tsx`
+- Remove dependency on post-insert row selection for guest flow:
+  - Generate `donationId` client-side (`crypto.randomUUID()`).
+  - Include `id: donationId` in `donationData`.
+  - Replace:
+    - `.insert(donationData).select().single()`
+    with:
+    - `.insert(donationData)` (no returning select).
+  - Use `donationId` directly in STK callback metadata and later update query.
 
-1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
-2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
-3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
-4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
+2) Keep strict data privacy (no broad anon SELECT policy)
+- Do not add a permissive anon SELECT policy on `mchango_donations` (contains PII like phone/email).
+- Keep existing RLS model focused on:
+  - insert allowed for guest/authenticated under `user_id` checks
+  - selective read access for owner/admin/creator paths.
 
-There are 3 total stuck withdrawals across the system with the same pattern.
+3) Optional backend hardening migration (if needed after step 1)
+- Add a narrow INSERT policy cleanup migration to avoid overlapping legacy policy behavior:
+  - keep one explicit INSERT policy for `anon, authenticated`
+  - condition:
+    `(user_id IS NULL) OR (auth.uid() IS NOT NULL AND user_id = auth.uid())`
+- This is only if policy audit shows ambiguity after frontend fix.
 
-## Root Cause
+4) End-to-end verification (explicitly requested)
+- Test as fully logged-out user on shared campaign URL:
+  - submit donation form
+  - confirm no RLS toast
+  - confirm STK push request is triggered
+  - confirm pending donation row exists with generated `id`, `user_id = null`.
+- Test as logged-in user:
+  - confirm donation insert + STK initiation still works.
+- Validate network:
+  - no `POST /rest/v1/mchango_donations` RLS error
+  - successful flow through `payment-stk-push`.
+- Validate database:
+  - recent row appears in `mchango_donations` with expected `payment_status` and reference updates.
 
-The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
-
-## Fix Plan
-
-### 1. Manually complete stuck withdrawal via RPC
-Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
-
-Also complete `e2ea0312` (KES 10) which has the same pattern.
-
-### 2. Fix retry-failed-payouts to query status before re-sending
-Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
-
-### 3. Add a "check status" path in withdrawals-crud
-Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
-
-### Files to Change
-- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
-- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
-- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
-
+Technical details:
+- Why this works:
+  - RLS failure is tied to `RETURNING` visibility, not necessarily raw INSERT permission.
+  - Eliminating `.select()` removes the need for anon read permission on PII table.
+- Security posture:
+  - avoids making `mchango_donations` broadly readable.
+  - preserves existing least-privilege access rules.
