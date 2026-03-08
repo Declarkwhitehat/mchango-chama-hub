@@ -49,6 +49,10 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
   const [has2FA, setHas2FA] = useState(false);
   const [resetting2FA, setResetting2FA] = useState(false);
   const [show2FAResetConfirm, setShow2FAResetConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePrivilegeCode, setDeletePrivilegeCode] = useState("");
+  const [deleteCodeError, setDeleteCodeError] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(false);
   useEffect(() => {
     if (userId) {
       loadUserDetails();
