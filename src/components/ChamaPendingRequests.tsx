@@ -5,8 +5,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { UserCheck, UserX, Clock, Loader2 } from "lucide-react";
+import { UserCheck, UserX, Clock, Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Info, TrendingUp, TrendingDown } from "lucide-react";
 import { TrustScoreBadge } from "@/components/chama/TrustScoreBadge";
+import { MemberDetailPanel } from "@/components/chama/MemberDetailPanel";
 
 interface PendingMember {
   id: string;
@@ -20,9 +21,15 @@ interface PendingMember {
   } | null;
 }
 
-interface TrustScore {
+interface TrustScoreDetail {
   user_id: string;
   trust_score: number;
+  total_chamas_completed: number;
+  total_on_time_payments: number;
+  total_late_payments: number;
+  total_missed_payments: number;
+  total_outstanding_debts: number;
+  updated_at: string;
 }
 
 interface ChamaPendingRequestsProps {
@@ -33,9 +40,10 @@ interface ChamaPendingRequestsProps {
 
 export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPendingRequestsProps) => {
   const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
-  const [trustScores, setTrustScores] = useState<Record<string, number>>({});
+  const [trustDetails, setTrustDetails] = useState<Record<string, TrustScoreDetail>>({});
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     loadPendingMembers();
@@ -71,18 +79,18 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         );
         setPendingMembers(uniqueMembers);
 
-        // Load trust scores for pending members
+        // Load full trust score details for pending members
         if (uniqueMembers.length > 0 && isManager) {
           const userIds = uniqueMembers.map(m => m.user_id).filter(Boolean);
           const { data: scores } = await supabase
             .from('member_trust_scores' as any)
-            .select('user_id, trust_score')
+            .select('user_id, trust_score, total_chamas_completed, total_on_time_payments, total_late_payments, total_missed_payments, total_outstanding_debts, updated_at')
             .in('user_id', userIds);
 
           if (scores) {
-            const scoreMap: Record<string, number> = {};
-            (scores as any[]).forEach((s: any) => { scoreMap[s.user_id] = s.trust_score; });
-            setTrustScores(scoreMap);
+            const detailMap: Record<string, TrustScoreDetail> = {};
+            (scores as any[]).forEach((s: any) => { detailMap[s.user_id] = s; });
+            setTrustDetails(detailMap);
           }
         }
       }
@@ -162,7 +170,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
           Pending Join Requests
         </CardTitle>
         <CardDescription>
-          {isManager ? "Review and approve or reject join requests" : "Join requests awaiting manager approval"}
+          {isManager ? "Review member details and trust scores before approving" : "Join requests awaiting manager approval"}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -171,19 +179,33 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
             const profile = member.profiles;
             const fullName = profile?.full_name ?? "Unknown User";
             const email = profile?.email ?? "No email available";
-            const score = trustScores[member.user_id];
+            const phone = profile?.phone ?? "No phone";
+            const detail = trustDetails[member.user_id];
+            const isExpanded = expandedId === member.id;
 
             return (
-              <div key={member.id} className="flex flex-col gap-3 p-4 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-3">
+              <div key={member.id} className="border border-border rounded-lg overflow-hidden">
+                {/* Header row */}
+                <div
+                  className={`flex items-center gap-3 p-4 cursor-pointer transition-colors ${isExpanded ? 'bg-muted' : 'bg-muted/30 hover:bg-muted/50'}`}
+                  onClick={() => isManager && setExpandedId(isExpanded ? null : member.id)}
+                >
                   <Avatar>
-                    <AvatarFallback>{fullName.charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                      {fullName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium text-foreground truncate">{fullName}</p>
-                      {isManager && score !== undefined && (
-                        <TrustScoreBadge score={score} compact />
+                      {isManager && detail && (
+                        <TrustScoreBadge score={detail.trust_score} compact />
+                      )}
+                      {isManager && !detail && (
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Info className="h-3 w-3" />
+                          New user
+                        </Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground truncate">{email}</p>
@@ -191,45 +213,68 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
                       Requested: {new Date(member.joined_at).toLocaleDateString()}
                     </p>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {isManager ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="flex-1"
-                        onClick={() => handleApproval(member.id, true)}
-                        disabled={processingId === member.id}
-                      >
-                        {processingId === member.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <><UserCheck className="h-4 w-4 mr-1" />Approve</>
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="flex-1"
-                        onClick={() => handleApproval(member.id, false)}
-                        disabled={processingId === member.id}
-                      >
-                        {processingId === member.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <><UserX className="h-4 w-4 mr-1" />Reject</>
-                        )}
-                      </Button>
-                    </>
-                  ) : (
-                    <Badge variant="secondary">
-                      <Clock className="h-3 w-3 mr-1" />
-                      Pending Approval
-                    </Badge>
+                  {isManager && (
+                    <div className="flex-shrink-0 text-muted-foreground">
+                      {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </div>
                   )}
                 </div>
+
+                {/* Expanded detail panel for managers */}
+                {isManager && isExpanded && (
+                  <MemberDetailPanel
+                    fullName={fullName}
+                    email={email}
+                    phone={phone}
+                    joinedAt={member.joined_at}
+                    detail={detail}
+                    processingId={processingId}
+                    memberId={member.id}
+                    onApprove={() => handleApproval(member.id, true)}
+                    onReject={() => handleApproval(member.id, false)}
+                  />
+                )}
+
+                {/* Compact actions when not expanded */}
+                {!isExpanded && (
+                  <div className="flex items-center gap-2 px-4 pb-3">
+                    {isManager ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="flex-1"
+                          onClick={(e) => { e.stopPropagation(); handleApproval(member.id, true); }}
+                          disabled={processingId === member.id}
+                        >
+                          {processingId === member.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <><UserCheck className="h-4 w-4 mr-1" />Approve</>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={(e) => { e.stopPropagation(); handleApproval(member.id, false); }}
+                          disabled={processingId === member.id}
+                        >
+                          {processingId === member.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <><UserX className="h-4 w-4 mr-1" />Reject</>
+                          )}
+                        </Button>
+                      </>
+                    ) : (
+                      <Badge variant="secondary">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Pending Approval
+                      </Badge>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
