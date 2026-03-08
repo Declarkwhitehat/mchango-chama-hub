@@ -105,21 +105,7 @@ export const WelfareContributionForm = ({ welfareId, memberId, contributionAmoun
       const resultCode = statusData?.ResultCode;
 
       if (resultCode === "0" || resultCode === 0) {
-        // Payment confirmed - now record the contribution
-        const { data, error } = await supabase.functions.invoke("welfare-contributions", {
-          method: "POST",
-          body: {
-            welfare_id: welfareId,
-            amount: numAmount,
-            payment_method: "mpesa",
-            mpesa_receipt_number: statusData?.MpesaReceiptNumber || checkoutRequestId,
-          },
-        });
-
-        if (error || data?.error) {
-          console.error("Contribution recording error:", error || data?.error);
-        }
-
+        // Payment confirmed — C2B callback already records the contribution and updates balances
         setPaymentStatus("success");
         setStatusMessage(`Payment of KES ${numAmount.toLocaleString()} successful!`);
         toast.success(`Contribution of KES ${numAmount.toLocaleString()} recorded!`);
