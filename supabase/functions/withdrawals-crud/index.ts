@@ -1353,11 +1353,12 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as any;
     console.error('Error in withdrawals-crud:', {
-      message: error.message,
-      code: error.code,
-      details: error.details
+      message: err.message,
+      code: err.code,
+      details: err.details
     });
     
     // Return safe error messages
