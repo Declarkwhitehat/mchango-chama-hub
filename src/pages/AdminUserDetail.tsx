@@ -263,6 +263,35 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
     }
   };
 
+  const confirmDeleteUser = async () => {
+    if (!userId) return;
+    setDeletingUser(true);
+    try {
+      const response = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: userId, privilege_code: deletePrivilegeCode },
+      });
+
+      if (response.error) throw new Error(response.error.message || 'Failed to delete user');
+      if (response.data?.error) throw new Error(response.data.error);
+
+      toast({ title: "Success", description: "User account deleted successfully" });
+      setShowDeleteConfirm(false);
+      navigate('/admin/users');
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      if (error.message?.includes('privilege code')) {
+        setDeleteCodeError(true);
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingUser(false);
+    }
+  };
+
   const getKycStatusIcon = (status: string) => {
     switch (status) {
       case 'approved':
