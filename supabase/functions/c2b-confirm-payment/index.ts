@@ -69,7 +69,7 @@ serve(async (req) => {
       supabase.from('welfare_contributions').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
     ]);
 
-    if (existingContribution || existingDeposit || existingDonation || existingWelfareContrib) {
+    if (existingContribution || existingContributionByReceipt || existingDeposit || existingDonation || existingWelfareContrib) {
       console.log('Duplicate payment detected:', mpesaReceiptNumber);
       return new Response(
         JSON.stringify({ 

@@ -540,6 +540,7 @@ async function settleDebts(
       commission_amount: toCompany,
       net_amount: grossPaymentAmount - toCompany,
       commission_rate: toCompany / grossPaymentAmount,
+      reference_id: contributionId || null,
       description: `FIFO debt settlement. Debts cleared: ${periodsCleared}. Penalty: ${allocations.filter(a => a.type === 'penalty_clearance').reduce((s, a) => s + a.amount, 0).toFixed(2)}`
     });
   }
