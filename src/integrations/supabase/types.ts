@@ -2512,6 +2512,91 @@ export type Database = {
           },
         ]
       }
+      welfare_executive_changes: {
+        Row: {
+          admin_decided_at: string | null
+          admin_decided_by: string | null
+          admin_decision: string | null
+          admin_notes: string | null
+          affected_member_id: string | null
+          affected_user_name: string | null
+          change_type: string
+          changed_by: string | null
+          cooldown_ends_at: string
+          cooldown_hours: number
+          created_at: string
+          id: string
+          new_member_id: string | null
+          new_role: string | null
+          new_user_name: string | null
+          old_role: string | null
+          pending_withdrawals_cancelled: number | null
+          welfare_id: string
+        }
+        Insert: {
+          admin_decided_at?: string | null
+          admin_decided_by?: string | null
+          admin_decision?: string | null
+          admin_notes?: string | null
+          affected_member_id?: string | null
+          affected_user_name?: string | null
+          change_type: string
+          changed_by?: string | null
+          cooldown_ends_at: string
+          cooldown_hours?: number
+          created_at?: string
+          id?: string
+          new_member_id?: string | null
+          new_role?: string | null
+          new_user_name?: string | null
+          old_role?: string | null
+          pending_withdrawals_cancelled?: number | null
+          welfare_id: string
+        }
+        Update: {
+          admin_decided_at?: string | null
+          admin_decided_by?: string | null
+          admin_decision?: string | null
+          admin_notes?: string | null
+          affected_member_id?: string | null
+          affected_user_name?: string | null
+          change_type?: string
+          changed_by?: string | null
+          cooldown_ends_at?: string
+          cooldown_hours?: number
+          created_at?: string
+          id?: string
+          new_member_id?: string | null
+          new_role?: string | null
+          new_user_name?: string | null
+          old_role?: string | null
+          pending_withdrawals_cancelled?: number | null
+          welfare_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_executive_changes_admin_decided_by_fkey"
+            columns: ["admin_decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "welfare_executive_changes_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "welfare_executive_changes_welfare_id_fkey"
+            columns: ["welfare_id"]
+            isOneToOne: false
+            referencedRelation: "welfares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       welfare_members: {
         Row: {
           created_at: string
