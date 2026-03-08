@@ -130,7 +130,7 @@ serve(async (req) => {
           amount: grossAmount,
           payment_reference: mpesaReceiptNumber,
           status: 'completed',
-          payment_notes: `Offline payment via till number. Payer: ${firstName} ${middleName || ''} ${lastName}. Phone: ${phoneNumber}`,
+          payment_notes: `Offline payment via till number. Payer: ${[firstName, middleName, lastName].filter(Boolean).join(' ')}. Phone: ${phoneNumber}`,
         })
         .select()
         .single();
