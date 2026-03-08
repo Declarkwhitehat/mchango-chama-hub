@@ -704,10 +704,10 @@ serve(async (req) => {
             query_result: statusResult,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-        } catch (err: any) {
+        } catch (err) {
           return new Response(JSON.stringify({
             error: 'Failed to query status',
-            message: err.message,
+            message: (err as any).message,
           }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }
