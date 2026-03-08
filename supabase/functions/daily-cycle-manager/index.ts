@@ -403,6 +403,18 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ time: now.toISOString() })
         });
 
+        if (!payoutResponse.ok) {
+          const errText = await payoutResponse.text();
+          console.error(`[AUTO-ADVANCE] Payout cron failed (${payoutResponse.status}):`, errText);
+          return new Response(JSON.stringify({ 
+            error: `Payout processing failed: ${payoutResponse.status}`,
+            details: errText
+          }), {
+            status: 502,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
         const payoutResult = await payoutResponse.json();
         console.log(`[AUTO-ADVANCE] Payout cron result:`, payoutResult);
 
@@ -415,6 +427,10 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({ action: 'create-today', chamaId }),
         });
+        
+        if (!createResponse.ok) {
+          console.error(`[AUTO-ADVANCE] Cycle creation failed (${createResponse.status})`);
+        }
         const createResult = await createResponse.json();
 
         return new Response(JSON.stringify({ 

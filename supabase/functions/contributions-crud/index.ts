@@ -341,6 +341,7 @@ async function settleDebts(
                   .from('withdrawals')
                   .insert({
                     chama_id: chamaId,
+                    cycle_id: deficitRecord.cycle_id, // Enable duplicate guard via unique index
                     requested_by: recipientMember.user_id,
                     amount: principalPay,
                     commission_amount: commission,
