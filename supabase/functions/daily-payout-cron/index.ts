@@ -61,7 +61,18 @@ async function checkMemberEligibility(supabase: any, memberId: string, chamaId: 
   const totalPaidCycles = (cyclePayments || []).filter((p: any) => p.fully_paid).length;
   const totalCycles = (cyclePayments || []).length;
 
-  const isEligible = unpaidCycles.length === 0 && totalCycles > 0;
+  // Also check outstanding debts
+  const { data: outstandingDebts } = await supabase
+    .from('chama_member_debts')
+    .select('id')
+    .eq('member_id', memberId)
+    .eq('chama_id', chamaId)
+    .in('status', ['outstanding', 'partial'])
+    .limit(1);
+
+  const hasDebts = (outstandingDebts && outstandingDebts.length > 0);
+
+  const isEligible = unpaidCycles.length === 0 && totalCycles > 0 && !hasDebts;
 
   return {
     isEligible,
@@ -148,10 +159,6 @@ async function recordPayoutSkip(
 /**
  * Phase I – Consequence Management:
  * Create debt and deficit records for each member who did NOT pay this cycle.
- * Spec rules:
- *  - principal_debt = expected_contribution
- *  - penalty_debt   = expected_contribution × late_penalty_rate (10%)
- *  - Self-inflicted deficit: if the ONLY non-payer IS the recipient, no deficit record is created.
  */
 async function accrueDebtsForCycle(
   supabase: any,
@@ -175,7 +182,19 @@ async function accrueDebtsForCycle(
     const principalDebt = contributionAmount;
     const penaltyDebt = contributionAmount * LATE_PENALTY_RATE;
 
-    // Insert debt record
+    // Check if debt already exists for this member+cycle to prevent duplicates
+    const { data: existingDebt } = await supabase
+      .from('chama_member_debts')
+      .select('id')
+      .eq('member_id', memberId)
+      .eq('cycle_id', cycleId)
+      .maybeSingle();
+
+    if (existingDebt) {
+      console.log(`ℹ️ Debt already exists for member ${memberId} cycle ${cycleId} — skipping`);
+      continue;
+    }
+
     const { data: debt, error: debtError } = await supabase
       .from('chama_member_debts')
       .insert({
@@ -205,13 +224,19 @@ async function accrueDebtsForCycle(
 
     console.log(`✅ Debt created for member ${memberId}: KES ${principalDebt} principal + KES ${penaltyDebt} penalty`);
 
-    // Skip deficit record for self-inflicted scenario
+    // Audit log for debt accrual
+    await supabase.from('audit_logs').insert({
+      action: 'DEBT_ACCRUED',
+      table_name: 'chama_member_debts',
+      record_id: debt.id,
+      new_values: { member_id: memberId, cycle_id: cycleId, principal: principalDebt, penalty: penaltyDebt }
+    });
+
     if (isSelfInflicted) {
       console.log(`ℹ️ Self-inflicted deficit detected — no deficit record created for member ${memberId}`);
       continue;
     }
 
-    // Net owed to recipient = principal × (1 - commission_rate)
     const netOwedToRecipient = principalDebt * (1 - commissionRate);
 
     const { error: deficitError } = await supabase
@@ -232,9 +257,16 @@ async function accrueDebtsForCycle(
       console.error(`Error creating deficit for member ${memberId}:`, deficitError);
     } else {
       console.log(`✅ Deficit created: recipient ${beneficiaryMemberId} is owed KES ${netOwedToRecipient.toFixed(2)} from member ${memberId}`);
+      
+      // Audit log for deficit creation
+      await supabase.from('audit_logs').insert({
+        action: 'DEFICIT_CREATED',
+        table_name: 'chama_cycle_deficits',
+        record_id: cycleId,
+        new_values: { recipient: beneficiaryMemberId, non_payer: memberId, net_owed: netOwedToRecipient }
+      });
     }
 
-    // Notify member of accrued debt
     const memberPhone = payment.chama_members?.profiles?.phone;
     if (memberPhone) {
       const totalOwed = principalDebt + penaltyDebt;
@@ -275,7 +307,6 @@ Deno.serve(async (req) => {
       const now = new Date().toISOString();
       
       // ========== GAP RECOVERY: Create missing cycles ==========
-      // If there are no pending cycles, check if cycles should be created
       const { data: latestCycle } = await supabase
         .from('contribution_cycles')
         .select('id, cycle_number, end_date, payout_processed')
@@ -285,13 +316,11 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (latestCycle && latestCycle.payout_processed) {
-        // Check if the latest cycle's end_date is in the past and no new cycle exists
         const latestEndDate = new Date(latestCycle.end_date);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
         if (latestEndDate < today) {
-          // GAP DETECTED: Create missing cycles up to today (max 50 to avoid timeout)
           const { data: activeMembers } = await supabase
             .from('chama_members')
             .select('id, order_index, carry_forward_credit, next_cycle_credit')
@@ -307,12 +336,11 @@ Deno.serve(async (req) => {
             const MAX_CATCHUP_CYCLES = 50;
 
             while (cyclesCreated < MAX_CATCHUP_CYCLES) {
-              // Calculate next cycle dates
               const nextStart = new Date(lastEndDate);
               nextStart.setDate(nextStart.getDate() + 1);
               nextStart.setHours(0, 0, 0, 0);
               
-              if (nextStart > today) break; // Don't create future cycles beyond today
+              if (nextStart > today) break;
 
               const nextEnd = new Date(nextStart);
               switch (chama.contribution_frequency) {
@@ -362,7 +390,6 @@ Deno.serve(async (req) => {
               const beneficiaryIndex = (nextCycleNum - 1) % activeMembers.length;
               const beneficiary = activeMembers[beneficiaryIndex];
 
-              // Historical gap cycles are pre-marked as processed (no payout)
               const { data: newCycle, error: cycleErr } = await supabase
                 .from('contribution_cycles')
                 .insert({
@@ -388,8 +415,7 @@ Deno.serve(async (req) => {
                 break;
               }
 
-              // Create unpaid payment records for all members
-              const paymentRecords = activeMembers.map(m => ({
+              const paymentRecords = activeMembers.map((m: any) => ({
                 member_id: m.id,
                 cycle_id: newCycle.id,
                 amount_due: chama.contribution_amount,
@@ -449,6 +475,29 @@ Deno.serve(async (req) => {
       for (const cycle of pendingCycles) {
         console.log(`  Processing cycle #${cycle.cycle_number} (${cycle.start_date} - ${cycle.end_date})`);
 
+        // ========== ROW-LEVEL LOCK: Claim cycle for processing ==========
+        const { data: claimed } = await supabase
+          .rpc('claim_cycle_for_processing', { p_cycle_id: cycle.id });
+
+        if (!claimed) {
+          console.log(`⚠️ Cycle ${cycle.id} already claimed by another process — skipping`);
+          continue;
+        }
+
+        // ========== DUPLICATE PAYOUT GUARD ==========
+        const { data: existingWithdrawal } = await supabase
+          .from('withdrawals')
+          .select('id, status')
+          .eq('chama_id', chama.id)
+          .eq('cycle_id', cycle.id)
+          .not('status', 'in', '("rejected","failed")')
+          .maybeSingle();
+
+        if (existingWithdrawal) {
+          console.log(`⚠️ Withdrawal already exists for cycle ${cycle.id} (${existingWithdrawal.id}) — skipping payout creation`);
+          // Still process debts and next cycle creation below
+        }
+
         const scheduledBeneficiary = cycle.beneficiary;
         const eligibility = await checkMemberEligibility(
           supabase,
@@ -464,11 +513,8 @@ Deno.serve(async (req) => {
 
         if (!eligibility.isEligible) {
           console.log(`⚠️ Member ${scheduledBeneficiary.member_code} NOT ELIGIBLE for payout.`);
-
           wasSkipped = true;
 
-          // ========== REORDERING: Move ineligible member to end of queue ==========
-          // Get the current max order_index in the chama
           const { data: maxOrderResult } = await supabase
             .from('chama_members')
             .select('order_index')
@@ -482,7 +528,6 @@ Deno.serve(async (req) => {
           const lastPosition = maxOrderResult?.order_index || scheduledBeneficiary.order_index;
           const newPosition = lastPosition + 1;
 
-          // Record the skip with the new position
           await recordPayoutSkip(
             supabase,
             chama.id,
@@ -495,7 +540,6 @@ Deno.serve(async (req) => {
             `Incomplete cycle payments: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}. Moved to position ${newPosition}.`
           );
 
-          // Move member to end of queue and increment deferred count
           const currentDeferredCount = scheduledBeneficiary.payout_deferred_count || 0;
           await supabase
             .from('chama_members')
@@ -509,35 +553,25 @@ Deno.serve(async (req) => {
             })
             .eq('id', scheduledBeneficiary.id);
 
-          // Resequence remaining members to fill the gap
           await supabase.rpc('resequence_member_order', { p_chama_id: chama.id });
           await supabase.rpc('calculate_expected_contributions', { p_chama_id: chama.id });
 
           console.log(`🔄 Member ${scheduledBeneficiary.member_code} moved from position ${scheduledBeneficiary.order_index} → ${newPosition} (deferred ${currentDeferredCount + 1} time(s))`);
 
-          // Log audit trail
+          // Audit log for skip
           await supabase.from('audit_logs').insert({
             action: 'PAYOUT_DEFERRED',
             table_name: 'chama_members',
             record_id: scheduledBeneficiary.id,
-            old_values: {
-              order_index: scheduledBeneficiary.order_index,
-              payout_deferred_count: currentDeferredCount
-            },
-            new_values: {
-              rescheduled_to_position: newPosition,
-              payout_deferred_count: currentDeferredCount + 1,
-              skip_reason: `${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}`
-            }
+            old_values: { order_index: scheduledBeneficiary.order_index, payout_deferred_count: currentDeferredCount },
+            new_values: { rescheduled_to_position: newPosition, payout_deferred_count: currentDeferredCount + 1, skip_reason: `${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}` }
           });
 
-          // Notify member
           const skipPhone = scheduledBeneficiary.profiles?.phone;
           if (skipPhone) {
             await sendSMS(skipPhone, `⚠️ Your chama "${chama.name}" payout was POSTPONED today. Reason: ${eligibility.unpaidCycles} unpaid cycle(s). Outstanding: KES ${eligibility.shortfall}. You've been moved to position ${newPosition} in the queue. Clear your payments to restore eligibility.`);
           }
 
-          // In-app notification
           if (scheduledBeneficiary.user_id) {
             await supabase.from('notifications').insert({
               user_id: scheduledBeneficiary.user_id,
@@ -552,7 +586,6 @@ Deno.serve(async (req) => {
 
           skipsProcessed++;
 
-          // Find next eligible member for THIS cycle's payout
           const nextEligible = await findNextEligibleMember(
             supabase,
             chama.id,
@@ -561,11 +594,10 @@ Deno.serve(async (req) => {
           );
 
           if (!nextEligible) {
+            // Already claimed above, just update metadata
             await supabase
               .from('contribution_cycles')
               .update({
-                payout_processed: true,
-                payout_processed_at: new Date().toISOString(),
                 payout_amount: 0,
                 payout_type: 'none',
                 members_skipped_count: 1
@@ -589,16 +621,14 @@ Deno.serve(async (req) => {
         const paidLateMembers = payments?.filter((p: any) => p.fully_paid && p.is_late_payment) || [];
         const allFullyPaidMembers = payments?.filter((p: any) => p.fully_paid) || [];
         const paidCount = allFullyPaidMembers.length;
-        // STRICT OVERPAYMENT RULE: each member's obligation is independent
         const unpaidMembers = payments?.filter((p: any) => !p.fully_paid) || [];
 
-        if (!skipPayout) {
+        if (!skipPayout && !existingWithdrawal) {
           // STRICT: only sum from members who fully paid their own obligation
           const collectedFromOnTime = paidOnTimeMembers.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
           const collectedFromLate = paidLateMembers.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
           const collectedAmount = collectedFromOnTime + collectedFromLate;
 
-          // Late penalties already deducted at payment time; on-time 5% deducted at payout
           const onTimeCommission = collectedFromOnTime * 0.05;
           const latePenaltiesCollected = paidLateMembers.reduce((sum: number, p: any) => {
             return sum + ((p.amount_paid || 0) * (0.10 / 0.90));
@@ -633,6 +663,7 @@ Deno.serve(async (req) => {
                 .from('withdrawals')
                 .insert({
                   chama_id: chama.id,
+                  cycle_id: cycle.id,  // Link to cycle for duplicate prevention
                   requested_by: actualBeneficiary.user_id,
                   amount: collectedAmount,
                   commission_amount: totalCommission,
@@ -640,7 +671,7 @@ Deno.serve(async (req) => {
                   status: withdrawalStatus,
                   payment_method_id: paymentMethod?.id,
                   payment_method_type: paymentMethod?.method_type,
-                  notes: `${wasSkipped ? `Redirected payout (${scheduledBeneficiary.member_code} skipped). ` : ''}${payoutType} (${paidCount}/${totalMembers} paid) | Late penalties collected: KES ${latePenaltiesCollected.toFixed(2)}`,
+                  notes: `${wasSkipped ? `Redirected payout (${scheduledBeneficiary.member_code} skipped). ` : ''}${payoutType} (${paidCount}/${totalMembers} paid) | Cycle #${cycle.cycle_number}`,
                   requested_at: new Date().toISOString(),
                   b2c_attempt_count: 0,
                   ...(withdrawalStatus === 'approved' ? { reviewed_at: new Date().toISOString() } : {})
@@ -649,14 +680,50 @@ Deno.serve(async (req) => {
                 .single();
 
               if (withdrawalError) {
-                console.error('Error creating withdrawal:', withdrawalError);
-                errors++;
-              } else {
+                // Check if it's a duplicate key violation (unique index)
+                if (withdrawalError.code === '23505') {
+                  console.log(`⚠️ Duplicate payout prevented for cycle ${cycle.id} — unique index caught it`);
+                } else {
+                  console.error('Error creating withdrawal:', withdrawalError);
+                  errors++;
+                }
+              } else if (newWithdrawal) {
+                // Record company earning
                 await supabase.rpc('record_company_earning', {
                   p_source: 'chama_commission',
                   p_amount: totalCommission,
                   p_group_id: chama.id,
                   p_description: `Payout commission - ${chama.name} cycle #${cycle.cycle_number}. On-time: KES ${onTimeCommission.toFixed(2)}`
+                });
+
+                // ========== PAYOUT LEDGER ENTRY ==========
+                await supabase.from('financial_ledger').insert({
+                  transaction_type: 'payout',
+                  source_type: 'chama',
+                  source_id: chama.id,
+                  gross_amount: collectedAmount,
+                  commission_amount: totalCommission,
+                  net_amount: payoutAmount,
+                  commission_rate: collectedAmount > 0 ? totalCommission / collectedAmount : 0.05,
+                  reference_id: newWithdrawal.id,
+                  description: `Cycle #${cycle.cycle_number} ${payoutType} payout to ${actualBeneficiary.member_code}. ${paidCount}/${totalMembers} paid.`
+                });
+
+                // Audit log for payout
+                await supabase.from('audit_logs').insert({
+                  action: 'PAYOUT_CREATED',
+                  table_name: 'withdrawals',
+                  record_id: newWithdrawal.id,
+                  new_values: {
+                    cycle_id: cycle.id,
+                    cycle_number: cycle.cycle_number,
+                    beneficiary: actualBeneficiary.member_code,
+                    gross: collectedAmount,
+                    commission: totalCommission,
+                    net: payoutAmount,
+                    payout_type: payoutType,
+                    was_redirected: wasSkipped
+                  }
                 });
 
                 if (canAutoApprove && newWithdrawal && paymentMethod?.phone_number) {
@@ -715,8 +782,6 @@ Deno.serve(async (req) => {
             await supabase
               .from('contribution_cycles')
               .update({
-                payout_processed: true,
-                payout_processed_at: new Date().toISOString(),
                 payout_amount: payoutAmount,
                 payout_type: payoutType,
                 members_paid_count: paidCount,
@@ -741,14 +806,13 @@ Deno.serve(async (req) => {
         }
 
         // ========== PHASE I: ACCRUE DEBTS FOR NON-PAYERS ==========
-        // This runs REGARDLESS of payout outcome
         const commissionRate = chama.commission_rate || 0.05;
         await accrueDebtsForCycle(
           supabase,
           chama.id,
           cycle.id,
           cycle.cycle_number,
-          scheduledBeneficiary.id,  // original beneficiary, not redirected
+          scheduledBeneficiary.id,
           unpaidMembers,
           chama.contribution_amount,
           commissionRate
@@ -790,6 +854,14 @@ Deno.serve(async (req) => {
               removed_at: new Date().toISOString()
             }).eq('id', member.id);
 
+            // Audit log for auto-removal
+            await supabase.from('audit_logs').insert({
+              action: 'MEMBER_AUTO_REMOVED',
+              table_name: 'chama_members',
+              record_id: member.id,
+              new_values: { missed_payments: newMissedCount, outstanding: totalOutstanding, chama: chama.name }
+            });
+
             const memberPhone = member.profiles?.phone;
             if (memberPhone) {
               await sendSMS(memberPhone,
@@ -809,7 +881,7 @@ Deno.serve(async (req) => {
               });
             }
 
-            // ========== MANAGER AUTO-REASSIGNMENT ==========
+            // Manager auto-reassignment
             if (member.is_manager) {
               console.log(`👑 Removed member was manager. Finding replacement for chama ${chama.name}`);
               
@@ -831,14 +903,12 @@ Deno.serve(async (req) => {
 
                 console.log(`👑 New manager assigned: ${bestCandidate.profiles?.full_name} (${bestCandidate.member_code})`);
 
-                // Notify new manager
                 if (bestCandidate.profiles?.phone) {
                   await sendSMS(bestCandidate.profiles.phone,
                     `👑 You are now the manager of "${chama.name}". The previous manager was removed due to missed payments. Log in to manage your group.`
                   );
                 }
 
-                // Notify all remaining active members about the manager change
                 const { data: remainingMembers } = await supabase
                   .from('chama_members')
                   .select('user_id, profiles!chama_members_user_id_fkey(phone)')
@@ -861,7 +931,7 @@ Deno.serve(async (req) => {
               }
             }
 
-            // ========== RESEQUENCE REMAINING MEMBERS ==========
+            // Resequence remaining members
             console.log(`🔄 Resequencing members for chama ${chama.name} after removal`);
             await supabase.rpc('resequence_member_order', { p_chama_id: chama.id });
             await supabase.rpc('calculate_expected_contributions', { p_chama_id: chama.id });
@@ -894,8 +964,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        // ========== AUTO-CREATE NEXT CYCLE (always) ==========
-        // Always create the next cycle first, THEN check for cycle completion
+        // ========== AUTO-CREATE NEXT CYCLE ==========
         try {
           const createCycleResponse = await fetch(`${supabaseUrl}/functions/v1/cycle-auto-create`, {
             method: 'POST',
@@ -916,7 +985,7 @@ Deno.serve(async (req) => {
           console.error(`⚠️ Error creating next cycle:`, createError);
         }
 
-        // ========== CHECK CYCLE COMPLETION (after creating next cycle) ==========
+        // ========== CHECK CYCLE COMPLETION ==========
         const { data: allProcessedCycles } = await supabase
           .from('contribution_cycles')
           .select('id')
@@ -932,7 +1001,6 @@ Deno.serve(async (req) => {
 
         const currentRound = chama.current_cycle_round || 1;
         const memberCount = allMembers?.length || 0;
-        // A rotation is complete when the latest cycle number is a multiple of member count
         const latestProcessedCycleNum = cycle.cycle_number;
         const isRotationComplete = memberCount > 0 && latestProcessedCycleNum > 0 && 
           latestProcessedCycleNum % memberCount === 0 &&
@@ -957,11 +1025,17 @@ Deno.serve(async (req) => {
           }).eq('id', chama.id);
 
           try {
-            await supabase.functions.invoke('chama-cycle-complete', { body: { chamaId: chama.id } });
+            await fetch(`${supabaseUrl}/functions/v1/chama-cycle-complete`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ chamaId: chama.id })
+            });
           } catch (invokeError) {
             console.error('Error invoking cycle-complete:', invokeError);
           }
-          // Don't break - allow remaining cycles to be processed
         }
 
         payoutsProcessed++;

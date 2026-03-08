@@ -12,7 +12,6 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // For POST requests, read action from body
     let action = '';
     let requestBody: any = {};
     
@@ -25,7 +24,6 @@ Deno.serve(async (req) => {
     if (action === 'create-today' && req.method === 'POST') {
       const { chamaId } = requestBody;
 
-      // Get chama details - work with ALL frequencies
       const { data: chama, error: chamaError } = await supabase
         .from('chama')
         .select('*, chama_members!inner(*)')
@@ -72,7 +70,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Determine today's beneficiary based on payout order and cycle count
+      // Determine today's beneficiary
       const { data: latestCycle } = await supabase
         .from('contribution_cycles')
         .select('cycle_number')
@@ -92,7 +90,7 @@ Deno.serve(async (req) => {
       
       switch (chama.contribution_frequency) {
         case 'daily':
-          endDate.setHours(22, 0, 0, 0); // Daily cycles end at 10:00 PM (payout deadline)
+          endDate.setHours(22, 0, 0, 0);
           break;
         case 'weekly':
           endDate.setDate(endDate.getDate() + 6);
@@ -100,7 +98,7 @@ Deno.serve(async (req) => {
           break;
         case 'monthly':
           endDate.setMonth(endDate.getMonth() + 1);
-          endDate.setDate(0); // Last day of month
+          endDate.setDate(0);
           endDate.setHours(23, 59, 59, 999);
           break;
         case 'every_n_days':
@@ -135,9 +133,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Create payment records for all members
-      // Apply carry-forward credit to reduce amount due
-      const paymentRecords = members.map(member => {
+      // Create payment records with carry-forward credit applied
+      const paymentRecords = members.map((member: any) => {
         const carryForward = member.carry_forward_credit || 0;
         const nextCycleCredit = member.next_cycle_credit || 0;
         const totalCredit = carryForward + nextCycleCredit;
@@ -171,7 +168,6 @@ Deno.serve(async (req) => {
       }
 
       // Track total credit applied so we can add it to the chama's available_balance
-      // Credit was already commission-deducted when originally overpaid, so it goes directly to pool
       let totalCreditApplied = 0;
 
       // Reset carry-forward and next_cycle_credit for members where it was applied
@@ -196,7 +192,6 @@ Deno.serve(async (req) => {
       }
 
       // Add applied carry-forward credit to chama's available_balance
-      // This credit was already commission-deducted, so it flows directly into the pool
       if (totalCreditApplied > 0) {
         const { data: chamaBalance } = await supabase
           .from('chama')
@@ -256,7 +251,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Get payment status for all members
       const { data: payments } = await supabase
         .from('member_cycle_payments')
         .select(`
@@ -270,7 +264,6 @@ Deno.serve(async (req) => {
         `)
         .eq('cycle_id', cycle.id);
 
-      // Return cycle with explicit end_date and cutoff_time for frontend countdown
       return new Response(JSON.stringify({ 
         cycle: {
           ...cycle,
@@ -287,7 +280,6 @@ Deno.serve(async (req) => {
     if (action === 'all-cycles' && req.method === 'POST') {
       const { chamaId, userId } = requestBody;
 
-      // Get all cycles for this chama, ordered by cycle_number desc
       const { data: cycles, error: cyclesError } = await supabase
         .from('contribution_cycles')
         .select(`
@@ -310,7 +302,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Get the member_id for this user
       const { data: memberData } = await supabase
         .from('chama_members')
         .select('id')
@@ -321,7 +312,6 @@ Deno.serve(async (req) => {
 
       let memberPayments: any[] = [];
       if (memberData) {
-        // Get all payment records for this member across all cycles
         const { data: payments } = await supabase
           .from('member_cycle_payments')
           .select('cycle_id, amount_due, amount_paid, amount_remaining, fully_paid, is_paid, is_late_payment, paid_at')
@@ -330,7 +320,6 @@ Deno.serve(async (req) => {
         memberPayments = payments || [];
       }
 
-      // Build per-cycle status
       const cyclesWithStatus = (cycles || []).map((cycle: any) => {
         const payment = memberPayments.find((p: any) => p.cycle_id === cycle.id);
         const now = new Date();
@@ -348,7 +337,6 @@ Deno.serve(async (req) => {
           is_complete: cycle.is_complete,
           payout_processed: cycle.payout_processed,
           payout_type: cycle.payout_type,
-          // Per-cycle payment status for this member
           member_payment: payment ? {
             amount_due: payment.amount_due,
             amount_paid: payment.amount_paid || 0,
@@ -358,10 +346,8 @@ Deno.serve(async (req) => {
             is_late_payment: payment.is_late_payment || false,
             paid_at: payment.paid_at,
           } : null,
-          // Commission info per cycle
           commission_rate: isPastDue && !(payment?.fully_paid) ? 0.10 : 0.05,
           commission_label: isPastDue && !(payment?.fully_paid) ? '10% (late)' : '5% (on-time)',
-          // Determine display status
           status: payment?.fully_paid 
             ? (payment.is_late_payment ? 'late' : 'paid')
             : isPastDue 
@@ -375,19 +361,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // AUTO-ADVANCE: Complete expired cycles and create next ones
-    // For daily chamas, cycles must advance on schedule regardless of payment completion
+    // AUTO-ADVANCE: Delegate expired cycle processing to daily-payout-cron
+    // This action now only triggers the payout cron for a specific chama,
+    // ensuring all cycle completions go through the single payout processing path.
     if (action === 'auto-advance' && req.method === 'POST') {
       const { chamaId } = requestBody;
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
 
-      // Find expired incomplete cycles for this chama
+      // Check if there are expired incomplete cycles
       const { data: expiredCycles } = await supabase
         .from('contribution_cycles')
-        .select('*, chama!inner(contribution_frequency, contribution_amount, every_n_days_count)')
+        .select('id, cycle_number, end_date')
         .eq('chama_id', chamaId)
-        .eq('is_complete', false)
+        .eq('payout_processed', false)
         .lt('end_date', now.toISOString())
         .order('cycle_number', { ascending: true });
 
@@ -397,66 +383,54 @@ Deno.serve(async (req) => {
         });
       }
 
-      const results = [];
+      console.log(`[AUTO-ADVANCE] Found ${expiredCycles.length} expired cycle(s) for chama ${chamaId}. Delegating to daily-payout-cron...`);
 
-      for (const cycle of expiredCycles) {
-        // Mark unpaid members as missed in member_cycle_payments
-        const { data: unpaidPayments } = await supabase
-          .from('member_cycle_payments')
-          .select('id, member_id')
-          .eq('cycle_id', cycle.id)
-          .eq('fully_paid', false);
+      // Delegate to daily-payout-cron which handles:
+      // - Row-level locking (claim_cycle_for_processing)
+      // - Duplicate payout prevention (cycle_id unique index)
+      // - Eligibility checks & skip logic
+      // - Debt accrual for non-payers
+      // - Financial ledger entries
+      // - B2C payout initiation
+      // - Next cycle creation
+      try {
+        const payoutResponse = await fetch(`${supabaseUrl}/functions/v1/daily-payout-cron`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ time: now.toISOString() })
+        });
 
-        if (unpaidPayments && unpaidPayments.length > 0) {
-          for (const payment of unpaidPayments) {
-            await supabase
-              .from('member_cycle_payments')
-              .update({ is_late_payment: true })
-              .eq('id', payment.id);
-          }
-        }
+        const payoutResult = await payoutResponse.json();
+        console.log(`[AUTO-ADVANCE] Payout cron result:`, payoutResult);
 
-        // Get payment stats
-        const { data: allPayments } = await supabase
-          .from('member_cycle_payments')
-          .select('fully_paid, amount_paid')
-          .eq('cycle_id', cycle.id);
+        // Now create today's cycle if needed
+        const createResponse = await fetch(`${supabaseUrl}/functions/v1/daily-cycle-manager`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'create-today', chamaId }),
+        });
+        const createResult = await createResponse.json();
 
-        const paidCount = allPayments?.filter((p: any) => p.fully_paid).length || 0;
-        const totalCollected = allPayments?.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0) || 0;
-
-        // Mark cycle as complete (time-expired)
-        await supabase
-          .from('contribution_cycles')
-          .update({
-            is_complete: true,
-            members_paid_count: paidCount,
-            members_skipped_count: (allPayments?.length || 0) - paidCount,
-            total_collected_amount: totalCollected,
-            payout_type: paidCount === (allPayments?.length || 0) ? 'full' : 'partial'
-          })
-          .eq('id', cycle.id);
-
-        results.push({ cycle_id: cycle.id, cycle_number: cycle.cycle_number, paid: paidCount, total: allPayments?.length || 0 });
+        return new Response(JSON.stringify({ 
+          advanced_cycles: expiredCycles.length,
+          payout_result: payoutResult,
+          new_cycle: createResult.cycle || null 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error: any) {
+        console.error('[AUTO-ADVANCE] Error delegating to payout cron:', error);
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
-
-      // Now create today's cycle by calling create-today internally
-      const createResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/daily-cycle-manager`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action: 'create-today', chamaId }),
-      });
-      const createResult = await createResponse.json();
-
-      return new Response(JSON.stringify({ 
-        advanced_cycles: results, 
-        new_cycle: createResult.cycle || null 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
     }
 
     return new Response(JSON.stringify({ error: 'Invalid endpoint' }), {
