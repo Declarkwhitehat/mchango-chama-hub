@@ -71,7 +71,10 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
       const activeUserEmail = session?.user?.email ?? null;
       
       // Create pending donation record
+      const donationId = crypto.randomUUID();
+
       const donationData = {
+        id: donationId,
         mchango_id: mchangoId,
         user_id: activeUserId,
         display_name: isAnonymous ? "Anonymous" : (displayName || "Anonymous"),
@@ -84,11 +87,9 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
         payment_status: "pending",
       };
 
-      const { data: donation, error: donationError } = await supabase
+      const { error: donationError } = await supabase
         .from("mchango_donations")
-        .insert(donationData)
-        .select()
-        .single();
+        .insert(donationData);
 
       if (donationError) throw donationError;
 
@@ -101,7 +102,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
           account_reference: mchangoTitle,
           transaction_desc: `Donation to ${mchangoTitle}`,
           callback_metadata: {
-            donation_id: donation.id,
+            donation_id: donationId,
             mchango_id: mchangoId,
           },
         }
