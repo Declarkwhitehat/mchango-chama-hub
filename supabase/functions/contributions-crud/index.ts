@@ -628,7 +628,8 @@ serve(async (req) => {
             member_id,
             chama_id,
             amount,
-            chamaInfo?.contribution_amount || amount
+            chamaInfo?.contribution_amount || amount,
+            contribution_id
           );
 
           console.log('Settle-only complete:', {
