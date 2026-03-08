@@ -393,45 +393,44 @@ const MchangoDetail = () => {
 
               {/* Post-donation account creation CTA for guests */}
               {!user && !isExpired && (
-                <Card className="relative overflow-hidden border-2 border-destructive/40 bg-gradient-to-r from-destructive/10 to-background shadow-lg">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-destructive" />
+                <Card className="relative overflow-hidden border-2 border-amber-500/60 bg-gradient-to-r from-amber-50 to-background dark:from-amber-950/30 shadow-lg">
+                  <div className="absolute top-0 left-0 right-0 h-2 bg-amber-500" />
                   <CardContent className="pt-6 pb-5 px-6 space-y-4">
-                    <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-full bg-destructive/15 flex items-center justify-center border border-destructive/20">
-                        <Shield className="h-6 w-6 text-destructive" />
+                    <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+                      <div className="flex-shrink-0 h-14 w-14 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center border-2 border-amber-400/40">
+                        <Shield className="h-7 w-7 text-amber-600 dark:text-amber-400" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="text-base font-extrabold text-destructive mb-1">
+                        <h4 className="text-xl font-extrabold text-amber-700 dark:text-amber-400 mb-2">
                           💰 You Donated — You Deserve to Know Where It Goes
                         </h4>
-                        <p className="text-sm font-semibold text-foreground">
-                          Your money, your right. Create a free account to <span className="text-destructive font-bold">get notified the moment a withdrawal happens</span>. 
-                          No surprises, no secrets — <span className="text-destructive font-bold">just full accountability.</span>
+                        <p className="text-base font-semibold text-foreground">
+                          Your money, your right. Create a free account to <span className="text-amber-700 dark:text-amber-400 font-extrabold">get notified the moment a withdrawal happens</span>. 
+                          No surprises, no secrets — <span className="text-amber-700 dark:text-amber-400 font-extrabold">just full accountability.</span>
                         </p>
                       </div>
                       <Button
-                        variant="destructive"
                         size="lg"
-                        className="flex-shrink-0 font-extrabold shadow-md px-6"
+                        className="flex-shrink-0 font-extrabold shadow-md px-8 text-base bg-amber-500 hover:bg-amber-600 text-white border-0"
                         onClick={() => navigate('/auth')}
                       >
-                        <UserPlus className="h-4 w-4 mr-2" />
+                        <UserPlus className="h-5 w-5 mr-2" />
                         Create Account
                       </Button>
                     </div>
                     
                     {/* Persuasive trust points */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-destructive/20">
-                      <div className="flex items-center gap-2 text-xs font-bold text-destructive">
-                        <Bell className="h-3.5 w-3.5 flex-shrink-0" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-amber-400/30">
+                      <div className="flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400">
+                        <Bell className="h-4 w-4 flex-shrink-0" />
                         Instant withdrawal alerts
                       </div>
-                      <div className="flex items-center gap-2 text-xs font-bold text-destructive">
-                        <Eye className="h-3.5 w-3.5 flex-shrink-0" />
+                      <div className="flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400">
+                        <Eye className="h-4 w-4 flex-shrink-0" />
                         See every transaction
                       </div>
-                      <div className="flex items-center gap-2 text-xs font-bold text-destructive">
-                        <Shield className="h-3.5 w-3.5 flex-shrink-0" />
+                      <div className="flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400">
+                        <Shield className="h-4 w-4 flex-shrink-0" />
                         Hold organizers accountable
                       </div>
                     </div>
