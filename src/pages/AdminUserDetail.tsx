@@ -332,13 +332,25 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
             <h1 className="text-3xl font-bold">{user.full_name}</h1>
             <p className="text-muted-foreground">{user.email}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             {userRoles.includes('admin') && (
               <Badge variant="default">
                 <Shield className="h-3 w-3 mr-1" />
                 Admin
               </Badge>
             )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setDeletePrivilegeCode("");
+                setDeleteCodeError(false);
+                setShowDeleteConfirm(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete User
+            </Button>
           </div>
         </div>
 
