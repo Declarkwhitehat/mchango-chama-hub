@@ -81,68 +81,55 @@ const ForgotPassword = () => {
     setIdentifier(data.emailOrPhone);
     
     try {
-      // Detect if it's a phone or email
-      const phoneCheck = /^[\+\d]/.test(data.emailOrPhone.trim()) && !data.emailOrPhone.includes('@');
-      setIsPhone(phoneCheck);
+      const isPhoneInput = /^[\+\d]/.test(data.emailOrPhone.trim()) && !data.emailOrPhone.includes('@');
+      setIsPhone(true); // Always use phone OTP flow now
 
-      if (phoneCheck) {
-        // Phone flow: Send OTP via edge function (bypasses RLS)
+      let requestBody: Record<string, string> = { purpose: 'password_reset' };
+
+      if (isPhoneInput) {
         const phone = normalizePhone(data.emailOrPhone);
         setNormalizedPhone(phone);
-
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const response = await fetch(`${supabaseUrl}/functions/v1/send-otp`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ phone, purpose: 'password_reset' }),
-        });
-
-        const otpData = await response.json();
-
-        if (!response.ok) {
-          if (response.status === 429) {
-            toast.error(otpData.error || "Too many attempts. Please try again later.");
-          } else if (response.status === 404) {
-            toast.error("No account found with this phone number");
-          } else {
-            toast.error(otpData.error || "Failed to send OTP. Please try again.");
-          }
-          return;
-        }
-
-        toast.success("OTP sent to your phone");
-        setStep('otp');
+        requestBody.phone = phone;
       } else {
-        // Email flow: Use rate-limited password reset
-        const redirectUrl = `${window.location.origin}/reset-password`;
-        
-        const { data: resetData, error } = await supabase.functions.invoke('request-password-reset', {
-          body: {
-            email: data.emailOrPhone,
-            redirectTo: redirectUrl,
-          }
-        });
-        
-        if (error) {
-          if (error.message?.includes('Too many')) {
-            toast.error(error.message);
-          } else {
-            toast.error("Failed to send password reset email. Please try again.");
-          }
-          return;
-        }
-
-        if (resetData?.error) {
-          toast.error(resetData.error);
-          return;
-        }
-        
-        setStep('success');
-        toast.success("Password reset email sent! Check your inbox.");
+        // Email: the edge function will look up the associated phone
+        requestBody.email = data.emailOrPhone;
       }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const otpData = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          toast.error(otpData.error || "Too many attempts. Please try again later.");
+        } else if (response.status === 404) {
+          toast.error(isPhoneInput 
+            ? "No account found with this phone number" 
+            : "No account found with this email address"
+          );
+        } else {
+          toast.error(otpData.error || "Failed to send OTP. Please try again.");
+        }
+        return;
+      }
+
+      // Store the resolved phone number from server response
+      if (otpData.phone) {
+        setNormalizedPhone(otpData.phone);
+      }
+      
+      // Show masked phone so user knows where OTP went
+      const displayPhone = otpData.maskedPhone || identifier;
+      toast.success(`OTP sent to ${displayPhone}`);
+      setStep('otp');
     } catch (error: any) {
       if (error.message?.includes('Too many') || error.message?.includes('rate limit')) {
         toast.error("Too many password reset attempts. Please try again later.");
@@ -262,12 +249,9 @@ const ForgotPassword = () => {
             </CardTitle>
             <CardDescription className="text-center">
               {step === 'identifier' && 'Enter your email or phone number to reset your password'}
-              {step === 'otp' && `Enter the 6-digit code sent to ${identifier}`}
+              {step === 'otp' && `Enter the 6-digit code sent to your registered phone number`}
               {step === 'newPassword' && 'Enter your new password'}
-              {step === 'success' && (isPhone 
-                ? 'Your password has been reset successfully'
-                : `Check your email at ${identifier} for reset instructions`
-              )}
+              {step === 'success' && 'Your password has been reset successfully'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -422,25 +406,13 @@ const ForgotPassword = () => {
 
             {step === 'success' && (
               <div className="space-y-4">
-                {!isPhone && (
-                  <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                    <p className="text-sm text-muted-foreground text-center">
-                      We've sent a password reset link to <strong>{identifier}</strong>
-                    </p>
-                  </div>
-                )}
                 <div className="text-center space-y-3">
-                  {!isPhone && (
-                    <p className="text-sm text-muted-foreground">
-                      Didn't receive the email? Check your spam folder.
-                    </p>
-                  )}
                   <Button
                     variant="hero"
                     onClick={() => navigate("/auth")}
                     className="w-full"
                   >
-                    {isPhone ? 'Login with New Password' : 'Return to Login'}
+                    Login with New Password
                   </Button>
                 </div>
               </div>

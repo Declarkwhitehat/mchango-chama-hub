@@ -14,7 +14,8 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 interface SendOTPRequest {
-  phone: string;
+  phone?: string;
+  email?: string;
   purpose?: string;
 }
 
@@ -56,7 +57,33 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const { phone, purpose }: SendOTPRequest = await req.json();
+    const { phone: rawPhone, email, purpose }: SendOTPRequest = await req.json();
+
+    let phone = rawPhone;
+
+    // If email provided, look up the associated phone number
+    if (email && !phone) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('email', email)
+        .single();
+
+      if (profileError || !profile?.phone) {
+        return new Response(
+          JSON.stringify({ error: 'No account found with this email address' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+        );
+      }
+
+      phone = profile.phone;
+      // Normalize if needed
+      if (phone && !phone.startsWith('+')) {
+        if (phone.startsWith('0')) phone = '+254' + phone.substring(1);
+        else if (phone.startsWith('7') || phone.startsWith('1')) phone = '+254' + phone;
+        else phone = '+' + phone;
+      }
+    }
 
     if (!phone || !/^\+\d{10,15}$/.test(phone)) {
       return new Response(
@@ -145,11 +172,16 @@ serve(async (req) => {
 
     console.log(`OTP sent successfully to ${phone}`);
 
+    // Mask phone for display (e.g., +254****5678)
+    const maskedPhone = phone.substring(0, 4) + '****' + phone.substring(phone.length - 4);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'OTP sent successfully',
-        expiresIn: 300 // 5 minutes in seconds
+        expiresIn: 300,
+        maskedPhone,
+        phone, // needed for OTP verification
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
