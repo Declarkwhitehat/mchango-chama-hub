@@ -11,7 +11,7 @@ import { ChamaPendingRequests } from "@/components/ChamaPendingRequests";
 import { MemberDashboard } from "@/components/MemberDashboard";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
-import { WithdrawalButton } from "@/components/WithdrawalButton";
+
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
 import { PaymentStatusManager } from "@/components/chama/PaymentStatusManager";
@@ -197,37 +197,9 @@ const ChamaDetail = () => {
         }
       }
 
-      // Use chama's available_balance if set (already net of commission)
-      // Fall back to calculating from contributions if not available
+      // Total Collected = available_balance (net pool balance after commission and withdrawals)
       const chamaAvailableBalance = Number(data.data.available_balance) || 0;
-      const chamaTotalWithdrawn = Number(data.data.total_withdrawn) || 0;
-      
-      if (chamaAvailableBalance > 0 || data.data.total_gross_collected) {
-        // Use the tracked net balance
-        setTotalContributions(Math.max(0, chamaAvailableBalance - chamaTotalWithdrawn));
-      } else {
-        // Fallback: Calculate from contributions with commission deduction
-        const { data: contributionsData } = await supabase
-          .from('contributions')
-          .select('amount')
-          .eq('chama_id', data.data.id)
-          .eq('status', 'completed');
-
-        const { data: withdrawalsData } = await supabase
-          .from('withdrawals')
-          .select('net_amount, status')
-          .eq('chama_id', data.data.id)
-          .in('status', ['approved', 'completed', 'processing']);
-
-        const grossContrib = contributionsData?.reduce((sum, contrib) => sum + Number(contrib.amount), 0) || 0;
-        const totalWithdrawn = withdrawalsData?.reduce((sum, w) => sum + Number(w.net_amount), 0) || 0;
-        
-        // Apply commission rate to get net available
-        const commissionRate = data.data.commission_rate || 0.05;
-        const netContrib = grossContrib * (1 - commissionRate);
-        
-        setTotalContributions(Math.max(0, netContrib - totalWithdrawn));
-      }
+      setTotalContributions(Math.max(0, chamaAvailableBalance));
 
       // Calculate whose turn it is and next turn dates
       await calculateTurns(data.data);
@@ -568,47 +540,39 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Withdrawal Status Section - Only show when funds are available */}
-        {isMember && isActive && totalContributions > 0 && (
+        {/* Payout Info - Automatic payouts, no manual withdrawal */}
+        {isMember && isActive && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wallet className="h-5 w-5" />
-                Withdrawal Status
+                Payout Schedule
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               {isMyTurn ? (
-                <>
-                  <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <div className="bg-primary p-2 rounded-full">
-                        <TrendingUp className="h-5 w-5 text-primary-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-primary">It's Your Turn!</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          You can now request a withdrawal from the chama pool.
-                        </p>
-                      </div>
+                <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-primary p-2 rounded-full">
+                      <TrendingUp className="h-5 w-5 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-primary">You're Next for Payout!</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Once all members pay for this cycle, your payout will be sent automatically to your registered payment method.
+                      </p>
                     </div>
                   </div>
-                  <WithdrawalButton
-                    chamaId={chama.id}
-                    totalAvailable={totalContributions}
-                    commissionRate={chama.commission_rate || 0.05}
-                    onSuccess={loadChama}
-                  />
-                </>
+                </div>
               ) : currentTurnMemberId ? (
                 <div className="p-4 bg-muted border rounded-lg">
                   <div className="flex items-start gap-3">
                     <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="font-medium">
-                        It's {approvedMembers.find(m => m.id === currentTurnMemberId)?.profiles?.full_name || 'Unknown'}'s turn
+                        Current recipient: {approvedMembers.find(m => m.id === currentTurnMemberId)?.profiles?.full_name || 'Unknown'}
                       </p>
-                      {nextTurnDates[currentUserMembership.id] && (
+                      {currentUserMembership && nextTurnDates[currentUserMembership.id] && (
                         <p className="text-sm text-muted-foreground mt-1">
                           Your estimated turn: <span className="font-medium text-primary">
                             {nextTurnDates[currentUserMembership.id].toLocaleDateString('en-US', {
@@ -620,8 +584,7 @@ const ChamaDetail = () => {
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground mt-2">
-                        Payouts follow the order members joined. Make sure you complete your contributions 
-                        before your turn to remain eligible.
+                        Payouts are automatic. When all members pay, funds are sent to the scheduled recipient's M-Pesa.
                       </p>
                     </div>
                   </div>

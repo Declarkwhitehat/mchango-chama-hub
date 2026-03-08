@@ -69,12 +69,13 @@ serve(async (req) => {
       const commissionRate = contribution.chama?.commission_rate || 0.05;
       const actualAmount = paidAmount || contribution.amount;
 
-      // Update contribution status
+      // Update contribution status with full payment details
       const { data: updatedContribution, error: contributionError } = await supabaseClient
         .from('contributions')
         .update({
           status: status,
           ...(mpesaReceiptNumber ? { mpesa_receipt_number: mpesaReceiptNumber } : {}),
+          payment_notes: `Online STK Push payment. Receipt: ${mpesaReceiptNumber || 'N/A'}. Amount: KES ${paidAmount || contribution.amount}`,
         })
         .eq('id', contribution.id)
         .select()
@@ -87,95 +88,44 @@ serve(async (req) => {
 
       console.log('Contribution updated:', updatedContribution);
 
-      // If successful, update member balance, chama financials, and record commission
+      // If successful, delegate financial tracking to contributions-crud settleDebts
       if (status === 'completed') {
-        // Calculate commission and net amounts
-        const commissionAmount = actualAmount * commissionRate;
-        const netAmount = actualAmount - commissionAmount;
+        const actualAmount = paidAmount || contribution.amount;
 
-        // Get member info
+        // Get member info for notifications only (NOT for financial tracking)
         const { data: member } = await supabaseClient
           .from('chama_members')
-          .select('*, chama(contribution_amount, total_gross_collected, total_commission_paid, available_balance)')
+          .select('user_id')
           .eq('id', contribution.member_id)
           .single();
 
-        if (member) {
-          const expectedAmount = member.chama?.contribution_amount || 0;
-          let creditDelta = 0;
-          let deficitDelta = 0;
-
-          if (actualAmount > expectedAmount) {
-            creditDelta = actualAmount - expectedAmount;
-          } else if (actualAmount < expectedAmount) {
-            deficitDelta = expectedAmount - actualAmount;
-          }
-
-          // Update member balance
-          const { error: updateError } = await supabaseClient
-            .from('chama_members')
-            .update({
-              balance_credit: (member.balance_credit || 0) + creditDelta,
-              balance_deficit: (member.balance_deficit || 0) + deficitDelta,
-              last_payment_date: new Date().toISOString(),
-            })
-            .eq('id', contribution.member_id);
-
-          if (updateError) {
-            console.error('Error updating member balance:', updateError);
-          } else {
-            console.log('Member balance updated:', { creditDelta, deficitDelta });
-          }
-
-          // Update chama financial tracking with NET amount as available
-          const chamaId = contribution.chama_id;
-          const { error: chamaUpdateError } = await supabaseClient
-            .from('chama')
-            .update({
-              total_gross_collected: (member.chama?.total_gross_collected || 0) + actualAmount,
-              total_commission_paid: (member.chama?.total_commission_paid || 0) + commissionAmount,
-              available_balance: (member.chama?.available_balance || 0) + netAmount,
-            })
-            .eq('id', chamaId);
-
-          if (chamaUpdateError) {
-            console.error('Error updating chama financials:', chamaUpdateError);
-          } else {
-            console.log('Chama financials updated:', { grossAmount: actualAmount, commissionAmount, netAmount });
-          }
+        // Delegate ALL financial tracking to contributions-crud settle-only
+        // This is the SINGLE SOURCE OF TRUTH for chama financial updates
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          const settleResponse = await fetch(`${supabaseUrl}/functions/v1/contributions-crud`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${serviceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'settle-only',
+              member_id: contribution.member_id,
+              chama_id: contribution.chama_id,
+              amount: actualAmount,
+              contribution_id: contribution.id,
+            }),
+          });
+          const settleResult = await settleResponse.json();
+          console.log('Settlement delegated successfully:', settleResult);
+        } catch (settleError) {
+          console.error('Error delegating settlement:', settleError);
+          // Non-fatal — the contribution is still recorded
         }
 
-        // Record commission as company earnings
-        await supabaseClient
-          .from('company_earnings')
-          .insert({
-            source: 'chama_contribution',
-            amount: commissionAmount,
-            reference_id: contribution.id,
-            description: `${(commissionRate * 100)}% commission on chama contribution of KES ${actualAmount}. Net credited: KES ${netAmount}`
-          });
-
-        // Record in financial ledger for detailed tracking
-        const { error: ledgerError } = await supabaseClient
-          .from('financial_ledger')
-          .insert({
-            transaction_type: 'contribution',
-            source_type: 'chama',
-            source_id: contribution.chama_id,
-            reference_id: contribution.id,
-            gross_amount: actualAmount,
-            commission_amount: commissionAmount,
-            net_amount: netAmount,
-            commission_rate: commissionRate,
-            payer_name: member ? 'Member Contribution' : 'Unknown',
-            description: `Chama contribution with ${(commissionRate * 100)}% commission deducted`
-          });
-
-        if (ledgerError) {
-          console.error('Error recording in financial ledger:', ledgerError);
-        }
-
-        console.log('Commission recorded:', commissionAmount, 'Net available:', netAmount);
+        console.log('Financial tracking delegated to contributions-crud');
 
         // Get beneficiary profile for notification
         const { data: beneficiaryProfile } = await supabaseClient

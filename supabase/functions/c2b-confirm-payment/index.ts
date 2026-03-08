@@ -138,52 +138,29 @@ serve(async (req) => {
 
       console.log('Contribution recorded successfully');
 
-      // Update chama financial tracking with NET amount as available
-      if (chamaData) {
-        const { error: chamaUpdateError } = await supabase
-          .from('chama')
-          .update({
-            total_gross_collected: (chamaData.total_gross_collected || 0) + grossAmount,
-            total_commission_paid: (chamaData.total_commission_paid || 0) + commissionAmount,
-            available_balance: (chamaData.available_balance || 0) + netAmount,
-          })
-          .eq('id', chamaData.id);
-
-        if (chamaUpdateError) {
-          console.error('Error updating chama financials:', chamaUpdateError);
-        } else {
-          console.log('Chama financials updated:', { grossAmount, commissionAmount, netAmount });
-        }
+      // Delegate ALL financial tracking to contributions-crud settle-only
+      // This is the SINGLE SOURCE OF TRUTH for chama financial updates
+      // It handles: chama totals, member_cycle_payments, commission, ledger
+      try {
+        const settleResponse = await fetch(`${supabaseUrl}/functions/v1/contributions-crud`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'settle-only',
+            member_id: chamaMemberData.id,
+            chama_id: chamaMemberData.chama_id,
+            amount: grossAmount,
+            contribution_id: contribution?.id,
+          }),
+        });
+        const settleResult = await settleResponse.json();
+        console.log('Settlement delegated successfully:', settleResult);
+      } catch (settleError) {
+        console.error('Error delegating settlement:', settleError);
       }
-
-      // Record commission as company earnings
-      await supabase
-        .from('company_earnings')
-        .insert({
-          source: 'chama_contribution',
-          amount: commissionAmount,
-          reference_id: contribution?.id,
-          description: `${(commissionRate * 100)}% commission on offline chama contribution of KES ${grossAmount}. Net credited: KES ${netAmount}`
-        });
-
-      // Record in financial ledger for detailed tracking
-      await supabase
-        .from('financial_ledger')
-        .insert({
-          transaction_type: 'contribution',
-          source_type: 'chama',
-          source_id: chamaMemberData.chama_id,
-          reference_id: contribution?.id,
-          gross_amount: grossAmount,
-          commission_amount: commissionAmount,
-          net_amount: netAmount,
-          commission_rate: commissionRate,
-          payer_name: `${firstName} ${middleName || ''} ${lastName}`.trim(),
-          payer_phone: phoneNumber,
-          description: `Offline chama contribution with ${(commissionRate * 100)}% commission deducted`
-        });
-
-      console.log('Commission recorded:', commissionAmount, 'Net available:', netAmount);
 
       // Send SMS notification
       if (chamaData) {
@@ -191,12 +168,11 @@ serve(async (req) => {
           await supabase.functions.invoke('send-transactional-sms', {
             body: {
               phone: phoneNumber,
-              message: `Payment of KSh ${grossAmount} received for ${chamaData.name}. Commission: KSh ${commissionAmount.toFixed(2)} (${(commissionRate * 100)}%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
+              message: `Payment of KSh ${grossAmount} received for ${chamaData.name}. Receipt: ${mpesaReceiptNumber}`,
             },
           });
         } catch (smsError) {
           console.error('Error sending SMS:', smsError);
-          // Don't fail the whole transaction if SMS fails
         }
       }
 
