@@ -15,7 +15,7 @@ import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
 import { PaymentStatusManager } from "@/components/chama/PaymentStatusManager";
-import { PaymentTransparency } from "@/components/chama/PaymentTransparency";
+
 import { SkippedMemberAlert } from "@/components/chama/SkippedMemberAlert";
 import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
