@@ -72,6 +72,8 @@ interface ChamaData {
     removal_reason?: string;
     missed_payments_count?: number;
     balance_deficit?: number;
+    was_skipped?: boolean;
+    rescheduled_to_position?: number | null;
     profiles: {
       full_name: string;
       email: string;
