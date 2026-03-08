@@ -42,12 +42,12 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
     setLoading(false);
   };
 
-  const totalPenalty = debts.reduce((s, d) => s + d.penalty_remaining, 0);
-  const totalPrincipal = debts.reduce((s, d) => s + d.principal_remaining, 0);
+  const totalLateCommission = debts.reduce((s, d) => s + d.penalty_remaining, 0);
+  const totalNetToRecipients = debts.reduce((s, d) => s + d.principal_remaining, 0);
   const currentCycleGross = currentCycleDue ? contributionAmount / (1 - 0.05) : 0;
   const currentCycleCommission = currentCycleGross * 0.05;
-  const totalPayable = totalPenalty + totalPrincipal + (totalPrincipal > 0 ? totalPrincipal * 0.05 : 0) + currentCycleGross;
-  const totalCommission = totalPenalty + (totalPrincipal * 0.05) + currentCycleCommission;
+  const totalPayable = totalNetToRecipients + totalLateCommission + currentCycleGross;
+  const totalCommission = totalLateCommission + currentCycleCommission;
 
   if (!loading && debts.length === 0 && !currentCycleDue) {
     return (
@@ -79,33 +79,33 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
         {/* Outstanding debts — FIFO order */}
         {debts.map(debt => {
           const cycleNum = (debt.cycle as any)?.cycle_number;
-          const totalDebtRemaining = debt.principal_remaining + debt.penalty_remaining;
-          const principalCommission = debt.principal_remaining * 0.05;
+          const totalOwed = debt.principal_remaining + debt.penalty_remaining;
+          // Late payments use 10% commission rate; the penalty_remaining IS the extra 5% commission
+          // Total gross = principal + penalty, where penalty = principal * 0.10 (late commission)
+          // 10% commission goes to platform, 90% net goes to the shortchanged recipient
+          const lateCommission = debt.penalty_remaining; // 10% commission on late payment
+          const netToRecipient = debt.principal_remaining; // net amount goes to the member who was shortchanged
           return (
             <div key={debt.id} className="space-y-1 rounded-md border border-destructive/20 bg-background/60 p-2">
               <div className="flex items-center gap-2 text-sm font-medium text-destructive">
                 <AlertTriangle className="h-4 w-4" />
-                Cycle #{cycleNum} — Outstanding Debt
+                Cycle #{cycleNum} — Late Payment Debt
               </div>
               <div className="ml-6 space-y-0.5 text-sm">
-                {debt.penalty_remaining > 0 && (
-                  <div className="flex justify-between text-destructive">
-                    <span>10% penalty (cleared first)</span>
-                    <span>KES {debt.penalty_remaining.toFixed(2)}</span>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Amount owed to recipient</span>
+                  <span>KES {netToRecipient.toFixed(2)}</span>
+                </div>
+                {lateCommission > 0 && (
+                  <div className="flex justify-between text-orange-600 dark:text-orange-400">
+                    <span>10% late commission (to platform)</span>
+                    <span>+ KES {lateCommission.toFixed(2)}</span>
                   </div>
                 )}
-                {debt.principal_remaining > 0 && (
-                  <>
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Principal owed</span>
-                      <span>KES {debt.principal_remaining.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-orange-600 dark:text-orange-400">
-                      <span>5% commission on principal</span>
-                      <span>+ KES {principalCommission.toFixed(2)}</span>
-                    </div>
-                  </>
-                )}
+                <div className="flex justify-between font-medium text-destructive">
+                  <span>Total for this cycle</span>
+                  <span>KES {totalOwed.toFixed(2)}</span>
+                </div>
               </div>
             </div>
           );
@@ -135,16 +135,16 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
 
         {/* Summary */}
         <div className="space-y-1 text-sm">
-          {totalPenalty > 0 && (
-            <div className="flex justify-between text-destructive">
-              <span>Penalties (cleared first)</span>
-              <span>KES {totalPenalty.toFixed(2)}</span>
+          {totalNetToRecipients > 0 && (
+            <div className="flex justify-between text-muted-foreground">
+              <span>Net to shortchanged recipients</span>
+              <span>KES {totalNetToRecipients.toFixed(2)}</span>
             </div>
           )}
-          {totalPrincipal > 0 && (
-            <div className="flex justify-between text-muted-foreground">
-              <span>Past principal + 5% commission</span>
-              <span>KES {(totalPrincipal + totalPrincipal * 0.05).toFixed(2)}</span>
+          {totalLateCommission > 0 && (
+            <div className="flex justify-between text-orange-600 dark:text-orange-400">
+              <span>Late commissions (10% to platform)</span>
+              <span>KES {totalLateCommission.toFixed(2)}</span>
             </div>
           )}
           {currentCycleDue && (
@@ -162,7 +162,7 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
         {debts.length > 0 && (
           <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">
             <ArrowRight className="h-3 w-3 mt-0.5 shrink-0" />
-            <span>Payments clear debts in order: penalty first, then principal (net goes to the member you owed). Then current cycle.</span>
+            <span>Late payments use a 10% commission rate. The commission goes to the platform, and the net amount goes directly to the member who received less on payout day.</span>
           </div>
         )}
       </CardContent>
