@@ -918,6 +918,14 @@ const ChamaDetail = () => {
               </Card>
             </TabsContent>
 
+            </TabsContent>
+
+            {isMember && (
+              <TabsContent value="chat">
+                <ChamaChatPanel chamaId={chama.id} isManager={isManager} />
+              </TabsContent>
+            )}
+
             <TabsContent value="details" className="space-y-4">
               {/* WhatsApp Group Link */}
               <WhatsAppLinkManager

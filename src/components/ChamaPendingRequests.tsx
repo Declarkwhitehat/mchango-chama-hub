@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { UserCheck, UserX, Clock, Loader2 } from "lucide-react";
+import { TrustScoreBadge } from "@/components/chama/TrustScoreBadge";
 
 interface PendingMember {
   id: string;
@@ -16,7 +17,12 @@ interface PendingMember {
     full_name: string;
     email: string;
     phone: string;
-  } | null; // ✅ allow null to avoid runtime crash
+  } | null;
+}
+
+interface TrustScore {
+  user_id: string;
+  trust_score: number;
 }
 
 interface ChamaPendingRequestsProps {
@@ -27,6 +33,7 @@ interface ChamaPendingRequestsProps {
 
 export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPendingRequestsProps) => {
   const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
+  const [trustScores, setTrustScores] = useState<Record<string, number>>({});
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -59,11 +66,25 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
         console.error("Error loading pending members:", error);
         setPendingMembers([]);
       } else {
-        // Deduplicate by member ID to prevent duplicate display
         const uniqueMembers = Array.from(
           new Map((data || []).map((m: PendingMember) => [m.id, m])).values()
         );
         setPendingMembers(uniqueMembers);
+
+        // Load trust scores for pending members
+        if (uniqueMembers.length > 0 && isManager) {
+          const userIds = uniqueMembers.map(m => m.user_id).filter(Boolean);
+          const { data: scores } = await supabase
+            .from('member_trust_scores' as any)
+            .select('user_id, trust_score')
+            .in('user_id', userIds);
+
+          if (scores) {
+            const scoreMap: Record<string, number> = {};
+            (scores as TrustScore[]).forEach(s => { scoreMap[s.user_id] = s.trust_score; });
+            setTrustScores(scoreMap);
+          }
+        }
       }
     } catch (error: any) {
       console.error("Error loading pending members:", error);
@@ -75,23 +96,15 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
 
   const handleApproval = async (memberId: string, approved: boolean) => {
     if (!isManager) {
-      toast({
-        title: "Access Denied",
-        description: "Only managers can approve or reject requests",
-        variant: "destructive",
-      });
+      toast({ title: "Access Denied", description: "Only managers can approve or reject requests", variant: "destructive" });
       return;
     }
 
     setProcessingId(memberId);
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error("Not authenticated");
-      }
+      if (!session?.access_token) throw new Error("Not authenticated");
 
-      // Use direct fetch with Authorization header
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-join`,
         {
@@ -100,10 +113,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
-            member_id: memberId,
-            approved: approved
-          }),
+          body: JSON.stringify({ member_id: memberId, approved }),
         }
       );
 
@@ -113,10 +123,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
       }
 
       const data = await response.json();
-
-      if (!data?.success) {
-        throw new Error(data?.error || "Failed to process request");
-      }
+      if (!data?.success) throw new Error(data?.error || "Failed to process request");
 
       toast({
         title: "Success",
@@ -126,15 +133,10 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
       });
 
       await loadPendingMembers();
-
       if (onUpdate) onUpdate();
     } catch (error: any) {
       console.error("Error processing approval:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to process request",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to process request", variant: "destructive" });
     } finally {
       setProcessingId(null);
     }
@@ -150,9 +152,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
     );
   }
 
-  if (pendingMembers.length === 0) {
-    return null;
-  }
+  if (pendingMembers.length === 0) return null;
 
   return (
     <Card>
@@ -162,9 +162,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
           Pending Join Requests
         </CardTitle>
         <CardDescription>
-          {isManager
-            ? "Review and approve or reject join requests"
-            : "Join requests awaiting manager approval"}
+          {isManager ? "Review and approve or reject join requests" : "Join requests awaiting manager approval"}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -173,20 +171,21 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
             const profile = member.profiles;
             const fullName = profile?.full_name ?? "Unknown User";
             const email = profile?.email ?? "No email available";
+            const score = trustScores[member.user_id];
 
             return (
-              <div
-                key={member.id}
-                className="flex flex-col gap-3 p-4 bg-muted/50 rounded-lg"
-              >
+              <div key={member.id} className="flex flex-col gap-3 p-4 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-3">
                   <Avatar>
-                    <AvatarFallback>
-                      {fullName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
+                    <AvatarFallback>{fullName.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground truncate">{fullName}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-foreground truncate">{fullName}</p>
+                      {isManager && score !== undefined && (
+                        <TrustScoreBadge score={score} compact />
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground truncate">{email}</p>
                     <p className="text-xs text-muted-foreground">
                       Requested: {new Date(member.joined_at).toLocaleDateString()}
@@ -207,10 +206,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
                         {processingId === member.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <>
-                            <UserCheck className="h-4 w-4 mr-1" />
-                            Approve
-                          </>
+                          <><UserCheck className="h-4 w-4 mr-1" />Approve</>
                         )}
                       </Button>
                       <Button
@@ -223,10 +219,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
                         {processingId === member.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <>
-                            <UserX className="h-4 w-4 mr-1" />
-                            Reject
-                          </>
+                          <><UserX className="h-4 w-4 mr-1" />Reject</>
                         )}
                       </Button>
                     </>
