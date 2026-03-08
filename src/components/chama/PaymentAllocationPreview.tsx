@@ -103,7 +103,7 @@ export function PaymentAllocationPreview({ memberId, chamaId, grossAmount }: Pay
   const penaltyLines = preview.allocations.filter(a => a.type === 'penalty_clearance');
   const principalLines = preview.allocations.filter(a => a.type === 'principal_clearance');
   const commissionLines = preview.allocations.filter(a => 
-    a.type === 'principal_commission' || a.type === 'current_cycle_commission' || a.type === 'carry_forward_commission'
+    a.type === 'principal_commission' || a.type === 'current_cycle_commission'
   );
   const currentCycleLines = preview.allocations.filter(a => a.type === 'current_cycle');
   const carryForwardLines = preview.allocations.filter(a => a.type === 'carry_forward');
