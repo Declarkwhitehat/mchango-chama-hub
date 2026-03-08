@@ -1,35 +1,67 @@
 
 
-## Diagnosis
+## Plan: Admin Revenue Dashboard
 
-The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
+### Overview
+Create a dedicated **Revenue** page in the admin panel that provides accurate, filterable revenue data sourced from the `financial_ledger` table (the single source of truth for all commissions). The page will support day/week/month/year filtering, professional KPI cards, trend charts, source breakdown, and downloadable PDF/CSV reports.
 
-1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
-2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
-3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
-4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
+### Data Source
+The `financial_ledger` table already records every commission earned with `commission_amount`, `commission_rate`, `gross_amount`, `net_amount`, `source_type` (mchango/chama/organization), `payer_name`, `payer_phone`, and `created_at`. This is the authoritative source -- no recalculation needed.
 
-There are 3 total stuck withdrawals across the system with the same pattern.
+### What will be built
 
-## Root Cause
+**1. New page: `src/pages/AdminRevenue.tsx`**
+- Wrapped in `AdminLayout`
+- Contains the new `RevenueDashboard` component
 
-The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
+**2. New component: `src/components/admin/RevenueDashboard.tsx`**
 
-## Fix Plan
+**Filter Bar:**
+- Period presets: Today, This Week, This Month, This Year, Custom Range
+- Custom date range with date pickers
+- Source filter (All / Mchango / Chama / Organizations / Welfare)
+- Auto-recalculates on filter change
 
-### 1. Manually complete stuck withdrawal via RPC
-Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
+**KPI Cards Row (4 cards):**
+- Total Revenue (commission earned in period)
+- Total Gross Collected (volume processed)
+- Transaction Count
+- Average Commission per Transaction
+- Each card shows comparison vs previous equivalent period (e.g., this week vs last week) with green/red percentage badge
 
-Also complete `e2ea0312` (KES 10) which has the same pattern.
+**Revenue Trend Chart:**
+- Area chart showing commission over time
+- X-axis auto-adjusts: hourly for day, daily for week, daily for month, monthly for year
+- Stacked by source (color-coded: Mchango pink, Chama blue, Organizations purple)
 
-### 2. Fix retry-failed-payouts to query status before re-sending
-Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
+**Source Breakdown Section:**
+- Pie chart + table side-by-side
+- Table columns: Source, Gross, Commission, Rate, % of Total Revenue
+- Bold totals row
 
-### 3. Add a "check status" path in withdrawals-crud
-Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
+**Transaction Ledger Table:**
+- Paginated, sortable table of individual `financial_ledger` entries
+- Columns: Date/Time, Source, Type, Payer, Gross, Rate, Commission, Net
+- Search within results
 
-### Files to Change
-- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
-- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
-- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
+**Report Downloads:**
+- PDF Statement: Professional header, period, summary, breakdown, line items
+- CSV Export: Full data dump for spreadsheet analysis
+
+**3. Routing & Navigation**
+- Add route `/admin/revenue` in `App.tsx`
+- Add "Revenue" menu item in `AdminSidebar.tsx` under Financial section with a `DollarSign` icon, positioned at the top of the financial items list
+- Remove the privilege code gate (unlike Commission Analytics) since this is a standard admin page
+
+### Accuracy Guarantees
+- All figures come directly from `financial_ledger` records (no client-side rate multiplication)
+- Uses `commission_amount` as stored, not recalculated
+- Date filtering uses `startOfDay`/`endOfDay` for precise boundaries
+- Handles the 1000-row Supabase limit by using `.range()` pagination for the ledger table and aggregate queries with `.select('commission_amount')` for totals (fetching all matching rows)
+
+### Files to create/edit
+1. **Create** `src/pages/AdminRevenue.tsx`
+2. **Create** `src/components/admin/RevenueDashboard.tsx`
+3. **Edit** `src/App.tsx` -- add lazy import + route
+4. **Edit** `src/components/admin/AdminSidebar.tsx` -- add menu item
 
