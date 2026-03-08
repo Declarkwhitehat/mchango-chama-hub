@@ -308,6 +308,12 @@ export const WithdrawalsManagement = () => {
   const canReview = (status: string) =>
     ['pending', 'pending_approval', 'pending_retry', 'approved', 'processing', 'failed'].includes(status);
 
+  const extractRecipientPhone = (notes: string | null): string | null => {
+    if (!notes) return null;
+    const match = notes.match(/Recipient:\s*([\d+]+)/);
+    return match?.[1] || null;
+  };
+
   const isMpesaPayment = selectedWithdrawal?.payment_method?.method_type === 'mpesa';
   const isRetryable = selectedWithdrawal && ['failed', 'pending_retry'].includes(selectedWithdrawal.status);
   const isPendingApproval = selectedWithdrawal?.status === 'pending_approval';
@@ -388,6 +394,11 @@ export const WithdrawalsManagement = () => {
                     <TableCell>
                       <div className="font-medium">{withdrawal.requester?.full_name || 'Unknown'}</div>
                       <div className="text-xs text-muted-foreground">{withdrawal.requester?.phone || ''}</div>
+                      {withdrawal.welfare_id && extractRecipientPhone(withdrawal.notes) && (
+                        <div className="text-xs text-primary font-medium mt-0.5">
+                          → Recipient: {extractRecipientPhone(withdrawal.notes)}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-xs font-medium text-muted-foreground">{withdrawal.entity_type}</div>
@@ -398,6 +409,8 @@ export const WithdrawalsManagement = () => {
                     <TableCell>
                       {withdrawal.payment_method?.phone_number ? (
                         <span className="text-xs font-mono">{withdrawal.payment_method.phone_number}</span>
+                      ) : extractRecipientPhone(withdrawal.notes) ? (
+                        <span className="text-xs font-mono">{extractRecipientPhone(withdrawal.notes)}</span>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
@@ -485,6 +498,17 @@ export const WithdrawalsManagement = () => {
                     <div>
                       <Label className="text-muted-foreground text-xs">M-Pesa Number</Label>
                       <p className="font-mono font-bold text-lg">{selectedWithdrawal.payment_method.phone_number}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recipient Phone (Welfare) */}
+                {selectedWithdrawal.welfare_id && extractRecipientPhone(selectedWithdrawal.notes) && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-muted border border-primary/20">
+                    <Phone className="h-4 w-4 text-primary" />
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Recipient M-Pesa Number</Label>
+                      <p className="font-mono font-bold text-lg">{extractRecipientPhone(selectedWithdrawal.notes)}</p>
                     </div>
                   </div>
                 )}
