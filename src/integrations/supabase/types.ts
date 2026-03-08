@@ -2516,6 +2516,7 @@ export type Database = {
           commission_amount: number
           completed_at: string | null
           created_at: string
+          cycle_id: string | null
           id: string
           last_b2c_attempt_at: string | null
           mchango_id: string | null
@@ -2544,6 +2545,7 @@ export type Database = {
           commission_amount?: number
           completed_at?: string | null
           created_at?: string
+          cycle_id?: string | null
           id?: string
           last_b2c_attempt_at?: string | null
           mchango_id?: string | null
@@ -2572,6 +2574,7 @@ export type Database = {
           commission_amount?: number
           completed_at?: string | null
           created_at?: string
+          cycle_id?: string | null
           id?: string
           last_b2c_attempt_at?: string | null
           mchango_id?: string | null
@@ -2598,6 +2601,13 @@ export type Database = {
             columns: ["chama_id"]
             isOneToOne: false
             referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "withdrawals_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "contribution_cycles"
             referencedColumns: ["id"]
           },
           {
@@ -2736,6 +2746,10 @@ export type Database = {
       check_signup_uniqueness: {
         Args: { p_email: string; p_id_number: string; p_phone: string }
         Returns: Json
+      }
+      claim_cycle_for_processing: {
+        Args: { p_cycle_id: string }
+        Returns: boolean
       }
       cleanup_expired_otps: { Args: never; Returns: undefined }
       cleanup_old_chat_messages: { Args: never; Returns: undefined }
