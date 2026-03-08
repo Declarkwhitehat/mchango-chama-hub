@@ -1028,86 +1028,142 @@ serve(async (req) => {
         if (allMembersPaid && !currentCycle.payout_processed) {
           console.log('🎉 All members paid on time! Triggering immediate payout for cycle:', currentCycle.id);
 
-          const { data: chamaDetails } = await supabaseClient
-            .from('chama')
-            .select('id, name, contribution_amount, commission_rate')
-            .eq('id', body.chama_id)
-            .single();
+          // ========== DUPLICATE PAYOUT GUARD ==========
+          const supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          );
 
-          const { data: beneficiaryMember } = await supabaseClient
-            .from('chama_members')
-            .select(`id, user_id, member_code, order_index, missed_payments_count, requires_admin_verification, profiles!chama_members_user_id_fkey(full_name, phone)`)
-            .eq('id', currentCycle.beneficiary_member_id)
-            .single();
+          const { data: existingPayout } = await supabaseAdmin
+            .from('withdrawals')
+            .select('id')
+            .eq('chama_id', body.chama_id)
+            .eq('cycle_id', currentCycle.id)
+            .not('status', 'in', '("rejected","failed")')
+            .maybeSingle();
 
-          if (beneficiaryMember && chamaDetails) {
-            const commissionRate = chamaDetails.commission_rate || 0.05;
-            const grossAmount = chamaDetails.contribution_amount * totalMembers;
-            const commissionAmount = grossAmount * commissionRate;
-            const netPayoutAmount = grossAmount - commissionAmount;
+          if (existingPayout) {
+            console.log(`⚠️ Payout already exists for cycle ${currentCycle.id} — skipping immediate payout`);
+          } else {
+            // Claim the cycle atomically
+            const { data: claimed } = await supabaseAdmin
+              .rpc('claim_cycle_for_processing', { p_cycle_id: currentCycle.id });
 
-            const { data: paymentMethod } = await supabaseClient
-              .from('payment_methods')
-              .select('*')
-              .eq('user_id', beneficiaryMember.user_id)
-              .eq('is_default', true)
-              .maybeSingle();
-
-            if (paymentMethod) {
-              const canAutoApprove = paymentMethod.method_type === 'mpesa' &&
-                                     !beneficiaryMember.requires_admin_verification &&
-                                     (beneficiaryMember.missed_payments_count || 0) === 0;
-
-              const { data: newWithdrawal } = await supabaseClient
-                .from('withdrawals')
-                .insert({
-                  chama_id: body.chama_id,
-                  requested_by: beneficiaryMember.user_id,
-                  amount: grossAmount,
-                  commission_amount: commissionAmount,
-                  net_amount: netPayoutAmount,
-                  status: canAutoApprove ? 'approved' : 'pending',
-                  payment_method_id: paymentMethod.id,
-                  payment_method_type: paymentMethod.method_type,
-                  notes: `Automatic immediate payout — all ${totalMembers} members paid`,
-                  requested_at: new Date().toISOString(),
-                  b2c_attempt_count: 0,
-                  ...(canAutoApprove ? { reviewed_at: new Date().toISOString() } : {})
-                })
-                .select('id')
+            if (!claimed) {
+              console.log(`⚠️ Cycle ${currentCycle.id} already claimed — skipping`);
+            } else {
+              const { data: chamaDetails } = await supabaseClient
+                .from('chama')
+                .select('id, name, contribution_amount, commission_rate')
+                .eq('id', body.chama_id)
                 .single();
 
-              if (newWithdrawal) {
-                await supabaseClient.rpc('record_company_earning', {
-                  p_source: 'chama_commission',
-                  p_amount: commissionAmount,
-                  p_group_id: body.chama_id,
-                  p_description: `Immediate payout commission — ${chamaDetails.name}`
-                });
+              const { data: beneficiaryMember } = await supabaseClient
+                .from('chama_members')
+                .select(`id, user_id, member_code, order_index, missed_payments_count, requires_admin_verification, profiles!chama_members_user_id_fkey(full_name, phone)`)
+                .eq('id', currentCycle.beneficiary_member_id)
+                .single();
 
-                await supabaseClient.from('contribution_cycles').update({
-                  is_complete: true,
-                  payout_processed: true,
-                  payout_processed_at: new Date().toISOString(),
-                  payout_amount: netPayoutAmount,
-                  payout_type: 'full',
-                  members_paid_count: totalMembers,
-                  total_collected_amount: grossAmount
-                }).eq('id', currentCycle.id);
+              if (beneficiaryMember && chamaDetails) {
+                const commissionRate = chamaDetails.commission_rate || 0.05;
+                const grossAmount = chamaDetails.contribution_amount * totalMembers;
+                const commissionAmount = grossAmount * commissionRate;
+                const netPayoutAmount = grossAmount - commissionAmount;
 
-                if (canAutoApprove && paymentMethod.phone_number) {
-                  try {
-                    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-                    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-                    await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
-                      method: 'POST',
-                      headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ withdrawal_id: newWithdrawal.id, phone_number: paymentMethod.phone_number, amount: netPayoutAmount })
+                const { data: paymentMethod } = await supabaseClient
+                  .from('payment_methods')
+                  .select('*')
+                  .eq('user_id', beneficiaryMember.user_id)
+                  .eq('is_default', true)
+                  .maybeSingle();
+
+                if (paymentMethod) {
+                  const canAutoApprove = paymentMethod.method_type === 'mpesa' &&
+                                         !beneficiaryMember.requires_admin_verification &&
+                                         (beneficiaryMember.missed_payments_count || 0) === 0;
+
+                  const { data: newWithdrawal, error: wdError } = await supabaseAdmin
+                    .from('withdrawals')
+                    .insert({
+                      chama_id: body.chama_id,
+                      cycle_id: currentCycle.id,  // Link to cycle for duplicate prevention
+                      requested_by: beneficiaryMember.user_id,
+                      amount: grossAmount,
+                      commission_amount: commissionAmount,
+                      net_amount: netPayoutAmount,
+                      status: canAutoApprove ? 'approved' : 'pending',
+                      payment_method_id: paymentMethod.id,
+                      payment_method_type: paymentMethod.method_type,
+                      notes: `Automatic immediate payout — all ${totalMembers} members paid | Cycle #${currentCycle.cycle_number}`,
+                      requested_at: new Date().toISOString(),
+                      b2c_attempt_count: 0,
+                      ...(canAutoApprove ? { reviewed_at: new Date().toISOString() } : {})
+                    })
+                    .select('id')
+                    .single();
+
+                  if (wdError && wdError.code === '23505') {
+                    console.log(`⚠️ Duplicate payout prevented by unique index for cycle ${currentCycle.id}`);
+                  } else if (newWithdrawal) {
+                    await supabaseAdmin.rpc('record_company_earning', {
+                      p_source: 'chama_commission',
+                      p_amount: commissionAmount,
+                      p_group_id: body.chama_id,
+                      p_description: `Immediate payout commission — ${chamaDetails.name}`
                     });
-                  } catch (e) { /* non-critical */ }
+
+                    // Payout ledger entry
+                    await supabaseAdmin.from('financial_ledger').insert({
+                      transaction_type: 'payout',
+                      source_type: 'chama',
+                      source_id: body.chama_id,
+                      gross_amount: grossAmount,
+                      commission_amount: commissionAmount,
+                      net_amount: netPayoutAmount,
+                      commission_rate: commissionRate,
+                      reference_id: newWithdrawal.id,
+                      description: `Immediate full payout — Cycle #${currentCycle.cycle_number} to ${beneficiaryMember.member_code}. All ${totalMembers} members paid.`
+                    });
+
+                    // Audit log
+                    await supabaseAdmin.from('audit_logs').insert({
+                      action: 'IMMEDIATE_PAYOUT_CREATED',
+                      table_name: 'withdrawals',
+                      record_id: newWithdrawal.id,
+                      new_values: {
+                        cycle_id: currentCycle.id,
+                        cycle_number: currentCycle.cycle_number,
+                        beneficiary: beneficiaryMember.member_code,
+                        gross: grossAmount,
+                        commission: commissionAmount,
+                        net: netPayoutAmount
+                      }
+                    });
+
+                    await supabaseAdmin.from('contribution_cycles').update({
+                      is_complete: true,
+                      payout_amount: netPayoutAmount,
+                      payout_type: 'full',
+                      members_paid_count: totalMembers,
+                      total_collected_amount: grossAmount
+                    }).eq('id', currentCycle.id);
+
+                    if (canAutoApprove && paymentMethod.phone_number) {
+                      try {
+                        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+                        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+                        await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
+                          method: 'POST',
+                          headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ withdrawal_id: newWithdrawal.id, phone_number: paymentMethod.phone_number, amount: netPayoutAmount })
+                        });
+                      } catch (e) { /* non-critical */ }
+                    }
+                  }
                 }
               }
             }
+          }
           }
         }
       }
