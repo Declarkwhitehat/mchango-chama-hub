@@ -79,29 +79,38 @@ const Index = () => {
               </p>
               
               {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4 sm:pt-6 max-w-3xl mx-auto">
+              <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 sm:gap-4 justify-center items-center pt-4 sm:pt-6 max-w-4xl mx-auto">
                 <Button 
                   variant="hero" 
                   size="xl"
-                  className="w-full sm:w-auto min-w-[200px]"
+                  className="w-full sm:w-auto sm:min-w-[180px]"
                   onClick={() => window.location.href = '/mchango'}
                 >
                   <Heart className="mr-2 h-5 w-5" />
-                  Browse Campaigns
+                  Campaigns
                 </Button>
                 <Button 
                   variant="heroSecondary" 
                   size="xl"
-                  className="w-full sm:w-auto min-w-[200px]"
+                  className="w-full sm:w-auto sm:min-w-[180px]"
                   onClick={() => window.location.href = '/chama'}
                 >
                   <Users className="mr-2 h-5 w-5" />
-                  Browse Chamas
+                  Chamas
                 </Button>
                 <Button 
                   variant="heroSecondary" 
                   size="xl"
-                  className="w-full sm:w-auto min-w-[200px]"
+                  className="w-full sm:w-auto sm:min-w-[180px]"
+                  onClick={() => window.location.href = '/welfare'}
+                >
+                  <ShieldCheck className="mr-2 h-5 w-5" />
+                  Welfare
+                </Button>
+                <Button 
+                  variant="heroSecondary" 
+                  size="xl"
+                  className="w-full sm:w-auto sm:min-w-[180px]"
                   onClick={() => window.location.href = '/organizations'}
                 >
                   <Building2 className="mr-2 h-5 w-5" />
