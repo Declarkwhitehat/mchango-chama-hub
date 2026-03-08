@@ -113,7 +113,7 @@ const AdminDashboard = () => {
   }, [fetchDashboardData]);
 
   const totalActiveGroups = stats.activeChamas + stats.activeOrganizations + stats.activeWelfares;
-  const hasAlerts = stats.pendingKyc > 0 || stats.pendingWithdrawals > 0 || stats.pendingCallbacks > 0;
+  const hasAlerts = stats.pendingKyc > 0 || stats.pendingWithdrawals > 0 || stats.pendingCallbacks > 0 || stats.pendingExecChanges > 0;
 
   if (loading) {
     return (
