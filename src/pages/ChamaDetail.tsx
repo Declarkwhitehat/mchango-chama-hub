@@ -15,7 +15,7 @@ import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
 import { PaymentStatusManager } from "@/components/chama/PaymentStatusManager";
-import { PaymentTransparency } from "@/components/chama/PaymentTransparency";
+
 import { SkippedMemberAlert } from "@/components/chama/SkippedMemberAlert";
 import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
@@ -780,11 +780,9 @@ const ChamaDetail = () => {
           <Tabs defaultValue="dashboard" className="w-full">
             <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center">
               <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
-              <TabsTrigger value="transparency" className="text-xs sm:text-sm">Transparency</TabsTrigger>
               {isManager && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               <TabsTrigger value="members" className="text-xs sm:text-sm">Members</TabsTrigger>
               {isMember && <TabsTrigger value="chat" className="text-xs sm:text-sm flex items-center gap-1"><MessageSquare className="h-3 w-3" />Chat</TabsTrigger>}
-              <TabsTrigger value="details" className="text-xs sm:text-sm">Details</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard">
@@ -800,12 +798,6 @@ const ChamaDetail = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="transparency">
-              <PaymentTransparency
-                chamaId={chama.id}
-                contributionAmount={chama.contribution_amount}
-              />
-            </TabsContent>
 
             {isManager && (
               <TabsContent value="payments">
@@ -818,7 +810,15 @@ const ChamaDetail = () => {
               </TabsContent>
             )}
 
-            <TabsContent value="members">
+            <TabsContent value="members" className="space-y-4">
+              {/* WhatsApp Group Link Manager */}
+              <WhatsAppLinkManager
+                chamaId={chama.id}
+                currentLink={chama.whatsapp_link}
+                isManager={isManager}
+                onUpdate={loadChama}
+              />
+
               <Card>
                 <CardHeader>
                   <CardTitle>Group Members ({approvedMembers.length})</CardTitle>
@@ -924,40 +924,6 @@ const ChamaDetail = () => {
               </TabsContent>
             )}
 
-            <TabsContent value="details" className="space-y-4">
-              {/* WhatsApp Group Link */}
-              <WhatsAppLinkManager
-                chamaId={chama.id}
-                currentLink={chama.whatsapp_link}
-                isManager={isManager}
-                onUpdate={loadChama}
-              />
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Chama Details</CardTitle>
-                  <CardDescription>Group information and settings</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Created</p>
-                    <p className="font-medium">
-                      {new Date(chama.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Contribution Frequency</p>
-                    <p className="font-medium capitalize">{chama.contribution_frequency}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Member Capacity</p>
-                    <p className="font-medium">
-                      {approvedMembers.length} / {chama.max_members} members
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
         )}
 
