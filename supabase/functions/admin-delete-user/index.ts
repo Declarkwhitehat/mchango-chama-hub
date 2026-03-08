@@ -24,7 +24,6 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '').trim();
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
@@ -50,7 +49,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { user_id, privilege_code } = body;
+    const { user_id, privilege_code, confirm_name, action } = body;
 
     if (!user_id) {
       return new Response(JSON.stringify({ error: 'user_id is required' }), {
@@ -65,131 +64,116 @@ serve(async (req) => {
     }
 
     // Prevent self-deletion
-    if (user_id === callerData.user.id) {
+    if (user_id === callerData.user.id && action !== 'restore') {
       return new Response(JSON.stringify({ error: 'Cannot delete your own account' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`Admin ${callerData.user.id} deleting user ${user_id}`);
-
-    // Cascade delete user data in correct order
-    const deletionSteps = [
-      // Fraud & security
-      { table: 'fraud_events', filter: { user_id } },
-      { table: 'user_risk_profiles', filter: { user_id } },
-      // Auth & security
-      { table: 'totp_secrets', filter: { user_id } },
-      { table: 'webauthn_credentials', filter: { user_id } },
-      { table: 'user_roles', filter: { user_id } },
-      { table: 'otp_verifications', filter: { phone: null } }, // handled separately
-      // Notifications & chat
-      { table: 'notifications', filter: { user_id } },
-      { table: 'chat_messages', filter: { user_id } },
-      // Audit
-      { table: 'audit_logs', filter: { user_id } },
-      // Payment methods
-      { table: 'payment_methods', filter: { user_id } },
-      // Trust scores
-      { table: 'member_trust_scores', filter: { user_id } },
-    ];
-
-    for (const step of deletionSteps) {
-      try {
-        const { error } = await supabaseAdmin
-          .from(step.table)
-          .delete()
-          .eq('user_id', user_id);
-        if (error) {
-          console.log(`Warning: Failed to delete from ${step.table}:`, (error as any).message);
-        }
-      } catch (e) {
-        console.log(`Warning: Table ${step.table} may not exist, skipping`);
-      }
-    }
-
-    // Delete OTP verifications by phone
-    const { data: profileData } = await supabaseAdmin
+    // Get profile to verify name confirmation
+    const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('phone')
+      .select('full_name, deleted_at')
       .eq('id', user_id)
       .single();
 
-    if (profileData?.phone) {
-      await supabaseAdmin
-        .from('otp_verifications')
-        .delete()
-        .eq('phone', profileData.phone);
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'User not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Remove chama memberships (but don't delete the chamas themselves)
-    await supabaseAdmin
-      .from('chama_members')
-      .delete()
-      .eq('user_id', user_id);
-
-    // Remove welfare memberships
-    await supabaseAdmin
-      .from('welfare_members')
-      .delete()
-      .eq('user_id', user_id);
-
-    // Remove chama rejoin requests
-    await supabaseAdmin
-      .from('chama_rejoin_requests')
-      .delete()
-      .eq('user_id', user_id);
-
-    // Delete KYC documents from storage
-    try {
-      const { data: files } = await supabaseAdmin.storage
-        .from('id-documents')
-        .list(user_id);
-
-      if (files && files.length > 0) {
-        const filePaths = files.map(f => `${user_id}/${f.name}`);
-        await supabaseAdmin.storage
-          .from('id-documents')
-          .remove(filePaths);
+    // RESTORE action
+    if (action === 'restore') {
+      if (!profile.deleted_at) {
+        return new Response(JSON.stringify({ error: 'User is not deleted' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
-    } catch (e) {
-      console.log('Warning: Failed to delete storage files:', (e as any).message);
+
+      const { error: restoreError } = await supabaseAdmin
+        .from('profiles')
+        .update({ deleted_at: null, deleted_by: null, deletion_reason: null })
+        .eq('id', user_id);
+
+      if (restoreError) {
+        return new Response(JSON.stringify({ error: 'Failed to restore user', details: (restoreError as any).message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`User ${user_id} restored by admin ${callerData.user.id}`);
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'User account has been restored'
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Delete the profile
-    const { error: profileDeleteError } = await supabaseAdmin
+    // DELETE action — require name confirmation
+    if (!confirm_name || confirm_name.trim().toLowerCase() !== profile.full_name.trim().toLowerCase()) {
+      return new Response(JSON.stringify({ error: 'Name confirmation does not match. Please type the exact user name.' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (profile.deleted_at) {
+      return new Response(JSON.stringify({ error: 'User is already deleted' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`Admin ${callerData.user.id} soft-deleting user ${user_id}`);
+
+    // Soft-delete: mark the profile as deleted
+    const { error: softDeleteError } = await supabaseAdmin
       .from('profiles')
-      .delete()
+      .update({ 
+        deleted_at: new Date().toISOString(),
+        deleted_by: callerData.user.id,
+        deletion_reason: body.reason || 'Deleted by admin'
+      })
       .eq('id', user_id);
 
-    if (profileDeleteError) {
-      console.error('Failed to delete profile:', (profileDeleteError as any).message);
+    if (softDeleteError) {
       return new Response(JSON.stringify({ 
-        error: 'Failed to delete user profile',
-        details: (profileDeleteError as any).message
+        error: 'Failed to delete user',
+        details: (softDeleteError as any).message
       }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Finally delete the auth user
-    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
-
-    if (authDeleteError) {
-      console.error('Failed to delete auth user:', (authDeleteError as any).message);
-      return new Response(JSON.stringify({ 
-        error: 'Profile deleted but auth cleanup failed',
-        details: (authDeleteError as any).message
-      }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Disable user's auth account (but don't permanently delete)
+    // Ban the user so they can't log in
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(user_id, {
+        ban_duration: '876000h', // ~100 years
       });
+    } catch (e) {
+      console.log('Warning: Failed to ban auth user:', (e as any).message);
     }
 
-    console.log(`User ${user_id} successfully deleted by admin ${callerData.user.id}`);
+    // Log to audit
+    try {
+      await supabaseAdmin.from('audit_logs').insert({
+        action: 'SOFT_DELETE',
+        table_name: 'profiles',
+        record_id: user_id,
+        user_id: callerData.user.id,
+        new_values: { deleted_at: new Date().toISOString(), reason: body.reason || 'Deleted by admin' },
+      });
+    } catch (e) {
+      console.log('Warning: Failed to create audit log');
+    }
+
+    console.log(`User ${user_id} soft-deleted by admin ${callerData.user.id}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'User account and all associated data have been deleted'
+      message: 'User account has been deleted. It will be visible in the admin dashboard for 45 days before permanent removal.'
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

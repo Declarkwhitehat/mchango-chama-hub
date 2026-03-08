@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key, Trash2 } from "lucide-react";
+import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key, Trash2, RotateCcw, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 
 interface User {
   id: string;
@@ -18,6 +18,7 @@ interface User {
   phone: string;
   kyc_status: string;
   created_at: string;
+  deleted_at: string | null;
 }
 
 interface UserRole {
@@ -40,9 +41,16 @@ export const UsersManagement = () => {
   const [codeError, setCodeError] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletePrivilegeCode, setDeletePrivilegeCode] = useState("");
-  const [pendingDeleteUserId, setPendingDeleteUserId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<User | null>(null);
   const [deleteCodeError, setDeleteCodeError] = useState(false);
+  const [deleteNameError, setDeleteNameError] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [restorePrivilegeCode, setRestorePrivilegeCode] = useState("");
+  const [pendingRestoreUser, setPendingRestoreUser] = useState<User | null>(null);
+  const [restoreCodeError, setRestoreCodeError] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -50,7 +58,6 @@ export const UsersManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      // Fetch users
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select('*')
@@ -58,14 +65,12 @@ export const UsersManagement = () => {
 
       if (usersError) throw usersError;
 
-      // Fetch user roles separately
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role');
 
       if (rolesError) throw rolesError;
 
-      // Map roles by user_id
       const rolesMap: Record<string, UserRole[]> = {};
       rolesData?.forEach(role => {
         if (!rolesMap[role.user_id]) {
@@ -167,35 +172,39 @@ export const UsersManagement = () => {
     }
   };
 
-  const handleDeleteClick = (userId: string) => {
-    setPendingDeleteUserId(userId);
+  const handleDeleteClick = (user: User) => {
+    setPendingDeleteUser(user);
     setDeletePrivilegeCode("");
+    setDeleteConfirmName("");
     setDeleteCodeError(false);
+    setDeleteNameError(false);
     setDeleteDialogOpen(true);
   };
 
   const confirmDeleteUser = async () => {
-    if (!pendingDeleteUserId) return;
+    if (!pendingDeleteUser) return;
     setDeleting(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error('Not authenticated');
-
       const response = await supabase.functions.invoke('admin-delete-user', {
-        body: { user_id: pendingDeleteUserId, privilege_code: deletePrivilegeCode },
+        body: { 
+          user_id: pendingDeleteUser.id, 
+          privilege_code: deletePrivilegeCode,
+          confirm_name: deleteConfirmName,
+        },
       });
 
       if (response.error) throw new Error(response.error.message || 'Failed to delete user');
       if (response.data?.error) throw new Error(response.data.error);
 
-      toast({ title: "Success", description: "User account deleted successfully" });
+      toast({ title: "Success", description: response.data?.message || "User account deleted" });
       setDeleteDialogOpen(false);
       await fetchUsers();
     } catch (error: any) {
       console.error('Error deleting user:', error);
       if (error.message?.includes('privilege code')) {
         setDeleteCodeError(true);
+      } else if (error.message?.includes('Name confirmation')) {
+        setDeleteNameError(true);
       }
       toast({
         title: "Error",
@@ -204,8 +213,46 @@ export const UsersManagement = () => {
       });
     } finally {
       setDeleting(false);
-      setPendingDeleteUserId(null);
-      setDeletePrivilegeCode("");
+    }
+  };
+
+  const handleRestoreClick = (user: User) => {
+    setPendingRestoreUser(user);
+    setRestorePrivilegeCode("");
+    setRestoreCodeError(false);
+    setRestoreDialogOpen(true);
+  };
+
+  const confirmRestoreUser = async () => {
+    if (!pendingRestoreUser) return;
+    setRestoring(true);
+    try {
+      const response = await supabase.functions.invoke('admin-delete-user', {
+        body: { 
+          user_id: pendingRestoreUser.id, 
+          privilege_code: restorePrivilegeCode,
+          action: 'restore',
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message || 'Failed to restore user');
+      if (response.data?.error) throw new Error(response.data.error);
+
+      toast({ title: "Success", description: "User account restored successfully" });
+      setRestoreDialogOpen(false);
+      await fetchUsers();
+    } catch (error: any) {
+      console.error('Error restoring user:', error);
+      if (error.message?.includes('privilege code')) {
+        setRestoreCodeError(true);
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to restore user",
+        variant: "destructive",
+      });
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -215,9 +262,12 @@ export const UsersManagement = () => {
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.phone.includes(searchTerm);
 
+    const isDeleted = !!user.deleted_at;
+    
     const matchesStatus = 
       statusFilter === "all" || 
-      user.kyc_status === statusFilter;
+      statusFilter === "deleted" ? isDeleted :
+      (!isDeleted && (statusFilter === "all" || user.kyc_status === statusFilter));
 
     return matchesSearch && matchesStatus;
   });
@@ -234,6 +284,11 @@ export const UsersManagement = () => {
     }
   };
 
+  const getDaysRemaining = (deletedAt: string) => {
+    const daysSinceDeleted = differenceInDays(new Date(), new Date(deletedAt));
+    return Math.max(0, 45 - daysSinceDeleted);
+  };
+
   if (loading) {
     return (
       <Card>
@@ -244,12 +299,15 @@ export const UsersManagement = () => {
     );
   }
 
+  const activeUsers = users.filter(u => !u.deleted_at);
+  const deletedUsers = users.filter(u => !!u.deleted_at);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>User Management</CardTitle>
         <CardDescription>
-          View and manage all registered users ({users.length} total)
+          View and manage all registered users ({activeUsers.length} active, {deletedUsers.length} deleted)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -273,6 +331,7 @@ export const UsersManagement = () => {
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="deleted">Deleted</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -287,26 +346,37 @@ export const UsersManagement = () => {
             filteredUsers.map((user) => {
               const userRolesList = userRoles[user.id] || [];
               const isAdmin = userRolesList.some(r => r.role === 'admin');
+              const isDeleted = !!user.deleted_at;
+              const daysRemaining = isDeleted ? getDaysRemaining(user.deleted_at!) : 0;
               
               return (
                 <div
                   key={user.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
+                  className={`flex items-center justify-between p-4 border rounded-lg ${isDeleted ? 'opacity-70 border-destructive/30 bg-destructive/5' : ''}`}
                 >
                   <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{user.full_name}</p>
-                      {isAdmin && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className={`font-medium ${isDeleted ? 'line-through' : ''}`}>{user.full_name}</p>
+                      {isDeleted && (
+                        <Badge variant="destructive" className="flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Deleted ({daysRemaining}d remaining)
+                        </Badge>
+                      )}
+                      {isAdmin && !isDeleted && (
                         <Badge variant="default">
                           <Shield className="h-3 w-3 mr-1" />
                           Admin
                         </Badge>
                       )}
-                      {getKycBadge(user.kyc_status)}
+                      {!isDeleted && getKycBadge(user.kyc_status)}
                     </div>
                     <p className="text-sm text-muted-foreground">{user.email}</p>
                     <p className="text-xs text-muted-foreground">
                       {user.phone} • Joined {format(new Date(user.created_at), "MMM d, yyyy")}
+                      {isDeleted && user.deleted_at && (
+                        <> • Deleted {format(new Date(user.deleted_at), "MMM d, yyyy")}</>
+                      )}
                     </p>
                   </div>
                   
@@ -319,35 +389,49 @@ export const UsersManagement = () => {
                       <ExternalLink className="h-4 w-4 mr-1" />
                       View Details
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => isAdmin ? removeAdminRole(user.id) : handleMakeAdminClick(user.id)}
-                      disabled={processing === user.id}
-                    >
-                      {processing === user.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : isAdmin ? (
-                        <>
-                          <ShieldOff className="h-4 w-4 mr-1" />
-                          Remove Admin
-                        </>
-                      ) : (
-                        <>
-                          <Shield className="h-4 w-4 mr-1" />
-                          Make Admin
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteClick(user.id)}
-                      disabled={deleting}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
+                    {isDeleted ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRestoreClick(user)}
+                        disabled={restoring}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Restore
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => isAdmin ? removeAdminRole(user.id) : handleMakeAdminClick(user.id)}
+                          disabled={processing === user.id}
+                        >
+                          {processing === user.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : isAdmin ? (
+                            <>
+                              <ShieldOff className="h-4 w-4 mr-1" />
+                              Remove Admin
+                            </>
+                          ) : (
+                            <>
+                              <Shield className="h-4 w-4 mr-1" />
+                              Make Admin
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteClick(user)}
+                          disabled={deleting}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -414,41 +498,108 @@ export const UsersManagement = () => {
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
               <p>
-                This will permanently delete the user's account, profile, memberships, 
-                and all associated data. This action cannot be undone.
+                This will delete the user's account. The account will remain visible 
+                in the admin dashboard for <strong>45 days</strong> before permanent removal. 
+                You can restore it during that period.
               </p>
-              <div className="space-y-2">
-                <Input
-                  type="password"
-                  placeholder="Enter privilege code to confirm"
-                  value={deletePrivilegeCode}
-                  onChange={(e) => {
-                    setDeletePrivilegeCode(e.target.value);
-                    setDeleteCodeError(false);
-                  }}
-                  className={deleteCodeError ? "border-destructive" : ""}
-                />
-                {deleteCodeError && (
-                  <p className="text-sm text-destructive">Invalid privilege code</p>
-                )}
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Type the user's full name to confirm:</p>
+                  <p className="text-sm text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
+                    {pendingDeleteUser?.full_name}
+                  </p>
+                  <Input
+                    placeholder="Type full name exactly as shown above"
+                    value={deleteConfirmName}
+                    onChange={(e) => {
+                      setDeleteConfirmName(e.target.value);
+                      setDeleteNameError(false);
+                    }}
+                    className={deleteNameError ? "border-destructive" : ""}
+                  />
+                  {deleteNameError && (
+                    <p className="text-sm text-destructive">Name does not match</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Enter privilege code:</p>
+                  <Input
+                    type="password"
+                    placeholder="Enter privilege code"
+                    value={deletePrivilegeCode}
+                    onChange={(e) => {
+                      setDeletePrivilegeCode(e.target.value);
+                      setDeleteCodeError(false);
+                    }}
+                    className={deleteCodeError ? "border-destructive" : ""}
+                  />
+                  {deleteCodeError && (
+                    <p className="text-sm text-destructive">Invalid privilege code</p>
+                  )}
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setDeletePrivilegeCode("");
+              setDeleteConfirmName("");
               setDeleteCodeError(false);
-              setPendingDeleteUserId(null);
+              setDeleteNameError(false);
+              setPendingDeleteUser(null);
             }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDeleteUser}
-              disabled={!deletePrivilegeCode || deleting}
+              disabled={!deletePrivilegeCode || !deleteConfirmName || deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Delete User Permanently
+              Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Restore User Dialog */}
+      <AlertDialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5" />
+              Restore User Account
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                Restore <strong>{pendingRestoreUser?.full_name}</strong>'s account? 
+                They will be able to log in again.
+              </p>
+              <div className="space-y-2">
+                <Input
+                  type="password"
+                  placeholder="Enter privilege code"
+                  value={restorePrivilegeCode}
+                  onChange={(e) => {
+                    setRestorePrivilegeCode(e.target.value);
+                    setRestoreCodeError(false);
+                  }}
+                  className={restoreCodeError ? "border-destructive" : ""}
+                />
+                {restoreCodeError && (
+                  <p className="text-sm text-destructive">Invalid privilege code</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRestoreUser}
+              disabled={!restorePrivilegeCode || restoring}
+            >
+              {restoring ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Restore Account
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
