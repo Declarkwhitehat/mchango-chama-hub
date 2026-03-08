@@ -86,8 +86,21 @@ serve(async (req) => {
       const netAmount = Math.round((grossAmount - commissionAmount) * 100) / 100;
 
       const cycleMonth = new Date().toISOString().substring(0, 7);
+      const paymentRef = payment_reference || `WC-${crypto.randomUUID().substring(0, 8)}`;
 
-      // Use supabaseAdmin for insert
+      // Idempotency guard: check for duplicate payment_reference
+      const { data: existing } = await supabaseAdmin
+        .from('welfare_contributions')
+        .select('*')
+        .eq('welfare_id', welfare_id)
+        .eq('payment_reference', paymentRef)
+        .maybeSingle();
+
+      if (existing) {
+        console.log('Duplicate contribution detected, returning existing:', existing.id);
+        return new Response(JSON.stringify({ data: existing }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       const { data: contribution, error } = await supabaseAdmin
         .from('welfare_contributions')
         .insert({
@@ -97,7 +110,7 @@ serve(async (req) => {
           gross_amount: grossAmount,
           commission_amount: commissionAmount,
           net_amount: netAmount,
-          payment_reference: payment_reference || `WC-${crypto.randomUUID().substring(0, 8)}`,
+          payment_reference: paymentRef,
           payment_method: payment_method || 'mpesa',
           payment_status: 'completed',
           cycle_month: cycleMonth,
