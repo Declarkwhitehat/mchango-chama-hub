@@ -1058,28 +1058,43 @@ serve(async (req) => {
 
       console.log('Withdrawal updated:', withdrawal);
 
-      // If manually completed, update chama total_withdrawn
-      if (isManualCompletion && existingWithdrawal.chama_id) {
-        const { data: chama } = await supabaseAdmin
-          .from('chama')
-          .select('total_withdrawn')
-          .eq('id', existingWithdrawal.chama_id)
-          .single();
-        
-        if (chama) {
-          const newTotal = Number(chama.total_withdrawn || 0) + Number(existingWithdrawal.net_amount);
-          await supabaseAdmin
-            .from('chama')
-            .update({ total_withdrawn: newTotal })
-            .eq('id', existingWithdrawal.chama_id);
-          
-          console.log('Updated chama total_withdrawn:', { 
-            chama_id: existingWithdrawal.chama_id,
-            previous: chama.total_withdrawn,
-            added: existingWithdrawal.net_amount,
-            new_total: newTotal
-          });
+      // If manually completed, update entity total_withdrawn and available_balance
+      if (isManualCompletion) {
+        const netAmt = Number(existingWithdrawal.net_amount);
+        if (existingWithdrawal.chama_id) {
+          const { data: entity } = await supabaseAdmin.from('chama').select('total_withdrawn, available_balance').eq('id', existingWithdrawal.chama_id).single();
+          if (entity) {
+            await supabaseAdmin.from('chama').update({
+              total_withdrawn: Number(entity.total_withdrawn || 0) + netAmt,
+              available_balance: Number(entity.available_balance || 0) - netAmt,
+            }).eq('id', existingWithdrawal.chama_id);
+          }
+        } else if (existingWithdrawal.mchango_id) {
+          const { data: entity } = await supabaseAdmin.from('mchango').select('total_withdrawn, available_balance').eq('id', existingWithdrawal.mchango_id).single();
+          if (entity) {
+            await supabaseAdmin.from('mchango').update({
+              total_withdrawn: Number(entity.total_withdrawn || 0) + netAmt,
+              available_balance: Number(entity.available_balance || 0) - netAmt,
+            }).eq('id', existingWithdrawal.mchango_id);
+          }
+        } else if (existingWithdrawal.organization_id) {
+          const { data: entity } = await supabaseAdmin.from('organizations').select('total_withdrawn, available_balance').eq('id', existingWithdrawal.organization_id).single();
+          if (entity) {
+            await supabaseAdmin.from('organizations').update({
+              total_withdrawn: Number(entity.total_withdrawn || 0) + netAmt,
+              available_balance: Number(entity.available_balance || 0) - netAmt,
+            }).eq('id', existingWithdrawal.organization_id);
+          }
+        } else if (existingWithdrawal.welfare_id) {
+          const { data: entity } = await supabaseAdmin.from('welfares').select('total_withdrawn, available_balance').eq('id', existingWithdrawal.welfare_id).single();
+          if (entity) {
+            await supabaseAdmin.from('welfares').update({
+              total_withdrawn: Number(entity.total_withdrawn || 0) + netAmt,
+              available_balance: Number(entity.available_balance || 0) - netAmt,
+            }).eq('id', existingWithdrawal.welfare_id);
+          }
         }
+        console.log('Updated entity balances for manual completion:', { withdrawal_id, net_amount: netAmt });
       }
 
       // If M-Pesa approval (Send via M-Pesa button), trigger B2C payout
