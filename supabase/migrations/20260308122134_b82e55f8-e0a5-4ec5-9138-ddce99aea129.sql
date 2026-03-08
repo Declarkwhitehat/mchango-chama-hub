@@ -1,0 +1,2 @@
+ALTER TABLE public.withdrawals DROP CONSTRAINT withdrawals_requested_by_fkey;
+ALTER TABLE public.withdrawals ADD CONSTRAINT withdrawals_requested_by_fkey FOREIGN KEY (requested_by) REFERENCES public.profiles(id);
