@@ -624,7 +624,7 @@ serve(async (req) => {
       const commissionAmount = Math.round(grossAmount * commissionRate * 100) / 100;
       const netAmount = Math.round((grossAmount - commissionAmount) * 100) / 100;
 
-      const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+      const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'Anonymous';
       const cycleMonth = new Date().toISOString().substring(0, 7);
 
       // Try to find welfare member by matching phone number in profiles
