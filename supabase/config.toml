@@ -158,3 +158,6 @@ verify_jwt = false
 
 [functions.b2c-status-query]
 verify_jwt = false
+
+[functions.admin-transactions]
+verify_jwt = false
