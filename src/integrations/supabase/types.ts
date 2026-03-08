@@ -589,6 +589,48 @@ export type Database = {
           },
         ]
       }
+      chama_messages: {
+        Row: {
+          chama_id: string
+          created_at: string
+          id: string
+          is_announcement: boolean
+          message: string
+          user_id: string
+        }
+        Insert: {
+          chama_id: string
+          created_at?: string
+          id?: string
+          is_announcement?: boolean
+          message: string
+          user_id: string
+        }
+        Update: {
+          chama_id?: string
+          created_at?: string
+          id?: string
+          is_announcement?: boolean
+          message?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_messages_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chama_rejoin_requests: {
         Row: {
           chama_id: string
@@ -1249,6 +1291,50 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_trust_scores: {
+        Row: {
+          id: string
+          total_chamas_completed: number
+          total_late_payments: number
+          total_missed_payments: number
+          total_on_time_payments: number
+          total_outstanding_debts: number
+          trust_score: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          total_chamas_completed?: number
+          total_late_payments?: number
+          total_missed_payments?: number
+          total_on_time_payments?: number
+          total_outstanding_debts?: number
+          trust_score?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          total_chamas_completed?: number
+          total_late_payments?: number
+          total_missed_payments?: number
+          total_on_time_payments?: number
+          total_outstanding_debts?: number
+          trust_score?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_trust_scores_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

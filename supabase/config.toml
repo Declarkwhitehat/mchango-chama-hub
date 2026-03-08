@@ -164,3 +164,18 @@ verify_jwt = false
 
 [functions.admin-member-activity]
 verify_jwt = false
+
+[functions.compute-trust-scores]
+verify_jwt = false
+
+[functions.cleanup-failed-transactions]
+verify_jwt = false
+
+[functions.cleanup-job-status]
+verify_jwt = false
+
+[functions.chama-auto-cleanup]
+verify_jwt = false
+
+[functions.chama-auto-restart]
+verify_jwt = false

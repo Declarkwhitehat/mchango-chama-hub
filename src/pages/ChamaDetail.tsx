@@ -24,8 +24,10 @@ import { ChamaEndDate } from "@/components/chama/ChamaEndDate";
 import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
+import { ChamaChatPanel } from "@/components/chama/ChamaChatPanel";
+import { TrustScoreBadge } from "@/components/chama/TrustScoreBadge";
 
-import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2 } from "lucide-react";
+import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -93,6 +95,7 @@ const ChamaDetail = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [memberPaymentStatuses, setMemberPaymentStatuses] = useState<Record<string, boolean>>({});
+  const [memberTrustScores, setMemberTrustScores] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadChama();
@@ -780,6 +783,7 @@ const ChamaDetail = () => {
               <TabsTrigger value="transparency" className="text-xs sm:text-sm">Transparency</TabsTrigger>
               {isManager && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               <TabsTrigger value="members" className="text-xs sm:text-sm">Members</TabsTrigger>
+              {isMember && <TabsTrigger value="chat" className="text-xs sm:text-sm flex items-center gap-1"><MessageSquare className="h-3 w-3" />Chat</TabsTrigger>}
               <TabsTrigger value="details" className="text-xs sm:text-sm">Details</TabsTrigger>
             </TabsList>
 
@@ -913,6 +917,12 @@ const ChamaDetail = () => {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {isMember && (
+              <TabsContent value="chat">
+                <ChamaChatPanel chamaId={chama.id} isManager={isManager} />
+              </TabsContent>
+            )}
 
             <TabsContent value="details" className="space-y-4">
               {/* WhatsApp Group Link */}

@@ -79,7 +79,8 @@ async function checkMemberEligibility(supabase: any, memberId: string, chamaId: 
     required: totalCycles * contributionAmount,
     contributed: totalPaidCycles * contributionAmount,
     shortfall: totalUnpaid,
-    unpaidCycles: unpaidCycles.length
+    unpaidCycles: unpaidCycles.length,
+    hasDebts
   };
 }
 
@@ -512,7 +513,26 @@ Deno.serve(async (req) => {
         let skipPayout = false;
 
         if (!eligibility.isEligible) {
-          console.log(`⚠️ Member ${scheduledBeneficiary.member_code} NOT ELIGIBLE for payout.`);
+          console.log(`⚠️ Member ${scheduledBeneficiary.member_code} NOT ELIGIBLE for payout. Details: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}, has outstanding debts: ${eligibility.hasDebts}, missed_payments_count: ${scheduledBeneficiary.missed_payments_count || 0}`);
+          
+          // Detailed audit log for eligibility failure
+          await supabase.from('audit_logs').insert({
+            action: 'PAYOUT_ELIGIBILITY_FAILED',
+            table_name: 'chama_members',
+            record_id: scheduledBeneficiary.id,
+            new_values: {
+              chama_id: chama.id,
+              cycle_id: cycle.id,
+              cycle_number: cycle.cycle_number,
+              member_code: scheduledBeneficiary.member_code,
+              unpaid_cycles: eligibility.unpaidCycles,
+              shortfall: eligibility.shortfall,
+              total_required: eligibility.required,
+              total_contributed: eligibility.contributed,
+              has_outstanding_debts: eligibility.hasDebts,
+              missed_payments_count: scheduledBeneficiary.missed_payments_count || 0
+            }
+          });
           wasSkipped = true;
 
           const { data: maxOrderResult } = await supabase

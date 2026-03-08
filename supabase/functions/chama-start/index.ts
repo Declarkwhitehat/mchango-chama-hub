@@ -149,13 +149,22 @@ serve(async (req) => {
 
     // ============================================
     // ASSIGN ORDER INDICES TO ALL APPROVED MEMBERS
-    // Order by join date (earliest first)
+    // Randomized via Fisher-Yates shuffle for fairness
     // ============================================
-    const sortedMembers = approvedMembers.sort((a: any, b: any) => {
-      const aTime = a.joined_at ? new Date(a.joined_at).getTime() : 0;
-      const bTime = b.joined_at ? new Date(b.joined_at).getTime() : 0;
-      return aTime - bTime;
-    });
+    const sortedMembers = [...approvedMembers];
+    // Fisher-Yates shuffle — cryptographically fair randomization
+    for (let i = sortedMembers.length - 1; i > 0; i--) {
+      const randomBytes = new Uint32Array(1);
+      crypto.getRandomValues(randomBytes);
+      const j = randomBytes[0] % (i + 1);
+      [sortedMembers[i], sortedMembers[j]] = [sortedMembers[j], sortedMembers[i]];
+    }
+
+    console.log('Randomized payout order:', sortedMembers.map((m: any, i: number) => ({
+      position: i + 1,
+      name: m.profiles?.full_name,
+      memberId: m.id
+    })));
 
     // Assign sequential order indices and generate member codes
     for (let i = 0; i < sortedMembers.length; i++) {

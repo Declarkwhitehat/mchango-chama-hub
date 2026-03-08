@@ -240,6 +240,75 @@ serve(async (req) => {
       });
     }
 
+    // Batch generate invite codes (up to 30)
+    if (action === 'batch_generate') {
+      const { chama_id, count: rawCount } = body;
+      const count = Math.min(Math.max(1, rawCount || 1), 30);
+
+      if (!chama_id) {
+        return new Response(JSON.stringify({ error: 'chama_id is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Verify user is a manager
+      const { data: membership, error: memberError } = await supabaseClient
+        .from('chama_members')
+        .select('is_manager')
+        .eq('chama_id', chama_id)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single();
+
+      if (memberError || !membership || !membership.is_manager) {
+        return new Response(JSON.stringify({ 
+          error: 'Only chama managers can generate invite codes' 
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const codes = [];
+      const usedCodes = new Set();
+
+      for (let i = 0; i < count; i++) {
+        let code;
+        do {
+          code = Array.from({ length: 8 }, () => 
+            charset[Math.floor(Math.random() * charset.length)]
+          ).join('');
+        } while (usedCodes.has(code));
+        usedCodes.add(code);
+        
+        codes.push({
+          chama_id,
+          created_by: user.id,
+          code,
+          expires_at: null,
+          is_active: true,
+        });
+      }
+
+      const { data, error } = await supabaseClient
+        .from('chama_invite_codes')
+        .insert(codes)
+        .select('*');
+
+      if (error) {
+        console.error('Failed to batch generate invite codes:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate invite codes', details: error.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(JSON.stringify({ data, count: data?.length || 0 }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+
     // List invite codes for a chama
     if (action === 'list') {
       const chamaId = body?.chama_id;
