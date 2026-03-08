@@ -17,7 +17,7 @@ import { WelfareApprovalCard } from "@/components/welfare/WelfareApprovalCard";
 import { WelfareContributionCycleManager } from "@/components/welfare/WelfareContributionCycleManager";
 import { WelfareTransactionLog } from "@/components/welfare/WelfareTransactionLog";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
-
+import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecutiveChangeBanner";
 
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +29,7 @@ const WelfareDetail = () => {
   const [myMemberId, setMyMemberId] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [cooldownActive, setCooldownActive] = useState(false);
 
   useEffect(() => {
     if (id) fetchWelfare();
@@ -209,6 +210,9 @@ const WelfareDetail = () => {
           )}
         </div>
 
+        {/* Executive Change Security Banner */}
+        <WelfareExecutiveChangeBanner welfareId={welfare.id} onCooldownActive={setCooldownActive} />
+
         {/* Frozen Warning */}
         {welfare.is_frozen && (
           <Card className="mb-4 border-destructive">
@@ -325,12 +329,21 @@ const WelfareDetail = () => {
 
           {isExecutive && (
             <TabsContent value="withdraw">
-              {(isChairman || isTreasurer) && !welfare.is_frozen && (
+              {(isChairman || isTreasurer) && !welfare.is_frozen && !cooldownActive && (
                 <WelfareWithdrawalRequest
                   welfareId={welfare.id}
                   availableBalance={welfare.available_balance}
                   onRequested={fetchWelfare}
                 />
+              )}
+              {cooldownActive && !welfare.is_frozen && (
+                <Card>
+                  <CardContent className="py-8 text-center text-destructive">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                    <p className="font-medium">Withdrawals are blocked</p>
+                    <p className="text-sm text-muted-foreground mt-1">Executive members have recently changed. A security cooldown is active.</p>
+                  </CardContent>
+                </Card>
               )}
               {(isSecretary || isTreasurer) && (
                 <WelfareApprovalCard welfareId={welfare.id} onDecision={fetchWelfare} />

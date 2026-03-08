@@ -1,87 +1,35 @@
 
 
-## Welfare Executive Change Security System
+## Diagnosis
 
-The backend logic (`welfare-members/index.ts`) and the `welfare_executive_changes` table already exist from the previous edit. What remains is:
-1. **Enforcing the withdrawal block** in the withdrawal creation and approval flows
-2. **Building the red banner + countdown timer** on the Welfare Detail page
-3. **Building the Admin management page** for executive changes
-4. **Auto-accept logic** when cooldown expires with no admin action
+The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
 
----
+1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
+2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
+3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
+4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
 
-### 1. Enforce Withdrawal Block (Backend)
+There are 3 total stuck withdrawals across the system with the same pattern.
 
-**`supabase/functions/withdrawals-crud/index.ts`** (POST handler):
-- Before creating a welfare withdrawal, query `welfare_executive_changes` for any active cooldown (`cooldown_ends_at > now()` AND `admin_decision = 'pending'`).
-- If found, reject with error: "Withdrawals blocked due to executive change. Try again after [cooldown_ends_at]."
+## Root Cause
 
-**`supabase/functions/welfare-withdrawal-approve/index.ts`**:
-- Same check before allowing Secretary/Treasurer approval decisions.
+The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
 
-### 2. Red Banner + Timer on Welfare Detail Page
+## Fix Plan
 
-**`src/components/welfare/WelfareExecutiveChangeBanner.tsx`** (new component):
-- Queries `welfare_executive_changes` for the welfare where `admin_decision = 'pending'` and `cooldown_ends_at > now()`.
-- Displays a red/destructive alert banner showing:
-  - "Executive members have changed" with details of outgoing/incoming members
-  - Live countdown timer to cooldown expiry
-  - Number of cancelled withdrawals
-  - "Contact customer care if suspicious" message
-- Renders at the top of the welfare detail page.
+### 1. Manually complete stuck withdrawal via RPC
+Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
 
-**`src/pages/WelfareDetail.tsx`**:
-- Import and render `WelfareExecutiveChangeBanner` above the main content.
+Also complete `e2ea0312` (KES 10) which has the same pattern.
 
-**`src/components/welfare/WelfareWithdrawalRequest.tsx`**:
-- Check for active cooldown before showing the form; if blocked, show a disabled state with the timer.
+### 2. Fix retry-failed-payouts to query status before re-sending
+Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
 
-### 3. Admin Executive Changes Management Page
+### 3. Add a "check status" path in withdrawals-crud
+Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
 
-**`src/pages/AdminWelfareExecutiveChanges.tsx`** (new page):
-- Table of all `welfare_executive_changes` records with filters (pending, approved, rejected, frozen, auto_accepted).
-- Each row shows: welfare name, change details (old/new role + names), cooldown timer, cancelled withdrawals count, admin decision.
-- Action buttons per row:
-  - **Approve**: Sets `admin_decision = 'approved'`, clears cooldown early
-  - **Reject**: Sets `admin_decision = 'rejected'`, keeps welfare frozen, reversal actions
-  - **Freeze**: Sets `admin_decision = 'frozen'`, freezes the entire welfare group (`is_frozen = true`)
-- If admin does nothing and cooldown expires, the system auto-accepts (handled by a cron or client-side check).
-
-**Route and sidebar integration**:
-- Add route `/admin/welfare-executive-changes` in `App.tsx`
-- Add sidebar entry under Security section in `AdminSidebar.tsx` with pending badge count
-
-### 4. Auto-Accept After Cooldown Expiry
-
-**`supabase/functions/welfare-executive-auto-accept/index.ts`** (new edge function):
-- Called by the daily cron or on-demand.
-- Finds all `welfare_executive_changes` where `admin_decision = 'pending'` AND `cooldown_ends_at <= now()`.
-- Updates them to `admin_decision = 'auto_accepted'`, `admin_decided_at = now()`.
-- Sends notification to welfare members: "Executive change has been accepted. Withdrawals are now unblocked."
-
-Alternatively, the auto-accept check can be done inline in the withdrawal creation flow: if cooldown has expired and decision is still pending, auto-update to `auto_accepted` and allow the withdrawal.
-
-### 5. Admin Dashboard Integration
-
-**`src/pages/AdminDashboard.tsx`**:
-- Add a pending executive changes count to the "Action Required" banner.
-- Link to the new admin page.
-
----
-
-### Files to create:
-- `src/components/welfare/WelfareExecutiveChangeBanner.tsx`
-- `src/pages/AdminWelfareExecutiveChanges.tsx`
-
-### Files to modify:
-- `supabase/functions/withdrawals-crud/index.ts` — add cooldown check for welfare withdrawals
-- `supabase/functions/welfare-withdrawal-approve/index.ts` — add cooldown check
-- `src/pages/WelfareDetail.tsx` — add banner component
-- `src/components/welfare/WelfareWithdrawalRequest.tsx` — disable during cooldown
-- `src/App.tsx` — add admin route
-- `src/components/admin/AdminSidebar.tsx` — add sidebar link with badge
-- `src/pages/AdminDashboard.tsx` — add pending count to alerts
-
-### No new migrations needed
-The `welfare_executive_changes` table already exists from the previous edit.
+### Files to Change
+- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
+- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
+- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
 

@@ -373,6 +373,29 @@ serve(async (req) => {
         });
       }
 
+      // Check for welfare executive change cooldown
+      if (body.welfare_id) {
+        const { data: activeCooldown } = await supabaseAdmin
+          .from('welfare_executive_changes')
+          .select('id, cooldown_ends_at, cooldown_hours')
+          .eq('welfare_id', body.welfare_id)
+          .eq('admin_decision', 'pending')
+          .gt('cooldown_ends_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (activeCooldown) {
+          return new Response(JSON.stringify({ 
+            error: `Withdrawals blocked due to executive change. Security cooldown active until ${new Date(activeCooldown.cooldown_ends_at).toLocaleString()}.`,
+            cooldown_ends_at: activeCooldown.cooldown_ends_at
+          }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       if (amount > totalAvailable) {
         return new Response(JSON.stringify({ 
           error: 'Insufficient funds',

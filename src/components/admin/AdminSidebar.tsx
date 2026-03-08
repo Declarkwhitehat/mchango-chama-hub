@@ -58,6 +58,7 @@ export function AdminSidebar() {
   const [pendingCallbacks, setPendingCallbacks] = useState(0);
   const [pendingVerifications, setPendingVerifications] = useState(0);
   const [pendingPayoutApprovals, setPendingPayoutApprovals] = useState(0);
+  const [pendingExecChanges, setPendingExecChanges] = useState(0);
 
   useEffect(() => {
     fetchPendingCounts();
@@ -90,11 +91,17 @@ export function AdminSidebar() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
 
+    const { count: execChangesCount } = await supabase
+      .from('welfare_executive_changes')
+      .select('*', { count: 'exact', head: true })
+      .eq('admin_decision', 'pending');
+
     setPendingKyc(kycCount || 0);
     setPendingWithdrawals(withdrawalsCount || 0);
     setPendingCallbacks(callbacksCount || 0);
     setPendingVerifications(verificationsCount || 0);
     setPendingPayoutApprovals(payoutApprovalsCount || 0);
+    setPendingExecChanges(execChangesCount || 0);
   };
 
   const mainMenuItems: MenuItem[] = [
@@ -158,6 +165,12 @@ export function AdminSidebar() {
   const securityItems: MenuItem[] = [
     { title: "Fraud & Risk", url: "/admin/fraud-monitoring", icon: ShieldAlert },
     { title: "Fraud Config", url: "/admin/fraud-config", icon: Settings },
+    { 
+      title: "Exec Changes", 
+      url: "/admin/welfare-executive-changes", 
+      icon: ShieldAlert,
+      badge: pendingExecChanges > 0 ? pendingExecChanges : null
+    },
   ];
 
   const systemItems: MenuItem[] = [

@@ -56,6 +56,24 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Already decided' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      // Check for active executive change cooldown
+      const { data: activeCooldown } = await supabaseAdmin
+        .from('welfare_executive_changes')
+        .select('id, cooldown_ends_at, cooldown_hours')
+        .eq('welfare_id', approval.welfare_id)
+        .eq('admin_decision', 'pending')
+        .gt('cooldown_ends_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeCooldown) {
+        return new Response(JSON.stringify({ 
+          error: `Withdrawals blocked due to executive change. Security cooldown active until ${new Date(activeCooldown.cooldown_ends_at).toLocaleString()}.`,
+          cooldown_ends_at: activeCooldown.cooldown_ends_at
+        }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       // Update the approval
       const { error: updateError } = await supabaseAdmin
         .from('welfare_withdrawal_approvals')

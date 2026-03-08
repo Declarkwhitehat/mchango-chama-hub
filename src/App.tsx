@@ -68,6 +68,7 @@ const AdminFraudUserDetail = lazy(() => import("./pages/AdminFraudUserDetail"));
 const AdminFraudConfig = lazy(() => import("./pages/AdminFraudConfig"));
 const AdminPayoutApprovals = lazy(() => import("./pages/AdminPayoutApprovals"));
 const AdminRevenue = lazy(() => import("./pages/AdminRevenue"));
+const AdminWelfareExecutiveChanges = lazy(() => import("./pages/AdminWelfareExecutiveChanges"));
 const queryClient = new QueryClient();
 
 // Loading fallback component
@@ -146,6 +147,7 @@ const AppContent = () => {
           <Route path="/admin/fraud-config" element={<AdminProtectedRoute><AdminFraudConfig /></AdminProtectedRoute>} />
           <Route path="/admin/payout-approvals" element={<AdminProtectedRoute><AdminPayoutApprovals /></AdminProtectedRoute>} />
           <Route path="/admin/revenue" element={<AdminProtectedRoute><AdminRevenue /></AdminProtectedRoute>} />
+          <Route path="/admin/welfare-executive-changes" element={<AdminProtectedRoute><AdminWelfareExecutiveChanges /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

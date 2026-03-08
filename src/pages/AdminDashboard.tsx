@@ -40,6 +40,7 @@ const AdminDashboard = () => {
     pendingWithdrawals: 0,
     pendingCallbacks: 0,
     recentTransactions: 0,
+    pendingExecChanges: 0,
   });
 
   const fetchDashboardData = useCallback(async (isAutoRefresh = false) => {
@@ -58,6 +59,7 @@ const AdminDashboard = () => {
         callbacksResult,
         transactionsResult,
         ledgerResult,
+        execChangesResult,
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
@@ -69,6 +71,7 @@ const AdminDashboard = () => {
         supabase.from('customer_callbacks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('transactions').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
         supabase.from('financial_ledger').select('commission_amount'),
+        supabase.from('welfare_executive_changes').select('*', { count: 'exact', head: true }).eq('admin_decision', 'pending'),
       ]);
 
       const totalPlatformRevenue = ledgerResult.data?.reduce((sum, item) => sum + (item.commission_amount || 0), 0) || 0;
@@ -84,6 +87,7 @@ const AdminDashboard = () => {
         pendingWithdrawals: withdrawalsResult.count || 0,
         pendingCallbacks: callbacksResult.count || 0,
         recentTransactions: transactionsResult.count || 0,
+        pendingExecChanges: execChangesResult.count || 0,
       });
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -109,7 +113,7 @@ const AdminDashboard = () => {
   }, [fetchDashboardData]);
 
   const totalActiveGroups = stats.activeChamas + stats.activeOrganizations + stats.activeWelfares;
-  const hasAlerts = stats.pendingKyc > 0 || stats.pendingWithdrawals > 0 || stats.pendingCallbacks > 0;
+  const hasAlerts = stats.pendingKyc > 0 || stats.pendingWithdrawals > 0 || stats.pendingCallbacks > 0 || stats.pendingExecChanges > 0;
 
   if (loading) {
     return (
@@ -186,17 +190,28 @@ const AdminDashboard = () => {
                   {stats.pendingWithdrawals} withdrawals pending
                 </Button>
               )}
-              {stats.pendingCallbacks > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
-                  onClick={() => navigate("/admin/callbacks")}
-                >
-                  <PhoneCall className="h-3.5 w-3.5" />
-                  {stats.pendingCallbacks} callbacks pending
-                </Button>
-              )}
+               {stats.pendingCallbacks > 0 && (
+                 <Button
+                   size="sm"
+                   variant="outline"
+                   className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                   onClick={() => navigate("/admin/callbacks")}
+                 >
+                   <PhoneCall className="h-3.5 w-3.5" />
+                   {stats.pendingCallbacks} callbacks pending
+                 </Button>
+               )}
+               {stats.pendingExecChanges > 0 && (
+                 <Button
+                   size="sm"
+                   variant="outline"
+                   className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                   onClick={() => navigate("/admin/welfare-executive-changes")}
+                 >
+                   <AlertCircle className="h-3.5 w-3.5" />
+                   {stats.pendingExecChanges} exec changes pending
+                 </Button>
+               )}
             </div>
           </div>
         )}
