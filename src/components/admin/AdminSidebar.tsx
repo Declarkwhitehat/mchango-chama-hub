@@ -132,6 +132,12 @@ export function AdminSidebar() {
       icon: DollarSign,
       badge: pendingWithdrawals > 0 ? pendingWithdrawals : null
     },
+    {
+      title: "Payout Approvals",
+      url: "/admin/payout-approvals",
+      icon: CheckCircle,
+      badge: pendingPayoutApprovals > 0 ? pendingPayoutApprovals : null
+    },
     { title: "Commission Analytics", url: "/admin/commission-analytics", icon: TrendingUp },
     { title: "Financial Ledger", url: "/admin/ledger", icon: Landmark },
     { title: "Payment Config", url: "/admin/payment-config", icon: Settings },
