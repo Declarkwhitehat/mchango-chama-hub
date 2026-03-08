@@ -126,7 +126,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
       await supabase
         .from("mchango_donations")
         .update({ payment_reference: checkoutRequestId })
-        .eq("id", donation.id);
+        .eq("id", donationId);
 
       // Optional: show the exact message from M-Pesa
       const customerMessage = stkResponse?.CustomerMessage;
