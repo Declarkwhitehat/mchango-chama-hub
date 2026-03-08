@@ -135,16 +135,16 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
 
         {/* Summary */}
         <div className="space-y-1 text-sm">
-          {totalPenalty > 0 && (
-            <div className="flex justify-between text-destructive">
-              <span>Penalties (cleared first)</span>
-              <span>KES {totalPenalty.toFixed(2)}</span>
+          {totalNetToRecipients > 0 && (
+            <div className="flex justify-between text-muted-foreground">
+              <span>Net to shortchanged recipients</span>
+              <span>KES {totalNetToRecipients.toFixed(2)}</span>
             </div>
           )}
-          {totalPrincipal > 0 && (
-            <div className="flex justify-between text-muted-foreground">
-              <span>Past principal + 5% commission</span>
-              <span>KES {(totalPrincipal + totalPrincipal * 0.05).toFixed(2)}</span>
+          {totalLateCommission > 0 && (
+            <div className="flex justify-between text-orange-600 dark:text-orange-400">
+              <span>Late commissions (10% to platform)</span>
+              <span>KES {totalLateCommission.toFixed(2)}</span>
             </div>
           )}
           {currentCycleDue && (
