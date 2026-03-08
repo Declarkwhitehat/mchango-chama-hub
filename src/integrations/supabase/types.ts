@@ -1631,6 +1631,116 @@ export type Database = {
         }
         Relationships: []
       }
+      payout_approval_requests: {
+        Row: {
+          admin_notes: string | null
+          b2c_triggered: boolean | null
+          chama_id: string
+          chosen_member_id: string | null
+          created_at: string
+          cycle_id: string
+          id: string
+          ineligible_members: Json | null
+          payout_amount: number
+          reason: string
+          recommended_member_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scheduled_beneficiary_id: string
+          status: string
+          updated_at: string
+          withdrawal_id: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          b2c_triggered?: boolean | null
+          chama_id: string
+          chosen_member_id?: string | null
+          created_at?: string
+          cycle_id: string
+          id?: string
+          ineligible_members?: Json | null
+          payout_amount?: number
+          reason: string
+          recommended_member_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_beneficiary_id: string
+          status?: string
+          updated_at?: string
+          withdrawal_id?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          b2c_triggered?: boolean | null
+          chama_id?: string
+          chosen_member_id?: string | null
+          created_at?: string
+          cycle_id?: string
+          id?: string
+          ineligible_members?: Json | null
+          payout_amount?: number
+          reason?: string
+          recommended_member_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_beneficiary_id?: string
+          status?: string
+          updated_at?: string
+          withdrawal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_approval_requests_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_approval_requests_chosen_member_id_fkey"
+            columns: ["chosen_member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_approval_requests_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: true
+            referencedRelation: "contribution_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_approval_requests_recommended_member_id_fkey"
+            columns: ["recommended_member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_approval_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_approval_requests_scheduled_beneficiary_id_fkey"
+            columns: ["scheduled_beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_approval_requests_withdrawal_id_fkey"
+            columns: ["withdrawal_id"]
+            isOneToOne: false
+            referencedRelation: "withdrawals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payout_skips: {
         Row: {
           amount_owed: number
