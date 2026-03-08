@@ -198,7 +198,8 @@ async function settleDebts(
   memberId: string,
   chamaId: string,
   grossPaymentAmount: number,
-  contributionAmount: number
+  contributionAmount: number,
+  contributionId?: string
 ): Promise<SettleResult> {
   const allocations: AllocationLine[] = [];
   let remaining = grossPaymentAmount;
@@ -539,6 +540,7 @@ async function settleDebts(
       commission_amount: toCompany,
       net_amount: grossPaymentAmount - toCompany,
       commission_rate: toCompany / grossPaymentAmount,
+      reference_id: contributionId || null,
       description: `FIFO debt settlement. Debts cleared: ${periodsCleared}. Penalty: ${allocations.filter(a => a.type === 'penalty_clearance').reduce((s, a) => s + a.amount, 0).toFixed(2)}`
     });
   }
@@ -626,7 +628,8 @@ serve(async (req) => {
             member_id,
             chama_id,
             amount,
-            chamaInfo?.contribution_amount || amount
+            chamaInfo?.contribution_amount || amount,
+            contribution_id
           );
 
           console.log('Settle-only complete:', {
