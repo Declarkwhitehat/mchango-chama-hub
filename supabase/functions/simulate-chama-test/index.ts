@@ -374,6 +374,15 @@ Deno.serve(async (req) => {
       commissionRate: COMMISSION_RATE,
     }));
 
+    // ===== SCENARIO 12: E2E Admin Fallback — No Eligible Member → Admin Approves → B2C =====
+    report.scenarios.push(await runScenarioAdminFallback(supabase, profiles, {
+      name: '12. E2E Admin Fallback — No Eligible → Admin Approves → B2C',
+      description: 'All members ineligible → admin approval request created → admin chooses member → B2C triggered',
+      memberCount: 10,
+      contribution: CONTRIBUTION,
+      commissionRate: COMMISSION_RATE,
+    }));
+
     // Summary
     report.summary.total = report.scenarios.length;
     report.summary.passed = report.scenarios.filter(s => s.passed).length;
