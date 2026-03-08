@@ -1,41 +1,35 @@
 
-## Review: Welfare Executive Change Security System
 
-All components are properly implemented and integrated. Here's a summary of what's in place:
+## Diagnosis
 
-### Backend (Edge Functions)
-1. **`welfare-members/index.ts`** — Detects executive role changes (chairman/secretary/treasurer), records them in `welfare_executive_changes`, auto-cancels pending withdrawals (96h cooldown if pending withdrawals exist, 72h otherwise), and sends notifications to all active members.
-2. **`withdrawals-crud/index.ts`** — Blocks welfare withdrawal creation during active cooldown (checks `admin_decision = 'pending'` and `cooldown_ends_at > now()`).
-3. **`welfare-withdrawal-approve/index.ts`** — Blocks approval decisions during active cooldown with the same check.
+The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
 
-### Frontend (User-facing)
-4. **`WelfareExecutiveChangeBanner.tsx`** — Red security banner with live countdown timer, outgoing/incoming member details, cancelled withdrawal count, and "contact customer care" message.
-5. **`WelfareDetail.tsx`** — Banner integrated above main content. Withdraw tab shows "Withdrawals are blocked" when `cooldownActive` is true, hiding the withdrawal form.
+1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
+2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
+3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
+4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
 
-### Admin
-6. **`AdminWelfareExecutiveChanges.tsx`** — Full management page with filter by status (pending/approved/rejected/frozen/auto_accepted/all), action buttons (approve/reject/freeze), welfare name resolution.
-7. **`AdminSidebar.tsx`** — "Exec Changes" link with pending badge count.
-8. **`AdminDashboard.tsx`** — `pendingExecChanges` count included in stats.
-9. **`App.tsx`** — Route `/admin/welfare-executive-changes` properly registered.
+There are 3 total stuck withdrawals across the system with the same pattern.
 
-### Database
-10. **`welfare_executive_changes` table** — Exists in types.ts with all required columns (welfare_id, change_type, old_role, new_role, cooldown_hours, cooldown_ends_at, admin_decision, pending_withdrawals_cancelled, etc.)
+## Root Cause
 
-### No Bugs Found
-- All queries use `supabaseAdmin` (service role) to bypass RLS where needed
-- Cooldown checks are consistent across both withdrawal creation and approval flows
-- Timer component properly cleans up intervals
-- Admin actions properly update decisions and can freeze welfares
-- Type safety is maintained via the generated types file
+The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
 
-### One Gap: Auto-Accept Logic
-The plan mentioned creating a `welfare-executive-auto-accept` edge function or inline auto-accept when cooldown expires. This is **not yet implemented**. Currently, if admin does nothing after hours expire, the status stays "pending" but the cooldown check (`cooldown_ends_at > now()`) naturally stops blocking withdrawals. The status just won't update to "auto_accepted" automatically.
+## Fix Plan
 
-### Recommendation
-The system works correctly as-is because the blocking logic is time-based (`cooldown_ends_at > now()`), so withdrawals naturally unblock when the cooldown expires regardless of admin action. To complete the auto-accept labeling, a small inline check could be added to the withdrawal flow or the banner component to update expired pending records to `auto_accepted`.
+### 1. Manually complete stuck withdrawal via RPC
+Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
 
-### Implementation Plan
-1. **Add inline auto-accept** in `WelfareExecutiveChangeBanner.tsx` — when fetching changes, if any have `cooldown_ends_at <= now()` and `admin_decision = 'pending'`, update them to `auto_accepted` via a direct update call.
-2. **Add same inline check** in `withdrawals-crud/index.ts` — before the cooldown check, auto-accept expired pending records so the admin page shows correct status.
+Also complete `e2ea0312` (KES 10) which has the same pattern.
 
-This is a minor labeling improvement, not a functional bug — withdrawals already unblock correctly after cooldown expiry.
+### 2. Fix retry-failed-payouts to query status before re-sending
+Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
+
+### 3. Add a "check status" path in withdrawals-crud
+Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
+
+### Files to Change
+- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
+- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
+- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
+

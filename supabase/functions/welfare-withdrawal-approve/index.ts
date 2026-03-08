@@ -56,6 +56,14 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Already decided' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      // Auto-accept expired pending executive changes
+      await supabaseAdmin
+        .from('welfare_executive_changes')
+        .update({ admin_decision: 'auto_accepted', admin_decided_at: new Date().toISOString() })
+        .eq('welfare_id', approval.welfare_id)
+        .eq('admin_decision', 'pending')
+        .lte('cooldown_ends_at', new Date().toISOString());
+
       // Check for active executive change cooldown
       const { data: activeCooldown } = await supabaseAdmin
         .from('welfare_executive_changes')
