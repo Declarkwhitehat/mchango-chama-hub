@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Calendar, Share2, Loader2, AlertCircle } from "lucide-react";
+import { Calendar, Share2, Loader2, AlertCircle, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DonationForm } from "@/components/DonationForm";
@@ -160,6 +160,20 @@ const MchangoDetail = () => {
   return (
     <Layout showBackButton>
         <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
+          {/* Account creation prompt for non-logged-in users */}
+          {!user && (
+            <Alert className="border-primary/30 bg-primary/5">
+              <UserPlus className="h-4 w-4" />
+              <AlertTitle>Stay Informed</AlertTitle>
+              <AlertDescription className="flex flex-col gap-2">
+                <span>Create an account to receive withdrawal notifications and updates for campaigns you contribute to. This ensures full transparency and accountability.</span>
+                <Button variant="outline" size="sm" className="w-fit" onClick={() => navigate('/auth')}>
+                  Create Account
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Expired Campaign Alert for Owner */}
           {isExpired && isCreator && (
             <Alert variant="destructive">

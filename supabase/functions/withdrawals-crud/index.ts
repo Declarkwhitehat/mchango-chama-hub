@@ -518,6 +518,37 @@ serve(async (req) => {
         relatedEntityType: 'withdrawal',
       });
 
+      // Notify all donors with accounts when a campaign withdrawal is made
+      if (mchango_id) {
+        try {
+          const { data: donors } = await supabaseAdmin
+            .from('mchango_donations')
+            .select('user_id')
+            .eq('mchango_id', mchango_id)
+            .eq('payment_status', 'completed')
+            .not('user_id', 'is', null);
+
+          if (donors && donors.length > 0) {
+            const uniqueDonorIds = [...new Set(donors.map(d => d.user_id).filter(Boolean))];
+            const donorIdsToNotify = uniqueDonorIds.filter(id => id !== user.id);
+
+            const donorNotif = NotificationTemplates.campaignWithdrawal(entityName, netAmount);
+            for (const donorId of donorIdsToNotify) {
+              await createNotification(supabaseAdmin, {
+                userId: donorId,
+                ...donorNotif,
+                relatedEntityId: mchango_id,
+                relatedEntityType: 'mchango',
+              });
+            }
+            console.log(`Notified ${donorIdsToNotify.length} donors about campaign withdrawal`);
+          }
+        } catch (notifErr) {
+          console.error('Error notifying donors about withdrawal:', notifErr);
+          // Don't fail the withdrawal if notifications fail
+        }
+      }
+
       // If auto-approved and M-Pesa, trigger B2C payout immediately
       if (canAutoApprove && defaultPaymentMethod.phone_number) {
         const withdrawalType = chama_id ? 'Chama' : mchango_id ? 'Mchango' : 'Organization';

@@ -1,63 +1,35 @@
 
 
-## Campaign Withdrawal Donor Notifications
+## Diagnosis
 
-### What we're building
-When a campaign (mchango) creator requests a withdrawal, notify all donors who have user accounts. Donors without accounts see a prompt to create one on the campaign detail page.
+The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
 
-### Changes
+1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
+2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
+3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
+4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
 
-**1. `supabase/functions/withdrawals-crud/index.ts`** — After mchango withdrawal is created (~line 519):
-- Query `mchango_donations` for the campaign to get all unique `user_id`s (non-null, completed donations)
-- For each donor with an account, create a notification: "The campaign [title] has withdrawn KES [amount]. This is for your transparency."
-- This runs using `supabaseAdmin` to bypass RLS
+There are 3 total stuck withdrawals across the system with the same pattern.
 
-**2. `src/pages/MchangoDetail.tsx`** — Add a banner for unauthenticated users or donors without accounts:
-- If user is not logged in and viewing the campaign, show an info alert: "Create an account to receive updates and withdrawal notifications for campaigns you contribute to."
-- Link to the auth page
+## Root Cause
 
-**3. `src/components/DonationForm.tsx`** — After successful donation by unauthenticated user:
-- Show a toast/prompt encouraging them to create an account for transparency updates
+The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
 
-**4. `supabase/functions/_shared/notifications.ts`** — Add a new template:
-- `campaignWithdrawal(campaignName, amount)` — notification template for donor alerts
+## Fix Plan
 
-### Backend notification logic (withdrawals-crud, mchango POST section ~line 496-519):
-```
-// After creating withdrawal and getting entityName for mchango:
-if (mchango_id) {
-  // Get all unique donors with accounts
-  const { data: donors } = await supabaseAdmin
-    .from('mchango_donations')
-    .select('user_id')
-    .eq('mchango_id', mchango_id)
-    .eq('payment_status', 'completed')
-    .not('user_id', 'is', null);
+### 1. Manually complete stuck withdrawal via RPC
+Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
 
-  const uniqueDonorIds = [...new Set(donors?.map(d => d.user_id).filter(Boolean))];
-  // Exclude the creator (they already get their own notification)
-  const donorIdsToNotify = uniqueDonorIds.filter(id => id !== user.id);
+Also complete `e2ea0312` (KES 10) which has the same pattern.
 
-  for (const donorId of donorIdsToNotify) {
-    await createNotification(supabaseAdmin, {
-      userId: donorId,
-      title: 'Campaign Withdrawal Notice',
-      message: `The campaign "${entityName}" has withdrawn KES ${netAmount.toLocaleString()}. If you find this suspicious, please contact customer care.`,
-      type: 'info',
-      category: 'campaign',
-      relatedEntityId: mchango_id,
-      relatedEntityType: 'mchango',
-    });
-  }
-}
-```
+### 2. Fix retry-failed-payouts to query status before re-sending
+Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
 
-### Files to modify:
-- `supabase/functions/withdrawals-crud/index.ts` — add donor notification after mchango withdrawal creation
-- `supabase/functions/_shared/notifications.ts` — add `campaignWithdrawal` template
-- `src/pages/MchangoDetail.tsx` — add "create account for updates" banner for non-logged-in users
-- `src/components/DonationForm.tsx` — add post-donation prompt for anonymous donors
+### 3. Add a "check status" path in withdrawals-crud
+Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
 
-### No database changes needed
-All required tables (`mchango_donations`, `notifications`) already exist.
+### Files to Change
+- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
+- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
+- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
 

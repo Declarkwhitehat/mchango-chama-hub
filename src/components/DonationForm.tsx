@@ -173,6 +173,17 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
       }
       setIsAnonymous(false);
 
+      // Prompt anonymous donors to create an account for transparency
+      if (!user) {
+        setTimeout(() => {
+          toast({
+            title: "Want withdrawal updates? 📢",
+            description: "Create an account to receive notifications when this campaign makes withdrawals. This ensures accountability.",
+            duration: 10000,
+          });
+        }, 3000);
+      }
+
       onSuccess?.();
     } catch (error: any) {
       console.error("Donation error:", error);
