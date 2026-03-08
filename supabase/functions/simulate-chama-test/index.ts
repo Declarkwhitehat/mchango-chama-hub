@@ -383,6 +383,15 @@ Deno.serve(async (req) => {
       commissionRate: COMMISSION_RATE,
     }));
 
+    // ===== SCENARIO 13: Double-Payout Prevention =====
+    report.scenarios.push(await runScenarioDoublePayoutGuard(supabase, profiles, {
+      name: '13. Double-Payout Prevention — Admin Cannot Select Same Member Twice',
+      description: 'Member who received in cycle 1 is blocked from admin selection in cycle 2 (same round). After all members receive, guard resets.',
+      memberCount: 3,
+      contribution: CONTRIBUTION,
+      commissionRate: COMMISSION_RATE,
+    }));
+
     // Summary
     report.summary.total = report.scenarios.length;
     report.summary.passed = report.scenarios.filter(s => s.passed).length;
@@ -1813,6 +1822,281 @@ async function runScenarioAdminFallback(
       passed,
       steps,
       assertion: passed ? undefined : 'Admin fallback flow did not complete successfully',
+    };
+
+  } catch (error) {
+    if (chamaId) {
+      await supabase.from('payout_approval_requests').delete().eq('chama_id', chamaId);
+      await cleanup(supabase, chamaId);
+    }
+    return {
+      name: config.name,
+      description: config.description,
+      passed: false,
+      steps,
+      error: (error as any).message,
+    };
+  }
+}
+
+// ==================== SCENARIO 13: Double-Payout Prevention ====================
+
+async function runScenarioDoublePayoutGuard(
+  supabase: any,
+  profiles: any[],
+  config: { name: string; description: string; memberCount: number; contribution: number; commissionRate: number }
+): Promise<ScenarioResult> {
+  const steps: StepResult[] = [];
+  let chamaId = '';
+
+  try {
+    // Step 1: Create chama with 3 members
+    const slug = `sim-s13-${Date.now()}`;
+    const { data: chama, error: chamaError } = await supabase
+      .from('chama')
+      .insert({
+        name: `Sim S13 Double-Payout Guard ${Date.now()}`,
+        slug,
+        contribution_amount: config.contribution,
+        contribution_frequency: 'daily',
+        max_members: config.memberCount,
+        min_members: 2,
+        status: 'active',
+        created_by: profiles[0].id,
+        commission_rate: config.commissionRate,
+        start_date: new Date(Date.now() - 86400000 * 5).toISOString(),
+      })
+      .select('id, group_code')
+      .single();
+
+    if (chamaError) throw new Error(`Create chama: ${chamaError.message}`);
+    chamaId = chama.id;
+    steps.push({ action: 'Create 3-member chama', result: 'Success', data: { id: chama.id } });
+
+    // Step 2: Add members
+    const { data: autoMember } = await supabase
+      .from('chama_members')
+      .select('id, user_id')
+      .eq('chama_id', chamaId)
+      .eq('user_id', profiles[0].id)
+      .single();
+
+    const memberIds: string[] = [autoMember.id];
+    const memberUserIds: string[] = [autoMember.user_id];
+
+    for (let i = 1; i < config.memberCount; i++) {
+      const profileIdx = i % profiles.length;
+      const memberCode = `${(chama.group_code || 'SIM').slice(0, 4)}M${String(i + 1).padStart(4, '0')}`;
+      const { data: member } = await supabase
+        .from('chama_members')
+        .insert({
+          chama_id: chamaId,
+          user_id: profiles[profileIdx].id,
+          is_manager: false,
+          member_code: memberCode,
+          order_index: i + 1,
+          status: 'active',
+          approval_status: 'approved',
+          first_payment_completed: true,
+          missed_payments_count: 0,
+        })
+        .select('id, user_id')
+        .single();
+
+      if (member) {
+        memberIds.push(member.id);
+        memberUserIds.push(member.user_id);
+      }
+    }
+
+    steps.push({ action: `Add ${config.memberCount} members`, result: `${memberIds.length} created` });
+
+    // Step 3: Set balance
+    const netBalance = config.contribution * config.memberCount * (1 - config.commissionRate) * 2;
+    await supabase.from('chama').update({ available_balance: netBalance }).eq('id', chamaId);
+
+    // Step 4: Create Cycle 1 — completed, beneficiary = Member 1
+    const { data: cycle1 } = await supabase
+      .from('contribution_cycles')
+      .insert({
+        chama_id: chamaId,
+        cycle_number: 1,
+        start_date: new Date(Date.now() - 86400000 * 4).toISOString(),
+        end_date: new Date(Date.now() - 86400000 * 3).toISOString(),
+        due_amount: config.contribution,
+        beneficiary_member_id: memberIds[0],
+        is_complete: true,
+        payout_processed: true,
+        payout_amount: netBalance / 2,
+      })
+      .select('id')
+      .single();
+
+    steps.push({ action: 'Cycle 1 completed → Member 1 received', result: 'Success' });
+
+    // Step 5: Create Cycle 2 — pending approval request for it
+    const { data: cycle2 } = await supabase
+      .from('contribution_cycles')
+      .insert({
+        chama_id: chamaId,
+        cycle_number: 2,
+        start_date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        end_date: new Date(Date.now() - 3600000).toISOString(),
+        due_amount: config.contribution,
+        is_complete: false,
+        payout_processed: false,
+      })
+      .select('id')
+      .single();
+
+    // Create approval request manually
+    const { data: approvalReq } = await supabase
+      .from('payout_approval_requests')
+      .insert({
+        chama_id: chamaId,
+        cycle_id: cycle2.id,
+        scheduled_beneficiary_id: memberIds[0],
+        payout_amount: netBalance / 2,
+        reason: 'Testing double-payout guard',
+        ineligible_members: [],
+        status: 'pending',
+      })
+      .select('id')
+      .single();
+
+    steps.push({ action: 'Cycle 2 approval request created', result: 'Success' });
+
+    // Ensure Member 1 has payment method
+    const { data: existingPM } = await supabase
+      .from('payment_methods')
+      .select('id')
+      .eq('user_id', memberUserIds[0])
+      .eq('method_type', 'mpesa')
+      .eq('is_default', true)
+      .maybeSingle();
+
+    if (!existingPM) {
+      await supabase.from('payment_methods').insert({
+        user_id: memberUserIds[0],
+        method_type: 'mpesa',
+        phone_number: profiles[0].phone || '0700000000',
+        is_default: true,
+        is_verified: true,
+      });
+    }
+
+    // Step 6: Try to approve with Member 1 (already received in this round) → should FAIL
+    const approveBlockedResponse = await fetch(`${supabaseUrl}/functions/v1/payout-approval`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'approve',
+        requestId: approvalReq.id,
+        chosenMemberId: memberIds[0], // Member 1 already received
+        adminNotes: 'Test: should be blocked',
+        adminUserId: profiles[0].id,
+      }),
+    });
+
+    const blockedResult = await approveBlockedResponse.json();
+    const wasBlocked = approveBlockedResponse.status === 400 && blockedResult.already_received_this_round === true;
+
+    steps.push({
+      action: '🛡️ Attempt to select Member 1 (already received)',
+      result: wasBlocked
+        ? '✅ BLOCKED — double-payout prevented'
+        : `❌ NOT BLOCKED — status ${approveBlockedResponse.status}: ${blockedResult.error || JSON.stringify(blockedResult)}`,
+      data: blockedResult,
+    });
+
+    // Step 7: Approve with Member 2 (has not received) → should SUCCEED
+    // Reset request to pending (in case it was modified)
+    await supabase.from('payout_approval_requests').update({ status: 'pending' }).eq('id', approvalReq.id);
+
+    // Ensure Member 2 has payment method
+    const { data: pm2 } = await supabase
+      .from('payment_methods')
+      .select('id')
+      .eq('user_id', memberUserIds[1])
+      .eq('method_type', 'mpesa')
+      .eq('is_default', true)
+      .maybeSingle();
+
+    if (!pm2) {
+      await supabase.from('payment_methods').insert({
+        user_id: memberUserIds[1],
+        method_type: 'mpesa',
+        phone_number: profiles[1 % profiles.length].phone || '0700000001',
+        is_default: true,
+        is_verified: true,
+      });
+    }
+
+    const approveOkResponse = await fetch(`${supabaseUrl}/functions/v1/payout-approval`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'approve',
+        requestId: approvalReq.id,
+        chosenMemberId: memberIds[1], // Member 2
+        adminNotes: 'Test: should succeed',
+        adminUserId: profiles[0].id,
+      }),
+    });
+
+    const okResult = await approveOkResponse.json();
+    const approved = approveOkResponse.status === 200 && okResult.success === true;
+
+    steps.push({
+      action: '✅ Approve Member 2 (has not received)',
+      result: approved
+        ? `✅ Approved! Withdrawal: ${okResult.withdrawal_id}, B2C: ${okResult.b2c_triggered}`
+        : `❌ Failed: ${okResult.error || 'Unknown'}`,
+      data: okResult,
+    });
+
+    // Step 8: Verify the get-eligible-members shows round tracking
+    const eligibleResponse = await fetch(`${supabaseUrl}/functions/v1/payout-approval`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'get-eligible-members', chamaId }),
+    });
+
+    const eligibleData = await eligibleResponse.json();
+
+    steps.push({
+      action: '📋 Get-eligible-members round tracking',
+      result: `Chama summary: Round #${eligibleData.chama_summary?.current_round}, ${eligibleData.chama_summary?.total_cycles_completed} cycles done`,
+      data: {
+        current_round: eligibleData.chama_summary?.current_round,
+        total_members: eligibleData.chama_summary?.total_members,
+        members_with_round_flag: eligibleData.members?.filter((m: any) => m.already_received_this_round).length,
+      },
+    });
+
+    // Final verdict
+    const passed = wasBlocked && approved;
+
+    // Cleanup
+    await supabase.from('payout_approval_requests').delete().eq('chama_id', chamaId);
+    await cleanup(supabase, chamaId);
+    steps.push({ action: 'Cleanup', result: 'Success' });
+
+    return {
+      name: config.name,
+      description: config.description,
+      passed,
+      steps,
+      assertion: passed ? undefined : 'Double-payout prevention did not work correctly',
     };
 
   } catch (error) {

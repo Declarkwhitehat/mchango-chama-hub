@@ -4,13 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, AlertTriangle, Users, Loader2, Send } from "lucide-react";
+import {
+  CheckCircle, XCircle, Clock, AlertTriangle, Users, Loader2, Send,
+  ChevronDown, History, ShieldAlert, Phone, CreditCard, Info
+} from "lucide-react";
 import { format } from "date-fns";
 
 interface ApprovalRequest {
@@ -25,21 +28,46 @@ interface ApprovalRequest {
   b2c_triggered: boolean;
   created_at: string;
   reviewed_at: string | null;
-  chama: { id: string; name: string; contribution_amount: number; group_code: string } | null;
+  chama: { id: string; name: string; contribution_amount: number; group_code: string; available_balance: number; max_members: number; current_cycle_round: number } | null;
   cycle: { cycle_number: number; start_date: string; end_date: string } | null;
-  scheduled_member: { id: string; member_code: string; profiles: { full_name: string } | null } | null;
+  scheduled_member: { id: string; member_code: string; profiles: { full_name: string; phone: string } | null } | null;
   chosen_member_detail: { id: string; member_code: string; profiles: { full_name: string } | null } | null;
   reviewer: { full_name: string } | null;
 }
 
-interface EligibleMember {
+interface EnrichedMember {
   id: string;
   member_code: string;
   order_index: number;
   is_eligible: boolean;
   unpaid_cycles: number;
   has_debts: boolean;
-  profiles: { full_name: string } | null;
+  payouts_received: number;
+  total_received_amount: number;
+  already_received_this_round: boolean;
+  missed_payments_count: number;
+  carry_forward_credit: number;
+  was_skipped: boolean;
+  trust_score: number | null;
+  profiles: { full_name: string; phone: string } | null;
+}
+
+interface ChamaSummary {
+  name: string;
+  group_code: string;
+  contribution_amount: number;
+  available_balance: number;
+  total_members: number;
+  total_cycles_completed: number;
+  current_round: number;
+  all_received_this_round: boolean;
+}
+
+interface PayoutHistoryEntry {
+  cycle_number: number;
+  beneficiary_name: string;
+  payout_amount: number;
+  date: string;
 }
 
 export default function AdminPayoutApprovals() {
@@ -48,11 +76,14 @@ export default function AdminPayoutApprovals() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("pending");
   const [selectedRequest, setSelectedRequest] = useState<ApprovalRequest | null>(null);
-  const [eligibleMembers, setEligibleMembers] = useState<EligibleMember[]>([]);
+  const [enrichedMembers, setEnrichedMembers] = useState<EnrichedMember[]>([]);
+  const [chamaSummary, setChamaSummary] = useState<ChamaSummary | null>(null);
+  const [payoutHistory, setPayoutHistory] = useState<PayoutHistoryEntry[]>([]);
   const [chosenMemberId, setChosenMemberId] = useState<string>("");
   const [adminNotes, setAdminNotes] = useState("");
   const [processing, setProcessing] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -64,7 +95,6 @@ export default function AdminPayoutApprovals() {
       const { data, error } = await supabase.functions.invoke('payout-approval', {
         body: { action: 'list', status: filter || undefined },
       });
-
       if (error) throw error;
       setRequests(data.requests || []);
     } catch (err: any) {
@@ -78,15 +108,26 @@ export default function AdminPayoutApprovals() {
     setSelectedRequest(request);
     setChosenMemberId("");
     setAdminNotes("");
+    setHistoryOpen(false);
     setLoadingMembers(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('payout-approval', {
         body: { action: 'get-eligible-members', chamaId: request.chama_id },
       });
-
       if (error) throw error;
-      setEligibleMembers(data.members || []);
+
+      const members = (data.members || []) as EnrichedMember[];
+      // Sort: eligible first, then by order_index
+      members.sort((a: EnrichedMember, b: EnrichedMember) => {
+        if (a.already_received_this_round !== b.already_received_this_round) return a.already_received_this_round ? 1 : -1;
+        if (a.is_eligible !== b.is_eligible) return a.is_eligible ? -1 : 1;
+        return (a.order_index || 0) - (b.order_index || 0);
+      });
+
+      setEnrichedMembers(members);
+      setChamaSummary(data.chama_summary || null);
+      setPayoutHistory(data.payout_history || []);
     } catch (err: any) {
       toast.error("Failed to load members: " + err.message);
     } finally {
@@ -111,8 +152,11 @@ export default function AdminPayoutApprovals() {
           adminUserId: user?.id,
         },
       });
-
       if (error) throw error;
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
 
       toast.success(
         `Payout approved! KES ${data.payout_amount?.toFixed(2)} → ${data.chosen_member}. ${data.b2c_triggered ? 'B2C initiated.' : 'Manual processing needed.'}`
@@ -134,7 +178,6 @@ export default function AdminPayoutApprovals() {
       const { error } = await supabase.functions.invoke('payout-approval', {
         body: { action: 'reject', requestId, adminNotes: notes, adminUserId: user?.id },
       });
-
       if (error) throw error;
       toast.success("Request rejected");
       fetchRequests();
@@ -152,7 +195,18 @@ export default function AdminPayoutApprovals() {
     }
   };
 
+  const getIneligibleReason = (m: any) => {
+    const reasons: string[] = [];
+    if (m.reason) return m.reason;
+    if (m.has_debts) reasons.push('Outstanding debts');
+    if (m.unpaid_cycles > 0) reasons.push(`${m.unpaid_cycles} unpaid cycles`);
+    if (m.missed_payments > 0) reasons.push(`${m.missed_payments} missed`);
+    return reasons.join(', ') || 'Ineligible';
+  };
+
   const pendingCount = requests.filter(r => r.status === 'pending').length;
+
+  const selectedMember = enrichedMembers.find(m => m.id === chosenMemberId);
 
   return (
     <AdminLayout>
@@ -195,28 +249,35 @@ export default function AdminPayoutApprovals() {
                     <div>
                       <CardTitle className="text-lg">{req.chama?.name || 'Unknown Chama'}</CardTitle>
                       <CardDescription>
+                        {req.chama?.group_code && <span className="font-mono mr-2">{req.chama.group_code}</span>}
                         Cycle #{req.cycle?.cycle_number} · {format(new Date(req.created_at), 'MMM d, yyyy HH:mm')}
+                        {req.cycle && (
+                          <span className="ml-2 text-xs">
+                            ({format(new Date(req.cycle.start_date), 'MMM d')} – {format(new Date(req.cycle.end_date), 'MMM d')})
+                          </span>
+                        )}
                       </CardDescription>
                     </div>
                     {statusBadge(req.status)}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                     <div>
                       <span className="text-muted-foreground">Payout Amount</span>
                       <p className="font-semibold">KES {req.payout_amount?.toFixed(2)}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Scheduled For</span>
-                      <p className="font-semibold">{req.scheduled_member?.profiles?.full_name || req.scheduled_member?.member_code || '-'}</p>
+                      <span className="text-muted-foreground">Contribution</span>
+                      <p className="font-semibold">KES {req.chama?.contribution_amount?.toFixed(2)}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Ineligible Members</span>
-                      <p className="font-semibold flex items-center gap-1">
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                        {(req.ineligible_members as any[])?.length || 0}
-                      </p>
+                      <span className="text-muted-foreground">Balance</span>
+                      <p className="font-semibold">KES {req.chama?.available_balance?.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Scheduled For</span>
+                      <p className="font-semibold">{req.scheduled_member?.profiles?.full_name || req.scheduled_member?.member_code || '-'}</p>
                     </div>
                     {req.chosen_member_detail && (
                       <div>
@@ -227,6 +288,29 @@ export default function AdminPayoutApprovals() {
                       </div>
                     )}
                   </div>
+
+                  {/* Ineligible members expanded */}
+                  {(req.ineligible_members as any[])?.length > 0 && (
+                    <Collapsible>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="text-amber-600 p-0 h-auto">
+                          <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                          {(req.ineligible_members as any[]).length} Ineligible Members
+                          <ChevronDown className="h-3 w-3 ml-1" />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2">
+                        <div className="bg-muted/50 rounded p-2 text-xs space-y-1">
+                          {(req.ineligible_members as any[]).map((m: any, i: number) => (
+                            <div key={i} className="flex justify-between">
+                              <span>{m.name || m.member_code}</span>
+                              <span className="text-muted-foreground">{getIneligibleReason(m)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
 
                   <p className="text-sm text-muted-foreground">{req.reason}</p>
 
@@ -261,7 +345,7 @@ export default function AdminPayoutApprovals() {
 
       {/* Approve Dialog */}
       <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Approve Payout — {selectedRequest?.chama?.name}</DialogTitle>
             <DialogDescription>
@@ -272,49 +356,151 @@ export default function AdminPayoutApprovals() {
           {loadingMembers ? (
             <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : (
-            <>
-              <div className="rounded-md border max-h-60 overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Select</TableHead>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Position</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {eligibleMembers.map(m => (
-                      <TableRow
-                        key={m.id}
-                        className={`cursor-pointer ${chosenMemberId === m.id ? 'bg-primary/10' : ''} ${!m.is_eligible ? 'opacity-50' : ''}`}
-                        onClick={() => setChosenMemberId(m.id)}
-                      >
-                        <TableCell>
-                          <input type="radio" checked={chosenMemberId === m.id} onChange={() => setChosenMemberId(m.id)} />
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{m.profiles?.full_name || 'Unknown'}</p>
-                            <p className="text-xs text-muted-foreground">{m.member_code}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>#{m.order_index}</TableCell>
-                        <TableCell>
-                          {m.is_eligible ? (
-                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600">Eligible</Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-red-500/10 text-red-600">
-                              {m.has_debts ? 'Has Debts' : `${m.unpaid_cycles} Unpaid`}
-                            </Badge>
-                          )}
-                        </TableCell>
+            <div className="space-y-4">
+              {/* Chama Summary */}
+              {chamaSummary && (
+                <Card className="bg-muted/30">
+                  <CardContent className="pt-4 pb-3">
+                    <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground text-xs">Group Code</span>
+                        <p className="font-mono font-semibold">{chamaSummary.group_code}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-xs">Members</span>
+                        <p className="font-semibold">{chamaSummary.total_members}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-xs">Contribution</span>
+                        <p className="font-semibold">KES {chamaSummary.contribution_amount}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-xs">Balance</span>
+                        <p className="font-semibold">KES {chamaSummary.available_balance?.toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-xs">Cycles Done</span>
+                        <p className="font-semibold">{chamaSummary.total_cycles_completed}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-xs">Current Round</span>
+                        <p className="font-semibold">#{chamaSummary.current_round}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Payout History */}
+              {payoutHistory.length > 0 && (
+                <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-between">
+                      <span className="flex items-center gap-1"><History className="h-4 w-4" /> Payout History ({payoutHistory.length} payouts)</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="rounded-md border max-h-40 overflow-y-auto mt-1">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Cycle</TableHead>
+                            <TableHead className="text-xs">Beneficiary</TableHead>
+                            <TableHead className="text-xs">Amount</TableHead>
+                            <TableHead className="text-xs">Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {payoutHistory.map((ph, i) => (
+                            <TableRow key={i} className="text-xs">
+                              <TableCell>#{ph.cycle_number}</TableCell>
+                              <TableCell>{ph.beneficiary_name}</TableCell>
+                              <TableCell>KES {ph.payout_amount?.toFixed(2)}</TableCell>
+                              <TableCell>{ph.date ? format(new Date(ph.date), 'MMM d') : '-'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {/* Member Selection Table */}
+              <div>
+                <p className="text-sm font-medium mb-2 flex items-center gap-1">
+                  <Users className="h-4 w-4" /> Select Beneficiary
+                </p>
+                <div className="rounded-md border max-h-64 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10"></TableHead>
+                        <TableHead className="text-xs">Name</TableHead>
+                        <TableHead className="text-xs">Phone</TableHead>
+                        <TableHead className="text-xs">Pos</TableHead>
+                        <TableHead className="text-xs">Payouts</TableHead>
+                        <TableHead className="text-xs">Missed</TableHead>
+                        <TableHead className="text-xs">Credit</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {enrichedMembers.map(m => {
+                        const blocked = m.already_received_this_round;
+                        const isSelected = chosenMemberId === m.id;
+                        return (
+                          <TableRow
+                            key={m.id}
+                            className={`${blocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'bg-primary/10' : ''}`}
+                            onClick={() => !blocked && setChosenMemberId(m.id)}
+                          >
+                            <TableCell>
+                              <input
+                                type="radio"
+                                checked={isSelected}
+                                disabled={blocked}
+                                onChange={() => !blocked && setChosenMemberId(m.id)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-xs">{m.profiles?.full_name || 'Unknown'}</p>
+                                <p className="text-[10px] text-muted-foreground">{m.member_code}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs">{m.profiles?.phone || '-'}</TableCell>
+                            <TableCell className="text-xs">#{m.order_index}</TableCell>
+                            <TableCell className="text-xs">{m.payouts_received}</TableCell>
+                            <TableCell className="text-xs">{m.missed_payments_count || 0}</TableCell>
+                            <TableCell className="text-xs">
+                              {(m.carry_forward_credit || 0) > 0 ? `KES ${m.carry_forward_credit}` : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {blocked ? (
+                                <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-200">
+                                  <ShieldAlert className="h-2.5 w-2.5 mr-0.5" /> Already Received
+                                </Badge>
+                              ) : m.is_eligible ? (
+                                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-200">
+                                  Eligible
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-600 border-red-200">
+                                  {m.has_debts ? 'Debts' : `${m.unpaid_cycles} Unpaid`}
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
 
+              {/* Admin Notes */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Admin Notes (optional)</label>
                 <Textarea
@@ -324,7 +510,7 @@ export default function AdminPayoutApprovals() {
                   rows={2}
                 />
               </div>
-            </>
+            </div>
           )}
 
           <DialogFooter>
