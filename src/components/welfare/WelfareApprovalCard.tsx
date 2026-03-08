@@ -24,16 +24,22 @@ export const WelfareApprovalCard = ({ welfareId, onDecision }: Props) => {
 
   const fetchApprovals = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('welfare-withdrawal-approve', {
-        method: 'GET',
-        body: null,
-        headers: {},
-      });
-      // Use query params approach
-      const { data: data2, error: error2 } = await supabase.functions.invoke(`welfare-withdrawal-approve?welfare_id=${welfareId}`, {
-        method: 'GET',
-      });
-      if (data2?.data) setApprovals(data2.data);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/welfare-withdrawal-approve?welfare_id=${welfareId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+      const result = await response.json();
+      if (result?.data) setApprovals(result.data);
     } catch (e) {
       console.error('Error fetching approvals:', e);
     } finally {
