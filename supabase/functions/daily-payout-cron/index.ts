@@ -79,7 +79,8 @@ async function checkMemberEligibility(supabase: any, memberId: string, chamaId: 
     required: totalCycles * contributionAmount,
     contributed: totalPaidCycles * contributionAmount,
     shortfall: totalUnpaid,
-    unpaidCycles: unpaidCycles.length
+    unpaidCycles: unpaidCycles.length,
+    hasDebts
   };
 }
 
