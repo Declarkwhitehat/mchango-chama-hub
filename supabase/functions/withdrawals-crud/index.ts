@@ -594,30 +594,48 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      // Fetch requester and reviewer profiles separately
+      // Fetch requester/reviewer profiles + entity names + welfare approvals in parallel
       const enrichedWithdrawals = await Promise.all((withdrawals || []).map(async (w: any) => {
-        let requester = null;
-        let reviewer = null;
+        const tasks: Promise<any>[] = [];
 
-        if (w.requested_by) {
-          const { data: requesterData } = await supabaseAdmin
-            .from('profiles')
-            .select('full_name, email, phone')
-            .eq('id', w.requested_by)
-            .single();
-          requester = requesterData;
+        // 0: requester profile
+        tasks.push(w.requested_by
+          ? supabaseAdmin.from('profiles').select('full_name, email, phone').eq('id', w.requested_by).single().then(r => r.data)
+          : Promise.resolve(null));
+
+        // 1: reviewer profile
+        tasks.push(w.reviewed_by
+          ? supabaseAdmin.from('profiles').select('full_name, email').eq('id', w.reviewed_by).single().then(r => r.data)
+          : Promise.resolve(null));
+
+        // 2: entity name
+        let entityPromise: Promise<any> = Promise.resolve(null);
+        if (w.chama_id) {
+          entityPromise = supabaseAdmin.from('chama').select('name').eq('id', w.chama_id).single().then(r => ({ name: r.data?.name, type: 'Chama' }));
+        } else if (w.mchango_id) {
+          entityPromise = supabaseAdmin.from('mchango').select('title').eq('id', w.mchango_id).single().then(r => ({ name: r.data?.title, type: 'Mchango' }));
+        } else if (w.organization_id) {
+          entityPromise = supabaseAdmin.from('organizations').select('name').eq('id', w.organization_id).single().then(r => ({ name: r.data?.name, type: 'Organization' }));
+        } else if (w.welfare_id) {
+          entityPromise = supabaseAdmin.from('welfares').select('name').eq('id', w.welfare_id).single().then(r => ({ name: r.data?.name, type: 'Welfare' }));
         }
+        tasks.push(entityPromise);
 
-        if (w.reviewed_by) {
-          const { data: reviewerData } = await supabaseAdmin
-            .from('profiles')
-            .select('full_name, email')
-            .eq('id', w.reviewed_by)
-            .single();
-          reviewer = reviewerData;
-        }
+        // 3: welfare approvals (only for welfare withdrawals)
+        tasks.push(w.welfare_id
+          ? supabaseAdmin.from('welfare_withdrawal_approvals').select('approver_role, decision, decided_at, rejection_reason').eq('withdrawal_id', w.id).then(r => r.data || [])
+          : Promise.resolve([]));
 
-        return { ...w, requester, reviewer };
+        const [requester, reviewer, entity, welfare_approvals] = await Promise.all(tasks);
+
+        return {
+          ...w,
+          requester,
+          reviewer,
+          entity_name: entity?.name || null,
+          entity_type: entity?.type || 'Unknown',
+          welfare_approvals,
+        };
       }));
 
       return new Response(JSON.stringify({ data: enrichedWithdrawals }), {
@@ -694,7 +712,135 @@ serve(async (req) => {
         }
       }
 
-      if (!withdrawal_id) {
+      // Admin-initiated retry for failed/pending_retry withdrawals
+      if (action === 'retry') {
+        if (!withdrawal_id) {
+          return new Response(JSON.stringify({ error: 'withdrawal_id is required' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const { data: retryAdminRole } = await supabaseClient
+          .from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
+        if (!retryAdminRole) {
+          return new Response(JSON.stringify({ error: 'Admin access required' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const { data: retryWd, error: retryErr } = await supabaseAdmin
+          .from('withdrawals')
+          .select(`*, payment_method:payment_methods(method_type, phone_number)`)
+          .eq('id', withdrawal_id).single();
+
+        if (retryErr || !retryWd) {
+          return new Response(JSON.stringify({ error: 'Withdrawal not found' }), {
+            status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!['failed', 'pending_retry'].includes(retryWd.status)) {
+          return new Response(JSON.stringify({ error: `Cannot retry withdrawal in ${retryWd.status} status` }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const retryPhone = retryWd.payment_method?.phone_number;
+        if (!retryPhone || retryWd.payment_method?.method_type !== 'mpesa') {
+          return new Response(JSON.stringify({ error: 'No M-Pesa phone number on payment method' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        await supabaseAdmin.from('withdrawals').update({
+          status: 'approved',
+          notes: (retryWd.notes || '') + `\n[ADMIN] Retry initiated by admin on ${new Date().toISOString()}`,
+          b2c_attempt_count: (retryWd.b2c_attempt_count || 0) + 1,
+          last_b2c_attempt_at: new Date().toISOString(),
+        }).eq('id', withdrawal_id);
+
+        const retryUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        const retryKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+        try {
+          const b2cRes = await fetch(`${retryUrl}/functions/v1/b2c-payout`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${retryKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawal_id, phone_number: retryPhone, amount: retryWd.net_amount }),
+          });
+          const b2cResult = await b2cRes.json();
+          if (!b2cRes.ok || !b2cResult.success) {
+            await supabaseAdmin.from('withdrawals').update({
+              status: 'failed',
+              b2c_error_details: b2cResult,
+              notes: (retryWd.notes || '') + `\n[ADMIN] Retry failed: ${b2cResult.error || 'Unknown'}`,
+            }).eq('id', withdrawal_id);
+            return new Response(JSON.stringify({ error: 'Retry B2C failed', details: b2cResult }), {
+              status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          return new Response(JSON.stringify({ message: 'M-Pesa retry initiated successfully', data: b2cResult }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (err: any) {
+          await supabaseAdmin.from('withdrawals').update({
+            status: 'pending_retry',
+            notes: (retryWd.notes || '') + `\n[ADMIN] Retry exception: ${err.message}`,
+          }).eq('id', withdrawal_id);
+          return new Response(JSON.stringify({ error: 'Retry failed', message: err.message }), {
+            status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      // Admin force-approve for welfare pending_approval withdrawals
+      if (action === 'force_approve') {
+        if (!withdrawal_id) {
+          return new Response(JSON.stringify({ error: 'withdrawal_id is required' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const { data: faAdminRole } = await supabaseClient
+          .from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
+        if (!faAdminRole) {
+          return new Response(JSON.stringify({ error: 'Admin access required' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const { data: faWd } = await supabaseAdmin
+          .from('withdrawals')
+          .select(`*, payment_method:payment_methods(method_type, phone_number)`)
+          .eq('id', withdrawal_id).single();
+        if (!faWd || faWd.status !== 'pending_approval') {
+          return new Response(JSON.stringify({ error: 'Withdrawal not in pending_approval status' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        await supabaseAdmin.from('withdrawals').update({
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id,
+          notes: (faWd.notes || '') + `\n[ADMIN] Force-approved by admin, bypassing multi-sig`,
+        }).eq('id', withdrawal_id);
+
+        if (faWd.payment_method?.method_type === 'mpesa' && faWd.payment_method?.phone_number) {
+          const faUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const faKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          const b2cRes = await fetch(`${faUrl}/functions/v1/b2c-payout`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${faKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawal_id, phone_number: faWd.payment_method.phone_number, amount: faWd.net_amount }),
+          });
+          const b2cResult = await b2cRes.json();
+          return new Response(JSON.stringify({ message: 'Force-approved and B2C initiated', data: b2cResult }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ message: 'Force-approved. Awaiting manual payment.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
         return new Response(JSON.stringify({ 
           error: 'Missing withdrawal_id',
           details: 'withdrawal_id is required'
@@ -1040,28 +1186,43 @@ serve(async (req) => {
 
       console.log('Withdrawal updated:', withdrawal);
 
-      // If manually completed, update chama total_withdrawn
-      if (isManualCompletion && existingWithdrawal.chama_id) {
-        const { data: chama } = await supabaseAdmin
-          .from('chama')
-          .select('total_withdrawn')
-          .eq('id', existingWithdrawal.chama_id)
-          .single();
-        
-        if (chama) {
-          const newTotal = Number(chama.total_withdrawn || 0) + Number(existingWithdrawal.net_amount);
-          await supabaseAdmin
-            .from('chama')
-            .update({ total_withdrawn: newTotal })
-            .eq('id', existingWithdrawal.chama_id);
-          
-          console.log('Updated chama total_withdrawn:', { 
-            chama_id: existingWithdrawal.chama_id,
-            previous: chama.total_withdrawn,
-            added: existingWithdrawal.net_amount,
-            new_total: newTotal
-          });
+      // If manually completed, update entity total_withdrawn and available_balance
+      if (isManualCompletion) {
+        const netAmt = Number(existingWithdrawal.net_amount);
+        if (existingWithdrawal.chama_id) {
+          const { data: entity } = await supabaseAdmin.from('chama').select('total_withdrawn, available_balance').eq('id', existingWithdrawal.chama_id).single();
+          if (entity) {
+            await supabaseAdmin.from('chama').update({
+              total_withdrawn: Number(entity.total_withdrawn || 0) + netAmt,
+              available_balance: Number(entity.available_balance || 0) - netAmt,
+            }).eq('id', existingWithdrawal.chama_id);
+          }
+        } else if (existingWithdrawal.mchango_id) {
+          const { data: entity } = await supabaseAdmin.from('mchango').select('total_withdrawn, available_balance').eq('id', existingWithdrawal.mchango_id).single();
+          if (entity) {
+            await supabaseAdmin.from('mchango').update({
+              total_withdrawn: Number(entity.total_withdrawn || 0) + netAmt,
+              available_balance: Number(entity.available_balance || 0) - netAmt,
+            }).eq('id', existingWithdrawal.mchango_id);
+          }
+        } else if (existingWithdrawal.organization_id) {
+          const { data: entity } = await supabaseAdmin.from('organizations').select('total_withdrawn, available_balance').eq('id', existingWithdrawal.organization_id).single();
+          if (entity) {
+            await supabaseAdmin.from('organizations').update({
+              total_withdrawn: Number(entity.total_withdrawn || 0) + netAmt,
+              available_balance: Number(entity.available_balance || 0) - netAmt,
+            }).eq('id', existingWithdrawal.organization_id);
+          }
+        } else if (existingWithdrawal.welfare_id) {
+          const { data: entity } = await supabaseAdmin.from('welfares').select('total_withdrawn, available_balance').eq('id', existingWithdrawal.welfare_id).single();
+          if (entity) {
+            await supabaseAdmin.from('welfares').update({
+              total_withdrawn: Number(entity.total_withdrawn || 0) + netAmt,
+              available_balance: Number(entity.available_balance || 0) - netAmt,
+            }).eq('id', existingWithdrawal.welfare_id);
+          }
         }
+        console.log('Updated entity balances for manual completion:', { withdrawal_id, net_amount: netAmt });
       }
 
       // If M-Pesa approval (Send via M-Pesa button), trigger B2C payout
