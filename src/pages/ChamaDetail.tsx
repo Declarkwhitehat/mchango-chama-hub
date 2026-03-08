@@ -924,40 +924,6 @@ const ChamaDetail = () => {
               </TabsContent>
             )}
 
-            <TabsContent value="details" className="space-y-4">
-              {/* WhatsApp Group Link */}
-              <WhatsAppLinkManager
-                chamaId={chama.id}
-                currentLink={chama.whatsapp_link}
-                isManager={isManager}
-                onUpdate={loadChama}
-              />
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Chama Details</CardTitle>
-                  <CardDescription>Group information and settings</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Created</p>
-                    <p className="font-medium">
-                      {new Date(chama.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Contribution Frequency</p>
-                    <p className="font-medium capitalize">{chama.contribution_frequency}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Member Capacity</p>
-                    <p className="font-medium">
-                      {approvedMembers.length} / {chama.max_members} members
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
         )}
 
