@@ -66,7 +66,7 @@ const AdminMpesaSearch = lazy(() => import("./pages/AdminMpesaSearch"));
 const AdminFraudMonitoring = lazy(() => import("./pages/AdminFraudMonitoring"));
 const AdminFraudUserDetail = lazy(() => import("./pages/AdminFraudUserDetail"));
 const AdminFraudConfig = lazy(() => import("./pages/AdminFraudConfig"));
-
+const AdminPayoutApprovals = lazy(() => import("./pages/AdminPayoutApprovals"));
 const queryClient = new QueryClient();
 
 // Loading fallback component
