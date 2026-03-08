@@ -239,9 +239,13 @@ const ChamaDetail = () => {
 
   const calculateTurns = async (chamaData: ChamaData) => {
     try {
+      // Use effective position: rescheduled_to_position if skipped, otherwise order_index
+      const getEffectivePosition = (m: any) => 
+        (m.was_skipped && m.rescheduled_to_position) ? m.rescheduled_to_position : (m.order_index || 0);
+
       const approvedMembers = chamaData.chama_members
         ?.filter(m => m.approval_status === 'approved' && m.status !== 'removed')
-        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0)) || [];
+        .sort((a, b) => getEffectivePosition(a) - getEffectivePosition(b)) || [];
 
       if (approvedMembers.length === 0) return;
 
