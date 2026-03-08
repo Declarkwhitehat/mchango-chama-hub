@@ -49,6 +49,7 @@ interface EnrichedMember {
   carry_forward_credit: number;
   was_skipped: boolean;
   trust_score: number | null;
+  success_rate: number;
   profiles: { full_name: string; phone: string } | null;
 }
 
