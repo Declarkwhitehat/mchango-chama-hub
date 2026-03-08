@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Languages, ArrowLeft, Send } from 'lucide-react';
+import { X, Languages, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import chatBotAvatar from '@/assets/chat-bot-avatar.png';
