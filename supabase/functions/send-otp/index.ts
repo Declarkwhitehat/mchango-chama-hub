@@ -57,7 +57,33 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const { phone, purpose }: SendOTPRequest = await req.json();
+    const { phone: rawPhone, email, purpose }: SendOTPRequest = await req.json();
+
+    let phone = rawPhone;
+
+    // If email provided, look up the associated phone number
+    if (email && !phone) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('email', email)
+        .single();
+
+      if (profileError || !profile?.phone) {
+        return new Response(
+          JSON.stringify({ error: 'No account found with this email address' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+        );
+      }
+
+      phone = profile.phone;
+      // Normalize if needed
+      if (phone && !phone.startsWith('+')) {
+        if (phone.startsWith('0')) phone = '+254' + phone.substring(1);
+        else if (phone.startsWith('7') || phone.startsWith('1')) phone = '+254' + phone;
+        else phone = '+' + phone;
+      }
+    }
 
     if (!phone || !/^\+\d{10,15}$/.test(phone)) {
       return new Response(
