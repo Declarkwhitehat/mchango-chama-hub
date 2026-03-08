@@ -42,12 +42,12 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
     setLoading(false);
   };
 
-  const totalPenalty = debts.reduce((s, d) => s + d.penalty_remaining, 0);
-  const totalPrincipal = debts.reduce((s, d) => s + d.principal_remaining, 0);
+  const totalLateCommission = debts.reduce((s, d) => s + d.penalty_remaining, 0);
+  const totalNetToRecipients = debts.reduce((s, d) => s + d.principal_remaining, 0);
   const currentCycleGross = currentCycleDue ? contributionAmount / (1 - 0.05) : 0;
   const currentCycleCommission = currentCycleGross * 0.05;
-  const totalPayable = totalPenalty + totalPrincipal + (totalPrincipal > 0 ? totalPrincipal * 0.05 : 0) + currentCycleGross;
-  const totalCommission = totalPenalty + (totalPrincipal * 0.05) + currentCycleCommission;
+  const totalPayable = totalNetToRecipients + totalLateCommission + currentCycleGross;
+  const totalCommission = totalLateCommission + currentCycleCommission;
 
   if (!loading && debts.length === 0 && !currentCycleDue) {
     return (
