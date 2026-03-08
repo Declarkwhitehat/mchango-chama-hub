@@ -27,9 +27,11 @@ import { VerificationRequestButton } from "@/components/VerificationRequestButto
 import { ChamaChatPanel } from "@/components/chama/ChamaChatPanel";
 import { TrustScoreBadge } from "@/components/chama/TrustScoreBadge";
 
-import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
+import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, MessageSquare, FlaskConical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 
 interface ChamaData {
