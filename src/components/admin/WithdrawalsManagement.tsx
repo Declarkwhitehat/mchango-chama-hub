@@ -502,6 +502,17 @@ export const WithdrawalsManagement = () => {
                   </div>
                 )}
 
+                {/* Recipient Phone (Welfare) */}
+                {selectedWithdrawal.welfare_id && extractRecipientPhone(selectedWithdrawal.notes) && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-muted border border-primary/20">
+                    <Phone className="h-4 w-4 text-primary" />
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Recipient M-Pesa Number</Label>
+                      <p className="font-mono font-bold text-lg">{extractRecipientPhone(selectedWithdrawal.notes)}</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Payment Method */}
                 {selectedWithdrawal.payment_method && !selectedWithdrawal.payment_method.phone_number && (
                   <div className="p-3 bg-muted rounded-lg">
