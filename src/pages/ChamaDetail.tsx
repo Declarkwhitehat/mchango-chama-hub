@@ -810,7 +810,15 @@ const ChamaDetail = () => {
               </TabsContent>
             )}
 
-            <TabsContent value="members">
+            <TabsContent value="members" className="space-y-4">
+              {/* WhatsApp Group Link Manager */}
+              <WhatsAppLinkManager
+                chamaId={chama.id}
+                currentLink={chama.whatsapp_link}
+                isManager={isManager}
+                onUpdate={loadChama}
+              />
+
               <Card>
                 <CardHeader>
                   <CardTitle>Group Members ({approvedMembers.length})</CardTitle>
