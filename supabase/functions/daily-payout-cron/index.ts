@@ -624,17 +624,28 @@ Deno.serve(async (req) => {
         const unpaidMembers = payments?.filter((p: any) => !p.fully_paid) || [];
 
         if (!skipPayout && !existingWithdrawal) {
-          // STRICT: only sum from members who fully paid their own obligation
-          const collectedFromOnTime = paidOnTimeMembers.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
-          const collectedFromLate = paidLateMembers.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
-          const collectedAmount = collectedFromOnTime + collectedFromLate;
+          // Use available_balance as source of truth — commission already deducted per-contribution
+          const { data: chamaPoolBalance } = await supabase
+            .from('chama')
+            .select('available_balance')
+            .eq('id', chama.id)
+            .single();
 
-          const onTimeCommission = collectedFromOnTime * 0.05;
-          const latePenaltiesCollected = paidLateMembers.reduce((sum: number, p: any) => {
-            return sum + ((p.amount_paid || 0) * (0.10 / 0.90));
-          }, 0);
-          const totalCommission = onTimeCommission;
-          const payoutAmount = collectedAmount - onTimeCommission;
+          const poolBalance = chamaPoolBalance?.available_balance || 0;
+          const totalCommission = 0; // Already collected per-contribution in settleDebts()
+          const payoutAmount = poolBalance;
+          const collectedAmount = poolBalance; // For ledger entry: pool is net
+
+          // Balance sufficiency check
+          if (poolBalance <= 0) {
+            console.warn(`⚠️ Chama ${chama.name} has zero available_balance — skipping payout for cycle ${cycle.cycle_number}`);
+            await supabase.from('audit_logs').insert({
+              action: 'PAYOUT_SKIPPED_NO_BALANCE',
+              table_name: 'contribution_cycles',
+              record_id: cycle.id,
+              new_values: { chama_id: chama.id, available_balance: poolBalance, cycle_number: cycle.cycle_number }
+            });
+          }
 
           const isFullPayout = paidCount === totalMembers;
           const payoutType = wasSkipped ? 'partial' : (isFullPayout ? 'full' : 'partial');
@@ -688,13 +699,7 @@ Deno.serve(async (req) => {
                   errors++;
                 }
               } else if (newWithdrawal) {
-                // Record company earning
-                await supabase.rpc('record_company_earning', {
-                  p_source: 'chama_commission',
-                  p_amount: totalCommission,
-                  p_group_id: chama.id,
-                  p_description: `Payout commission - ${chama.name} cycle #${cycle.cycle_number}. On-time: KES ${onTimeCommission.toFixed(2)}`
-                });
+                // Commission already collected per-contribution in settleDebts() — no double-charge
 
                 // ========== PAYOUT LEDGER ENTRY ==========
                 await supabase.from('financial_ledger').insert({

@@ -341,6 +341,7 @@ async function settleDebts(
                   .from('withdrawals')
                   .insert({
                     chama_id: chamaId,
+                    cycle_id: deficitRecord.cycle_id, // Enable duplicate guard via unique index
                     requested_by: recipientMember.user_id,
                     amount: principalPay,
                     commission_amount: commission,
@@ -1065,10 +1066,16 @@ serve(async (req) => {
                 .single();
 
               if (beneficiaryMember && chamaDetails) {
-                const commissionRate = chamaDetails.commission_rate || 0.05;
-                const grossAmount = chamaDetails.contribution_amount * totalMembers;
-                const commissionAmount = grossAmount * commissionRate;
-                const netPayoutAmount = grossAmount - commissionAmount;
+                // Use available_balance — commission was already deducted per-contribution
+                const { data: chamaBalanceData } = await supabaseAdmin
+                  .from('chama')
+                  .select('available_balance')
+                  .eq('id', body.chama_id)
+                  .single();
+
+                const netPayoutAmount = chamaBalanceData?.available_balance || 0;
+                const commissionAmount = 0; // Already collected per-contribution in settleDebts()
+                const grossAmount = netPayoutAmount; // Pool is already net of commission
 
                 const { data: paymentMethod } = await supabaseClient
                   .from('payment_methods')
@@ -1105,12 +1112,8 @@ serve(async (req) => {
                   if (wdError && wdError.code === '23505') {
                     console.log(`⚠️ Duplicate payout prevented by unique index for cycle ${currentCycle.id}`);
                   } else if (newWithdrawal) {
-                    await supabaseAdmin.rpc('record_company_earning', {
-                      p_source: 'chama_commission',
-                      p_amount: commissionAmount,
-                      p_group_id: body.chama_id,
-                      p_description: `Immediate payout commission — ${chamaDetails.name}`
-                    });
+                    // Commission already collected per-contribution — no double-charge
+                    // Skip record_company_earning here since it was done in settleDebts()
 
                     // Payout ledger entry
                     await supabaseAdmin.from('financial_ledger').insert({
