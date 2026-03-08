@@ -67,8 +67,8 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
     try {
       // Get active session (works for both logged-in and guest flows)
       const { data: { session } } = await supabase.auth.getSession();
-      const activeUserId = session?.user?.id ?? user?.id ?? null;
-      const activeUserEmail = session?.user?.email ?? profile?.email ?? null;
+      const activeUserId = session?.user?.id ?? null;
+      const activeUserEmail = session?.user?.email ?? null;
       
       // Create pending donation record
       const donationData = {
