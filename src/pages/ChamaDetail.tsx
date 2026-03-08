@@ -836,7 +836,11 @@ const ChamaDetail = () => {
 
                   <div className="space-y-3">
                      {approvedMembers
-                      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+                      .sort((a, b) => {
+                        const posA = (a.was_skipped && a.rescheduled_to_position) ? a.rescheduled_to_position : (a.order_index || 0);
+                        const posB = (b.was_skipped && b.rescheduled_to_position) ? b.rescheduled_to_position : (b.order_index || 0);
+                        return posA - posB;
+                      })
                       .map((member) => {
                         const hasPaid = memberPaymentStatuses[member.id];
                         const isPaidKnown = member.id in memberPaymentStatuses;
