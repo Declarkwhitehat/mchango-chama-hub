@@ -532,10 +532,10 @@ serve(async (req) => {
             .update({
               status: 'pending_retry',
               b2c_error_details: { 
-                error: b2cError.message || 'Network error',
+                error: (b2cError as any).message || 'Network error',
                 auto_approval_failure: true 
               },
-              notes: (notes || '') + `\n[SYSTEM] Auto-approval B2C exception: ${b2cError.message}`
+              notes: (notes || '') + `\n[SYSTEM] Auto-approval B2C exception: ${(b2cError as any).message}`
             })
             .eq('id', withdrawal.id);
 
