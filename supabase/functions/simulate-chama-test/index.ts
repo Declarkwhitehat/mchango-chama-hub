@@ -1451,6 +1451,9 @@ async function cleanup(supabase: any, chamaId: string) {
       }
     }
 
+    await supabase.from('financial_ledger').delete().eq('source_id', chamaId);
+    await supabase.from('company_earnings').delete().eq('group_id', chamaId);
+    await supabase.from('audit_logs').delete().eq('new_values->>chama_id', chamaId);
     await supabase.from('withdrawals').delete().eq('chama_id', chamaId);
     await supabase.from('contribution_cycles').delete().eq('chama_id', chamaId);
     await supabase.from('contributions').delete().eq('chama_id', chamaId);
