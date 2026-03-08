@@ -349,6 +349,90 @@ Deno.serve(async (req) => {
       });
     }
 
+    // AUTO-ADVANCE: Complete expired cycles and create next ones
+    // For daily chamas, cycles must advance on schedule regardless of payment completion
+    if (action === 'auto-advance' && req.method === 'POST') {
+      const { chamaId } = requestBody;
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+
+      // Find expired incomplete cycles for this chama
+      const { data: expiredCycles } = await supabase
+        .from('contribution_cycles')
+        .select('*, chama!inner(contribution_frequency, contribution_amount, every_n_days_count)')
+        .eq('chama_id', chamaId)
+        .eq('is_complete', false)
+        .lt('end_date', now.toISOString())
+        .order('cycle_number', { ascending: true });
+
+      if (!expiredCycles || expiredCycles.length === 0) {
+        return new Response(JSON.stringify({ message: 'No expired cycles to advance' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const results = [];
+
+      for (const cycle of expiredCycles) {
+        // Mark unpaid members as missed in member_cycle_payments
+        const { data: unpaidPayments } = await supabase
+          .from('member_cycle_payments')
+          .select('id, member_id')
+          .eq('cycle_id', cycle.id)
+          .eq('fully_paid', false);
+
+        if (unpaidPayments && unpaidPayments.length > 0) {
+          for (const payment of unpaidPayments) {
+            await supabase
+              .from('member_cycle_payments')
+              .update({ is_late_payment: true })
+              .eq('id', payment.id);
+          }
+        }
+
+        // Get payment stats
+        const { data: allPayments } = await supabase
+          .from('member_cycle_payments')
+          .select('fully_paid, amount_paid')
+          .eq('cycle_id', cycle.id);
+
+        const paidCount = allPayments?.filter((p: any) => p.fully_paid).length || 0;
+        const totalCollected = allPayments?.reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0) || 0;
+
+        // Mark cycle as complete (time-expired)
+        await supabase
+          .from('contribution_cycles')
+          .update({
+            is_complete: true,
+            members_paid_count: paidCount,
+            members_skipped_count: (allPayments?.length || 0) - paidCount,
+            total_collected_amount: totalCollected,
+            payout_type: paidCount === (allPayments?.length || 0) ? 'full' : 'partial'
+          })
+          .eq('id', cycle.id);
+
+        results.push({ cycle_id: cycle.id, cycle_number: cycle.cycle_number, paid: paidCount, total: allPayments?.length || 0 });
+      }
+
+      // Now create today's cycle by calling create-today internally
+      const createResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/daily-cycle-manager`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'create-today', chamaId }),
+      });
+      const createResult = await createResponse.json();
+
+      return new Response(JSON.stringify({ 
+        advanced_cycles: results, 
+        new_cycle: createResult.cycle || null 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     return new Response(JSON.stringify({ error: 'Invalid endpoint' }), {
       status: 404,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
