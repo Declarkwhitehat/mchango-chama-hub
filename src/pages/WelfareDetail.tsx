@@ -29,6 +29,7 @@ const WelfareDetail = () => {
   const [myMemberId, setMyMemberId] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [cooldownActive, setCooldownActive] = useState(false);
 
   useEffect(() => {
     if (id) fetchWelfare();
