@@ -594,30 +594,48 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      // Fetch requester and reviewer profiles separately
+      // Fetch requester/reviewer profiles + entity names + welfare approvals in parallel
       const enrichedWithdrawals = await Promise.all((withdrawals || []).map(async (w: any) => {
-        let requester = null;
-        let reviewer = null;
+        const tasks: Promise<any>[] = [];
 
-        if (w.requested_by) {
-          const { data: requesterData } = await supabaseAdmin
-            .from('profiles')
-            .select('full_name, email, phone')
-            .eq('id', w.requested_by)
-            .single();
-          requester = requesterData;
+        // 0: requester profile
+        tasks.push(w.requested_by
+          ? supabaseAdmin.from('profiles').select('full_name, email, phone').eq('id', w.requested_by).single().then(r => r.data)
+          : Promise.resolve(null));
+
+        // 1: reviewer profile
+        tasks.push(w.reviewed_by
+          ? supabaseAdmin.from('profiles').select('full_name, email').eq('id', w.reviewed_by).single().then(r => r.data)
+          : Promise.resolve(null));
+
+        // 2: entity name
+        let entityPromise: Promise<any> = Promise.resolve(null);
+        if (w.chama_id) {
+          entityPromise = supabaseAdmin.from('chama').select('name').eq('id', w.chama_id).single().then(r => ({ name: r.data?.name, type: 'Chama' }));
+        } else if (w.mchango_id) {
+          entityPromise = supabaseAdmin.from('mchango').select('title').eq('id', w.mchango_id).single().then(r => ({ name: r.data?.title, type: 'Mchango' }));
+        } else if (w.organization_id) {
+          entityPromise = supabaseAdmin.from('organizations').select('name').eq('id', w.organization_id).single().then(r => ({ name: r.data?.name, type: 'Organization' }));
+        } else if (w.welfare_id) {
+          entityPromise = supabaseAdmin.from('welfares').select('name').eq('id', w.welfare_id).single().then(r => ({ name: r.data?.name, type: 'Welfare' }));
         }
+        tasks.push(entityPromise);
 
-        if (w.reviewed_by) {
-          const { data: reviewerData } = await supabaseAdmin
-            .from('profiles')
-            .select('full_name, email')
-            .eq('id', w.reviewed_by)
-            .single();
-          reviewer = reviewerData;
-        }
+        // 3: welfare approvals (only for welfare withdrawals)
+        tasks.push(w.welfare_id
+          ? supabaseAdmin.from('welfare_withdrawal_approvals').select('approver_role, decision, decided_at, rejection_reason').eq('withdrawal_id', w.id).then(r => r.data || [])
+          : Promise.resolve([]));
 
-        return { ...w, requester, reviewer };
+        const [requester, reviewer, entity, welfare_approvals] = await Promise.all(tasks);
+
+        return {
+          ...w,
+          requester,
+          reviewer,
+          entity_name: entity?.name || null,
+          entity_type: entity?.type || 'Unknown',
+          welfare_approvals,
+        };
       }));
 
       return new Response(JSON.stringify({ data: enrichedWithdrawals }), {
