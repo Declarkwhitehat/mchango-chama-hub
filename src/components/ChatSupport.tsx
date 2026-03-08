@@ -208,19 +208,14 @@ export function ChatSupport() {
 
   return (
     <>
-      {/* Chat trigger — bottom-right, compact */}
+      {/* Chat trigger — bottom-right, minimal */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 z-50 group flex items-center gap-2.5 pl-1 pr-4 py-1 rounded-full bg-card border border-border shadow-lg hover:shadow-xl transition-all hover:scale-[1.03] active:scale-[0.98]"
+          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 z-50 h-11 w-11 rounded-full overflow-hidden shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 touch-manipulation border-2 border-primary/30"
           aria-label="Open chat"
         >
-          <div className="relative h-10 w-10 rounded-full overflow-hidden border-2 border-primary/30 flex-shrink-0">
-            <img src={chatBotAvatar} alt="" className="h-full w-full object-cover" />
-            {/* Online dot */}
-            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-card" />
-          </div>
-          <span className="text-sm font-medium text-foreground">Chat with us</span>
+          <img src={chatBotAvatar} alt="Chat" className="h-full w-full object-cover" />
         </button>
       )}
 
