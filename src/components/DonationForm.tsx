@@ -28,7 +28,6 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
   const [amount, setAmount] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState(profile?.phone || "");
-  const [email, setEmail] = useState(profile?.email || "");
   const [isAnonymous, setIsAnonymous] = useState(false);
 
   const handleDonate = async (e: React.FormEvent) => {
