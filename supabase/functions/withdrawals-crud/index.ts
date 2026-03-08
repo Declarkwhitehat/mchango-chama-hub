@@ -383,12 +383,34 @@ serve(async (req) => {
         });
       }
 
+      // Check if user account is frozen or flagged — force admin approval
+      let accountFrozenOrFlagged = false;
+      try {
+        const { data: riskProfile } = await supabaseAdmin
+          .from('user_risk_profiles')
+          .select('is_frozen, is_flagged')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (riskProfile && (riskProfile.is_frozen || riskProfile.is_flagged)) {
+          accountFrozenOrFlagged = true;
+          console.log('Account frozen/flagged — withdrawal requires admin approval', {
+            is_frozen: riskProfile.is_frozen,
+            is_flagged: riskProfile.is_flagged,
+          });
+        }
+      } catch (riskErr) {
+        console.log('Risk profile check skipped (table may not exist)');
+      }
+
       // Determine if auto-approval is allowed
       // Auto-approve for Mchango AND Organization withdrawals by creators with M-Pesa
       // All Chama withdrawals require admin approval (no auto-approve)
-      const canAutoApprove = defaultPaymentMethod.method_type === 'mpesa' && 
+      // Frozen/flagged accounts ALWAYS require admin approval
+      const canAutoApprove = !accountFrozenOrFlagged && 
+        defaultPaymentMethod.method_type === 'mpesa' && 
         (mchango_id || organization_id) && isCreator;
-      const initialStatus = canAutoApprove ? 'approved' : 'pending';
+      const initialStatus = accountFrozenOrFlagged ? 'pending_approval' : (canAutoApprove ? 'approved' : 'pending');
 
       console.log('Auto-approval check:', { 
         chama_id: !!chama_id, 
@@ -413,7 +435,11 @@ serve(async (req) => {
           payment_method_id: defaultPaymentMethod.id,
           payment_method_type: defaultPaymentMethod.method_type,
           status: initialStatus,
-          notes: hasPaymentIssues ? (notes || '') + ' [Requires admin review: payment issues detected]' : notes,
+          notes: accountFrozenOrFlagged 
+            ? (notes || '') + ' [Requires admin approval — account is frozen/flagged]'
+            : hasPaymentIssues 
+              ? (notes || '') + ' [Requires admin review: payment issues detected]' 
+              : notes,
           reviewed_at: canAutoApprove ? new Date().toISOString() : null,
         })
         .select()

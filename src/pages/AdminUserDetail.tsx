@@ -10,9 +10,10 @@ import { toast } from "@/hooks/use-toast";
 import { 
   Loader2, User, Mail, Phone, CreditCard, Shield, FileText, 
   TrendingUp, Users, Activity, MapPin, Calendar, Download,
-  ExternalLink, Eye, CheckCircle, XCircle, Clock, ShieldOff, AlertTriangle
+  ExternalLink, Eye, CheckCircle, XCircle, Clock, ShieldOff, AlertTriangle, Trash2, Key
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 
 interface UserDetail {
@@ -48,6 +49,10 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
   const [has2FA, setHas2FA] = useState(false);
   const [resetting2FA, setResetting2FA] = useState(false);
   const [show2FAResetConfirm, setShow2FAResetConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePrivilegeCode, setDeletePrivilegeCode] = useState("");
+  const [deleteCodeError, setDeleteCodeError] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(false);
   useEffect(() => {
     if (userId) {
       loadUserDetails();
@@ -262,6 +267,35 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
     }
   };
 
+  const confirmDeleteUser = async () => {
+    if (!userId) return;
+    setDeletingUser(true);
+    try {
+      const response = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: userId, privilege_code: deletePrivilegeCode },
+      });
+
+      if (response.error) throw new Error(response.error.message || 'Failed to delete user');
+      if (response.data?.error) throw new Error(response.data.error);
+
+      toast({ title: "Success", description: "User account deleted successfully" });
+      setShowDeleteConfirm(false);
+      navigate('/admin/users');
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      if (error.message?.includes('privilege code')) {
+        setDeleteCodeError(true);
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingUser(false);
+    }
+  };
+
   const getKycStatusIcon = (status: string) => {
     switch (status) {
       case 'approved':
@@ -302,13 +336,25 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
             <h1 className="text-3xl font-bold">{user.full_name}</h1>
             <p className="text-muted-foreground">{user.email}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             {userRoles.includes('admin') && (
               <Badge variant="default">
                 <Shield className="h-3 w-3 mr-1" />
                 Admin
               </Badge>
             )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setDeletePrivilegeCode("");
+                setDeleteCodeError(false);
+                setShowDeleteConfirm(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete User
+            </Button>
           </div>
         </div>
 
@@ -1012,6 +1058,50 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : null}
                 Confirm Reset
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete User Confirmation Dialog */}
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                Delete User Account
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-4">
+                <p>
+                  This will permanently delete <strong>{user.full_name}</strong>'s account, 
+                  profile, memberships, and all associated data. This action cannot be undone.
+                </p>
+                <div className="space-y-2">
+                  <Input
+                    type="password"
+                    placeholder="Enter privilege code to confirm"
+                    value={deletePrivilegeCode}
+                    onChange={(e) => {
+                      setDeletePrivilegeCode(e.target.value);
+                      setDeleteCodeError(false);
+                    }}
+                    className={deleteCodeError ? "border-destructive" : ""}
+                  />
+                  {deleteCodeError && (
+                    <p className="text-sm text-destructive">Invalid privilege code</p>
+                  )}
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteUser}
+                disabled={!deletePrivilegeCode || deletingUser}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deletingUser ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                Delete User Permanently
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
