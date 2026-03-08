@@ -134,4 +134,11 @@ export const NotificationTemplates = {
     type: 'error' as const,
     category: 'verification' as const,
   }),
+
+  campaignWithdrawal: (campaignName: string, amount: number) => ({
+    title: 'Campaign Withdrawal Notice 📢',
+    message: `The campaign "${campaignName}" has withdrawn KES ${amount.toLocaleString()}. If you find this suspicious, please contact customer care.`,
+    type: 'info' as const,
+    category: 'campaign' as const,
+  }),
 };
