@@ -26,6 +26,9 @@ import { CleanupJobStatus } from "@/components/admin/CleanupJobStatus";
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const [stats, setStats] = useState({
     totalUsers: 0,
     verifiedUsers: 0,
@@ -39,13 +42,10 @@ const AdminDashboard = () => {
     recentTransactions: 0,
   });
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async (isAutoRefresh = false) => {
     try {
-      setLoading(true);
+      if (!isAutoRefresh) setLoading(true);
+      else setRefreshing(true);
 
       const [
         usersResult,
