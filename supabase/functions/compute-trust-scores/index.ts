@@ -72,9 +72,11 @@ Deno.serve(async (req) => {
         const outstandingDebts = (debts || []).length;
 
         // Calculate trust score
-        let score = 50; // base score
+        let score = 0;
 
-        if (totalPayments > 0) {
+        if (totalPayments === 0) {
+          score = 50; // neutral starting point for new members
+        } else {
           // On-time payment ratio (70% weight)
           const onTimeRatio = onTimePayments / totalPayments;
           score = Math.round(onTimeRatio * 70);

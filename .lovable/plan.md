@@ -1,56 +1,35 @@
 
 
-## End-to-End Test Review: Chama System Upgrade
+## Diagnosis
 
-I cannot perform interactive browser testing in this mode, but I've reviewed all the implemented code for correctness. Here are my findings:
+The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
 
----
+1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
+2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
+3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
+4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
 
-### Code Review Results
+There are 3 total stuck withdrawals across the system with the same pattern.
 
-**1. Randomized Payout Order (chama-start) — Correct**
-Fisher-Yates shuffle using `crypto.getRandomValues()` is properly implemented at lines 154-161. Order is assigned once and remains fixed. No issues found.
+## Root Cause
 
-**2. Batch Invite Generation (chama-invite) — Correct**
-`batch_generate` action is handled in the edge function. Frontend `ChamaInviteManager.tsx` has batch UI with count selector (1-30). Codes are generated in a loop and bulk-inserted. No issues found.
+The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
 
-**3. Group Chat (ChamaChatPanel) — Correct**
-Realtime subscription, message loading, send functionality, and announcement toggle all look correct. Uses `as any` casts since `chama_messages` is a new table not yet in the generated types — this is expected and functional.
+## Fix Plan
 
-**4. Trust Scores (compute-trust-scores) — Minor Issue Found**
-The function queries `chama_cycle_history` for completed chamas — this table exists. However, there's a **logic bug on line 76-80**: when `totalPayments > 0`, it sets `score = Math.round(onTimeRatio * 70)`, which **replaces** the base score of 50. But when `totalPayments === 0`, it keeps `score = 50`. This means a brand new member with zero history gets a **higher score (50 + 10 clean bonus = 60)** than a member with 50% on-time rate (35 + 0 + 0 = 35). The base score should not be overwritten — it should be additive or the base 50 should be removed.
+### 1. Manually complete stuck withdrawal via RPC
+Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
 
-**5. Trust Score Display (ChamaPendingRequests) — Correct**
-Queries `member_trust_scores` table and displays `TrustScoreBadge` next to each pending member. Manager-only visibility.
+Also complete `e2ea0312` (KES 10) which has the same pattern.
 
----
+### 2. Fix retry-failed-payouts to query status before re-sending
+Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
 
-### Recommended Fix
+### 3. Add a "check status" path in withdrawals-crud
+Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
 
-Fix the trust score calculation in `compute-trust-scores/index.ts` to remove the base score of 50 (since it's overwritten anyway when payments exist):
-
-```typescript
-// Line 75: Change from
-let score = 50; // base score
-// To
-let score = 0;
-
-// And for users with no payments, give them a neutral starting score
-if (totalPayments === 0) {
-  score = 50; // neutral for new members
-} else {
-  score = Math.round((onTimePayments / totalPayments) * 70);
-}
-```
-
-### To Test Manually
-
-Since interactive testing requires you to be logged in, here's the test checklist to verify in the preview:
-
-1. **Create a Chama** at `/chama/create` — set min_members to 2
-2. **Generate batch codes** — click "Generate Batch" with count 5-10 on the Invites tab
-3. **Have a second user join** via invite code, then approve their request
-4. **Start the Chama** — verify the payout order is randomized (check member positions)
-5. **Open the Chat tab** — send a message and verify it appears in real-time
-6. **Call compute-trust-scores** edge function — then check if trust scores appear on pending join requests
+### Files to Change
+- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
+- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
+- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
 
