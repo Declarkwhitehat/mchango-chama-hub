@@ -132,11 +132,28 @@ const AdminDashboard = () => {
     <AdminLayout>
       <div className="container px-4 py-8 max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Welcome back! Here's an overview of your platform.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground mt-1">
+              Welcome back! Here's an overview of your platform.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Updated {lastRefreshed.toLocaleTimeString()}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchDashboardData(true)}
+              disabled={refreshing}
+              className="gap-1.5"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          </div>
         </div>
 
         {/* Action Required Banner */}
