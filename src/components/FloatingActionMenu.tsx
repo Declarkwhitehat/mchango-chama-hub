@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, X, Heart, Users, Building2, Shield } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus, Heart, Users, Building2, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -82,21 +81,16 @@ export const FloatingActionMenu = () => {
         )}
 
         {/* Main FAB Button */}
-        <Button
-          size="icon"
+        <button
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "h-12 w-12 rounded-full shadow-xl transition-all duration-300",
-            "bg-gradient-to-br from-primary to-primary-glow hover:from-primary/90 hover:to-primary-glow/90",
+            "h-11 w-11 rounded-full flex items-center justify-center shadow-md transition-all duration-300 touch-manipulation",
+            "bg-primary/80 backdrop-blur-sm text-primary-foreground hover:bg-primary",
             isOpen && "rotate-45"
           )}
         >
-          {isOpen ? (
-            <X className="h-5 w-5" />
-          ) : (
-            <Plus className="h-5 w-5" />
-          )}
-        </Button>
+          <Plus className="h-5 w-5" />
+        </button>
       </div>
     </>
   );
