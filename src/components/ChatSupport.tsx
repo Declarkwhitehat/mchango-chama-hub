@@ -272,12 +272,26 @@ export function ChatSupport() {
     <>
       {/* Chat Button */}
       {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 h-14 w-14 sm:h-16 sm:w-16 rounded-full shadow-lg hover:shadow-xl transition-all z-50 p-0 overflow-hidden border-2 border-primary/30 hover:border-primary/60"
-        >
-          <img src={chatBotAvatar} alt="Chat with us" className="h-full w-full object-cover" />
-        </button>
+        <div className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 z-50 flex flex-col items-end gap-2">
+          {/* Label bubble */}
+          <div className="bg-foreground text-background text-xs font-medium px-3 py-1.5 rounded-full shadow-md animate-bounce-gentle flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            Chat with us
+          </div>
+          
+          {/* Bot avatar button */}
+          <button
+            onClick={() => setIsOpen(true)}
+            className="group relative h-14 w-14 sm:h-16 sm:w-16 rounded-full shadow-lg hover:shadow-xl transition-all p-0 overflow-hidden border-2 border-primary/30 hover:border-primary/60 hover:scale-105"
+          >
+            <img src={chatBotAvatar} alt="Chat with us" className="h-full w-full object-cover" />
+            {/* Pulse ring */}
+            <span className="absolute inset-0 rounded-full border-2 border-primary/40 animate-ping opacity-30 pointer-events-none"></span>
+          </button>
+        </div>
       )}
 
       {/* Chat Window */}
