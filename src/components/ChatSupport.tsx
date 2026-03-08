@@ -272,12 +272,12 @@ export function ChatSupport() {
     <>
       {/* Chat Button */}
       {!isOpen && (
-        <Button
+        <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-lg hover:shadow-xl transition-all z-50 bg-primary/70 hover:bg-primary/90 backdrop-blur-sm p-0"
+          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 h-14 w-14 sm:h-16 sm:w-16 rounded-full shadow-lg hover:shadow-xl transition-all z-50 p-0 overflow-hidden border-2 border-primary/30 hover:border-primary/60"
         >
-          <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
-        </Button>
+          <img src={chatBotAvatar} alt="Chat with us" className="h-full w-full object-cover" />
+        </button>
       )}
 
       {/* Chat Window */}
