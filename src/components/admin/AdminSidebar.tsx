@@ -16,7 +16,8 @@ import {
   Building2,
   Landmark,
   BadgeCheck,
-  ShieldAlert
+  ShieldAlert,
+  CheckCircle
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +57,7 @@ export function AdminSidebar() {
   const [pendingWithdrawals, setPendingWithdrawals] = useState(0);
   const [pendingCallbacks, setPendingCallbacks] = useState(0);
   const [pendingVerifications, setPendingVerifications] = useState(0);
+  const [pendingPayoutApprovals, setPendingPayoutApprovals] = useState(0);
 
   useEffect(() => {
     fetchPendingCounts();
@@ -83,10 +85,16 @@ export function AdminSidebar() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
 
+    const { count: payoutApprovalsCount } = await supabase
+      .from('payout_approval_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
     setPendingKyc(kycCount || 0);
     setPendingWithdrawals(withdrawalsCount || 0);
     setPendingCallbacks(callbacksCount || 0);
     setPendingVerifications(verificationsCount || 0);
+    setPendingPayoutApprovals(payoutApprovalsCount || 0);
   };
 
   const mainMenuItems: MenuItem[] = [
@@ -124,6 +132,12 @@ export function AdminSidebar() {
       url: "/admin/withdrawals", 
       icon: DollarSign,
       badge: pendingWithdrawals > 0 ? pendingWithdrawals : null
+    },
+    {
+      title: "Payout Approvals",
+      url: "/admin/payout-approvals",
+      icon: CheckCircle,
+      badge: pendingPayoutApprovals > 0 ? pendingPayoutApprovals : null
     },
     { title: "Commission Analytics", url: "/admin/commission-analytics", icon: TrendingUp },
     { title: "Financial Ledger", url: "/admin/ledger", icon: Landmark },

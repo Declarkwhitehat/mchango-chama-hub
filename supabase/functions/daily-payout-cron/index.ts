@@ -614,13 +614,113 @@ Deno.serve(async (req) => {
           );
 
           if (!nextEligible) {
-            // Already claimed above, just update metadata
+            // No eligible member found — create admin approval request
+            console.log(`⚠️ No eligible member for payout in ${chama.name} cycle #${cycle.cycle_number}. Creating admin approval request.`);
+
+            // Gather all members with eligibility info for admin context
+            const { data: allMembers } = await supabase
+              .from('chama_members')
+              .select('id, member_code, order_index, missed_payments_count, user_id, was_skipped, profiles!chama_members_user_id_fkey(full_name)')
+              .eq('chama_id', chama.id)
+              .eq('status', 'active')
+              .eq('approval_status', 'approved')
+              .order('order_index');
+
+            const ineligibleDetails: any[] = [];
+            for (const m of (allMembers || [])) {
+              const elig = await checkMemberEligibility(supabase, m.id, chama.id, chama.contribution_amount, m.order_index);
+              if (!elig.isEligible) {
+                ineligibleDetails.push({
+                  member_id: m.id,
+                  member_code: m.member_code,
+                  name: m.profiles?.full_name || 'Unknown',
+                  unpaid_cycles: elig.unpaidCycles,
+                  shortfall: elig.shortfall,
+                  has_debts: elig.hasDebts,
+                  missed_payments: m.missed_payments_count || 0,
+                });
+              }
+            }
+
+            // Get pool balance for payout amount
+            const { data: chamaPoolForApproval } = await supabase
+              .from('chama')
+              .select('available_balance')
+              .eq('id', chama.id)
+              .single();
+
+            const approvalPayoutAmount = chamaPoolForApproval?.available_balance || 0;
+
+            // Create the approval request
+            const { data: approvalReq, error: approvalError } = await supabase
+              .from('payout_approval_requests')
+              .insert({
+                chama_id: chama.id,
+                cycle_id: cycle.id,
+                scheduled_beneficiary_id: scheduledBeneficiary.id,
+                payout_amount: approvalPayoutAmount,
+                reason: `No eligible beneficiary found for Cycle #${cycle.cycle_number}. Scheduled beneficiary (${scheduledBeneficiary.member_code}) and all subsequent members are ineligible. ${ineligibleDetails.length} member(s) have outstanding issues.`,
+                ineligible_members: ineligibleDetails,
+                status: 'pending',
+              })
+              .select('id')
+              .single();
+
+            if (approvalError) {
+              if (approvalError.code === '23505') {
+                console.log(`ℹ️ Approval request already exists for cycle ${cycle.id}`);
+              } else {
+                console.error('Error creating approval request:', approvalError);
+              }
+            } else {
+              console.log(`📋 Admin approval request created: ${approvalReq?.id}`);
+
+              // Notify admins
+              const { data: adminUsers } = await supabase
+                .from('user_roles')
+                .select('user_id')
+                .eq('role', 'admin');
+
+              for (const admin of (adminUsers || [])) {
+                await supabase.from('notifications').insert({
+                  user_id: admin.user_id,
+                  title: 'Payout Approval Required',
+                  message: `Chama "${chama.name}" Cycle #${cycle.cycle_number}: No eligible beneficiary found. ${ineligibleDetails.length} member(s) ineligible. Available balance: KES ${approvalPayoutAmount.toFixed(2)}. Please review and assign a beneficiary.`,
+                  type: 'warning',
+                  category: 'admin',
+                  related_entity_id: chama.id,
+                  related_entity_type: 'chama',
+                });
+              }
+
+              // Notify chama manager
+              const { data: managers } = await supabase
+                .from('chama_members')
+                .select('user_id')
+                .eq('chama_id', chama.id)
+                .eq('is_manager', true)
+                .eq('status', 'active');
+
+              for (const mgr of (managers || [])) {
+                await supabase.from('notifications').insert({
+                  user_id: mgr.user_id,
+                  title: 'Payout Review Pending',
+                  message: `Your chama "${chama.name}" Cycle #${cycle.cycle_number} payout is pending admin review. No eligible member was found automatically.`,
+                  type: 'info',
+                  category: 'chama',
+                  related_entity_id: chama.id,
+                  related_entity_type: 'chama',
+                });
+              }
+            }
+
+            // Still update cycle metadata
             await supabase
               .from('contribution_cycles')
               .update({
                 payout_amount: 0,
-                payout_type: 'none',
-                members_skipped_count: 1
+                payout_type: 'pending_approval',
+                members_skipped_count: ineligibleDetails.length
               })
               .eq('id', cycle.id);
 
