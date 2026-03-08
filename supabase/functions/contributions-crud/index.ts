@@ -302,7 +302,7 @@ async function settleDebts(
         description: `Net from Cycle #${cycleNum} principal to original recipient`
       });
 
-      // Mark deficit as PAID if principal fully cleared and penalty cleared
+      // Mark deficit as PAID and DISBURSE funds to shortchanged recipient
       const newPenaltyRemaining = debtUpdates.penalty_remaining ?? debt.penalty_remaining;
       const newPrincipalRemaining = debtUpdates.principal_remaining;
       const isDebtCleared = newPrincipalRemaining <= 0 && newPenaltyRemaining <= 0;
@@ -313,7 +313,124 @@ async function settleDebts(
           paid_at: new Date().toISOString()
         }).eq('id', deficitRecord.id);
 
-        console.log(`✅ Deficit ${deficitRecord.id} marked PAID — KES ${netToRecipient.toFixed(2)} routed to original recipient`);
+        console.log(`✅ Deficit ${deficitRecord.id} marked PAID — KES ${netToRecipient.toFixed(2)} to be disbursed to recipient`);
+
+        // ===== DEFICIT DISBURSEMENT: Actually send money to shortchanged recipient =====
+        if (netToRecipient > 0 && deficitRecord.recipient_member_id) {
+          try {
+            // Get recipient's user_id and payment method
+            const { data: recipientMember } = await supabase
+              .from('chama_members')
+              .select('user_id, member_code')
+              .eq('id', deficitRecord.recipient_member_id)
+              .single();
+
+            if (recipientMember?.user_id) {
+              const { data: recipientPaymentMethod } = await supabase
+                .from('payment_methods')
+                .select('id, method_type, phone_number')
+                .eq('user_id', recipientMember.user_id)
+                .eq('is_default', true)
+                .maybeSingle();
+
+              if (recipientPaymentMethod) {
+                const canAutoApprove = recipientPaymentMethod.method_type === 'mpesa';
+
+                // Create withdrawal for deficit settlement
+                const { data: deficitWithdrawal, error: defWithdrawErr } = await supabase
+                  .from('withdrawals')
+                  .insert({
+                    chama_id: chamaId,
+                    requested_by: recipientMember.user_id,
+                    amount: principalPay,
+                    commission_amount: commission,
+                    net_amount: netToRecipient,
+                    status: canAutoApprove ? 'approved' : 'pending',
+                    payment_method_id: recipientPaymentMethod.id,
+                    payment_method_type: recipientPaymentMethod.method_type,
+                    notes: `Deficit settlement: Cycle #${cycleNum} late payment received. Net KES ${netToRecipient.toFixed(2)} to ${recipientMember.member_code}`,
+                    requested_at: new Date().toISOString(),
+                    b2c_attempt_count: 0,
+                    ...(canAutoApprove ? { reviewed_at: new Date().toISOString() } : {})
+                  })
+                  .select('id')
+                  .single();
+
+                if (deficitWithdrawal && !defWithdrawErr) {
+                  // Record in financial_ledger
+                  await supabase.from('financial_ledger').insert({
+                    transaction_type: 'deficit_settlement',
+                    source_type: 'chama',
+                    source_id: chamaId,
+                    gross_amount: principalPay,
+                    commission_amount: commission,
+                    net_amount: netToRecipient,
+                    commission_rate: ONTIME_RATE,
+                    reference_id: deficitWithdrawal.id,
+                    description: `Deficit settlement: Cycle #${cycleNum} → ${recipientMember.member_code}. Debt ${debt.id} cleared.`
+                  });
+
+                  // Audit log
+                  await supabase.from('audit_logs').insert({
+                    action: 'DEFICIT_SETTLED',
+                    table_name: 'withdrawals',
+                    record_id: deficitWithdrawal.id,
+                    new_values: {
+                      deficit_id: deficitRecord.id,
+                      debt_id: debt.id,
+                      recipient: recipientMember.member_code,
+                      net_amount: netToRecipient,
+                      cycle_number: cycleNum
+                    }
+                  });
+
+                  // Trigger B2C payout if auto-approved
+                  if (canAutoApprove && recipientPaymentMethod.phone_number) {
+                    try {
+                      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+                      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+                      await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          withdrawal_id: deficitWithdrawal.id,
+                          phone_number: recipientPaymentMethod.phone_number,
+                          amount: netToRecipient
+                        })
+                      });
+                      console.log(`✅ B2C initiated for deficit settlement: KES ${netToRecipient.toFixed(2)} to ${recipientMember.member_code}`);
+                    } catch (b2cErr: any) {
+                      console.error(`⚠️ B2C error for deficit settlement:`, b2cErr);
+                      await supabase.from('withdrawals').update({
+                        status: 'pending_retry',
+                        b2c_attempt_count: 1,
+                        last_b2c_attempt_at: new Date().toISOString(),
+                        b2c_error_details: { error: b2cErr.message }
+                      }).eq('id', deficitWithdrawal.id);
+                    }
+                  }
+
+                  // Notify recipient
+                  await supabase.from('notifications').insert({
+                    user_id: recipientMember.user_id,
+                    title: 'Deficit Payment Received',
+                    message: `A late payment has been received! KES ${netToRecipient.toFixed(2)} from Cycle #${cycleNum} is being sent to you.`,
+                    type: 'info',
+                    category: 'chama',
+                    related_entity_id: chamaId,
+                    related_entity_type: 'chama'
+                  });
+                } else if (defWithdrawErr) {
+                  console.error(`Error creating deficit withdrawal:`, defWithdrawErr);
+                }
+              } else {
+                console.warn(`No payment method for deficit recipient ${recipientMember.member_code}`);
+              }
+            }
+          } catch (disbursementErr: any) {
+            console.error(`Error in deficit disbursement:`, disbursementErr);
+          }
+        }
       }
 
       if (isDebtCleared) periodsCleared++;
