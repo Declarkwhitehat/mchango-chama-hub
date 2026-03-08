@@ -253,8 +253,13 @@ export function PaymentCountdownTimer({
           {/* Payment Info */}
           <div className="text-center space-y-1">
             <p className="text-lg font-semibold">
-              Pay KES {contributionAmount.toLocaleString()}
+              Pay KES {(totalPayable || contributionAmount).toLocaleString()}
             </p>
+            {totalPayable && totalPayable > contributionAmount && (
+              <p className="text-xs text-destructive">
+                Includes KES {(totalPayable - contributionAmount).toLocaleString()} outstanding debt
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">
               Today's beneficiary: <span className="font-medium text-foreground">{beneficiaryName}</span>
             </p>
