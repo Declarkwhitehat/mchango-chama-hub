@@ -453,7 +453,7 @@ export const WithdrawalsManagement = () => {
                   <div>
                     <Label className="text-muted-foreground">Type</Label>
                     <p className="font-medium">
-                      {selectedWithdrawal.chama_id ? 'Chama' : 'Mchango'}
+                      {selectedWithdrawal.chama_id ? 'Chama' : selectedWithdrawal.mchango_id ? 'Mchango' : selectedWithdrawal.welfare_id ? 'Welfare' : selectedWithdrawal.organization_id ? 'Organization' : 'Unknown'}
                     </p>
                   </div>
                   <div>
