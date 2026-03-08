@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Languages } from 'lucide-react';
+import { MessageCircle, X, Languages, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import chatBotAvatar from '@/assets/chat-bot-avatar.png';
 import { ChatMessage } from './ChatMessage';
 import { CallbackForm } from './CallbackForm';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -271,38 +272,51 @@ export function ChatSupport() {
     <>
       {/* Chat Button */}
       {!isOpen && (
-        <Button
+        <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-lg hover:shadow-xl transition-all z-50 bg-primary/70 hover:bg-primary/90 backdrop-blur-sm p-0"
+          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 h-14 w-14 sm:h-16 sm:w-16 rounded-full shadow-lg hover:shadow-xl transition-all z-50 p-0 overflow-hidden border-2 border-primary/30 hover:border-primary/60"
         >
-          <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
-        </Button>
+          <img src={chatBotAvatar} alt="Chat with us" className="h-full w-full object-cover" />
+        </button>
       )}
 
       {/* Chat Window */}
       {isOpen && (
         <Card className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-[calc(100vw-1rem)] max-md:h-[calc(100vh-1rem)] max-md:bottom-0 max-md:right-0 max-md:rounded-none">
           {/* Header */}
-          <div className="p-3 border-b bg-primary text-primary-foreground rounded-t-lg space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MessageCircle className="h-4 w-4" />
-                <h3 className="font-semibold text-sm">AI Assistant</h3>
-              </div>
+          <div className="border-b bg-primary text-primary-foreground rounded-t-lg max-md:rounded-none">
+            {/* Top bar with back/close */}
+            <div className="flex items-center justify-between px-3 pt-2 pb-1">
               <button
                 onClick={() => setIsOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg bg-white/10 hover:bg-white/25 active:bg-white/30 transition-colors touch-manipulation"
+                className="flex items-center gap-1 px-2 py-2 min-h-[44px] rounded-lg hover:bg-white/15 active:bg-white/25 transition-colors touch-manipulation"
                 aria-label="Close chat"
               >
-                <span className="text-xs text-primary-foreground/80 font-medium">
-                  Close
-                </span>
+                <ArrowLeft className="h-5 w-5" />
+                <span className="text-sm font-medium">Back</span>
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-white/15 active:bg-white/25 transition-colors touch-manipulation"
+                aria-label="Close chat"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
             
+            {/* Bot identity */}
+            <div className="flex items-center gap-3 px-4 pb-2">
+              <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-white/30 flex-shrink-0">
+                <img src={chatBotAvatar} alt="AI Assistant" className="h-full w-full object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm">AI Assistant</h3>
+                <p className="text-xs text-primary-foreground/70">Online • Ready to help</p>
+              </div>
+            </div>
+            
             {/* Language Selector */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-4 pb-2">
               <Languages className="h-3 w-3" />
               <Select value={language} onValueChange={handleLanguageChange}>
                 <SelectTrigger className="h-7 w-[100px] bg-primary-foreground text-primary border-0 text-xs">

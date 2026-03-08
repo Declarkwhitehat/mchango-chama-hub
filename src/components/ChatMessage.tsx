@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { User, FileDown } from 'lucide-react';
-import declarkAvatar from '@/assets/declark-chacha-avatar.png';
+import chatBotAvatar from '@/assets/chat-bot-avatar.png';
 import { Button } from './ui/button';
 
 interface Message {
@@ -35,8 +35,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <User className="h-4 w-4" />
         ) : (
           <img 
-            src={declarkAvatar} 
-            alt="Declark Chacha" 
+            src={chatBotAvatar} 
+            alt="AI Assistant" 
             className="h-full w-full object-cover"
           />
         )}
