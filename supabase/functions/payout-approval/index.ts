@@ -492,3 +492,139 @@ async function handleReject(supabase: any, body: any) {
 
   return jsonResponse({ success: true });
 }
+
+// ========== GET MEMBER PROFILE (cross-platform) ==========
+async function handleGetMemberProfile(supabase: any, body: any) {
+  const { userId } = body;
+  if (!userId) return jsonResponse({ error: 'userId required' }, 400);
+
+  // Get profile
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, full_name, phone, email, kyc_status, created_at')
+    .eq('id', userId)
+    .single();
+
+  // Chama memberships with payment stats
+  const { data: chamaMemberships } = await supabase
+    .from('chama_members')
+    .select(`
+      id, member_code, order_index, is_manager, status, approval_status, 
+      total_contributed, missed_payments_count, carry_forward_credit, balance_deficit,
+      joined_at, first_payment_completed,
+      chama:chama!chama_members_chama_id_fkey(id, name, group_code, contribution_amount, status, contribution_frequency)
+    `)
+    .eq('user_id', userId)
+    .neq('status', 'removed')
+    .order('joined_at', { ascending: false });
+
+  // For each chama, get payment success rate
+  const chamaDetails = [];
+  for (const cm of (chamaMemberships || [])) {
+    const { data: payments } = await supabase
+      .from('member_cycle_payments')
+      .select('id, fully_paid, is_late_payment')
+      .eq('member_id', cm.id);
+
+    const total = payments?.length || 0;
+    const paid = payments?.filter((p: any) => p.fully_paid)?.length || 0;
+    const late = payments?.filter((p: any) => p.is_late_payment)?.length || 0;
+    const successRate = total > 0 ? Math.round((paid / total) * 100) : 100;
+
+    chamaDetails.push({
+      chama_name: cm.chama?.name,
+      group_code: cm.chama?.group_code,
+      chama_status: cm.chama?.status,
+      contribution_amount: cm.chama?.contribution_amount,
+      frequency: cm.chama?.contribution_frequency,
+      role: cm.is_manager ? 'Manager' : 'Member',
+      member_status: cm.status,
+      member_code: cm.member_code,
+      position: cm.order_index,
+      total_contributed: cm.total_contributed || 0,
+      missed_payments: cm.missed_payments_count || 0,
+      late_payments: late,
+      total_cycles: total,
+      paid_cycles: paid,
+      success_rate: successRate,
+      balance_deficit: cm.balance_deficit || 0,
+      carry_forward: cm.carry_forward_credit || 0,
+      joined_at: cm.joined_at,
+    });
+  }
+
+  // Welfare memberships
+  const { data: welfareMemberships } = await supabase
+    .from('welfare_members')
+    .select(`
+      id, role, status, member_code, created_at,
+      welfare:welfares!welfare_members_welfare_id_fkey(id, name, group_code, status)
+    `)
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  const welfareDetails = (welfareMemberships || []).map((wm: any) => ({
+    welfare_name: wm.welfare?.name,
+    group_code: wm.welfare?.group_code,
+    status: wm.welfare?.status,
+    role: wm.role,
+    member_code: wm.member_code,
+    joined_at: wm.created_at,
+  }));
+
+  // Mchango campaigns (as creator or manager)
+  const { data: mchangoCreated } = await supabase
+    .from('mchango')
+    .select('id, title, group_code, status, target_amount, current_amount, created_at')
+    .eq('created_by', userId);
+
+  const { data: mchangoManaged } = await supabase
+    .from('mchango')
+    .select('id, title, group_code, status, target_amount, current_amount')
+    .contains('managers', [userId]);
+
+  // Combine and deduplicate
+  const allMchangos = new Map();
+  for (const m of (mchangoCreated || [])) {
+    allMchangos.set(m.id, { ...m, role: 'Creator' });
+  }
+  for (const m of (mchangoManaged || [])) {
+    if (!allMchangos.has(m.id)) {
+      allMchangos.set(m.id, { ...m, role: 'Manager' });
+    }
+  }
+
+  const campaignDetails = Array.from(allMchangos.values()).map((m: any) => ({
+    title: m.title,
+    group_code: m.group_code,
+    status: m.status,
+    role: m.role,
+    target_amount: m.target_amount,
+    current_amount: m.current_amount,
+  }));
+
+  // Trust score
+  const { data: trustData } = await supabase
+    .from('member_trust_scores')
+    .select('trust_score, total_on_time_payments, total_late_payments, total_missed_payments, total_chamas_completed')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return jsonResponse({
+    profile,
+    chamas: chamaDetails,
+    welfares: welfareDetails,
+    campaigns: campaignDetails,
+    trust: trustData || null,
+    summary: {
+      total_chamas: chamaDetails.length,
+      active_chamas: chamaDetails.filter(c => c.chama_status === 'active').length,
+      total_welfares: welfareDetails.length,
+      total_campaigns: campaignDetails.length,
+      manager_roles: chamaDetails.filter(c => c.role === 'Manager').length,
+      overall_success_rate: chamaDetails.length > 0
+        ? Math.round(chamaDetails.reduce((sum, c) => sum + c.success_rate, 0) / chamaDetails.length)
+        : 100,
+    },
+  });
+}
