@@ -365,6 +365,15 @@ Deno.serve(async (req) => {
       removalTargetIndex: 9, // Member 10
     }));
 
+    // ===== SCENARIO 11: E2E Auto-Payout via B2C =====
+    report.scenarios.push(await runScenarioE2EAutoPayout(supabase, profiles, {
+      name: '11. E2E Auto-Payout — B2C Triggered for Perfect Member',
+      description: 'All 30 pay on time, beneficiary has 0 missed payments + M-Pesa method → daily-payout-cron creates approved withdrawal + calls B2C',
+      memberCount: 30,
+      contribution: CONTRIBUTION,
+      commissionRate: COMMISSION_RATE,
+    }));
+
     // Summary
     report.summary.total = report.scenarios.length;
     report.summary.passed = report.scenarios.filter(s => s.passed).length;
