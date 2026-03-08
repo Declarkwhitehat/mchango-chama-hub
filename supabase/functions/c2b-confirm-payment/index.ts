@@ -130,7 +130,7 @@ serve(async (req) => {
           amount: grossAmount,
           payment_reference: mpesaReceiptNumber,
           status: 'completed',
-          payment_notes: `Offline payment via till number. Payer: ${firstName} ${middleName || ''} ${lastName}. Phone: ${phoneNumber}`,
+          payment_notes: `Offline payment via till number. Payer: ${[firstName, middleName, lastName].filter(Boolean).join(' ')}. Phone: ${phoneNumber}`,
         })
         .select()
         .single();
@@ -390,7 +390,7 @@ serve(async (req) => {
       const netAmount = grossAmount - commissionAmount;
 
       // Create donor display name
-      const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+      const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'Anonymous';
 
       // Record mchango donation with full financial tracking
       const { data: donation, error: donationError } = await supabase
@@ -508,7 +508,7 @@ serve(async (req) => {
       const netAmount = grossAmount - commissionAmount;
 
       // Use the payer's real name from M-Pesa
-      const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+      const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'Anonymous';
 
       // Record organization donation
       const { data: donation, error: donationError } = await supabase
@@ -624,7 +624,7 @@ serve(async (req) => {
       const commissionAmount = Math.round(grossAmount * commissionRate * 100) / 100;
       const netAmount = Math.round((grossAmount - commissionAmount) * 100) / 100;
 
-      const displayName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+      const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'Anonymous';
       const cycleMonth = new Date().toISOString().substring(0, 7);
 
       // Try to find welfare member by matching phone number in profiles
