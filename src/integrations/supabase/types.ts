@@ -1968,6 +1968,9 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          deletion_reason: string | null
           email: string
           email_verified: boolean | null
           full_name: string
@@ -1991,6 +1994,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deletion_reason?: string | null
           email: string
           email_verified?: boolean | null
           full_name: string
@@ -2014,6 +2020,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deletion_reason?: string | null
           email?: string
           email_verified?: boolean | null
           full_name?: string
