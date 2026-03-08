@@ -178,7 +178,7 @@ export const Header = () => {
                   Login
                 </Button>
                 <Button 
-                  onClick={() => navigate('/auth')}
+                  onClick={() => navigate('/auth?tab=signup')}
                   className="gap-2"
                 >
                   <UserPlus className="h-4 w-4" />
@@ -332,7 +332,7 @@ export const Header = () => {
                   </Button>
                   <Button 
                     onClick={() => {
-                      navigate('/auth');
+                      navigate('/auth?tab=signup');
                       setMobileMenuOpen(false);
                     }}
                     className="w-full justify-start gap-2"
