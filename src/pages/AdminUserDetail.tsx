@@ -1083,23 +1083,45 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
               </AlertDialogTitle>
               <AlertDialogDescription className="space-y-4">
                 <p>
-                  This will permanently delete <strong>{user.full_name}</strong>'s account, 
-                  profile, memberships, and all associated data. This action cannot be undone.
+                  This will delete <strong>{user.full_name}</strong>'s account. 
+                  The account will remain visible for <strong>45 days</strong> before permanent removal. 
+                  You can restore it during that period.
                 </p>
-                <div className="space-y-2">
-                  <Input
-                    type="password"
-                    placeholder="Enter privilege code to confirm"
-                    value={deletePrivilegeCode}
-                    onChange={(e) => {
-                      setDeletePrivilegeCode(e.target.value);
-                      setDeleteCodeError(false);
-                    }}
-                    className={deleteCodeError ? "border-destructive" : ""}
-                  />
-                  {deleteCodeError && (
-                    <p className="text-sm text-destructive">Invalid privilege code</p>
-                  )}
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Type the user's full name to confirm:</p>
+                    <p className="text-sm text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
+                      {user.full_name}
+                    </p>
+                    <Input
+                      placeholder="Type full name exactly as shown above"
+                      value={deleteConfirmName}
+                      onChange={(e) => {
+                        setDeleteConfirmName(e.target.value);
+                        setDeleteNameError(false);
+                      }}
+                      className={deleteNameError ? "border-destructive" : ""}
+                    />
+                    {deleteNameError && (
+                      <p className="text-sm text-destructive">Name does not match</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Enter privilege code:</p>
+                    <Input
+                      type="password"
+                      placeholder="Enter privilege code"
+                      value={deletePrivilegeCode}
+                      onChange={(e) => {
+                        setDeletePrivilegeCode(e.target.value);
+                        setDeleteCodeError(false);
+                      }}
+                      className={deleteCodeError ? "border-destructive" : ""}
+                    />
+                    {deleteCodeError && (
+                      <p className="text-sm text-destructive">Invalid privilege code</p>
+                    )}
+                  </div>
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -1107,11 +1129,11 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDeleteUser}
-                disabled={!deletePrivilegeCode || deletingUser}
+                disabled={!deletePrivilegeCode || !deleteConfirmName || deletingUser}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {deletingUser ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                Delete User Permanently
+                Delete User
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
