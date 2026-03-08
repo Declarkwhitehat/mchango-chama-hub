@@ -98,9 +98,6 @@ const ChamaDetail = () => {
   const [isStarting, setIsStarting] = useState(false);
   const [memberPaymentStatuses, setMemberPaymentStatuses] = useState<Record<string, boolean>>({});
   const [memberTrustScores, setMemberTrustScores] = useState<Record<string, number>>({});
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simResults, setSimResults] = useState<any>(null);
-  const [showSimDialog, setShowSimDialog] = useState(false);
 
   useEffect(() => {
     loadChama();
