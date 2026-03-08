@@ -782,12 +782,12 @@ serve(async (req) => {
           return new Response(JSON.stringify({ message: 'M-Pesa retry initiated successfully', data: b2cResult }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
-        } catch (err: any) {
+        } catch (err) {
           await supabaseAdmin.from('withdrawals').update({
             status: 'pending_retry',
-            notes: (retryWd.notes || '') + `\n[ADMIN] Retry exception: ${err.message}`,
+            notes: (retryWd.notes || '') + `\n[ADMIN] Retry exception: ${(err as any).message}`,
           }).eq('id', withdrawal_id);
-          return new Response(JSON.stringify({ error: 'Retry failed', message: err.message }), {
+          return new Response(JSON.stringify({ error: 'Retry failed', message: (err as any).message }), {
             status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
