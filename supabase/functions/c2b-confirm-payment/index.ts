@@ -53,13 +53,17 @@ serve(async (req) => {
     console.log(`Original account: "${accountNumber}" -> Normalized: "${upperAccountNumber}"`);
 
     // Check for duplicate payment (same M-Pesa receipt number) across all tables
+    // CRITICAL: Also check contributions.mpesa_receipt_number because STK payments store
+    // the CheckoutRequestID as payment_reference, not the M-Pesa receipt number
     const [
       { data: existingContribution },
+      { data: existingContributionByReceipt },
       { data: existingDeposit },
       { data: existingDonation },
       { data: existingWelfareContrib }
     ] = await Promise.all([
       supabase.from('contributions').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
+      supabase.from('contributions').select('id').eq('mpesa_receipt_number', mpesaReceiptNumber).maybeSingle(),
       supabase.from('saving_deposits').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
       supabase.from('mchango_donations').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
       supabase.from('welfare_contributions').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
