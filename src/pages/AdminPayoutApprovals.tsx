@@ -85,6 +85,8 @@ export default function AdminPayoutApprovals() {
   const [processing, setProcessing] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [memberProfile, setMemberProfile] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
   useEffect(() => {
     fetchRequests();
