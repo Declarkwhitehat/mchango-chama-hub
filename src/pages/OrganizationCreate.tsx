@@ -166,6 +166,19 @@ const OrganizationCreate = () => {
         return `ORG-${code}`;
       };
 
+      // Check for duplicate organization name
+      const { data: existingOrg } = await supabase
+        .from('organizations')
+        .select('id')
+        .ilike('name', name.trim())
+        .maybeSingle();
+
+      if (existingOrg) {
+        toast.error("An organization with this name already exists. Please choose a different name.");
+        setIsLoading(false);
+        return;
+      }
+
       const organizationData = {
         name,
         slug,

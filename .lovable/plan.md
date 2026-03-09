@@ -1,46 +1,35 @@
 
 
-## Plan: Enforce Unique Names Across Chama, Mchango, Organizations, and Welfares
+## Diagnosis
 
-### Problem
-Currently, multiple chamas, campaigns, organizations, or welfares can share the same name. Only slugs are unique (via random suffixes). This causes confusion for users.
+The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
 
-### Solution
-Add unique name validation in both the edge functions (server-side) and the frontend create forms (client-side) for all four entity types.
+1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
+2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
+3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
+4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
 
-### Database Changes
-Add unique constraints on the `name` column (case-insensitive) for each table:
+There are 3 total stuck withdrawals across the system with the same pattern.
 
-**Migration SQL:**
-```sql
-CREATE UNIQUE INDEX unique_chama_name ON public.chama (lower(trim(name)));
-CREATE UNIQUE INDEX unique_mchango_name ON public.mchango (lower(trim(title)));
-CREATE UNIQUE INDEX unique_organization_name ON public.organizations (lower(trim(name)));
-CREATE UNIQUE INDEX unique_welfare_name ON public.welfares (lower(trim(name)));
-```
+## Root Cause
 
-### Edge Function Changes (4 files)
-Add a duplicate name check before INSERT in each CRUD function, returning a clear error message like `"A chama with this name already exists. Please choose a different name."`:
+The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
 
-1. **`supabase/functions/chama-crud/index.ts`** — Check `chama.name` before insert
-2. **`supabase/functions/mchango-crud/index.ts`** — Check `mchango.title` before insert
-3. **`supabase/functions/welfare-crud/index.ts`** — Check `welfares.name` before insert
-4. Organization creation (need to identify the handler — likely inline in a page or separate function)
+## Fix Plan
 
-### Frontend Changes (4 create pages)
-Add user-friendly error display when the server returns a duplicate name error:
+### 1. Manually complete stuck withdrawal via RPC
+Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
 
-1. **`src/pages/ChamaCreate.tsx`** — Already shows `error.message` in toast
-2. **`src/pages/MchangoCreate.tsx`** — Same pattern
-3. **`src/pages/WelfareCreate.tsx`** — Same pattern  
-4. **`src/pages/OrganizationCreate.tsx`** — Same pattern
+Also complete `e2ea0312` (KES 10) which has the same pattern.
 
-The existing toast error handling in all four forms will automatically surface the server error messages, so minimal frontend changes are needed beyond ensuring the error messages are clear.
+### 2. Fix retry-failed-payouts to query status before re-sending
+Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
 
-### How It Works
-1. User enters a name like "Tumaini Savings Group"
-2. Edge function queries `SELECT 1 FROM chama WHERE lower(trim(name)) = lower(trim($input))`
-3. If found → returns 400 with `"A chama with this name already exists. Please choose a different name."`
-4. If not found → proceeds with creation as normal
-5. Database unique index acts as a safety net for race conditions
+### 3. Add a "check status" path in withdrawals-crud
+Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
+
+### Files to Change
+- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
+- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
+- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
 

@@ -482,6 +482,20 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      // Check for duplicate name
+      const { data: existingChama } = await supabaseAdmin
+        .from('chama')
+        .select('id')
+        .ilike('name', body.name.trim())
+        .maybeSingle();
+
+      if (existingChama) {
+        return new Response(JSON.stringify({ error: 'A chama with this name already exists. Please choose a different name.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       const base = (body.slug || body.name).toString().trim();
       // Generate unique slug by appending random string
       const randomSuffix = Math.random().toString(36).substring(2, 8);

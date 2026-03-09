@@ -104,6 +104,17 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Name must be at least 3 characters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      // Check for duplicate name
+      const { data: existingWelfare } = await supabaseAdmin
+        .from('welfares')
+        .select('id')
+        .ilike('name', name.trim())
+        .maybeSingle();
+
+      if (existingWelfare) {
+        return new Response(JSON.stringify({ error: 'A welfare group with this name already exists. Please choose a different name.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       const slug = name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/-+$/, '') + '-' + Math.random().toString(36).substring(2, 6);
 
       // Use supabaseAdmin to bypass RLS KYC requirement

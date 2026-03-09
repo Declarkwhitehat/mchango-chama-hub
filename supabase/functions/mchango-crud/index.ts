@@ -179,6 +179,20 @@ serve(async (req) => {
         );
       }
 
+      // Check for duplicate title
+      const { data: existingMchango } = await supabaseClient
+        .from('mchango')
+        .select('id')
+        .ilike('title', body.title.trim())
+        .maybeSingle();
+
+      if (existingMchango) {
+        return new Response(
+          JSON.stringify({ error: 'A campaign with this title already exists. Please choose a different title.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Generate slug from title
       let slug = body.slug || body.title
         .toLowerCase()
