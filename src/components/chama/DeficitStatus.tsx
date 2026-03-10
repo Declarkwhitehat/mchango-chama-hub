@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Clock, TrendingDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDate } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Deficit {
