@@ -81,11 +81,6 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
         {debts.map(debt => {
           const cycleNum = (debt.cycle as any)?.cycle_number;
           const totalOwed = debt.principal_remaining + debt.penalty_remaining;
-          // Late payments use 10% commission rate; the penalty_remaining IS the extra 5% commission
-          // Total gross = principal + penalty, where penalty = principal * 0.10 (late commission)
-          // 10% commission goes to platform, 90% net goes to the shortchanged recipient
-          const lateCommission = debt.penalty_remaining; // 10% commission on late payment
-          const netToRecipient = debt.principal_remaining; // net amount goes to the member who was shortchanged
           return (
             <div key={debt.id} className="space-y-1 rounded-md border border-destructive/20 bg-background/60 p-2">
               <div className="flex items-center gap-2 text-sm font-medium text-destructive">
@@ -95,12 +90,12 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
               <div className="ml-6 space-y-0.5 text-sm">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Amount owed to recipient</span>
-                  <span>KES {netToRecipient.toFixed(2)}</span>
+                  <span>KES {debt.principal_remaining.toFixed(2)}</span>
                 </div>
-                {lateCommission > 0 && (
+                {debt.penalty_remaining > 0 && (
                   <div className="flex justify-between text-orange-600 dark:text-orange-400">
-                    <span>10% late commission (to platform)</span>
-                    <span>+ KES {lateCommission.toFixed(2)}</span>
+                    <span>10% late penalty (to platform)</span>
+                    <span>+ KES {debt.penalty_remaining.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-medium text-destructive">
