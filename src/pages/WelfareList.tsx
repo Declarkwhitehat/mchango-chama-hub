@@ -152,7 +152,7 @@ const WelfareList = () => {
                         </div>
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Calendar className="h-3.5 w-3.5" />
-                          {new Date(welfare.created_at).toLocaleDateString()}
+                          {formatDate(welfare.created_at)}
                         </div>
                       </div>
                     </CardContent>

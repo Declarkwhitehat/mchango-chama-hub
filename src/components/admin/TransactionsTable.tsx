@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Download, Search, X, Phone, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDate } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
 interface UnifiedTransaction {

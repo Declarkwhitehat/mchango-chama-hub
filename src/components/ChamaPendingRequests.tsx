@@ -211,7 +211,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
                     </div>
                     <p className="text-sm text-muted-foreground truncate">{email}</p>
                     <p className="text-xs text-muted-foreground">
-                      Requested: {new Date(member.joined_at).toLocaleDateString()}
+                      Requested: {formatDate(member.joined_at)}
                     </p>
                   </div>
                   {isManager && (
