@@ -421,8 +421,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
               <p className="text-sm text-muted-foreground mb-1">Last Payment</p>
               <p className="text-lg font-semibold text-foreground">
                 {member.last_payment_date
-                  ? new Date(member.last_payment_date).toLocaleDateString()
-                  : 'No payments yet'}
+                   ? formatDate(member.last_payment_date)
+                   : 'No payments yet'}
               </p>
             </div>
           </div>
