@@ -178,7 +178,8 @@ export const PreStartDashboard = ({
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>• All approved members will be activated with their payout positions</p>
-          <p>• The first contribution cycle will begin immediately</p>
+          <p>• <strong className="text-foreground">Members get a 24-hour grace period</strong> to prepare their first payment</p>
+          <p>• First payment deadline: <strong className="text-foreground">10:00 PM the next day</strong> after start</p>
           <p>• Members will receive SMS notifications with their contribution schedule</p>
           <p>• The first member in order will receive the pooled contributions after the cycle ends</p>
         </CardContent>
