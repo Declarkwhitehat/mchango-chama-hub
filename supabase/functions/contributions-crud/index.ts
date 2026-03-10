@@ -358,10 +358,10 @@ async function settleDebts(
                         body: JSON.stringify({
                           withdrawal_id: deficitWithdrawal.id,
                           phone_number: recipientPaymentMethod.phone_number,
-                          amount: netToRecipient
+                          amount: principalPay
                         })
                       });
-                      console.log(`✅ B2C initiated for deficit settlement: KES ${netToRecipient.toFixed(2)} to ${recipientMember.member_code}`);
+                      console.log(`✅ B2C initiated for deficit settlement: KES ${principalPay.toFixed(2)} to ${recipientMember.member_code}`);
                     } catch (b2cErr: any) {
                       console.error(`⚠️ B2C error for deficit settlement:`, b2cErr);
                       await supabase.from('withdrawals').update({
