@@ -176,9 +176,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Date</span>
                   <span className="font-medium">
-                    {new Date(removedMember.removed_at).toLocaleDateString('en-US', { 
-                      month: 'short', day: 'numeric', year: 'numeric' 
-                    })}
+                     {formatDate(removedMember.removed_at)}
                   </span>
                 </div>
               )}
