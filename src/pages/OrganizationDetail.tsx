@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatDate } from "@/lib/utils";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -229,10 +230,7 @@ const OrganizationDetail = () => {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">
-                  Since {new Date(organization.created_at).toLocaleDateString('en-US', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                  })}
+                  Since {formatDate(organization.created_at)}
                 </p>
               </div>
             </div>

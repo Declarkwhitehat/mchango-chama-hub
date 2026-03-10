@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatDate } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -154,7 +155,7 @@ export const WithdrawalHistory = ({ chamaId, mchangoId, organizationId }: Withdr
                 <div>
                   <p className="text-muted-foreground">Requested</p>
                   <p className="font-medium">
-                    {new Date(withdrawal.requested_at).toLocaleDateString()}
+                    {formatDate(withdrawal.requested_at)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(withdrawal.requested_at).toLocaleTimeString()}
@@ -165,7 +166,7 @@ export const WithdrawalHistory = ({ chamaId, mchangoId, organizationId }: Withdr
                   <div>
                     <p className="text-muted-foreground">Reviewed</p>
                     <p className="font-medium">
-                      {new Date(withdrawal.reviewed_at).toLocaleDateString()}
+                      {formatDate(withdrawal.reviewed_at)}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(withdrawal.reviewed_at).toLocaleTimeString()}

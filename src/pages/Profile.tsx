@@ -1,4 +1,5 @@
 import { Layout } from "@/components/Layout";
+import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -205,7 +206,7 @@ const Profile = () => {
               </Avatar>
               <div className="space-y-1">
                 <h2 className="text-xl sm:text-2xl font-bold text-foreground break-words">{profile.full_name}</h2>
-                <p className="text-sm sm:text-base text-muted-foreground">Member since {new Date(profile.created_at).toLocaleDateString()}</p>
+                <p className="text-sm sm:text-base text-muted-foreground">Member since {formatDate(profile.created_at)}</p>
               </div>
             </div>
           </CardContent>

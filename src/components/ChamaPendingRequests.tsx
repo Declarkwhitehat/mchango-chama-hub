@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -210,7 +211,7 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
                     </div>
                     <p className="text-sm text-muted-foreground truncate">{email}</p>
                     <p className="text-xs text-muted-foreground">
-                      Requested: {new Date(member.joined_at).toLocaleDateString()}
+                      Requested: {formatDate(member.joined_at)}
                     </p>
                   </div>
                   {isManager && (

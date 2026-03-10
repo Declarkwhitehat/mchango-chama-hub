@@ -5,7 +5,7 @@ import { Loader2, CheckCircle2, XCircle, AlertCircle, Clock, TrendingUp, AlertTr
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import { PaymentCountdownTimer } from "./PaymentCountdownTimer";
 
 
@@ -235,7 +235,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
         endDate={cycleInfo.end_date}
         cutoffHour={22}
         contributionAmount={cycleInfo.due_amount}
-        totalPayable={missedCyclesCount > 0 ? totalOutstanding + cycleInfo.due_amount : undefined}
+        totalPayable={missedCyclesCount > 0 ? totalOutstanding + (cycleInfo.due_amount * 1.05) : cycleInfo.due_amount * 1.05}
         beneficiaryName={cycleInfo.beneficiary_name}
         paidCount={paidCount}
         totalCount={totalCount}
@@ -269,7 +269,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
                       Cycle #{cycle.cycle_number}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {format(new Date(cycle.start_date), 'MMM d')} - {format(new Date(cycle.end_date), 'MMM d, yyyy')}
+                      {formatDate(cycle.start_date)} - {formatDate(cycle.end_date)}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Beneficiary: {cycle.beneficiary_name}
@@ -455,7 +455,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
                       Paid
                       {payment.payment_time && (
                         <span className="ml-1 text-xs">
-                          {format(new Date(payment.payment_time), 'HH:mm')}
+                          {formatDateTime(payment.payment_time).split(' ')[1]}
                         </span>
                       )}
                     </Badge>

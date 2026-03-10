@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatDate } from "@/lib/utils";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -151,7 +152,7 @@ const WelfareList = () => {
                         </div>
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Calendar className="h-3.5 w-3.5" />
-                          {new Date(welfare.created_at).toLocaleDateString()}
+                          {formatDate(welfare.created_at)}
                         </div>
                       </div>
                     </CardContent>

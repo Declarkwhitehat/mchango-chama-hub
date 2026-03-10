@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatDate } from "@/lib/utils";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -257,7 +258,7 @@ const MchangoDetail = () => {
                 />
               </div>
               <CardDescription>
-                Created on {new Date(campaign.created_at).toLocaleDateString()}
+                Created on {formatDate(campaign.created_at)}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

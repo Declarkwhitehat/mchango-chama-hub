@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -157,7 +158,7 @@ export const PreStartDashboard = ({
                       </p>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        Joined {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : 'N/A'}
+                        Joined {member.joined_at ? formatDate(member.joined_at) : 'N/A'}
                       </p>
                     </div>
                   </div>

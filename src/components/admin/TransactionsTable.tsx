@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Download, Search, X, Phone, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDate } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
 interface UnifiedTransaction {
@@ -83,7 +84,7 @@ export const TransactionsTable = () => {
     try {
       const headers = ["Date", "Source", "Entity", "Type", "User", "Phone", "Amount", "Commission", "Net", "Reference", "M-Pesa Receipt", "Status"];
       const rows = filteredTransactions.map((tx) => [
-        new Date(tx.created_at).toLocaleDateString(),
+        formatDate(tx.created_at),
         tx.source,
         tx.source_name,
         tx.transaction_type,
@@ -220,7 +221,7 @@ export const TransactionsTable = () => {
                   return (
                     <TableRow key={`${tx.source}-${tx.id}`}>
                       <TableCell className="text-sm whitespace-nowrap">
-                        {new Date(tx.created_at).toLocaleDateString()}
+                        {formatDate(tx.created_at)}
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">

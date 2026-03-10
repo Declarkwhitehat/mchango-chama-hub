@@ -99,30 +99,19 @@ async function previewAllocation(
       });
     }
 
-    // b. Pay principal
+    // b. Pay principal — full amount to recipient (penalty IS the late commission)
     if (debt.principal_remaining > 0 && remaining > 0) {
       const principalPay = Math.min(debt.principal_remaining, remaining);
-      const commission = principalPay * ONTIME_RATE;
-      const netToRecipient = principalPay - commission;
       remaining -= principalPay;
-      toCompany += commission;
-      toRecipients += netToRecipient;
+      toRecipients += principalPay;
 
-      allocations.push({
-        type: 'principal_commission',
-        debt_id: debt.id,
-        cycle_number: cycleNum,
-        amount: commission,
-        destination: 'Platform fee',
-        description: `5% commission on KES ${principalPay.toFixed(2)} principal`
-      });
       allocations.push({
         type: 'principal_clearance',
         debt_id: debt.id,
         cycle_number: cycleNum,
-        amount: netToRecipient,
+        amount: principalPay,
         destination: `${recipientName} (clearing deficit)`,
-        description: `Net proceeds from Cycle #${cycleNum} principal`
+        description: `Full principal from Cycle #${cycleNum} to recipient`
       });
 
       const willClearPrincipal = principalPay >= debt.principal_remaining;
@@ -131,12 +120,13 @@ async function previewAllocation(
     }
   }
 
-  // Phase 2: Current cycle contribution
+  // Phase 2: Current cycle contribution (commission additive — on top of base)
   if (remaining > 0 && cycle) {
     const amountDue = cycle.member_cycle_payments?.[0]?.amount_remaining || contributionAmount;
-    const toApply = Math.min(remaining, amountDue);
-    const commission = toApply * ONTIME_RATE;
-    const net = toApply - commission;
+    const grossNeeded = amountDue * (1 + ONTIME_RATE);
+    const toApply = Math.min(remaining, grossNeeded);
+    const net = toApply / (1 + ONTIME_RATE);
+    const commission = toApply - net;
     remaining -= toApply;
     toCompany += commission;
     toCyclePot += net;
@@ -256,41 +246,22 @@ async function settleDebts(
       });
     }
 
-    // 2b. Pay principal_remaining → commission to company, net to deficit recipient
+    // 2b. Pay principal_remaining → full amount to deficit recipient (penalty IS the late commission)
     if (debt.principal_remaining > 0 && remaining > 0) {
       const principalPay = Math.min(debt.principal_remaining, remaining);
-      const commission = principalPay * ONTIME_RATE;
-      const netToRecipient = principalPay - commission;
       remaining -= principalPay;
-      toCompany += commission;
-      toRecipients += netToRecipient;
+      toRecipients += principalPay;
       debtAllocEntry.principal_cleared = principalPay;
       debtAllocEntry.payment_gross += principalPay;
       debtUpdates.principal_remaining = debt.principal_remaining - principalPay;
 
-      // Record commission earning
-      await supabase.from('company_earnings').insert({
-        source: 'chama_commission',
-        amount: commission,
-        group_id: chamaId,
-        description: `Commission on principal repayment for cycle #${cycleNum}`
-      });
-
-      allocations.push({
-        type: 'principal_commission',
-        debt_id: debt.id,
-        cycle_number: cycleNum,
-        amount: commission,
-        destination: 'Platform fee',
-        description: `5% commission on KES ${principalPay.toFixed(2)} principal`
-      });
       allocations.push({
         type: 'principal_clearance',
         debt_id: debt.id,
         cycle_number: cycleNum,
-        amount: netToRecipient,
+        amount: principalPay,
         destination: 'Deficit recipient (transferred)',
-        description: `Net from Cycle #${cycleNum} principal to original recipient`
+        description: `Full principal from Cycle #${cycleNum} to original recipient`
       });
 
       // Mark deficit as PAID and DISBURSE funds to shortchanged recipient
@@ -304,10 +275,10 @@ async function settleDebts(
           paid_at: new Date().toISOString()
         }).eq('id', deficitRecord.id);
 
-        console.log(`✅ Deficit ${deficitRecord.id} marked PAID — KES ${netToRecipient.toFixed(2)} to be disbursed to recipient`);
+        console.log(`✅ Deficit ${deficitRecord.id} marked PAID — KES ${principalPay.toFixed(2)} to be disbursed to recipient`);
 
         // ===== DEFICIT DISBURSEMENT: Actually send money to shortchanged recipient =====
-        if (netToRecipient > 0 && deficitRecord.recipient_member_id) {
+        if (principalPay > 0 && deficitRecord.recipient_member_id) {
           try {
             // Get recipient's user_id and payment method
             const { data: recipientMember } = await supabase
@@ -335,12 +306,12 @@ async function settleDebts(
                     cycle_id: deficitRecord.cycle_id, // Enable duplicate guard via unique index
                     requested_by: recipientMember.user_id,
                     amount: principalPay,
-                    commission_amount: commission,
-                    net_amount: netToRecipient,
+                    commission_amount: 0,
+                    net_amount: principalPay,
                     status: canAutoApprove ? 'approved' : 'pending',
                     payment_method_id: recipientPaymentMethod.id,
                     payment_method_type: recipientPaymentMethod.method_type,
-                    notes: `Deficit settlement: Cycle #${cycleNum} late payment received. Net KES ${netToRecipient.toFixed(2)} to ${recipientMember.member_code}`,
+                    notes: `Deficit settlement: Cycle #${cycleNum} late payment received. KES ${principalPay.toFixed(2)} to ${recipientMember.member_code}`,
                     requested_at: new Date().toISOString(),
                     b2c_attempt_count: 0,
                     ...(canAutoApprove ? { reviewed_at: new Date().toISOString() } : {})
@@ -355,9 +326,9 @@ async function settleDebts(
                     source_type: 'chama',
                     source_id: chamaId,
                     gross_amount: principalPay,
-                    commission_amount: commission,
-                    net_amount: netToRecipient,
-                    commission_rate: ONTIME_RATE,
+                    commission_amount: 0,
+                    net_amount: principalPay,
+                    commission_rate: 0,
                     reference_id: deficitWithdrawal.id,
                     description: `Deficit settlement: Cycle #${cycleNum} → ${recipientMember.member_code}. Debt ${debt.id} cleared.`
                   });
@@ -371,7 +342,7 @@ async function settleDebts(
                       deficit_id: deficitRecord.id,
                       debt_id: debt.id,
                       recipient: recipientMember.member_code,
-                      net_amount: netToRecipient,
+                      net_amount: principalPay,
                       cycle_number: cycleNum
                     }
                   });
@@ -387,10 +358,10 @@ async function settleDebts(
                         body: JSON.stringify({
                           withdrawal_id: deficitWithdrawal.id,
                           phone_number: recipientPaymentMethod.phone_number,
-                          amount: netToRecipient
+                          amount: principalPay
                         })
                       });
-                      console.log(`✅ B2C initiated for deficit settlement: KES ${netToRecipient.toFixed(2)} to ${recipientMember.member_code}`);
+                      console.log(`✅ B2C initiated for deficit settlement: KES ${principalPay.toFixed(2)} to ${recipientMember.member_code}`);
                     } catch (b2cErr: any) {
                       console.error(`⚠️ B2C error for deficit settlement:`, b2cErr);
                       await supabase.from('withdrawals').update({
@@ -406,7 +377,7 @@ async function settleDebts(
                   await supabase.from('notifications').insert({
                     user_id: recipientMember.user_id,
                     title: 'Deficit Payment Received',
-                    message: `A late payment has been received! KES ${netToRecipient.toFixed(2)} from Cycle #${cycleNum} is being sent to you.`,
+                    message: `A late payment has been received! KES ${principalPay.toFixed(2)} from Cycle #${cycleNum} is being sent to you.`,
                     type: 'info',
                     category: 'chama',
                     related_entity_id: chamaId,
@@ -467,9 +438,10 @@ async function settleDebts(
     const isLate = now > lateDeadline;
     const cycleCommissionRate = isLate ? LATE_RATE : ONTIME_RATE;
 
-    const toApply = Math.min(remaining, amountRemaining / (1 - cycleCommissionRate));
-    const commission = toApply * cycleCommissionRate;
-    const net = toApply - commission;
+    const grossNeeded = amountRemaining * (1 + cycleCommissionRate);
+    const toApply = Math.min(remaining, grossNeeded);
+    const net = toApply / (1 + cycleCommissionRate);
+    const commission = toApply - net;
     remaining -= toApply;
     toCompany += commission;
     toCyclePot += net;
@@ -557,8 +529,8 @@ async function settleDebts(
       .maybeSingle();
 
     if (pendingCyclePayment && remaining > 0) {
-      const commission = remaining * ONTIME_RATE;
-      const net = remaining - commission;
+      const net = remaining / (1 + ONTIME_RATE);
+      const commission = remaining - net;
       toCompany += commission;
       toCyclePot += net;
 

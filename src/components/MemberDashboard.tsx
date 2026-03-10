@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -175,9 +176,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Date</span>
                   <span className="font-medium">
-                    {new Date(removedMember.removed_at).toLocaleDateString('en-US', { 
-                      month: 'short', day: 'numeric', year: 'numeric' 
-                    })}
+                     {formatDate(removedMember.removed_at)}
                   </span>
                 </div>
               )}
@@ -329,7 +328,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                   <TableRow key={idx} className="bg-destructive/5">
                     <TableCell className="font-medium">#{mp.cycle_number}</TableCell>
                     <TableCell className="text-sm">
-                      {mp.start_date ? new Date(mp.start_date).toLocaleDateString() : '-'} – {mp.end_date ? new Date(mp.end_date).toLocaleDateString() : '-'}
+                      {mp.start_date ? formatDate(mp.start_date) : '-'} – {mp.end_date ? formatDate(mp.end_date) : '-'}
                     </TableCell>
                     <TableCell>KES {(mp.amount_due || 0).toLocaleString()}</TableCell>
                     <TableCell>KES {(mp.amount_paid || 0).toLocaleString()}</TableCell>
@@ -413,8 +412,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
               <p className="text-sm text-muted-foreground mb-1">Next Due</p>
               <p className="text-lg font-semibold text-foreground">
                 {member.next_due_date 
-                  ? new Date(member.next_due_date).toLocaleDateString()
-                  : 'TBD'}
+                   ? formatDate(member.next_due_date)
+                   : 'TBD'}
               </p>
             </div>
 
@@ -422,8 +421,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
               <p className="text-sm text-muted-foreground mb-1">Last Payment</p>
               <p className="text-lg font-semibold text-foreground">
                 {member.last_payment_date
-                  ? new Date(member.last_payment_date).toLocaleDateString()
-                  : 'No payments yet'}
+                   ? formatDate(member.last_payment_date)
+                   : 'No payments yet'}
               </p>
             </div>
           </div>
@@ -452,7 +451,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
               <div className="p-4 bg-primary/10 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Estimated Payout Date</p>
                 <p className="text-lg font-semibold text-foreground">
-                  {new Date(payout_schedule.estimated_payout_date).toLocaleDateString()}
+                  {formatDate(payout_schedule.estimated_payout_date)}
                 </p>
               </div>
 
@@ -494,7 +493,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                   <TableRow key={payment.id}>
                     <TableCell>
                       <div>
-                        <p>{new Date(payment.contribution_date).toLocaleDateString()}</p>
+                        <p>{formatDate(payment.contribution_date)}</p>
                         {payment.payment_notes && (
                           <p className="text-xs text-muted-foreground mt-1">{payment.payment_notes}</p>
                         )}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatDate } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -234,7 +235,7 @@ const ChamaList = () => {
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Calendar className="h-3 w-3" />
-                        <span>Created {new Date(chama.created_at).toLocaleDateString()}</span>
+                        <span>Created {formatDate(chama.created_at)}</span>
                       </div>
                     </div>
 

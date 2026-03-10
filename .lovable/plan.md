@@ -1,66 +1,35 @@
 
 
-## Plan: Fix Commission Model, Amount Display, and Date Format
+## Diagnosis
 
-### Three Issues to Fix
+The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
 
-**Issue 1: Commission model is wrong (fundamental)**
-Currently, commission is **deducted from** the member's payment. If a member pays KES 100, only KES 95 goes to the pool and KES 5 goes to the platform. The user wants commission to be **added on top**: KES 100 goes fully to the pool, and the platform charges KES 5 extra, so the member actually pays KES 105. For late payments: KES 100 to recipient + KES 10 penalty = KES 110 total.
+1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
+2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
+3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
+4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
 
-**Issue 2: Shows KES 200 instead of KES 100**
-In `DailyPaymentStatus.tsx` line 238, `totalPayable` is calculated as `totalOutstanding + cycleInfo.due_amount`, which double-counts when a member has 1 missed cycle (KES 100 outstanding + KES 100 current = KES 200). But the member only paid KES 100. The preview and timer should reflect what the member is actually paying, not the total owed.
+There are 3 total stuck withdrawals across the system with the same pattern.
 
-**Issue 3: Dates should be dd/mm/yy format**
-All dates across the platform currently use various formats (US locale, ISO, etc.). Need a centralized date formatter using `dd/MM/yy` format.
+## Root Cause
 
----
+The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
 
-### Changes Required
+## Fix Plan
 
-#### 1. Commission Model Change (Additive, not Subtractive)
+### 1. Manually complete stuck withdrawal via RPC
+Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
 
-**`supabase/functions/contributions-crud/index.ts`** — Both `previewAllocation()` and `settleDebts()` functions:
-- **Debt principal settlement**: Currently takes 5% commission FROM the principal (KES 100 → KES 5 commission + KES 95 to recipient). Change to: full KES 100 goes to recipient, commission is separately tracked. The gross payment from member = principal + penalty (commission is embedded in the penalty rate).
-- **Current cycle**: Currently `net = toApply - commission`. Change to: the full contribution amount goes to the cycle pot. Commission is a separate charge on top. Member pays `contributionAmount * (1 + rate)`.
-- **Preview math**: For KES 100 contribution with 5% on-time: show "KES 100 to pool, KES 5 commission, Total: KES 105". For late with 10%: "KES 100 to recipient, KES 10 penalty, Total: KES 110".
+Also complete `e2ea0312` (KES 10) which has the same pattern.
 
-**`src/components/chama/AmountToPayCard.tsx`**:
-- Fix line 47: `currentCycleGross = currentCycleDue ? contributionAmount / (1 - 0.05) : 0` → should be `contributionAmount * (1 + 0.05)` i.e. `contributionAmount * 1.05`
-- Fix `totalPayable` calculation to use additive model
+### 2. Fix retry-failed-payouts to query status before re-sending
+Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
 
-**`src/components/chama/PaymentAllocationPreview.tsx`** — UI will automatically reflect backend changes since it reads from the edge function preview.
+### 3. Add a "check status" path in withdrawals-crud
+Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
 
-**`src/utils/commissionCalculator.ts`**:
-- Update `calculateAmountToPay()` to use additive model: `totalPayable = baseTotal + totalCommission` (commission ON TOP, not deducted)
-- Update `calculateNetBalance` / `calculateTransactionNet` to reflect the new model
-
-#### 2. Fix KES 200 Double Display
-
-**`src/components/chama/DailyPaymentStatus.tsx`**:
-- The `totalPayable` passed to `PaymentCountdownTimer` should not blindly add `totalOutstanding + cycleInfo.due_amount`. It should show what the member needs to pay NOW based on their actual debts and current cycle, respecting FIFO priority.
-
-#### 3. Date Format (dd/mm/yy)
-
-**`src/lib/utils.ts`** — Add a centralized date formatting helper:
-```typescript
-export function formatDate(date: string | Date): string {
-  const d = new Date(date);
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = String(d.getFullYear()).slice(-2);
-  return `${day}/${month}/${year}`;
-}
-```
-
-Then update all ~26 files that use `toLocaleDateString()` to use this helper instead. Key files include:
-- `src/pages/Home.tsx`, `src/pages/ChamaDetail.tsx`, `src/pages/ChamaList.tsx`
-- `src/components/chama/PreStartDashboard.tsx`, `src/components/chama/DailyPaymentStatus.tsx`
-- `src/components/admin/*.tsx` (multiple admin components)
-- All other pages and components with date displays
-
-### Summary of File Changes
-- **Edge function**: `supabase/functions/contributions-crud/index.ts` (commission model fix)
-- **Frontend components**: `AmountToPayCard.tsx`, `DailyPaymentStatus.tsx`, `PaymentAllocationPreview.tsx`
-- **Utils**: `commissionCalculator.ts`, `src/lib/utils.ts`
-- **Date format**: ~26 files across the codebase
+### Files to Change
+- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
+- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
+- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
 

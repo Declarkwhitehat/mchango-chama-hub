@@ -29,6 +29,7 @@ import { TrustScoreBadge } from "@/components/chama/TrustScoreBadge";
 
 import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDate } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -637,11 +638,7 @@ const ChamaDetail = () => {
                       {currentUserMembership && nextTurnDates[currentUserMembership.id] && (
                         <p className="text-sm text-muted-foreground mt-1">
                           Your estimated turn: <span className="font-medium text-primary">
-                            {nextTurnDates[currentUserMembership.id].toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
+                            {formatDate(nextTurnDates[currentUserMembership.id])}
                           </span>
                         </p>
                       )}
@@ -894,7 +891,7 @@ const ChamaDetail = () => {
                               )}
                               {nextTurnDates[member.id] && (
                                 <p className="text-xs text-muted-foreground">
-                                  Next turn: {nextTurnDates[member.id].toLocaleDateString()}
+                                  Next turn: {formatDate(nextTurnDates[member.id])}
                                 </p>
                               )}
                             </div>
