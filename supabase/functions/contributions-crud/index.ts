@@ -99,30 +99,19 @@ async function previewAllocation(
       });
     }
 
-    // b. Pay principal
+    // b. Pay principal — full amount to recipient (penalty IS the late commission)
     if (debt.principal_remaining > 0 && remaining > 0) {
       const principalPay = Math.min(debt.principal_remaining, remaining);
-      const commission = principalPay * ONTIME_RATE;
-      const netToRecipient = principalPay - commission;
       remaining -= principalPay;
-      toCompany += commission;
-      toRecipients += netToRecipient;
+      toRecipients += principalPay;
 
-      allocations.push({
-        type: 'principal_commission',
-        debt_id: debt.id,
-        cycle_number: cycleNum,
-        amount: commission,
-        destination: 'Platform fee',
-        description: `5% commission on KES ${principalPay.toFixed(2)} principal`
-      });
       allocations.push({
         type: 'principal_clearance',
         debt_id: debt.id,
         cycle_number: cycleNum,
-        amount: netToRecipient,
+        amount: principalPay,
         destination: `${recipientName} (clearing deficit)`,
-        description: `Net proceeds from Cycle #${cycleNum} principal`
+        description: `Full principal from Cycle #${cycleNum} to recipient`
       });
 
       const willClearPrincipal = principalPay >= debt.principal_remaining;
