@@ -438,9 +438,10 @@ async function settleDebts(
     const isLate = now > lateDeadline;
     const cycleCommissionRate = isLate ? LATE_RATE : ONTIME_RATE;
 
-    const toApply = Math.min(remaining, amountRemaining / (1 - cycleCommissionRate));
-    const commission = toApply * cycleCommissionRate;
-    const net = toApply - commission;
+    const grossNeeded = amountRemaining * (1 + cycleCommissionRate);
+    const toApply = Math.min(remaining, grossNeeded);
+    const net = toApply / (1 + cycleCommissionRate);
+    const commission = toApply - net;
     remaining -= toApply;
     toCompany += commission;
     toCyclePot += net;
