@@ -493,7 +493,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                   <TableRow key={payment.id}>
                     <TableCell>
                       <div>
-                        <p>{new Date(payment.contribution_date).toLocaleDateString()}</p>
+                        <p>{formatDate(payment.contribution_date)}</p>
                         {payment.payment_notes && (
                           <p className="text-xs text-muted-foreground mt-1">{payment.payment_notes}</p>
                         )}
