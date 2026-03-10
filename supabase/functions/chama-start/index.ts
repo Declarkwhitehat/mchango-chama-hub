@@ -225,8 +225,16 @@ serve(async (req) => {
 
     // ============================================
     // CREATE FIRST CONTRIBUTION CYCLE
+    // End date includes 24hr grace period: at least until graceDeadline
     // ============================================
-    const cycleEndDate = calculateCycleEndDate(startDate, chama.contribution_frequency, chama.every_n_days_count, chama.monthly_contribution_day, chama.monthly_contribution_day_2);
+    const normalCycleEndDate = calculateCycleEndDate(startDate, chama.contribution_frequency, chama.every_n_days_count, chama.monthly_contribution_day, chama.monthly_contribution_day_2);
+    // Ensure the first cycle end is at least the grace deadline (next day 10PM)
+    const cycleEndDate = normalCycleEndDate > graceDeadline ? normalCycleEndDate : graceDeadline;
+
+    console.log('First cycle dates:', {
+      normalEnd: normalCycleEndDate.toISOString(),
+      withGrace: cycleEndDate.toISOString(),
+    });
     
     const { data: firstCycle, error: cycleError } = await supabaseClient
       .from('contribution_cycles')
