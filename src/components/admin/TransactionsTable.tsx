@@ -84,7 +84,7 @@ export const TransactionsTable = () => {
     try {
       const headers = ["Date", "Source", "Entity", "Type", "User", "Phone", "Amount", "Commission", "Net", "Reference", "M-Pesa Receipt", "Status"];
       const rows = filteredTransactions.map((tx) => [
-        new Date(tx.created_at).toLocaleDateString(),
+        formatDate(tx.created_at),
         tx.source,
         tx.source_name,
         tx.transaction_type,
