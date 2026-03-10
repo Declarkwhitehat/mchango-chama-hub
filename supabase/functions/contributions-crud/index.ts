@@ -326,9 +326,9 @@ async function settleDebts(
                     source_type: 'chama',
                     source_id: chamaId,
                     gross_amount: principalPay,
-                    commission_amount: commission,
-                    net_amount: netToRecipient,
-                    commission_rate: ONTIME_RATE,
+                    commission_amount: 0,
+                    net_amount: principalPay,
+                    commission_rate: 0,
                     reference_id: deficitWithdrawal.id,
                     description: `Deficit settlement: Cycle #${cycleNum} → ${recipientMember.member_code}. Debt ${debt.id} cleared.`
                   });
