@@ -221,7 +221,7 @@ export const TransactionsTable = () => {
                   return (
                     <TableRow key={`${tx.source}-${tx.id}`}>
                       <TableCell className="text-sm whitespace-nowrap">
-                        {new Date(tx.created_at).toLocaleDateString()}
+                        {formatDate(tx.created_at)}
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
