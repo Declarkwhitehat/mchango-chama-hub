@@ -342,7 +342,7 @@ async function settleDebts(
                       deficit_id: deficitRecord.id,
                       debt_id: debt.id,
                       recipient: recipientMember.member_code,
-                      net_amount: netToRecipient,
+                      net_amount: principalPay,
                       cycle_number: cycleNum
                     }
                   });
