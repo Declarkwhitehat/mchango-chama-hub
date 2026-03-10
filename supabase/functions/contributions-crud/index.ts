@@ -120,12 +120,13 @@ async function previewAllocation(
     }
   }
 
-  // Phase 2: Current cycle contribution
+  // Phase 2: Current cycle contribution (commission additive — on top of base)
   if (remaining > 0 && cycle) {
     const amountDue = cycle.member_cycle_payments?.[0]?.amount_remaining || contributionAmount;
-    const toApply = Math.min(remaining, amountDue);
-    const commission = toApply * ONTIME_RATE;
-    const net = toApply - commission;
+    const grossNeeded = amountDue * (1 + ONTIME_RATE);
+    const toApply = Math.min(remaining, grossNeeded);
+    const net = toApply / (1 + ONTIME_RATE);
+    const commission = toApply - net;
     remaining -= toApply;
     toCompany += commission;
     toCyclePot += net;
