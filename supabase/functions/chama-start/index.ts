@@ -148,6 +148,19 @@ serve(async (req) => {
     const startDate = new Date();
 
     // ============================================
+    // CALCULATE GRACE PERIOD END (24hrs from start, cutoff at 22:00)
+    // Members get until 10:00 PM the next day to make their first payment
+    // ============================================
+    const graceDeadline = new Date(startDate);
+    graceDeadline.setDate(graceDeadline.getDate() + 1);
+    graceDeadline.setHours(22, 0, 0, 0); // 10:00 PM cutoff
+
+    console.log('Grace period:', {
+      startDate: startDate.toISOString(),
+      graceDeadline: graceDeadline.toISOString(),
+    });
+
+    // ============================================
     // ASSIGN ORDER INDICES TO ALL APPROVED MEMBERS
     // Randomized via Fisher-Yates shuffle for fairness
     // ============================================
