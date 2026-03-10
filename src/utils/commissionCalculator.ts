@@ -66,6 +66,7 @@ export const calculateAmountToPay = (
   const lateBase = lateCycles * baseContribution;
   const baseTotal = onTimeBase + lateBase;
   
+  // Additive model: commission is ON TOP of base
   const onTimeCommission = onTimeBase * CHAMA_DEFAULT_COMMISSION_RATE;
   const lateCommission = lateBase * CHAMA_LATE_COMMISSION_RATE;
   const totalCommission = onTimeCommission + lateCommission;
@@ -77,7 +78,7 @@ export const calculateAmountToPay = (
     onTimeCommission,
     lateCommission,
     totalCommission,
-    totalPayable: baseTotal + totalCommission,
+    totalPayable: baseTotal + totalCommission, // commission added on top
   };
 };
 
