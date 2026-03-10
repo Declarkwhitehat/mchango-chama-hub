@@ -105,12 +105,13 @@ export const getMchangoCommissionInfo = (totalAmount: number) => {
 export const getChamaCommissionInfo = (totalAmount: number, customRate?: number) => {
   const rate = customRate || CHAMA_DEFAULT_COMMISSION_RATE;
   const commission = calculateCommission(totalAmount, rate);
-  const netBalance = calculateNetBalance(totalAmount, rate);
+  const grossAmount = totalAmount + commission;
   
   return {
     totalAmount,
     commission,
-    netBalance,
+    grossAmount,
+    netBalance: totalAmount, // base amount goes to pool
     rate,
     percentage: formatCommissionPercentage(rate),
   };
