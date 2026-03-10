@@ -412,8 +412,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
               <p className="text-sm text-muted-foreground mb-1">Next Due</p>
               <p className="text-lg font-semibold text-foreground">
                 {member.next_due_date 
-                  ? new Date(member.next_due_date).toLocaleDateString()
-                  : 'TBD'}
+                   ? formatDate(member.next_due_date)
+                   : 'TBD'}
               </p>
             </div>
 
