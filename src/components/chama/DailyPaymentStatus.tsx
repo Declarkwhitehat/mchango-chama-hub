@@ -455,7 +455,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
                       Paid
                       {payment.payment_time && (
                         <span className="ml-1 text-xs">
-                          {format(new Date(payment.payment_time), 'HH:mm')}
+                          {formatDateTime(payment.payment_time).split(' ')[1]}
                         </span>
                       )}
                     </Badge>
