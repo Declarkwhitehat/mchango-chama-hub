@@ -451,7 +451,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
               <div className="p-4 bg-primary/10 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Estimated Payout Date</p>
                 <p className="text-lg font-semibold text-foreground">
-                  {new Date(payout_schedule.estimated_payout_date).toLocaleDateString()}
+                  {formatDate(payout_schedule.estimated_payout_date)}
                 </p>
               </div>
 
