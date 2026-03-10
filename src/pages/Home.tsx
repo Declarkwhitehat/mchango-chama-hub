@@ -773,7 +773,7 @@ const Home = () => {
                         </div>
                         <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground pt-2 border-t border-border">
                           <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          Created: {new Date(welfare.created_at).toLocaleDateString()}
+                          Created: {formatDate(welfare.created_at)}
                         </div>
                       </CardContent>
                     </Card>

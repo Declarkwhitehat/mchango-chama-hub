@@ -258,7 +258,7 @@ const MchangoDetail = () => {
                 />
               </div>
               <CardDescription>
-                Created on {new Date(campaign.created_at).toLocaleDateString()}
+                Created on {formatDate(campaign.created_at)}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

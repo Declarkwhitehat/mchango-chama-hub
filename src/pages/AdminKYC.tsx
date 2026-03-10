@@ -415,7 +415,7 @@ const AdminKYC = () => {
                         <h3 className="font-semibold">{submission.full_name}</h3>
                         <p className="text-sm text-muted-foreground">{submission.email}</p>
                         <p className="text-xs text-muted-foreground">
-                          Submitted: {new Date(submission.kyc_submitted_at!).toLocaleDateString()}
+                          Submitted: {formatDate(submission.kyc_submitted_at!)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">

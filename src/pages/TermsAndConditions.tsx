@@ -22,7 +22,7 @@ const TermsAndConditions = () => {
           <CardHeader>
             <CardTitle className="text-3xl">Terms and Conditions</CardTitle>
             <CardDescription>
-              Last Updated: {new Date().toLocaleDateString()} | Version 1.0
+              Last Updated: {formatDate(new Date())} | Version 1.0
             </CardDescription>
           </CardHeader>
           <CardContent className="prose prose-sm max-w-none space-y-6">

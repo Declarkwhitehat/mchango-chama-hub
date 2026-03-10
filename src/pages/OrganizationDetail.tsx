@@ -230,10 +230,7 @@ const OrganizationDetail = () => {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">
-                  Since {new Date(organization.created_at).toLocaleDateString('en-US', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                  })}
+                  Since {formatDate(organization.created_at)}
                 </p>
               </div>
             </div>
