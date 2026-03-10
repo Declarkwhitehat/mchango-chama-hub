@@ -377,7 +377,7 @@ async function settleDebts(
                   await supabase.from('notifications').insert({
                     user_id: recipientMember.user_id,
                     title: 'Deficit Payment Received',
-                    message: `A late payment has been received! KES ${netToRecipient.toFixed(2)} from Cycle #${cycleNum} is being sent to you.`,
+                    message: `A late payment has been received! KES ${principalPay.toFixed(2)} from Cycle #${cycleNum} is being sent to you.`,
                     type: 'info',
                     category: 'chama',
                     related_entity_id: chamaId,
