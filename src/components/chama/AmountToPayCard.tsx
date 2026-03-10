@@ -44,8 +44,9 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
 
   const totalLateCommission = debts.reduce((s, d) => s + d.penalty_remaining, 0);
   const totalNetToRecipients = debts.reduce((s, d) => s + d.principal_remaining, 0);
-  const currentCycleGross = currentCycleDue ? contributionAmount / (1 - 0.05) : 0;
-  const currentCycleCommission = currentCycleGross * 0.05;
+  const currentCycleBase = currentCycleDue ? contributionAmount : 0;
+  const currentCycleCommission = currentCycleBase * 0.05;
+  const currentCycleGross = currentCycleBase + currentCycleCommission;
   const totalPayable = totalNetToRecipients + totalLateCommission + currentCycleGross;
   const totalCommission = totalLateCommission + currentCycleCommission;
 
