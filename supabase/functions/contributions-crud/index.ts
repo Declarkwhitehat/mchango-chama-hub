@@ -246,41 +246,22 @@ async function settleDebts(
       });
     }
 
-    // 2b. Pay principal_remaining → commission to company, net to deficit recipient
+    // 2b. Pay principal_remaining → full amount to deficit recipient (penalty IS the late commission)
     if (debt.principal_remaining > 0 && remaining > 0) {
       const principalPay = Math.min(debt.principal_remaining, remaining);
-      const commission = principalPay * ONTIME_RATE;
-      const netToRecipient = principalPay - commission;
       remaining -= principalPay;
-      toCompany += commission;
-      toRecipients += netToRecipient;
+      toRecipients += principalPay;
       debtAllocEntry.principal_cleared = principalPay;
       debtAllocEntry.payment_gross += principalPay;
       debtUpdates.principal_remaining = debt.principal_remaining - principalPay;
 
-      // Record commission earning
-      await supabase.from('company_earnings').insert({
-        source: 'chama_commission',
-        amount: commission,
-        group_id: chamaId,
-        description: `Commission on principal repayment for cycle #${cycleNum}`
-      });
-
-      allocations.push({
-        type: 'principal_commission',
-        debt_id: debt.id,
-        cycle_number: cycleNum,
-        amount: commission,
-        destination: 'Platform fee',
-        description: `5% commission on KES ${principalPay.toFixed(2)} principal`
-      });
       allocations.push({
         type: 'principal_clearance',
         debt_id: debt.id,
         cycle_number: cycleNum,
-        amount: netToRecipient,
+        amount: principalPay,
         destination: 'Deficit recipient (transferred)',
-        description: `Net from Cycle #${cycleNum} principal to original recipient`
+        description: `Full principal from Cycle #${cycleNum} to original recipient`
       });
 
       // Mark deficit as PAID and DISBURSE funds to shortchanged recipient
