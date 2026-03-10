@@ -306,12 +306,12 @@ async function settleDebts(
                     cycle_id: deficitRecord.cycle_id, // Enable duplicate guard via unique index
                     requested_by: recipientMember.user_id,
                     amount: principalPay,
-                    commission_amount: commission,
-                    net_amount: netToRecipient,
+                    commission_amount: 0,
+                    net_amount: principalPay,
                     status: canAutoApprove ? 'approved' : 'pending',
                     payment_method_id: recipientPaymentMethod.id,
                     payment_method_type: recipientPaymentMethod.method_type,
-                    notes: `Deficit settlement: Cycle #${cycleNum} late payment received. Net KES ${netToRecipient.toFixed(2)} to ${recipientMember.member_code}`,
+                    notes: `Deficit settlement: Cycle #${cycleNum} late payment received. KES ${principalPay.toFixed(2)} to ${recipientMember.member_code}`,
                     requested_at: new Date().toISOString(),
                     b2c_attempt_count: 0,
                     ...(canAutoApprove ? { reviewed_at: new Date().toISOString() } : {})
