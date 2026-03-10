@@ -148,6 +148,19 @@ serve(async (req) => {
     const startDate = new Date();
 
     // ============================================
+    // CALCULATE GRACE PERIOD END (24hrs from start, cutoff at 22:00)
+    // Members get until 10:00 PM the next day to make their first payment
+    // ============================================
+    const graceDeadline = new Date(startDate);
+    graceDeadline.setDate(graceDeadline.getDate() + 1);
+    graceDeadline.setHours(22, 0, 0, 0); // 10:00 PM cutoff
+
+    console.log('Grace period:', {
+      startDate: startDate.toISOString(),
+      graceDeadline: graceDeadline.toISOString(),
+    });
+
+    // ============================================
     // ASSIGN ORDER INDICES TO ALL APPROVED MEMBERS
     // Randomized via Fisher-Yates shuffle for fairness
     // ============================================
@@ -212,8 +225,16 @@ serve(async (req) => {
 
     // ============================================
     // CREATE FIRST CONTRIBUTION CYCLE
+    // End date includes 24hr grace period: at least until graceDeadline
     // ============================================
-    const cycleEndDate = calculateCycleEndDate(startDate, chama.contribution_frequency, chama.every_n_days_count, chama.monthly_contribution_day, chama.monthly_contribution_day_2);
+    const normalCycleEndDate = calculateCycleEndDate(startDate, chama.contribution_frequency, chama.every_n_days_count, chama.monthly_contribution_day, chama.monthly_contribution_day_2);
+    // Ensure the first cycle end is at least the grace deadline (next day 10PM)
+    const cycleEndDate = normalCycleEndDate > graceDeadline ? normalCycleEndDate : graceDeadline;
+
+    console.log('First cycle dates:', {
+      normalEnd: normalCycleEndDate.toISOString(),
+      withGrace: cycleEndDate.toISOString(),
+    });
     
     const { data: firstCycle, error: cycleError } = await supabaseClient
       .from('contribution_cycles')
@@ -281,7 +302,9 @@ serve(async (req) => {
       const payoutDate = new Date(startDate);
       payoutDate.setDate(payoutDate.getDate() + daysUntilPayout);
 
-      const message = `🎉 "${chama.name}" has started! You are Member #${memberIndex}. Contribute KES ${chama.contribution_amount.toLocaleString()} ${frequencyText}. Your payout date: ${payoutDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}. ${i === 0 ? 'You are first in line - make your contribution now!' : `${memberIndex - 1} member(s) before you.`}`;
+      const graceDeadlineStr = graceDeadline.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+
+      const message = `🎉 "${chama.name}" has started! You are Member #${memberIndex}. You have a 24hr grace period - first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 10:00 PM. Contribute ${frequencyText}. Your payout date: ${payoutDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}. ${i === 0 ? 'You are first in line!' : `${memberIndex - 1} member(s) before you.`}`;
 
       if (member.profiles?.phone) {
         try {
