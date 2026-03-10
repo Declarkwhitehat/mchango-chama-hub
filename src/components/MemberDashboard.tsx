@@ -328,7 +328,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                   <TableRow key={idx} className="bg-destructive/5">
                     <TableCell className="font-medium">#{mp.cycle_number}</TableCell>
                     <TableCell className="text-sm">
-                      {mp.start_date ? new Date(mp.start_date).toLocaleDateString() : '-'} – {mp.end_date ? new Date(mp.end_date).toLocaleDateString() : '-'}
+                      {mp.start_date ? formatDate(mp.start_date) : '-'} – {mp.end_date ? formatDate(mp.end_date) : '-'}
                     </TableCell>
                     <TableCell>KES {(mp.amount_due || 0).toLocaleString()}</TableCell>
                     <TableCell>KES {(mp.amount_paid || 0).toLocaleString()}</TableCell>
