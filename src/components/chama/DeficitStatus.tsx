@@ -184,7 +184,7 @@ export function DeficitStatus({ memberMemberId, chamaName }: DeficitStatusProps)
                   {deficit.paid_at && (
                     <p className="text-xs text-muted-foreground ml-6 mt-1 flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      Cleared {new Date(deficit.paid_at).toLocaleDateString()}
+                      Cleared {formatDate(deficit.paid_at)}
                     </p>
                   )}
                 </div>

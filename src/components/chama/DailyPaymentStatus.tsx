@@ -269,7 +269,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
                       Cycle #{cycle.cycle_number}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {format(new Date(cycle.start_date), 'MMM d')} - {format(new Date(cycle.end_date), 'MMM d, yyyy')}
+                      {formatDate(cycle.start_date)} - {formatDate(cycle.end_date)}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Beneficiary: {cycle.beneficiary_name}
