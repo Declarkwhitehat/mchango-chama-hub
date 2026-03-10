@@ -638,11 +638,7 @@ const ChamaDetail = () => {
                       {currentUserMembership && nextTurnDates[currentUserMembership.id] && (
                         <p className="text-sm text-muted-foreground mt-1">
                           Your estimated turn: <span className="font-medium text-primary">
-                            {nextTurnDates[currentUserMembership.id].toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
+                            {formatDate(nextTurnDates[currentUserMembership.id])}
                           </span>
                         </p>
                       )}
