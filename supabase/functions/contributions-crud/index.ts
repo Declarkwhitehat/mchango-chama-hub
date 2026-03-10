@@ -275,10 +275,10 @@ async function settleDebts(
           paid_at: new Date().toISOString()
         }).eq('id', deficitRecord.id);
 
-        console.log(`✅ Deficit ${deficitRecord.id} marked PAID — KES ${netToRecipient.toFixed(2)} to be disbursed to recipient`);
+        console.log(`✅ Deficit ${deficitRecord.id} marked PAID — KES ${principalPay.toFixed(2)} to be disbursed to recipient`);
 
         // ===== DEFICIT DISBURSEMENT: Actually send money to shortchanged recipient =====
-        if (netToRecipient > 0 && deficitRecord.recipient_member_id) {
+        if (principalPay > 0 && deficitRecord.recipient_member_id) {
           try {
             // Get recipient's user_id and payment method
             const { data: recipientMember } = await supabase
