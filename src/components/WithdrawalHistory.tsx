@@ -155,7 +155,7 @@ export const WithdrawalHistory = ({ chamaId, mchangoId, organizationId }: Withdr
                 <div>
                   <p className="text-muted-foreground">Requested</p>
                   <p className="font-medium">
-                    {new Date(withdrawal.requested_at).toLocaleDateString()}
+                    {formatDate(withdrawal.requested_at)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(withdrawal.requested_at).toLocaleTimeString()}
