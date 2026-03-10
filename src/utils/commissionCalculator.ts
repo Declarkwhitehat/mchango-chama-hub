@@ -87,12 +87,13 @@ export const calculateAmountToPay = (
  */
 export const getMchangoCommissionInfo = (totalAmount: number) => {
   const commission = calculateCommission(totalAmount, MCHANGO_COMMISSION_RATE);
-  const netBalance = calculateNetBalance(totalAmount, MCHANGO_COMMISSION_RATE);
+  const grossAmount = totalAmount + commission;
   
   return {
     totalAmount,
     commission,
-    netBalance,
+    grossAmount,
+    netBalance: totalAmount, // base amount goes to campaign
     rate: MCHANGO_COMMISSION_RATE,
     percentage: formatCommissionPercentage(MCHANGO_COMMISSION_RATE),
   };
