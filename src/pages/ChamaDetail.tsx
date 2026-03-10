@@ -891,7 +891,7 @@ const ChamaDetail = () => {
                               )}
                               {nextTurnDates[member.id] && (
                                 <p className="text-xs text-muted-foreground">
-                                  Next turn: {nextTurnDates[member.id].toLocaleDateString()}
+                                  Next turn: {formatDate(nextTurnDates[member.id])}
                                 </p>
                               )}
                             </div>
