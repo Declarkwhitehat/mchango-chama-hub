@@ -120,8 +120,12 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
                 <span>KES {contributionAmount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-orange-600 dark:text-orange-400">
-                <span>Commission (5%)</span>
+                <span>Commission (5%, added on top)</span>
                 <span>+ KES {currentCycleCommission.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span>Gross to pay</span>
+                <span>KES {currentCycleGross.toFixed(2)}</span>
               </div>
             </div>
           </div>

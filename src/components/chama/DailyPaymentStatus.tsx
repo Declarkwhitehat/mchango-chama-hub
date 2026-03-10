@@ -235,7 +235,7 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
         endDate={cycleInfo.end_date}
         cutoffHour={22}
         contributionAmount={cycleInfo.due_amount}
-        totalPayable={missedCyclesCount > 0 ? totalOutstanding + cycleInfo.due_amount : undefined}
+        totalPayable={missedCyclesCount > 0 ? totalOutstanding + (cycleInfo.due_amount * 1.05) : cycleInfo.due_amount * 1.05}
         beneficiaryName={cycleInfo.beneficiary_name}
         paidCount={paidCount}
         totalCount={totalCount}

@@ -7,24 +7,32 @@ export const CHAMA_LATE_COMMISSION_RATE = 0.10; // 10% late
 export const ORGANIZATION_COMMISSION_RATE = 0.05; // 5%
 
 /**
- * Calculate commission amount
+ * Calculate commission amount (additive — on top of base)
  */
 export const calculateCommission = (amount: number, rate: number): number => {
   return amount * rate;
 };
 
 /**
- * Calculate net balance after commission
+ * Calculate gross amount including commission (additive model)
+ * Member pays: base + commission
  */
-export const calculateNetBalance = (amount: number, rate: number): number => {
-  return amount - calculateCommission(amount, rate);
+export const calculateGrossAmount = (baseAmount: number, rate: number): number => {
+  return baseAmount + calculateCommission(baseAmount, rate);
 };
 
 /**
- * Calculate per-transaction net amount
+ * Calculate net balance (base amount, since commission is added on top)
  */
-export const calculateTransactionNet = (amount: number, rate: number): number => {
-  return amount * (1 - rate);
+export const calculateNetBalance = (grossAmount: number, rate: number): number => {
+  return grossAmount / (1 + rate);
+};
+
+/**
+ * Calculate per-transaction net amount from gross
+ */
+export const calculateTransactionNet = (grossAmount: number, rate: number): number => {
+  return grossAmount / (1 + rate);
 };
 
 /**
