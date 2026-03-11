@@ -675,22 +675,27 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
           );
 
-          // Idempotency: check if this contribution was already settled
+          // ═══ ATOMIC IDEMPOTENCY: Use settlement_locks table with unique constraint ═══
           if (contribution_id) {
-            const { data: existingLedger } = await supabaseAdmin
-              .from('financial_ledger')
-              .select('id')
-              .eq('reference_id', contribution_id)
-              .eq('source_type', 'chama')
-              .maybeSingle();
+            const { error: lockError } = await supabaseAdmin
+              .from('settlement_locks')
+              .insert({ 
+                contribution_id: contribution_id,
+                settlement_result: { status: 'processing' }
+              });
 
-            if (existingLedger) {
-              console.log('Settlement already processed for contribution:', contribution_id);
+            if (lockError && (lockError as any).code === '23505') {
+              console.log('⚠️ Settlement already locked for contribution:', contribution_id);
               return new Response(JSON.stringify({ 
                 success: true, 
                 already_settled: true,
-                message: 'Settlement already processed'
+                message: 'Settlement already processed (atomic lock)'
               }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+
+            if (lockError) {
+              console.error('Settlement lock insert error:', lockError);
+              // Non-fatal — proceed but log the issue
             }
           }
 

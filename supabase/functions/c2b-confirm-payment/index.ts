@@ -120,7 +120,7 @@ serve(async (req) => {
       const commissionAmount = grossAmount * effectiveRate;
       const netAmount = grossAmount - commissionAmount;
 
-      // Record chama contribution
+      // Record chama contribution (unique constraint on payment_reference prevents duplicates)
       const { data: contribution, error: contributionError } = await supabase
         .from('contributions')
         .insert({
@@ -129,6 +129,7 @@ serve(async (req) => {
           paid_by_member_id: chamaMemberData.id,
           amount: grossAmount,
           payment_reference: mpesaReceiptNumber,
+          mpesa_receipt_number: mpesaReceiptNumber,
           status: 'completed',
           payment_notes: `Offline payment via till number. Payer: ${[firstName, middleName, lastName].filter(Boolean).join(' ')}. Phone: ${phoneNumber}`,
         })
@@ -136,6 +137,14 @@ serve(async (req) => {
         .single();
 
       if (contributionError) {
+        // Handle unique constraint violation — duplicate C2B callback
+        if ((contributionError as any).code === '23505') {
+          console.log('⚠️ Duplicate C2B contribution insert blocked by unique constraint:', mpesaReceiptNumber);
+          return new Response(
+            JSON.stringify({ ResultCode: 0, ResultDesc: 'Payment already processed (constraint)' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         console.error('Error recording contribution:', contributionError);
         throw contributionError;
       }

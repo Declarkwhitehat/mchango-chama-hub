@@ -65,6 +65,33 @@ serve(async (req) => {
         isPaidByOther: contribution.paid_by_member_id !== contribution.member_id
       });
 
+      // ═══ IDEMPOTENCY GUARD: Skip if already completed ═══
+      if (contribution.status === 'completed') {
+        console.log('⚠️ Contribution already completed, skipping duplicate callback:', contribution.id);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Already processed', contribution_id: contribution.id }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // ═══ IDEMPOTENCY GUARD: Check if M-Pesa receipt already used ═══
+      if (mpesaReceiptNumber) {
+        const { data: existingReceipt } = await supabaseClient
+          .from('contributions')
+          .select('id')
+          .eq('mpesa_receipt_number', mpesaReceiptNumber)
+          .neq('id', contribution.id)
+          .maybeSingle();
+
+        if (existingReceipt) {
+          console.log('⚠️ M-Pesa receipt already used on another contribution:', mpesaReceiptNumber);
+          return new Response(
+            JSON.stringify({ success: true, message: 'Receipt already processed' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
       // Determine commission rate (default 5%)
       const commissionRate = contribution.chama?.commission_rate || 0.05;
       const actualAmount = paidAmount || contribution.amount;
@@ -78,6 +105,7 @@ serve(async (req) => {
           payment_notes: `Online STK Push payment. Receipt: ${mpesaReceiptNumber || 'N/A'}. Amount: KES ${paidAmount || contribution.amount}`,
         })
         .eq('id', contribution.id)
+        .eq('status', 'pending')
         .select()
         .single();
 
@@ -224,8 +252,16 @@ serve(async (req) => {
       .eq('payment_reference', checkoutRequestId);
 
     if (donations && donations.length > 0) {
-      // This is a donation - update mchango_donations table
       const donation = donations[0];
+
+      // ═══ IDEMPOTENCY GUARD: Skip if already completed ═══
+      if (donation.payment_status === 'completed') {
+        console.log('⚠️ Mchango donation already completed, skipping:', donation.id);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Already processed', donation_id: donation.id }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       const grossAmount = paidAmount || donation.amount;
       
       // Calculate commission using shared constant (7%)
@@ -339,6 +375,15 @@ serve(async (req) => {
     if (orgDonations && orgDonations.length > 0) {
       const orgDonation = orgDonations[0];
       console.log('Found organization donation record:', orgDonation.id);
+
+      // ═══ IDEMPOTENCY GUARD: Skip if already completed ═══
+      if (orgDonation.payment_status === 'completed') {
+        console.log('⚠️ Org donation already completed, skipping:', orgDonation.id);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Already processed', donation_id: orgDonation.id }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       const grossAmount = paidAmount || orgDonation.amount;
       const commissionRate = COMMISSION_RATES.ORGANIZATION;
