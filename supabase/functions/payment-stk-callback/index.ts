@@ -376,6 +376,15 @@ serve(async (req) => {
       const orgDonation = orgDonations[0];
       console.log('Found organization donation record:', orgDonation.id);
 
+      // ═══ IDEMPOTENCY GUARD: Skip if already completed ═══
+      if (orgDonation.payment_status === 'completed') {
+        console.log('⚠️ Org donation already completed, skipping:', orgDonation.id);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Already processed', donation_id: orgDonation.id }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const grossAmount = paidAmount || orgDonation.amount;
       const commissionRate = COMMISSION_RATES.ORGANIZATION;
       const commissionAmount = grossAmount * commissionRate;
