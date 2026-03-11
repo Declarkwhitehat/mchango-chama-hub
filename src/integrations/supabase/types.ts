@@ -2079,6 +2079,69 @@ export type Database = {
         }
         Relationships: []
       }
+      reconciliation_logs: {
+        Row: {
+          actual_value: number | null
+          anomaly_type: string
+          auto_corrected: boolean | null
+          created_at: string
+          details: Json | null
+          difference: number | null
+          entity_id: string | null
+          entity_type: string
+          expected_value: number | null
+          id: string
+        }
+        Insert: {
+          actual_value?: number | null
+          anomaly_type: string
+          auto_corrected?: boolean | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          entity_id?: string | null
+          entity_type: string
+          expected_value?: number | null
+          id?: string
+        }
+        Update: {
+          actual_value?: number | null
+          anomaly_type?: string
+          auto_corrected?: boolean | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          entity_id?: string | null
+          entity_type?: string
+          expected_value?: number | null
+          id?: string
+        }
+        Relationships: []
+      }
+      settlement_locks: {
+        Row: {
+          contribution_id: string
+          created_at: string
+          id: string
+          settled_at: string
+          settlement_result: Json | null
+        }
+        Insert: {
+          contribution_id: string
+          created_at?: string
+          id?: string
+          settled_at?: string
+          settlement_result?: Json | null
+        }
+        Update: {
+          contribution_id?: string
+          created_at?: string
+          id?: string
+          settled_at?: string
+          settlement_result?: Json | null
+        }
+        Relationships: []
+      }
       totp_secrets: {
         Row: {
           backup_codes: string[] | null
