@@ -65,6 +65,33 @@ serve(async (req) => {
         isPaidByOther: contribution.paid_by_member_id !== contribution.member_id
       });
 
+      // ═══ IDEMPOTENCY GUARD: Skip if already completed ═══
+      if (contribution.status === 'completed') {
+        console.log('⚠️ Contribution already completed, skipping duplicate callback:', contribution.id);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Already processed', contribution_id: contribution.id }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // ═══ IDEMPOTENCY GUARD: Check if M-Pesa receipt already used ═══
+      if (mpesaReceiptNumber) {
+        const { data: existingReceipt } = await supabaseClient
+          .from('contributions')
+          .select('id')
+          .eq('mpesa_receipt_number', mpesaReceiptNumber)
+          .neq('id', contribution.id)
+          .maybeSingle();
+
+        if (existingReceipt) {
+          console.log('⚠️ M-Pesa receipt already used on another contribution:', mpesaReceiptNumber);
+          return new Response(
+            JSON.stringify({ success: true, message: 'Receipt already processed' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
       // Determine commission rate (default 5%)
       const commissionRate = contribution.chama?.commission_rate || 0.05;
       const actualAmount = paidAmount || contribution.amount;
@@ -78,6 +105,7 @@ serve(async (req) => {
           payment_notes: `Online STK Push payment. Receipt: ${mpesaReceiptNumber || 'N/A'}. Amount: KES ${paidAmount || contribution.amount}`,
         })
         .eq('id', contribution.id)
+        .eq('status', 'pending')
         .select()
         .single();
 
