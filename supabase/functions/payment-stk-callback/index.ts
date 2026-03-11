@@ -252,8 +252,16 @@ serve(async (req) => {
       .eq('payment_reference', checkoutRequestId);
 
     if (donations && donations.length > 0) {
-      // This is a donation - update mchango_donations table
       const donation = donations[0];
+
+      // ═══ IDEMPOTENCY GUARD: Skip if already completed ═══
+      if (donation.payment_status === 'completed') {
+        console.log('⚠️ Mchango donation already completed, skipping:', donation.id);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Already processed', donation_id: donation.id }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       const grossAmount = paidAmount || donation.amount;
       
       // Calculate commission using shared constant (7%)
