@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, Calendar, TrendingUp } from "lucide-react";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { JoinByCodeForm } from "@/components/chama/JoinByCodeForm";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -145,6 +146,9 @@ const ChamaList = () => {
             Join a chama group and start saving together
           </p>
         </div>
+
+        {/* Join a Chama */}
+        {user && <JoinByCodeForm />}
 
         {/* Search and Filter */}
         <Card>
