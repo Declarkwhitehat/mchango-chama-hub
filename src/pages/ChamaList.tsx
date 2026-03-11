@@ -147,6 +147,9 @@ const ChamaList = () => {
           </p>
         </div>
 
+        {/* Join a Chama */}
+        {user && <JoinByCodeForm />}
+
         {/* Search and Filter */}
         <Card>
           <CardContent className="pt-6">
