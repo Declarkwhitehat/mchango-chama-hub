@@ -20,21 +20,32 @@ interface AuditLog {
 export const AuditLogsTable = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
-    fetchAuditLogs();
+    fetchAuditLogs(0);
   }, []);
 
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = async (pageNum: number) => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('audit_logs')
-        .select('*')
+        .select('id, user_id, action, table_name, record_id, ip_address, created_at')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
       if (error) throw error;
-      setLogs(data || []);
+      const newData = data || [];
+      setHasMore(newData.length === PAGE_SIZE);
+      if (pageNum === 0) {
+        setLogs(newData);
+      } else {
+        setLogs(prev => [...prev, ...newData]);
+      }
+      setPage(pageNum);
     } catch (error: any) {
       console.error('Error fetching audit logs:', error);
       toast({
