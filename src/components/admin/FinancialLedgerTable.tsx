@@ -44,19 +44,23 @@ export const FinancialLedgerTable = () => {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
-    fetchLedgerEntries();
+    setPage(0);
+    fetchLedgerEntries(0);
   }, [sourceFilter, typeFilter]);
 
-  const fetchLedgerEntries = async () => {
+  const fetchLedgerEntries = async (pageNum: number) => {
     try {
       setLoading(true);
       let query = supabase
         .from('financial_ledger')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
       if (sourceFilter !== "all") {
         query = query.eq('source_type', sourceFilter);
