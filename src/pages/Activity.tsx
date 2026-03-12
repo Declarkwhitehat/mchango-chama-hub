@@ -66,9 +66,10 @@ export default function Activity() {
       if (memberIds.length > 0) {
         const { data, error: chamaError } = await supabase
           .from("contributions")
-          .select("*, chama:chama_id(name)")
+          .select("id, amount, status, created_at, chama_id, mpesa_receipt_number, member_id, chama:chama_id(name)")
           .in("member_id", memberIds)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(50);
           
         if (chamaError) throw chamaError;
         chamaData = data || [];
