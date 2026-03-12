@@ -83,9 +83,10 @@ export default function Activity() {
       // Fetch mchango donations with joined title
       const { data: mchangoData, error: mchangoError } = await supabase
         .from("mchango_donations")
-        .select("*, mchango:mchango_id(title)")
+        .select("id, amount, created_at, mchango_id, payment_status, payment_reference, mchango:mchango_id(title)")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (mchangoError) throw mchangoError;
 
