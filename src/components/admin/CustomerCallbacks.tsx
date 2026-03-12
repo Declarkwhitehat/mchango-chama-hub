@@ -63,7 +63,8 @@ export function CustomerCallbacks() {
       let query = supabase
         .from('customer_callbacks')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (selectedStatus !== 'all') {
         query = query.eq('status', selectedStatus);

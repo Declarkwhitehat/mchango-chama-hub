@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -11,8 +12,6 @@ interface AuditLog {
   action: string;
   table_name: string;
   record_id: string | null;
-  old_values: any;
-  new_values: any;
   ip_address: string | null;
   created_at: string;
 }
@@ -20,21 +19,32 @@ interface AuditLog {
 export const AuditLogsTable = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
-    fetchAuditLogs();
+    fetchAuditLogs(0);
   }, []);
 
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = async (pageNum: number) => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('audit_logs')
-        .select('*')
+        .select('id, user_id, action, table_name, record_id, ip_address, created_at')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
       if (error) throw error;
-      setLogs(data || []);
+      const newData = data || [];
+      setHasMore(newData.length === PAGE_SIZE);
+      if (pageNum === 0) {
+        setLogs(newData);
+      } else {
+        setLogs(prev => [...prev, ...newData]);
+      }
+      setPage(pageNum);
     } catch (error: any) {
       console.error('Error fetching audit logs:', error);
       toast({
@@ -111,6 +121,13 @@ export const AuditLogsTable = () => {
             </TableBody>
           </Table>
         </div>
+        {hasMore && (
+          <div className="flex justify-center mt-4">
+            <Button variant="outline" size="sm" onClick={() => fetchAuditLogs(page + 1)} disabled={loading}>
+              {loading ? "Loading..." : "Load More"}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

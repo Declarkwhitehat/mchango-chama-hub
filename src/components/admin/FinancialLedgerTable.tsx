@@ -44,19 +44,23 @@ export const FinancialLedgerTable = () => {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
-    fetchLedgerEntries();
+    setPage(0);
+    fetchLedgerEntries(0);
   }, [sourceFilter, typeFilter]);
 
-  const fetchLedgerEntries = async () => {
+  const fetchLedgerEntries = async (pageNum: number) => {
     try {
       setLoading(true);
       let query = supabase
         .from('financial_ledger')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
       if (sourceFilter !== "all") {
         query = query.eq('source_type', sourceFilter);
@@ -70,9 +74,15 @@ export const FinancialLedgerTable = () => {
 
       if (error) throw error;
 
-      setEntries(data || []);
+      const newData = data || [];
+      setHasMore(newData.length === PAGE_SIZE);
+      if (pageNum === 0) {
+        setEntries(newData);
+      } else {
+        setEntries(prev => [...prev, ...newData]);
+      }
 
-      // Calculate summary
+      // Calculate summary (on current page data for pageNum 0, accumulated for load more)
       const summaryData = (data || []).reduce(
         (acc, entry) => ({
           totalGross: acc.totalGross + Number(entry.gross_amount),
@@ -296,6 +306,13 @@ export const FinancialLedgerTable = () => {
               </TableBody>
             </Table>
           </div>
+          {hasMore && (
+            <div className="flex justify-center mt-4">
+              <Button variant="outline" size="sm" onClick={() => { const next = page + 1; setPage(next); fetchLedgerEntries(next); }} disabled={loading}>
+                {loading ? "Loading..." : "Load More"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

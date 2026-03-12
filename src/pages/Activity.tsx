@@ -66,9 +66,10 @@ export default function Activity() {
       if (memberIds.length > 0) {
         const { data, error: chamaError } = await supabase
           .from("contributions")
-          .select("*, chama:chama_id(name)")
+          .select("id, amount, status, created_at, chama_id, mpesa_receipt_number, member_id, chama:chama_id(name)")
           .in("member_id", memberIds)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(50);
           
         if (chamaError) throw chamaError;
         chamaData = data || [];
@@ -82,9 +83,10 @@ export default function Activity() {
       // Fetch mchango donations with joined title
       const { data: mchangoData, error: mchangoError } = await supabase
         .from("mchango_donations")
-        .select("*, mchango:mchango_id(title)")
+        .select("id, amount, created_at, mchango_id, payment_status, payment_reference, mchango:mchango_id(title)")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (mchangoError) throw mchangoError;
 
@@ -97,9 +99,10 @@ export default function Activity() {
       // Fetch organization donations with joined name
       const { data: orgData, error: orgError } = await supabase
         .from("organization_donations")
-        .select("*, organization:organization_id(name)")
+        .select("id, amount, created_at, organization_id, payment_status, mpesa_receipt_number, organization:organization_id(name)")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (orgError) throw orgError;
 
@@ -112,9 +115,10 @@ export default function Activity() {
       // Fetch withdrawals
       const { data: withdrawalData, error: withdrawalError } = await supabase
         .from("withdrawals")
-        .select("*")
+        .select("id, amount, status, created_at, payment_reference")
         .eq("requested_by", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (withdrawalError) throw withdrawalError;
 

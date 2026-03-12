@@ -145,7 +145,7 @@ export const CommissionAnalyticsDashboard = () => {
         query = query.eq("source_type", sourceFilter);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.limit(500);
       if (error) throw error;
 
       const entries = (data || []) as LedgerEntry[];
