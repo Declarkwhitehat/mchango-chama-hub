@@ -122,6 +122,13 @@ export const AuditLogsTable = () => {
             </TableBody>
           </Table>
         </div>
+        {hasMore && (
+          <div className="flex justify-center mt-4">
+            <Button variant="outline" size="sm" onClick={() => fetchAuditLogs(page + 1)} disabled={loading}>
+              {loading ? "Loading..." : "Load More"}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
