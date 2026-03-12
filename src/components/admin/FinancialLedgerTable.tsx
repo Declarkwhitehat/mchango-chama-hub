@@ -74,9 +74,15 @@ export const FinancialLedgerTable = () => {
 
       if (error) throw error;
 
-      setEntries(data || []);
+      const newData = data || [];
+      setHasMore(newData.length === PAGE_SIZE);
+      if (pageNum === 0) {
+        setEntries(newData);
+      } else {
+        setEntries(prev => [...prev, ...newData]);
+      }
 
-      // Calculate summary
+      // Calculate summary (on current page data for pageNum 0, accumulated for load more)
       const summaryData = (data || []).reduce(
         (acc, entry) => ({
           totalGross: acc.totalGross + Number(entry.gross_amount),
