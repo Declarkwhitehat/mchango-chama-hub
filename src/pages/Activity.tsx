@@ -99,9 +99,10 @@ export default function Activity() {
       // Fetch organization donations with joined name
       const { data: orgData, error: orgError } = await supabase
         .from("organization_donations")
-        .select("*, organization:organization_id(name)")
+        .select("id, amount, created_at, organization_id, payment_status, mpesa_receipt_number, organization:organization_id(name)")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (orgError) throw orgError;
 
