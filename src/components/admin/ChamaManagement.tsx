@@ -63,14 +63,16 @@ export const ChamaManagement = () => {
       const { data, error } = await supabase
         .from('chama')
         .select(`
-          *,
+          id, name, slug, description, contribution_amount, contribution_frequency,
+          max_members, status, is_verified, created_at,
           profiles:created_by (
             full_name,
             email
           ),
           chama_members(id, approval_status)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
 

@@ -115,9 +115,10 @@ export default function Activity() {
       // Fetch withdrawals
       const { data: withdrawalData, error: withdrawalError } = await supabase
         .from("withdrawals")
-        .select("*")
+        .select("id, amount, status, created_at, payment_reference")
         .eq("requested_by", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (withdrawalError) throw withdrawalError;
 

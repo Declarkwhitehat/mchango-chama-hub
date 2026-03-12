@@ -60,8 +60,9 @@ export const UsersManagement = () => {
     try {
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, full_name, email, phone, kyc_status, created_at, deleted_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (usersError) throw usersError;
 

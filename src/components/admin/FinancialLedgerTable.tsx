@@ -306,6 +306,13 @@ export const FinancialLedgerTable = () => {
               </TableBody>
             </Table>
           </div>
+          {hasMore && (
+            <div className="flex justify-center mt-4">
+              <Button variant="outline" size="sm" onClick={() => { const next = page + 1; setPage(next); fetchLedgerEntries(next); }} disabled={loading}>
+                {loading ? "Loading..." : "Load More"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

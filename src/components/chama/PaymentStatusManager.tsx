@@ -108,7 +108,7 @@ export const PaymentStatusManager = ({
       const startDate = startOfMonth(new Date());
       const { data: contributionsData, error: contributionsError } = await supabase
         .from("contributions")
-        .select("*")
+        .select("id, member_id, amount, contribution_date, status, payment_reference")
         .eq("chama_id", chamaId)
         .gte("contribution_date", startDate.toISOString())
         .order("contribution_date", { ascending: false });

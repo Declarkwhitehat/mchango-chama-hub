@@ -56,9 +56,10 @@ const AdminKYC = () => {
       // Fetch all profiles with KYC submissions
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, full_name, id_number, phone, email, kyc_status, id_front_url, id_back_url, kyc_submitted_at, kyc_rejection_reason')
         .not('kyc_submitted_at', 'is', null)
-        .order('kyc_submitted_at', { ascending: false });
+        .order('kyc_submitted_at', { ascending: false })
+        .limit(100);
 
       if (error) {
         console.error('Fetch error:', error);

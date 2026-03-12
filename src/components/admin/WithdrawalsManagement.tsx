@@ -69,7 +69,8 @@ export const WithdrawalsManagement = () => {
     loadWithdrawals();
     const channel = supabase
       .channel('admin-withdrawals')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, () => loadWithdrawals())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'withdrawals' }, () => loadWithdrawals())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'withdrawals' }, () => loadWithdrawals())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);

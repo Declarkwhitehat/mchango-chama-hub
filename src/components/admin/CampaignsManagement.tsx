@@ -60,13 +60,15 @@ export const CampaignsManagement = () => {
       const { data, error } = await supabase
         .from('mchango')
         .select(`
-          *,
+          id, title, slug, description, target_amount, current_amount,
+          status, is_verified, created_at,
           profiles:created_by (
             full_name,
             email
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
 
