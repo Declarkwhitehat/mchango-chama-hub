@@ -1,35 +1,68 @@
 
 
-## Diagnosis
+## Plan: Welfare Sequential Member IDs, Payment Lookup, and Document Uploads
 
-The withdrawal `0c616645` (KES 15) for the vibechasers account is stuck in `pending_retry` because:
+### Overview
 
-1. **B2C was initiated successfully** — ConversationID `AG_20260302_010015490foxbxdva8mf` was assigned, meaning Safaricom accepted and sent the money
-2. **Callback never arrived** — the `b2c-callback` function has zero logs, meaning Safaricom's result callback is not reaching the endpoint
-3. **Retry system re-sent B2C** — the retry function tried to send the money again, which failed with ResultCode 25 ("parameter format null"), putting it in `pending_retry`
-4. **User is now blocked** — the concurrent withdrawal check sees the `pending_retry` record and blocks new withdrawal requests with a 400 error
+Three features to add to the welfare system:
 
-There are 3 total stuck withdrawals across the system with the same pattern.
+1. **Sequential unique member IDs** (e.g., `WF4KM0001`) that persist when a member leaves and rejoins
+2. **Check Payment lookup** — search by name or member ID to view a member's transaction history
+3. **Constitution/Rules document upload** — executives can upload one document (max 3MB), members can view it
 
-## Root Cause
+---
 
-The `retry-failed-payouts` function blindly retries B2C for `pending_retry` withdrawals without checking if the original B2C already succeeded. It should first query Safaricom's Transaction Status API before attempting a new B2C.
+### 1. Sequential Member IDs with Rejoin Persistence
 
-## Fix Plan
+**Problem**: The current `generate_welfare_member_code()` function creates random 4-char suffixes (e.g., `WF4KHJ7N`). Need sequential IDs like `WF4KM0001`.
 
-### 1. Manually complete stuck withdrawal via RPC
-Call `process_withdrawal_completion` for withdrawal `0c616645` (KES 15) to mark it completed and deduct from the mchango balance. The ConversationID serves as the receipt since the callback never arrived.
+**Database Migration**:
+- Replace the `generate_welfare_member_code` function with a sequential version: `[group_code]M[zero-padded number]` (same pattern as chama)
+- The `assign_welfare_member_code` trigger already calls this function on INSERT
 
-Also complete `e2ea0312` (KES 10) which has the same pattern.
+**Edge Function (`welfare-members/index.ts`) — Rejoin Logic** (line 162-180):
+- Currently when a user has an existing record with `status = 'left'` or `'removed'`, the code falls through to INSERT (which would create a duplicate or fail). Fix:
+  - If `existing` is found with status `left` or `removed`, UPDATE their status back to `active` and keep the same `member_code`
+  - This ensures the original sequential ID is preserved on rejoin
 
-### 2. Fix retry-failed-payouts to query status before re-sending
-Change the retry logic: for withdrawals that already have a ConversationID in their notes (meaning B2C was previously initiated), call `b2c-status-query` first instead of blindly re-triggering `b2c-payout`. Only re-send if the status query confirms the original failed.
+### 2. Check Payment Feature
 
-### 3. Add a "check status" path in withdrawals-crud
-Add a PATCH handler so users can trigger a status check on their stuck `pending_retry` or `processing` withdrawals from the UI, rather than waiting for the cron.
+**New component**: `src/components/welfare/WelfarePaymentLookup.tsx`
+- Two search inputs: Name and Member ID
+- Queries `welfare_contributions` joined with `welfare_members` filtered by the welfare ID
+- Displays matching member's contribution history in a table: date, amount, status, receipt
+- Shows total contributed and number of payments
+- Add as a new tab "Check Payment" in `WelfareDetail.tsx` (visible to all members)
 
-### Files to Change
-- **`supabase/functions/retry-failed-payouts/index.ts`**: Add status-query-first logic for withdrawals with existing ConversationIDs
-- **`supabase/functions/withdrawals-crud/index.ts`**: Add PATCH handler for manual status check
-- **Manual DB fix**: Complete the 2-3 stuck withdrawals via RPC
+### 3. Constitution/Rules Document Upload
+
+**Database Migration**:
+- Add columns to `welfares` table:
+  - `constitution_file_path TEXT` — storage path
+  - `constitution_file_name TEXT` — original filename
+  - `constitution_uploaded_by UUID`
+  - `constitution_uploaded_at TIMESTAMPTZ`
+
+**Storage**:
+- Create a `welfare-documents` storage bucket (public: false)
+- RLS: authenticated users can read files for welfares they're members of; executives can upload
+
+**New component**: `src/components/welfare/WelfareConstitution.tsx`
+- If no document uploaded: executives see upload button, members see "No document uploaded"
+- Upload validates: file ≤ 3MB, only PDF/DOC/DOCX allowed, only one document per welfare
+- If document exists: all members see download button with file name and upload date
+- Executives see the document but cannot replace it (must ask admin to delete first)
+- Admin can delete the document via the admin welfare detail page
+
+**Add to `WelfareDetail.tsx`**: New tab "Documents" visible to all members
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| **Migration** | Replace `generate_welfare_member_code` function with sequential version; add constitution columns to `welfares`; create `welfare-documents` bucket + RLS |
+| `supabase/functions/welfare-members/index.ts` | Add rejoin logic: if existing member with `left`/`removed` status, reactivate with same member_code |
+| **New** `src/components/welfare/WelfarePaymentLookup.tsx` | Check payment search by name/member ID |
+| **New** `src/components/welfare/WelfareConstitution.tsx` | Document upload/view/download for constitution |
+| `src/pages/WelfareDetail.tsx` | Add "Check Payment" and "Documents" tabs |
 
