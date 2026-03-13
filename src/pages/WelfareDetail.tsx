@@ -259,14 +259,14 @@ const WelfareDetail = () => {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="w-full overflow-x-auto flex justify-start mb-4">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-            <TabsTrigger value="contribute" className="text-xs sm:text-sm">Contribute</TabsTrigger>
-            <TabsTrigger value="transactions" className="text-xs sm:text-sm">History</TabsTrigger>
-            <TabsTrigger value="payments" className="text-xs sm:text-sm">Check Payment</TabsTrigger>
-            <TabsTrigger value="documents" className="text-xs sm:text-sm">Documents</TabsTrigger>
-            {isExecutive && <TabsTrigger value="withdraw" className="text-xs sm:text-sm">Withdraw</TabsTrigger>}
-            {(isChairman || isSecretary) && <TabsTrigger value="manage" className="text-xs sm:text-sm">Manage</TabsTrigger>}
+          <TabsList className="w-full grid mb-4" style={{ gridTemplateColumns: `repeat(${5 + (isExecutive ? 1 : 0) + ((isChairman || isSecretary) ? 1 : 0)}, 1fr)` }}>
+            <TabsTrigger value="overview" className="text-[11px] sm:text-sm font-bold px-1 sm:px-3">Overview</TabsTrigger>
+            <TabsTrigger value="contribute" className="text-[11px] sm:text-sm font-bold px-1 sm:px-3">Contribute</TabsTrigger>
+            <TabsTrigger value="transactions" className="text-[11px] sm:text-sm font-bold px-1 sm:px-3">History</TabsTrigger>
+            <TabsTrigger value="payments" className="text-[11px] sm:text-sm font-bold px-1 sm:px-3">Payments</TabsTrigger>
+            <TabsTrigger value="documents" className="text-[11px] sm:text-sm font-bold px-1 sm:px-3">Docs</TabsTrigger>
+            {isExecutive && <TabsTrigger value="withdraw" className="text-[11px] sm:text-sm font-bold px-1 sm:px-3">Withdraw</TabsTrigger>}
+            {(isChairman || isSecretary) && <TabsTrigger value="manage" className="text-[11px] sm:text-sm font-bold px-1 sm:px-3">Manage</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
