@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Shield, Users, Wallet, History, Settings, Loader2, Copy, CheckCircle, XCircle, Clock, AlertTriangle, LogOut } from "lucide-react";
+import { Shield, Users, Wallet, History, Settings, Loader2, Copy, CheckCircle, XCircle, Clock, AlertTriangle, LogOut, Search, FileText } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { WelfareExecutivePanel } from "@/components/welfare/WelfareExecutivePanel";
@@ -18,6 +18,8 @@ import { WelfareContributionCycleManager } from "@/components/welfare/WelfareCon
 import { WelfareTransactionLog } from "@/components/welfare/WelfareTransactionLog";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecutiveChangeBanner";
+import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
+import { WelfareConstitution } from "@/components/welfare/WelfareConstitution";
 
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -257,10 +259,12 @@ const WelfareDetail = () => {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 mb-4">
+          <TabsList className="w-full overflow-x-auto flex justify-start mb-4">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
             <TabsTrigger value="contribute" className="text-xs sm:text-sm">Contribute</TabsTrigger>
             <TabsTrigger value="transactions" className="text-xs sm:text-sm">History</TabsTrigger>
+            <TabsTrigger value="payments" className="text-xs sm:text-sm">Check Payment</TabsTrigger>
+            <TabsTrigger value="documents" className="text-xs sm:text-sm">Documents</TabsTrigger>
             {isExecutive && <TabsTrigger value="withdraw" className="text-xs sm:text-sm">Withdraw</TabsTrigger>}
             {(isChairman || isSecretary) && <TabsTrigger value="manage" className="text-xs sm:text-sm">Manage</TabsTrigger>}
           </TabsList>
@@ -325,6 +329,22 @@ const WelfareDetail = () => {
 
           <TabsContent value="transactions">
             <WelfareTransactionLog welfareId={welfare.id} />
+          </TabsContent>
+
+          <TabsContent value="payments">
+            <WelfarePaymentLookup welfareId={welfare.id} />
+          </TabsContent>
+
+          <TabsContent value="documents">
+            <WelfareConstitution
+              welfareId={welfare.id}
+              welfareName={welfare.name}
+              constitutionFilePath={welfare.constitution_file_path}
+              constitutionFileName={welfare.constitution_file_name}
+              constitutionUploadedAt={welfare.constitution_uploaded_at}
+              isExecutive={isExecutive}
+              onUploaded={fetchWelfare}
+            />
           </TabsContent>
 
           {isExecutive && (

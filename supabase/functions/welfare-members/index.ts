@@ -170,6 +170,19 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Already a member' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      // Rejoin: reactivate existing member with same member_code
+      if (existing && (existing.status === 'left' || existing.status === 'removed')) {
+        const { data, error } = await supabaseAdmin
+          .from('welfare_members')
+          .update({ status: 'active', role: 'member' })
+          .eq('id', existing.id)
+          .select('*, profiles:user_id(full_name, phone)')
+          .single();
+
+        if (error) throw error;
+        return new Response(JSON.stringify({ data, rejoined: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       const { data, error } = await supabaseAdmin
         .from('welfare_members')
         .insert({ welfare_id: targetWelfareId, user_id: user.id, role: 'member', status: 'active' })
