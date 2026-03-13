@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Shield, Users, Wallet, History, Settings, Loader2, Copy, CheckCircle, XCircle, Clock, AlertTriangle, LogOut } from "lucide-react";
+import { Shield, Users, Wallet, History, Settings, Loader2, Copy, CheckCircle, XCircle, Clock, AlertTriangle, LogOut, Search, FileText } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { WelfareExecutivePanel } from "@/components/welfare/WelfareExecutivePanel";
