@@ -259,10 +259,12 @@ const WelfareDetail = () => {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 mb-4">
+          <TabsList className="w-full overflow-x-auto flex justify-start mb-4">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
             <TabsTrigger value="contribute" className="text-xs sm:text-sm">Contribute</TabsTrigger>
             <TabsTrigger value="transactions" className="text-xs sm:text-sm">History</TabsTrigger>
+            <TabsTrigger value="payments" className="text-xs sm:text-sm">Check Payment</TabsTrigger>
+            <TabsTrigger value="documents" className="text-xs sm:text-sm">Documents</TabsTrigger>
             {isExecutive && <TabsTrigger value="withdraw" className="text-xs sm:text-sm">Withdraw</TabsTrigger>}
             {(isChairman || isSecretary) && <TabsTrigger value="manage" className="text-xs sm:text-sm">Manage</TabsTrigger>}
           </TabsList>
