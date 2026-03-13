@@ -18,6 +18,8 @@ import { WelfareContributionCycleManager } from "@/components/welfare/WelfareCon
 import { WelfareTransactionLog } from "@/components/welfare/WelfareTransactionLog";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecutiveChangeBanner";
+import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
+import { WelfareConstitution } from "@/components/welfare/WelfareConstitution";
 
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
