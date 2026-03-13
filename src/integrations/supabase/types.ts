@@ -2776,6 +2776,10 @@ export type Database = {
         Row: {
           available_balance: number | null
           commission_rate: number | null
+          constitution_file_name: string | null
+          constitution_file_path: string | null
+          constitution_uploaded_at: string | null
+          constitution_uploaded_by: string | null
           contribution_amount: number | null
           contribution_deadline_days: number | null
           contribution_frequency: string | null
@@ -2804,6 +2808,10 @@ export type Database = {
         Insert: {
           available_balance?: number | null
           commission_rate?: number | null
+          constitution_file_name?: string | null
+          constitution_file_path?: string | null
+          constitution_uploaded_at?: string | null
+          constitution_uploaded_by?: string | null
           contribution_amount?: number | null
           contribution_deadline_days?: number | null
           contribution_frequency?: string | null
@@ -2832,6 +2840,10 @@ export type Database = {
         Update: {
           available_balance?: number | null
           commission_rate?: number | null
+          constitution_file_name?: string | null
+          constitution_file_path?: string | null
+          constitution_uploaded_at?: string | null
+          constitution_uploaded_by?: string | null
           contribution_amount?: number | null
           contribution_deadline_days?: number | null
           contribution_frequency?: string | null
