@@ -331,6 +331,22 @@ const WelfareDetail = () => {
             <WelfareTransactionLog welfareId={welfare.id} />
           </TabsContent>
 
+          <TabsContent value="payments">
+            <WelfarePaymentLookup welfareId={welfare.id} />
+          </TabsContent>
+
+          <TabsContent value="documents">
+            <WelfareConstitution
+              welfareId={welfare.id}
+              welfareName={welfare.name}
+              constitutionFilePath={welfare.constitution_file_path}
+              constitutionFileName={welfare.constitution_file_name}
+              constitutionUploadedAt={welfare.constitution_uploaded_at}
+              isExecutive={isExecutive}
+              onUploaded={fetchWelfare}
+            />
+          </TabsContent>
+
           {isExecutive && (
             <TabsContent value="withdraw">
               {(isChairman || isTreasurer) && !welfare.is_frozen && !cooldownActive && (
