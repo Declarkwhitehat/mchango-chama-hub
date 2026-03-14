@@ -259,14 +259,14 @@ const WelfareDetail = () => {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="w-full grid gap-2 mb-6 auto-rows-fr" style={{ gridTemplateColumns: `repeat(${Math.min(3, 5 + (isExecutive ? 1 : 0) + ((isChairman || isSecretary) ? 1 : 0))}, 1fr)` }}>
-            <TabsTrigger value="overview" className="text-sm sm:text-base font-bold px-2 py-3 h-auto whitespace-normal leading-tight">Overview</TabsTrigger>
-            <TabsTrigger value="contribute" className="text-sm sm:text-base font-bold px-2 py-3 h-auto whitespace-normal leading-tight">Contribute</TabsTrigger>
-            <TabsTrigger value="transactions" className="text-sm sm:text-base font-bold px-2 py-3 h-auto whitespace-normal leading-tight">History</TabsTrigger>
-            <TabsTrigger value="payments" className="text-sm sm:text-base font-bold px-2 py-3 h-auto whitespace-normal leading-tight">Payments</TabsTrigger>
-            <TabsTrigger value="documents" className="text-sm sm:text-base font-bold px-2 py-3 h-auto whitespace-normal leading-tight">Documents</TabsTrigger>
-            {isExecutive && <TabsTrigger value="withdraw" className="text-sm sm:text-base font-bold px-2 py-3 h-auto whitespace-normal leading-tight">Withdraw</TabsTrigger>}
-            {(isChairman || isSecretary) && <TabsTrigger value="manage" className="text-sm sm:text-base font-bold px-2 py-3 h-auto whitespace-normal leading-tight">Manage</TabsTrigger>}
+          <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 5 + (isExecutive ? 1 : 0) + ((isChairman || isSecretary) ? 1 : 0))}, 1fr)` }}>
+            <TabsTrigger value="overview" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Overview</TabsTrigger>
+            <TabsTrigger value="contribute" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Contribute</TabsTrigger>
+            <TabsTrigger value="transactions" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">History</TabsTrigger>
+            <TabsTrigger value="payments" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Payments</TabsTrigger>
+            <TabsTrigger value="documents" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Documents</TabsTrigger>
+            {isExecutive && <TabsTrigger value="withdraw" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Withdraw</TabsTrigger>}
+            {(isChairman || isSecretary) && <TabsTrigger value="manage" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Manage</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
