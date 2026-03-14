@@ -237,12 +237,19 @@ serve(async (req) => {
             .maybeSingle();
 
           if (beneficiaryMember && chamaData) {
-            // Calculate payout: each member's contribution × number of members, minus commission
-            const payoutGross = chamaData.contribution_amount * totalMembers;
-            const payoutCommission = payoutGross * commissionRate;
-            const netPayoutAmount = payoutGross - payoutCommission;
+            // Use available_balance as payout source — commission already deducted per-contribution
+            // by the settlement engine (contributions-crud/settle-only)
+            const { data: chamaPoolBalance } = await supabase
+              .from('chama')
+              .select('available_balance')
+              .eq('id', chamaMemberData.chama_id)
+              .single();
 
-            console.log(`C2B Immediate payout: ${totalMembers} members × KES ${chamaData.contribution_amount} = KES ${payoutGross}, commission: KES ${payoutCommission}, net: KES ${netPayoutAmount}`);
+            const netPayoutAmount = chamaPoolBalance?.available_balance || 0;
+            const payoutCommission = 0; // Already collected per-contribution in settleDebts()
+            const payoutGross = netPayoutAmount; // Pool is already net of commission
+
+            console.log(`C2B Immediate payout: available_balance = KES ${netPayoutAmount} (commission already deducted per-contribution)`);
 
             // Get beneficiary's payment method
             const { data: paymentMethod } = await supabase
@@ -264,6 +271,7 @@ serve(async (req) => {
                 .from('withdrawals')
                 .insert({
                   chama_id: chamaMemberData.chama_id,
+                  cycle_id: currentCycle.id, // Link to cycle for duplicate prevention
                   requested_by: beneficiaryMember.user_id,
                   amount: payoutGross,
                   commission_amount: payoutCommission,
@@ -279,14 +287,11 @@ serve(async (req) => {
                 .select('id')
                 .single();
 
-              if (!withdrawalError && newWithdrawal) {
-                // Record commission
-                await supabase.rpc('record_company_earning', {
-                  p_source: 'chama_commission',
-                  p_amount: payoutCommission,
-                  p_group_id: chamaMemberData.chama_id,
-                  p_description: `Immediate C2B payout commission - ${chamaData.name}`
-                });
+              if (withdrawalError && (withdrawalError as any).code === '23505') {
+                console.log(`⚠️ C2B: Duplicate payout prevented for cycle ${currentCycle.id}`);
+              } else if (!withdrawalError && newWithdrawal) {
+                // Commission already collected per-contribution — no double-charge
+                // Skip record_company_earning here since it was done in settleDebts()
 
                 // Mark cycle as complete
                 await supabase
@@ -550,7 +555,7 @@ serve(async (req) => {
       const { error: orgUpdateError } = await supabase
         .from('organizations')
         .update({
-          current_amount: (orgData.current_amount || 0) + grossAmount,
+          current_amount: (orgData.current_amount || 0) + netAmount,
           total_gross_collected: (orgData.total_gross_collected || 0) + grossAmount,
           total_commission_paid: (orgData.total_commission_paid || 0) + commissionAmount,
           available_balance: (orgData.available_balance || 0) + netAmount,
