@@ -555,7 +555,7 @@ serve(async (req) => {
       const { error: orgUpdateError } = await supabase
         .from('organizations')
         .update({
-          current_amount: (orgData.current_amount || 0) + grossAmount,
+          current_amount: (orgData.current_amount || 0) + netAmount,
           total_gross_collected: (orgData.total_gross_collected || 0) + grossAmount,
           total_commission_paid: (orgData.total_commission_paid || 0) + commissionAmount,
           available_balance: (orgData.available_balance || 0) + netAmount,
