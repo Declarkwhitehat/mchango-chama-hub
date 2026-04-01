@@ -161,16 +161,18 @@ const Home = () => {
     const [mchangoResult, chamaResult, memberChamaResult, orgResult, welfareResult] = await Promise.allSettled([
       supabase
         .from('mchango')
-        .select('*')
+        .select('id, title, slug, description, target_amount, current_amount, end_date, created_at')
         .eq('created_by', user.id)
         .eq('status', 'active')
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(50),
       supabase
         .from('chama')
-        .select('*')
+        .select('id, name, slug, description, created_at, contribution_amount, contribution_frequency')
         .eq('created_by', user.id)
         .in('status', ['pending', 'active', 'cycle_complete'])
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(50),
       supabase
         .from('chama_members')
         .select(`
@@ -186,13 +188,15 @@ const Home = () => {
           )
         `)
         .eq('user_id', user.id)
-        .eq('approval_status', 'approved'),
+        .eq('approval_status', 'approved')
+        .limit(50),
       supabase
         .from('organizations')
-        .select('*')
+        .select('id, name, slug, description, category, current_amount, created_at')
         .eq('created_by', user.id)
         .eq('status', 'active')
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(50),
       supabase.functions.invoke('welfare-crud', { method: 'GET' }),
     ]);
 
