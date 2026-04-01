@@ -52,7 +52,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, full_name, email, phone, id_number, kyc_status, kyc_submitted_at, kyc_rejection_reason, created_at, payment_details_completed')
         .eq('id', userId)
         .single();
 
