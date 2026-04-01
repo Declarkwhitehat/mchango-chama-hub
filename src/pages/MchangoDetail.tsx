@@ -74,7 +74,7 @@ const MchangoDetail = () => {
       // First, try to fetch the campaign
       const { data, error } = await supabase
         .from('mchango')
-        .select('*')
+        .select('id, title, slug, description, target_amount, current_amount, end_date, created_at, created_by, status, image_url, image_url_2, image_url_3, category, whatsapp_link, youtube_url, beneficiary_url, is_verified, is_public, paybill_account_id, group_code, managers, available_balance, total_gross_collected, total_commission_paid')
         .eq('slug', id)
         .maybeSingle();
 

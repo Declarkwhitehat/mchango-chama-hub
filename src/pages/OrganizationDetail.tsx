@@ -72,7 +72,7 @@ const OrganizationDetail = () => {
       
       const { data, error } = await supabase
         .from('organizations')
-        .select('*')
+        .select('id, name, slug, description, about, category, current_amount, location, logo_url, cover_image_url, is_verified, is_public, created_by, email, phone, website_url, youtube_url, whatsapp_link, paybill_account_id, group_code, available_balance, total_gross_collected, total_commission_paid, status, created_at')
         .eq('slug', id)
         .eq('is_public', true)
         .maybeSingle();

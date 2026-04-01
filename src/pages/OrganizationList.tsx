@@ -49,10 +49,11 @@ const OrganizationList = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('organizations')
-        .select('*')
+        .select('id, name, slug, description, category, current_amount, location, logo_url, is_verified, created_at')
         .eq('status', 'active')
         .eq('is_public', true)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
       setOrganizations(data || []);
