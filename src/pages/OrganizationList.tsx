@@ -49,7 +49,7 @@ const OrganizationList = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, slug, description, category, current_amount, location, logo_url, is_verified, created_at')
+        .select('id, name, slug, description, about, category, current_amount, location, logo_url, cover_image_url, website_url, is_verified, status, created_at, created_by, total_gross_collected')
         .eq('status', 'active')
         .eq('is_public', true)
         .order('created_at', { ascending: false })
