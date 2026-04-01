@@ -77,12 +77,13 @@ const ChamaList = () => {
         const { data: myChamas, error: myError } = await supabase
           .from('chama')
           .select(`
-            *,
+            ${chamaColumns},
             profiles!chama_created_by_fkey(full_name),
             chama_members(approval_status)
           `)
           .in('status', ['pending', 'active', 'cycle_complete'])
-          .eq('is_public', false);
+          .eq('is_public', false)
+          .limit(50);
 
         if (!myError && myChamas) {
           allChamas = [...allChamas, ...myChamas];
