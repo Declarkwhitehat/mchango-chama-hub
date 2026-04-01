@@ -52,7 +52,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, full_name, email, phone, id_number, kyc_status, kyc_submitted_at, kyc_rejection_reason, created_at, payment_details_completed')
         .eq('id', userId)
         .single();
 
@@ -113,9 +113,13 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
 
     initializeAuth();
 
-    // Refresh session when tab regains focus (fixes stale token after idle)
+    // Refresh session when tab regains focus (debounced – skip if < 60s since last)
+    let lastVisibilityRefresh = 0;
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        if (now - lastVisibilityRefresh < 60_000) return; // skip if < 60s
+        lastVisibilityRefresh = now;
         supabase.auth.getSession().then(({ data: { session: refreshedSession } }) => {
           if (!mounted) return;
           setSession(refreshedSession);

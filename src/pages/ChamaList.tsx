@@ -51,15 +51,17 @@ const ChamaList = () => {
       setLoading(true);
       
       // Fetch public chamas
+      const chamaColumns = 'id, name, slug, description, contribution_amount, contribution_frequency, max_members, status, is_verified, created_at, is_public';
       let publicQuery = supabase
         .from('chama')
         .select(`
-          *,
+          ${chamaColumns},
           profiles!chama_created_by_fkey(full_name),
           chama_members(approval_status)
         `)
         .in('status', ['pending', 'active', 'cycle_complete'])
-        .eq('is_public', true);
+        .eq('is_public', true)
+        .limit(50);
 
       if (sortBy === 'newest') {
         publicQuery = publicQuery.order('created_at', { ascending: false });
@@ -75,12 +77,13 @@ const ChamaList = () => {
         const { data: myChamas, error: myError } = await supabase
           .from('chama')
           .select(`
-            *,
+            ${chamaColumns},
             profiles!chama_created_by_fkey(full_name),
             chama_members(approval_status)
           `)
           .in('status', ['pending', 'active', 'cycle_complete'])
-          .eq('is_public', false);
+          .eq('is_public', false)
+          .limit(50);
 
         if (!myError && myChamas) {
           allChamas = [...allChamas, ...myChamas];

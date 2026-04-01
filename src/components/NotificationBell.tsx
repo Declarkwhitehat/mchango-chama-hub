@@ -71,10 +71,10 @@ export function NotificationBell() {
     try {
       const { data, error } = await supabase
         .from('notifications')
-        .select('*')
+        .select('id, title, message, type, is_read, category, created_at, related_entity_id, related_entity_type')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(30);
 
       if (error) throw error;
       setNotifications(data || []);

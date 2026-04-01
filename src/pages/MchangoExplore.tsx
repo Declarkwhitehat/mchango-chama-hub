@@ -57,7 +57,7 @@ const MchangoExplore = () => {
           query = query.order("created_at", { ascending: false });
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.limit(50);
 
       if (error) throw error;
       setMchangos(data || []);
