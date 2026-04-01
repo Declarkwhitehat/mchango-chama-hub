@@ -289,12 +289,15 @@ const WelfareDetail = () => {
               <CardContent>
                 <div className="space-y-2">
                   {activeMembers.map((member: any) => (
-                    <div key={member.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                      <div>
-                        <p className="font-medium text-sm">{member.profiles?.full_name || 'Unknown'}</p>
-                        {member.user_id === user?.id && (
-                          <p className="text-xs text-muted-foreground">{member.member_code}</p>
-                        )}
+                    <div key={member.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-primary">{member.member_code?.replace(/^.*M/, 'M') || '?'}</span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">{member.profiles?.full_name || 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{member.member_code || 'No ID'}</p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
