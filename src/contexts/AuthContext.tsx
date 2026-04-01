@@ -113,9 +113,13 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
 
     initializeAuth();
 
-    // Refresh session when tab regains focus (fixes stale token after idle)
+    // Refresh session when tab regains focus (debounced – skip if < 60s since last)
+    let lastVisibilityRefresh = 0;
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        if (now - lastVisibilityRefresh < 60_000) return; // skip if < 60s
+        lastVisibilityRefresh = now;
         supabase.auth.getSession().then(({ data: { session: refreshedSession } }) => {
           if (!mounted) return;
           setSession(refreshedSession);

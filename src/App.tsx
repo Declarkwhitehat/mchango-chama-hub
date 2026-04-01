@@ -69,7 +69,17 @@ const AdminFraudConfig = lazy(() => import("./pages/AdminFraudConfig"));
 const AdminPayoutApprovals = lazy(() => import("./pages/AdminPayoutApprovals"));
 const AdminRevenue = lazy(() => import("./pages/AdminRevenue"));
 const AdminWelfareExecutiveChanges = lazy(() => import("./pages/AdminWelfareExecutiveChanges"));
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000,      // 2 min – reuse cached data without refetching
+      gcTime: 10 * 60 * 1000,         // 10 min – keep unused cache entries
+      refetchOnWindowFocus: false,     // don't refetch every tab-switch
+      retry: 1,                        // single retry on failure
+      refetchOnReconnect: 'always',    // do refetch after offline→online
+    },
+  },
+});
 
 // Loading fallback component
 const PageLoader = () => (
