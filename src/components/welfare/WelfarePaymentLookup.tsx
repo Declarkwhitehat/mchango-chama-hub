@@ -60,11 +60,10 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
       // Fetch contributions for this member
       const { data: contributions, error: cErr } = await supabase
         .from("welfare_contributions")
-        .select("id, amount, gross_amount, net_amount, payment_status, mpesa_receipt_number, created_at, contribution_type")
+        .select("id, gross_amount, net_amount, payment_status, mpesa_receipt_number, created_at, payment_reference")
         .eq("welfare_id", welfareId)
         .eq("member_id", member.id)
-        .order("created_at", { ascending: false })
-        .limit(100);
+        .order("created_at", { ascending: false });
 
       if (cErr) throw cErr;
       setResults(contributions || []);
