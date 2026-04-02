@@ -60,11 +60,10 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
       // Fetch contributions for this member
       const { data: contributions, error: cErr } = await supabase
         .from("welfare_contributions")
-        .select("id, amount, gross_amount, net_amount, payment_status, mpesa_receipt_number, created_at, contribution_type")
+        .select("id, gross_amount, net_amount, payment_status, mpesa_receipt_number, created_at, payment_reference")
         .eq("welfare_id", welfareId)
         .eq("member_id", member.id)
-        .order("created_at", { ascending: false })
-        .limit(100);
+        .order("created_at", { ascending: false });
 
       if (cErr) throw cErr;
       setResults(contributions || []);
@@ -76,7 +75,7 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
     }
   };
 
-  const totalPaid = results?.filter(r => r.payment_status === "completed").reduce((sum, r) => sum + Number(r.amount || 0), 0) || 0;
+  const totalPaid = results?.filter(r => r.payment_status === "completed").reduce((sum, r) => sum + Number(r.gross_amount || 0), 0) || 0;
   const completedCount = results?.filter(r => r.payment_status === "completed").length || 0;
 
   return (
@@ -158,7 +157,7 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
                 {results.map((tx) => (
                   <TableRow key={tx.id}>
                     <TableCell className="text-xs">{format(new Date(tx.created_at), "dd MMM yyyy")}</TableCell>
-                    <TableCell className="font-medium">KES {Number(tx.amount || 0).toLocaleString()}</TableCell>
+                    <TableCell className="font-medium">KES {Number(tx.gross_amount || 0).toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge
                         variant={tx.payment_status === "completed" ? "default" : "secondary"}
