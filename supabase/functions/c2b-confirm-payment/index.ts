@@ -622,13 +622,40 @@ serve(async (req) => {
       );
     }
 
-    // Try welfare - matches by paybill_account_id (e.g., WFYWFHXY) or group_code
-    const { data: welfareData } = await supabase
-      .from('welfares')
-      .select('id, name, group_code, paybill_account_id, current_amount, total_gross_collected, total_commission_paid, available_balance, commission_rate')
-      .or(`paybill_account_id.eq.${upperAccountNumber},group_code.eq.${upperAccountNumber}`)
+    // Try welfare - first check if the account number is a welfare member_code (e.g., Q8KKUG7V → member ID)
+    let welfareData = null;
+    let matchedMember = null;
+
+    const { data: welfareMemberByCode } = await supabase
+      .from('welfare_members')
+      .select('id, user_id, welfare_id, member_code')
+      .eq('member_code', upperAccountNumber)
       .eq('status', 'active')
       .maybeSingle();
+
+    if (welfareMemberByCode) {
+      console.log('Found Welfare member by member_code:', welfareMemberByCode);
+      matchedMember = { id: welfareMemberByCode.id, user_id: welfareMemberByCode.user_id };
+
+      // Fetch the welfare group data
+      const { data: wData } = await supabase
+        .from('welfares')
+        .select('id, name, group_code, paybill_account_id, current_amount, total_gross_collected, total_commission_paid, available_balance, commission_rate')
+        .eq('id', welfareMemberByCode.welfare_id)
+        .single();
+      welfareData = wData;
+    }
+
+    // If not matched by member_code, try group-level paybill_account_id or group_code
+    if (!welfareData) {
+      const { data: wData } = await supabase
+        .from('welfares')
+        .select('id, name, group_code, paybill_account_id, current_amount, total_gross_collected, total_commission_paid, available_balance, commission_rate')
+        .or(`paybill_account_id.eq.${upperAccountNumber},group_code.eq.${upperAccountNumber}`)
+        .eq('status', 'active')
+        .maybeSingle();
+      welfareData = wData;
+    }
 
     if (welfareData) {
       console.log('Found Welfare group:', welfareData);
@@ -641,25 +668,26 @@ serve(async (req) => {
       const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'Anonymous';
       const cycleMonth = new Date().toISOString().substring(0, 7);
 
-      // Try to find welfare member by matching phone number in profiles
-      let matchedMember = null;
-      const { data: allMembers } = await supabase
-        .from('welfare_members')
-        .select('id, user_id')
-        .eq('welfare_id', welfareData.id)
-        .eq('status', 'active');
+      // If not already matched by member_code, try matching by phone number
+      if (!matchedMember) {
+        const { data: allMembers } = await supabase
+          .from('welfare_members')
+          .select('id, user_id')
+          .eq('welfare_id', welfareData.id)
+          .eq('status', 'active');
 
-      if (allMembers && phoneNumber) {
-        const phoneSuffix = phoneNumber.replace(/\D/g, '').slice(-9);
-        for (const wm of allMembers) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('phone')
-            .eq('id', wm.user_id)
-            .maybeSingle();
-          if (profile?.phone && profile.phone.replace(/\D/g, '').endsWith(phoneSuffix)) {
-            matchedMember = wm;
-            break;
+        if (allMembers && phoneNumber) {
+          const phoneSuffix = phoneNumber.replace(/\D/g, '').slice(-9);
+          for (const wm of allMembers) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('phone')
+              .eq('id', wm.user_id)
+              .maybeSingle();
+            if (profile?.phone && profile.phone.replace(/\D/g, '').endsWith(phoneSuffix)) {
+              matchedMember = wm;
+              break;
+            }
           }
         }
       }

@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, CheckCircle2 } from "lucide-react";
 
 interface Props {
   welfareId: string;
@@ -21,15 +21,51 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [category, setCategory] = useState("");
-  const [recipientPhone, setRecipientPhone] = useState("");
+  const [recipientMemberId, setRecipientMemberId] = useState("");
+  const [resolvedRecipient, setResolvedRecipient] = useState<{ name: string; phone: string; memberId: string } | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const lookupMember = async () => {
+    const code = recipientMemberId.trim().toUpperCase();
+    if (!code) { toast.error("Enter a member ID"); return; }
+    setLookingUp(true);
+    setResolvedRecipient(null);
+    try {
+      const { data: member, error } = await supabase
+        .from('welfare_members')
+        .select('id, member_code, user_id, status')
+        .eq('welfare_id', welfareId)
+        .eq('member_code', code)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!member) { toast.error("Member ID not found in this welfare group"); return; }
+      if (member.status !== 'active') { toast.error("This member is not active"); return; }
+
+      const { data: profile, error: pErr } = await supabase
+        .from('profiles')
+        .select('full_name, phone')
+        .eq('id', member.user_id)
+        .single();
+
+      if (pErr || !profile?.phone) { toast.error("Could not resolve member's phone number"); return; }
+
+      setResolvedRecipient({ name: profile.full_name || 'Unknown', phone: profile.phone, memberId: code });
+      toast.success(`Recipient: ${profile.full_name}`);
+    } catch (err: any) {
+      toast.error(err.message || "Lookup failed");
+    } finally {
+      setLookingUp(false);
+    }
+  };
 
   const handleRequest = async () => {
     const numAmount = Number(amount);
     if (!user?.id) { toast.error("Please log in again and retry"); return; }
     if (!numAmount || numAmount <= 0) { toast.error("Enter a valid amount"); return; }
     if (numAmount > availableBalance) { toast.error("Insufficient balance"); return; }
-    if (!recipientPhone.trim()) { toast.error("Recipient phone required"); return; }
+    if (!resolvedRecipient) { toast.error("Look up the recipient member ID first"); return; }
     if (!category) { toast.error("Select a reason category"); return; }
 
     setLoading(true);
@@ -43,7 +79,7 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
           commission_amount: 0,
           net_amount: numAmount,
           status: 'pending_approval',
-          notes: `Category: ${category}. ${reason}. Recipient: ${recipientPhone}`,
+          notes: `Category: ${category}. ${reason}. Recipient: ${resolvedRecipient.phone} (Member ID: ${resolvedRecipient.memberId}, Name: ${resolvedRecipient.name})`,
         })
         .select()
         .single();
@@ -79,13 +115,13 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
       const approvalError = approvalInserts.find((result) => result.error)?.error;
       if (approvalError) throw approvalError;
 
-      // Notify secretary and treasurer about the pending withdrawal
+      // Notify secretary and treasurer
       await Promise.all(
         members.map((member) =>
           supabase.from('notifications').insert({
             user_id: member.user_id,
             title: 'Welfare Withdrawal Pending Your Approval',
-            message: `A withdrawal of KES ${numAmount.toLocaleString()} (${category}) requires your approval as ${member.role}.`,
+            message: `A withdrawal of KES ${numAmount.toLocaleString()} (${category}) to ${resolvedRecipient.name} requires your approval as ${member.role}.`,
             category: 'welfare',
             type: 'action_required',
             related_entity_type: 'welfare',
@@ -95,7 +131,7 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
       );
 
       toast.success("Withdrawal request submitted for approval");
-      setAmount(""); setReason(""); setCategory(""); setRecipientPhone("");
+      setAmount(""); setReason(""); setCategory(""); setRecipientMemberId(""); setResolvedRecipient(null);
       onRequested();
     } catch (error: any) {
       toast.error(error.message || "Failed to submit request");
@@ -116,8 +152,24 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
         <p className="text-sm text-muted-foreground">Available: <strong>KES {availableBalance.toLocaleString()}</strong></p>
 
         <div className="space-y-2">
-          <Label>Recipient Phone Number</Label>
-          <Input placeholder="e.g., 0712345678" value={recipientPhone} onChange={(e) => setRecipientPhone(e.target.value)} />
+          <Label>Recipient Member ID</Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="e.g., Q8KKM0001"
+              value={recipientMemberId}
+              onChange={(e) => { setRecipientMemberId(e.target.value.toUpperCase()); setResolvedRecipient(null); }}
+              className="font-mono"
+            />
+            <Button type="button" variant="outline" onClick={lookupMember} disabled={lookingUp || !recipientMemberId.trim()}>
+              {lookingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+            </Button>
+          </div>
+          {resolvedRecipient && (
+            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 dark:bg-green-950/30 rounded-md p-2">
+              <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+              <span><strong>{resolvedRecipient.name}</strong> — {resolvedRecipient.phone}</span>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -144,7 +196,7 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
           <Textarea placeholder="Provide details..." value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
         </div>
 
-        <Button onClick={handleRequest} disabled={loading} className="w-full">
+        <Button onClick={handleRequest} disabled={loading || !resolvedRecipient} className="w-full">
           {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
           Submit for Approval
         </Button>

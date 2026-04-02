@@ -157,7 +157,7 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
                 {results.map((tx) => (
                   <TableRow key={tx.id}>
                     <TableCell className="text-xs">{format(new Date(tx.created_at), "dd MMM yyyy")}</TableCell>
-                    <TableCell className="font-medium">KES {Number(tx.amount || 0).toLocaleString()}</TableCell>
+                    <TableCell className="font-medium">KES {Number(tx.gross_amount || 0).toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge
                         variant={tx.payment_status === "completed" ? "default" : "secondary"}
