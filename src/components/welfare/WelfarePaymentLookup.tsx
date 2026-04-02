@@ -75,7 +75,7 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
     }
   };
 
-  const totalPaid = results?.filter(r => r.payment_status === "completed").reduce((sum, r) => sum + Number(r.amount || 0), 0) || 0;
+  const totalPaid = results?.filter(r => r.payment_status === "completed").reduce((sum, r) => sum + Number(r.gross_amount || 0), 0) || 0;
   const completedCount = results?.filter(r => r.payment_status === "completed").length || 0;
 
   return (
