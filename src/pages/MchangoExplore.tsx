@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Heart, Calendar, TrendingUp, Share2 } from "lucide-react";
+import { Search, Heart, Calendar, TrendingUp } from "lucide-react";
+import { ShareMenu } from "@/components/ShareMenu";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { toast } from "sonner";
 
@@ -97,15 +98,7 @@ const MchangoExplore = () => {
     return diff > 0 ? diff : 0;
   };
 
-  const handleSharePage = async () => {
-    const url = window.location.href;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied! Share it with anyone.");
-    } catch {
-      toast.error("Failed to copy link");
-    }
-  };
+  const exploreShareUrl = window.location.href;
 
   return (
     <div className="min-h-screen bg-background">
@@ -119,10 +112,7 @@ const MchangoExplore = () => {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
             Browse active fundraising campaigns and make a difference. Every contribution counts!
           </p>
-          <Button onClick={handleSharePage} variant="outline" className="gap-2">
-            <Share2 className="h-4 w-4" />
-            Share This Page
-          </Button>
+          <ShareMenu url={exploreShareUrl} title="Explore Mchango" text="Browse active fundraising campaigns on Pamoja Nova" label="Share This Page" />
         </div>
       </div>
 

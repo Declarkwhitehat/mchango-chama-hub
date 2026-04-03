@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, TrendingUp, Calendar, Heart, Share2 } from "lucide-react";
+import { Search, TrendingUp, Calendar, Heart } from "lucide-react";
+import { ShareMenu } from "@/components/ShareMenu";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -115,15 +116,7 @@ const MchangoList = () => {
     return daysLeft === null || daysLeft > 0;
   });
 
-  const handleSharePublicLink = async () => {
-    const publicUrl = `${window.location.origin}/explore/mchango`;
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      toast.success("Public link copied! Share it with anyone.");
-    } catch {
-      toast.error("Failed to copy link");
-    }
-  };
+  const publicShareUrl = `${window.location.origin}/explore/mchango`;
 
   if (loading) {
     return (
@@ -148,10 +141,7 @@ const MchangoList = () => {
           <p className="text-muted-foreground">
             Support meaningful causes and make a difference in people's lives
           </p>
-          <Button variant="outline" onClick={handleSharePublicLink} className="gap-2">
-            <Share2 className="h-4 w-4" />
-            Share Public Link
-          </Button>
+          <ShareMenu url={publicShareUrl} title="Mchango Campaigns" text="Support meaningful causes on Pamoja Nova" label="Share Public Link" />
         </div>
 
         {/* Search and Filter */}

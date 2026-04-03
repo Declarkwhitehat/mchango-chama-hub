@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Building2, MapPin, Globe, Share2, Plus } from "lucide-react";
+import { Search, Building2, MapPin, Globe, Plus } from "lucide-react";
+import { ShareMenu } from "@/components/ShareMenu";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -85,15 +86,7 @@ const OrganizationList = () => {
 
   const categories = [...new Set(organizations.map(org => org.category).filter(Boolean))];
 
-  const handleSharePublicLink = async () => {
-    const publicUrl = `${window.location.origin}/organizations`;
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      toast.success("Public link copied! Share it with anyone.");
-    } catch {
-      toast.error("Failed to copy link");
-    }
-  };
+  const publicShareUrl = `${window.location.origin}/organizations`;
 
   const OrganizationCard = ({ org }: { org: Organization }) => (
     <Card
@@ -189,10 +182,7 @@ const OrganizationList = () => {
             Discover and support verified churches, schools, orphanages, NGOs and other organizations making a difference in their communities.
           </p>
           <div className="flex items-center justify-center gap-3">
-            <Button variant="outline" onClick={handleSharePublicLink} className="gap-2">
-              <Share2 className="h-4 w-4" />
-              Share Public Link
-            </Button>
+            <ShareMenu url={publicShareUrl} title="Support Organizations" text="Discover and support verified organizations on Pamoja Nova" label="Share Public Link" />
             {user && profile?.kyc_status === 'approved' && (
               <Button onClick={() => navigate('/organizations/create')} className="gap-2">
                 <Plus className="h-4 w-4" />

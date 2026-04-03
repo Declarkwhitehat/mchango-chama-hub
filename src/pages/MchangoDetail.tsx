@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Calendar, Share2, Loader2, AlertCircle, UserPlus, Bell, Shield, Eye } from "lucide-react";
+import { Calendar, Loader2, AlertCircle, UserPlus, Bell, Shield, Eye } from "lucide-react";
+import { ShareMenu } from "@/components/ShareMenu";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DonationForm } from "@/components/DonationForm";
@@ -132,12 +133,7 @@ const MchangoDetail = () => {
     return diffDays > 0 ? diffDays : 0;
   };
 
-  const handleShare = () => {
-    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    const shareUrl = `${baseUrl}/mchango/${campaign?.slug}`;
-    navigator.clipboard.writeText(shareUrl);
-    toast.success("Link copied to clipboard!");
-  };
+  const shareUrl = `${import.meta.env.VITE_APP_URL || window.location.origin}/mchango/${campaign?.slug}`;
 
   if (loading) {
     return (
@@ -238,10 +234,7 @@ const MchangoDetail = () => {
                       {daysLeft} days left
                     </Badge>
                   )}
-                  <Button variant="outline" size="sm" onClick={handleShare}>
-                    <Share2 className="h-3 w-3 mr-1" />
-                    Share
-                  </Button>
+                  <ShareMenu url={shareUrl} title={campaign?.title || "Mchango Campaign"} text={`Support ${campaign?.title} on Pamoja Nova`} />
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">

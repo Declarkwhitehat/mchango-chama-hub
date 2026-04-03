@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, MapPin, Globe, Phone, Mail, Share2, Loader2, Calendar, MessageCircle } from "lucide-react";
+import { Building2, MapPin, Globe, Phone, Mail, Loader2, Calendar, MessageCircle } from "lucide-react";
+import { ShareMenu } from "@/components/ShareMenu";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { CopyableUniqueId } from "@/components/CopyableUniqueId";
@@ -100,12 +101,7 @@ const OrganizationDetail = () => {
     fetchOrganization();
   };
 
-  const handleShare = () => {
-    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    const shareUrl = `${baseUrl}/organizations/${organization?.slug}`;
-    navigator.clipboard.writeText(shareUrl);
-    toast.success("Link copied to clipboard!");
-  };
+  const shareUrl = `${import.meta.env.VITE_APP_URL || window.location.origin}/organizations/${organization?.slug}`;
 
   if (loading) {
     return (
@@ -186,10 +182,7 @@ const OrganizationDetail = () => {
                 </CardDescription>
 
                 <div className="flex items-center gap-2 pt-2">
-                  <Button variant="outline" size="sm" onClick={handleShare}>
-                    <Share2 className="h-4 w-4 mr-1" />
-                    Share
-                  </Button>
+                  <ShareMenu url={shareUrl} title={organization?.name || "Organization"} text={`Support ${organization?.name} on Pamoja Nova`} />
                   {organization.website_url && (
                     <Button 
                       variant="outline" 

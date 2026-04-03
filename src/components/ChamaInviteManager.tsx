@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Copy, Check, X, Link2, Plus, Loader2, Users } from "lucide-react";
+import { ShareMenu } from "@/components/ShareMenu";
 import { format } from "date-fns";
 
 interface InviteCode {
@@ -248,18 +249,17 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
                       </p>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => copyInviteLink(inviteCode.code)}>
-                      {copiedCode === inviteCode.code ? (
-                        <><Check className="h-4 w-4 mr-1" />Copied</>
-                      ) : (
-                        <><Copy className="h-4 w-4 mr-1" />Copy Link</>
-                      )}
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => deleteCode(inviteCode.id)}>
-                      <X className="h-4 w-4 mr-1" />Delete
-                    </Button>
-                  </div>
+                    <div className="flex gap-2">
+                      <ShareMenu 
+                        url={`https://mchango-chama-hub.lovable.app/chama/join/${chamaSlug}?code=${inviteCode.code}`}
+                        title="Chama Invite"
+                        text={`You're invited to join our Chama! Use code: ${inviteCode.code}`}
+                        label="Share"
+                      />
+                      <Button size="sm" variant="destructive" onClick={() => deleteCode(inviteCode.id)}>
+                        <X className="h-4 w-4 mr-1" />Delete
+                      </Button>
+                    </div>
                 </div>
               ))}
             </div>
