@@ -82,6 +82,18 @@ export const VerificationRequestButton = ({
     }
   };
 
+  const VERIFICATION_FEE = 200;
+  const requiresFee = entityType !== 'chama';
+
+  const getEntityTable = () => {
+    switch (entityType) {
+      case 'mchango': return 'mchango';
+      case 'organization': return 'organizations';
+      case 'welfare': return 'welfare_groups';
+      default: return '';
+    }
+  };
+
   const handleSubmit = async () => {
     if (!reason.trim()) {
       toast({
@@ -94,6 +106,51 @@ export const VerificationRequestButton = ({
 
     setIsSubmitting(true);
     try {
+      // For non-chama entities, check balance and deduct verification fee
+      if (requiresFee) {
+        const table = getEntityTable();
+        const { data: entityData, error: fetchError } = await supabase
+          .from(table)
+          .select('available_balance')
+          .eq('id', entityId)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        const balance = entityData?.available_balance ?? 0;
+        if (balance < VERIFICATION_FEE) {
+          toast({
+            title: "Insufficient Balance",
+            description: `You need at least KSh ${VERIFICATION_FEE} in your ${entityType === 'mchango' ? 'campaign' : entityType} balance to request verification.`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Deduct fee from entity balance
+        const { error: deductError } = await supabase
+          .from(table)
+          .update({ available_balance: balance - VERIFICATION_FEE })
+          .eq('id', entityId);
+
+        if (deductError) throw deductError;
+
+        // Record fee as company revenue
+        const { error: revenueError } = await supabase
+          .from('company_earnings')
+          .insert({
+            amount: VERIFICATION_FEE,
+            source: 'verification_fee',
+            description: `Verification fee for ${entityType}: ${entityName}`,
+            group_id: entityId,
+          });
+
+        if (revenueError) {
+          console.error('Failed to record verification revenue:', revenueError);
+        }
+      }
+
       const { error } = await supabase
         .from('verification_requests')
         .insert({
@@ -118,7 +175,9 @@ export const VerificationRequestButton = ({
 
       toast({
         title: "Request Submitted",
-        description: "Your verification request has been submitted for admin review",
+        description: requiresFee
+          ? `KSh ${VERIFICATION_FEE} has been deducted. Your verification request has been submitted for admin review.`
+          : "Your verification request has been submitted for admin review",
       });
 
       setIsOpen(false);
