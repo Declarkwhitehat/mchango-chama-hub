@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { AlertTriangle, Clock, CheckCircle, Users } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle, Users, ChevronDown } from "lucide-react";
 import { differenceInDays, differenceInHours, format, parseISO } from "date-fns";
 
 interface Props {
