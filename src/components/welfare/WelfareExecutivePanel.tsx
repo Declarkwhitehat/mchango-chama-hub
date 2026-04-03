@@ -107,6 +107,7 @@ export const WelfareExecutivePanel = ({ members, welfareId, isChairman, isAdmin 
           <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
         </CollapsibleTrigger>
         <CollapsibleContent>
+          <CardContent className="space-y-3 pt-2">
         {roleCard("Chairman", <Crown className="h-4 w-4 text-primary" />, chairman, "chairman")}
         {roleCard("Secretary", <BookOpen className="h-4 w-4 text-primary" />, secretary, "secretary")}
         {roleCard("Treasurer", <Landmark className="h-4 w-4 text-primary" />, treasurer, "treasurer")}
