@@ -39,6 +39,7 @@ const WelfareCreate = lazy(() => import("./pages/WelfareCreate"));
 const WelfareList = lazy(() => import("./pages/WelfareList"));
 const WelfareDetail = lazy(() => import("./pages/WelfareDetail"));
 const WelfareJoin = lazy(() => import("./pages/WelfareJoin"));
+const PinSetup = lazy(() => import("./pages/PinSetup"));
 
 // Admin pages - lazy loaded
 const AdminKYC = lazy(() => import("./pages/AdminKYC"));
