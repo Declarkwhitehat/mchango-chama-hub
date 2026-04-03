@@ -26,6 +26,67 @@ serve(async (req) => {
 
     if (req.method === 'POST') {
       const body = await req.json();
+      
+      // Handle admin cancel during cooling-off period
+      if (body.action === 'cancel_cooling_off') {
+        const { withdrawal_id } = body;
+        if (!withdrawal_id) {
+          return new Response(JSON.stringify({ error: 'withdrawal_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        // Check if user is admin
+        const { data: adminRole } = await supabaseAdmin
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+
+        if (!adminRole) {
+          return new Response(JSON.stringify({ error: 'Only admin can cancel during cooling-off period' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        const { data: withdrawal } = await supabaseAdmin
+          .from('withdrawals')
+          .select('id, status, cooling_off_until, welfare_id, amount, requested_by')
+          .eq('id', withdrawal_id)
+          .single();
+
+        if (!withdrawal) {
+          return new Response(JSON.stringify({ error: 'Withdrawal not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        if (withdrawal.status !== 'approved' || !withdrawal.cooling_off_until) {
+          return new Response(JSON.stringify({ error: 'Withdrawal is not in cooling-off period' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        await supabaseAdmin
+          .from('withdrawals')
+          .update({
+            status: 'rejected',
+            rejection_reason: 'Cancelled by admin during 24-hour cooling-off period',
+            reviewed_at: new Date().toISOString(),
+            cooling_off_until: null,
+          })
+          .eq('id', withdrawal_id);
+
+        // Notify requester
+        if (withdrawal.requested_by) {
+          await createNotification(supabaseAdmin, {
+            user_id: withdrawal.requested_by,
+            title: 'Withdrawal Cancelled',
+            message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} was cancelled by admin during the cooling-off period.`,
+            category: 'welfare',
+            related_entity_type: 'welfare',
+            related_entity_id: withdrawal.welfare_id,
+          });
+        }
+
+        return new Response(JSON.stringify({ status: 'cancelled', message: 'Withdrawal cancelled during cooling-off period' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { approval_id, decision, rejection_reason } = body;
 
       if (!approval_id || !decision) {
@@ -137,66 +198,68 @@ serve(async (req) => {
       const allApproved = allApprovals?.every(a => a.decision === 'approved');
 
       if (allApproved) {
-        // Get withdrawal details before updating
+        // Get withdrawal details
         const { data: withdrawal } = await supabaseAdmin
           .from('withdrawals')
           .select('requested_by, amount, net_amount, notes')
           .eq('id', approval.withdrawal_id)
           .single();
 
-        // Both approved → mark withdrawal as approved for B2C payout
+        // Set 24-hour cooling-off period instead of immediate B2C
+        const coolingOffUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        
         await supabaseAdmin
           .from('withdrawals')
           .update({
             status: 'approved',
             reviewed_at: new Date().toISOString(),
-            notes: (withdrawal?.notes || '') + '\n[SYSTEM] Multi-sig approved by Secretary and Treasurer',
+            cooling_off_until: coolingOffUntil,
+            notes: (withdrawal?.notes || '') + '\n[SYSTEM] Multi-sig approved by Secretary and Treasurer. 24-hour cooling-off period started.',
           })
           .eq('id', approval.withdrawal_id);
 
-        // Notify requester
+        // Notify requester about approval + cooling-off
         if (withdrawal) {
           await createNotification(supabaseAdmin, {
             user_id: withdrawal.requested_by,
-            title: 'Withdrawal Approved',
-            message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} has been approved and will be processed shortly.`,
+            title: 'Withdrawal Approved — 24hr Hold',
+            message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} has been approved. Payout will be processed after a 24-hour cooling-off period.`,
             category: 'welfare',
             related_entity_type: 'welfare',
             related_entity_id: approval.welfare_id,
           });
+        }
 
-          // Extract recipient phone from notes (format: "Recipient: 07XXXXXXXX")
-          const phoneMatch = (withdrawal.notes || '').match(/Recipient:\s*([\d+]+)/);
-          const recipientPhone = phoneMatch?.[1];
+        // Notify ALL welfare members about the approved withdrawal
+        const { data: allMembers } = await supabaseAdmin
+          .from('welfare_members')
+          .select('user_id')
+          .eq('welfare_id', approval.welfare_id)
+          .eq('status', 'active');
 
-          if (recipientPhone) {
-            // Trigger B2C payout
-            console.log('Triggering B2C payout for welfare withdrawal:', approval.withdrawal_id, 'phone:', recipientPhone);
-            try {
-              const b2cResponse = await fetch(`${supabaseUrl}/functions/v1/b2c-payout`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  withdrawal_id: approval.withdrawal_id,
-                  phone_number: recipientPhone,
-                  amount: withdrawal.net_amount || withdrawal.amount,
-                }),
+        if (allMembers && withdrawal) {
+          const phoneMatch = (withdrawal.notes || '').match(/Name:\s*([^)]+)\)/);
+          const recipientName = phoneMatch?.[1] || 'a member';
+          
+          for (const member of allMembers) {
+            if (member.user_id !== withdrawal.requested_by) {
+              await createNotification(supabaseAdmin, {
+                user_id: member.user_id,
+                title: 'Welfare Withdrawal Approved',
+                message: `A withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} to ${recipientName} has been approved. Payout in 24 hours unless cancelled.`,
+                category: 'welfare',
+                related_entity_type: 'welfare',
+                related_entity_id: approval.welfare_id,
               });
-              const b2cResult = await b2cResponse.json();
-              console.log('B2C payout response:', b2cResult);
-            } catch (b2cError: any) {
-              console.error('B2C payout trigger failed:', b2cError.message);
-              // Don't fail the approval — withdrawal is approved, payout can be retried
             }
-          } else {
-            console.error('Could not extract recipient phone from withdrawal notes:', withdrawal.notes);
           }
         }
 
-        return new Response(JSON.stringify({ status: 'approved', message: 'Both approvers agreed. Withdrawal approved and payout initiated.' }), {
+        return new Response(JSON.stringify({ 
+          status: 'approved', 
+          message: 'Both approvers agreed. Withdrawal approved with 24-hour cooling-off period before payout.',
+          cooling_off_until: coolingOffUntil,
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
