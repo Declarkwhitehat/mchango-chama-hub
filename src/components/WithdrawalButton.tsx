@@ -44,6 +44,7 @@ export const WithdrawalButton = ({
   const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(true);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [show2FAConfirm, setShow2FAConfirm] = useState(false);
+  const [showPinConfirm, setShowPinConfirm] = useState(false);
 
   // For campaigns and organizations, allow custom amount; for chamas, use full balance
   const allowCustomAmount = !chamaId && (!!mchangoId || !!organizationId);
