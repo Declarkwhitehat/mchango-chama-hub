@@ -21,6 +21,8 @@ import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecut
 import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
 import { WelfareConstitution } from "@/components/welfare/WelfareConstitution";
 import { WelfareWithdrawalStatus } from "@/components/welfare/WelfareWithdrawalStatus";
+import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
+import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
 
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -58,7 +60,6 @@ const WelfareDetail = () => {
       if (data?.error) throw new Error(data.error);
       setWelfare(data.data);
 
-      // Find current user's role
       if (user && data.data?.welfare_members) {
         const myMember = data.data.welfare_members.find((m: any) => m.user_id === user.id && m.status === 'active');
         setMyRole(myMember?.role || null);
@@ -140,7 +141,6 @@ const WelfareDetail = () => {
                 />
               </div>
             </div>
-            {/* Leave button - not for chairman */}
             {isMember && !isChairman && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -260,17 +260,25 @@ const WelfareDetail = () => {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 5 + (isExecutive ? 1 : 0) + ((isChairman || isSecretary) ? 1 : 0))}, 1fr)` }}>
+          <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 5 + (isExecutive ? 1 : 0) + (isExecutive ? 1 : 0))}, 1fr)` }}>
             <TabsTrigger value="overview" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Overview</TabsTrigger>
             <TabsTrigger value="contribute" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Contribute</TabsTrigger>
             <TabsTrigger value="transactions" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">History</TabsTrigger>
             <TabsTrigger value="payments" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Payments</TabsTrigger>
             <TabsTrigger value="documents" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Documents</TabsTrigger>
             {isExecutive && <TabsTrigger value="withdraw" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Withdraw</TabsTrigger>}
-            {(isChairman || isSecretary) && <TabsTrigger value="manage" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Manage</TabsTrigger>}
+            {isExecutive && <TabsTrigger value="manage" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Manage</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            {/* Active Cycle Status with unpaid tracking */}
+            {isMember && (
+              <WelfareCycleStatus
+                welfareId={welfare.id}
+                members={activeMembers}
+              />
+            )}
+
             {isMember && <WelfareWithdrawalStatus welfareId={welfare.id} isAdmin={isAdmin} />}
             <WelfareExecutivePanel
               members={activeMembers}
@@ -340,7 +348,7 @@ const WelfareDetail = () => {
             <WelfarePaymentLookup welfareId={welfare.id} />
           </TabsContent>
 
-          <TabsContent value="documents">
+          <TabsContent value="documents" className="space-y-4">
             <WelfareConstitution
               welfareId={welfare.id}
               welfareName={welfare.name}
@@ -350,6 +358,10 @@ const WelfareDetail = () => {
               isExecutive={isExecutive}
               onUploaded={fetchWelfare}
             />
+            {/* PDF Report for all members */}
+            {isMember && (
+              <WelfareContributionReport welfareId={welfare.id} welfareName={welfare.name} />
+            )}
           </TabsContent>
 
           {isExecutive && (
@@ -384,11 +396,9 @@ const WelfareDetail = () => {
             </TabsContent>
           )}
 
-          {(isChairman || isSecretary) && (
+          {isExecutive && (
             <TabsContent value="manage" className="space-y-4">
-              {isSecretary && (
-                <WelfareContributionCycleManager welfareId={welfare.id} />
-              )}
+              <WelfareContributionCycleManager welfareId={welfare.id} />
             </TabsContent>
           )}
         </Tabs>

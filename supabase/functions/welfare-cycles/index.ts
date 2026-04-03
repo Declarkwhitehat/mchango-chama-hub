@@ -33,7 +33,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // POST - Secretary creates a new cycle
+    // POST - Executive creates a new cycle
     if (req.method === 'POST') {
       if (!token) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -45,7 +45,7 @@ serve(async (req) => {
       }
 
       const body = await req.json();
-      const { welfare_id, amount, start_date, end_date } = body;
+      const { welfare_id, amount, start_date, end_date, deadline_days } = body;
 
       if (!welfare_id || !amount || !start_date || !end_date) {
         return new Response(JSON.stringify({ error: 'welfare_id, amount, start_date, end_date required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -55,7 +55,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Amount must be positive' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Verify user is secretary
+      // Verify user is an executive (chairman, secretary, or treasurer)
       const { data: member } = await supabaseAdmin
         .from('welfare_members')
         .select('role')
@@ -64,8 +64,8 @@ serve(async (req) => {
         .eq('status', 'active')
         .single();
 
-      if (!member || member.role !== 'secretary') {
-        return new Response(JSON.stringify({ error: 'Only the Secretary can set contribution cycles' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      if (!member || !['chairman', 'secretary', 'treasurer'].includes(member.role)) {
+        return new Response(JSON.stringify({ error: 'Only executives (Chairman, Secretary, Treasurer) can set contribution cycles' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       // Close any active cycles
@@ -75,7 +75,7 @@ serve(async (req) => {
         .eq('welfare_id', welfare_id)
         .eq('status', 'active');
 
-      // Use supabaseAdmin for insert to bypass RLS
+      // Insert new cycle
       const { data, error } = await supabaseAdmin
         .from('welfare_contribution_cycles')
         .insert({
@@ -84,6 +84,7 @@ serve(async (req) => {
           amount,
           start_date,
           end_date,
+          deadline_days: deadline_days || null,
           status: 'active',
         })
         .select()
@@ -91,10 +92,32 @@ serve(async (req) => {
 
       if (error) throw error;
 
+      // Update welfare contribution amount
       await supabaseAdmin
         .from('welfares')
         .update({ contribution_amount: amount })
         .eq('id', welfare_id);
+
+      // Notify all welfare members about the new cycle
+      const { data: allMembers } = await supabaseAdmin
+        .from('welfare_members')
+        .select('user_id')
+        .eq('welfare_id', welfare_id)
+        .eq('status', 'active');
+
+      if (allMembers && allMembers.length > 0) {
+        const notifications = allMembers.map((m: any) => ({
+          user_id: m.user_id,
+          title: 'New Contribution Cycle',
+          message: `A new contribution cycle of KES ${amount.toLocaleString()} has been set. Deadline: ${deadline_days ? `${deadline_days} days` : end_date}.`,
+          type: 'info',
+          category: 'welfare',
+          related_entity_type: 'welfare',
+          related_entity_id: welfare_id,
+        }));
+
+        await supabaseAdmin.from('notifications').insert(notifications);
+      }
 
       return new Response(JSON.stringify({ data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
