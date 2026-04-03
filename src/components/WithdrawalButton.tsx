@@ -185,12 +185,17 @@ export const WithdrawalButton = ({
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // If 2FA is enabled, require verification first
+    // Always require PIN first
+    setShowPinConfirm(true);
+  };
+
+  const handlePinVerified = async () => {
+    setShowPinConfirm(false);
+    // After PIN, check 2FA
     if (is2FAEnabled) {
       setShow2FAConfirm(true);
       return;
     }
-
     await executeWithdraw();
   };
 
