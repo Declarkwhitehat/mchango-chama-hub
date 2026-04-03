@@ -531,6 +531,15 @@ export const WithdrawalButton = ({
       </DialogContent>
     </Dialog>
 
+      {/* PIN Confirmation for Withdrawal */}
+      <PinEntryDialog
+        open={showPinConfirm}
+        onOpenChange={setShowPinConfirm}
+        onVerified={handlePinVerified}
+        title="Verify PIN to Withdraw"
+        description="Enter your 5-digit security PIN to confirm this withdrawal"
+      />
+
       {/* 2FA Confirmation for Withdrawal */}
       <TwoFactorConfirmDialog
         open={show2FAConfirm}
