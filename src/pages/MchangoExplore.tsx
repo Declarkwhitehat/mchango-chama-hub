@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Heart, Calendar, TrendingUp, Share2 } from "lucide-react";
+import { Search, Heart, Calendar, TrendingUp } from "lucide-react";
+import { ShareMenu } from "@/components/ShareMenu";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { toast } from "sonner";
 
