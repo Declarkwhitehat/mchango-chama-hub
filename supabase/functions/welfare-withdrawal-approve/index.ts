@@ -70,6 +70,24 @@ serve(async (req) => {
           })
           .eq('id', withdrawal_id);
 
+        // Refund the amount back to welfare available_balance
+        const cancelAmount = Number(withdrawal.amount || 0);
+        if (cancelAmount > 0 && withdrawal.welfare_id) {
+          const { data: welfare } = await supabaseAdmin
+            .from('welfares')
+            .select('available_balance')
+            .eq('id', withdrawal.welfare_id)
+            .single();
+
+          if (welfare) {
+            const restoredBalance = Number(welfare.available_balance || 0) + cancelAmount;
+            await supabaseAdmin
+              .from('welfares')
+              .update({ available_balance: restoredBalance })
+              .eq('id', withdrawal.welfare_id);
+          }
+        }
+
         // Notify requester
         if (withdrawal.requested_by) {
           await createNotification(supabaseAdmin, {
