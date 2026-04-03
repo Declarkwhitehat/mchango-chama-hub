@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { Wallet, Loader2, Clock, AlertCircle, Smartphone, Building2 } from "lucide-react";
 import { PAYMENT_METHOD_LIMITS, type PaymentMethodType } from "@/utils/paymentLimits";
 import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
+import { PinEntryDialog } from "@/components/PinEntryDialog";
 
 interface WithdrawalButtonProps {
   chamaId?: string;
