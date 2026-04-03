@@ -271,6 +271,7 @@ const WelfareDetail = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            {isMember && <WelfareWithdrawalStatus welfareId={welfare.id} isAdmin={isAdmin} />}
             <WelfareExecutivePanel
               members={activeMembers}
               welfareId={welfare.id}
