@@ -2465,6 +2465,7 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          deadline_days: number | null
           end_date: string
           id: string
           set_by: string
@@ -2475,6 +2476,7 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string
+          deadline_days?: number | null
           end_date: string
           id?: string
           set_by: string
@@ -2485,6 +2487,7 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          deadline_days?: number | null
           end_date?: string
           id?: string
           set_by?: string
@@ -2507,6 +2510,7 @@ export type Database = {
           commission_amount: number | null
           completed_at: string | null
           created_at: string
+          cycle_id: string | null
           cycle_month: string | null
           gross_amount: number
           id: string
@@ -2523,6 +2527,7 @@ export type Database = {
           commission_amount?: number | null
           completed_at?: string | null
           created_at?: string
+          cycle_id?: string | null
           cycle_month?: string | null
           gross_amount: number
           id?: string
@@ -2539,6 +2544,7 @@ export type Database = {
           commission_amount?: number | null
           completed_at?: string | null
           created_at?: string
+          cycle_id?: string | null
           cycle_month?: string | null
           gross_amount?: number
           id?: string
@@ -2552,6 +2558,13 @@ export type Database = {
           welfare_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "welfare_contributions_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "welfare_contribution_cycles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "welfare_contributions_member_id_fkey"
             columns: ["member_id"]
