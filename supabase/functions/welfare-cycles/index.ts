@@ -68,12 +68,33 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Only executives (Chairman, Secretary, Treasurer) can set contribution cycles' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Close any active cycles
+      // Check for an active cycle that hasn't expired yet
+      const { data: activeCycle } = await supabaseAdmin
+        .from('welfare_contribution_cycles')
+        .select('id, end_date, amount')
+        .eq('welfare_id', welfare_id)
+        .eq('status', 'active')
+        .gte('end_date', new Date().toISOString().split('T')[0])
+        .maybeSingle();
+
+      if (activeCycle) {
+        const endDate = new Date(activeCycle.end_date);
+        const now = new Date();
+        const hoursLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60));
+        const daysLeft = Math.ceil(hoursLeft / 24);
+        const timeLeft = daysLeft > 0 ? `${daysLeft} day(s)` : `${hoursLeft} hour(s)`;
+        return new Response(JSON.stringify({ 
+          error: `There is already an active contribution cycle of KES ${activeCycle.amount}. You cannot set a new cycle until the current one expires in ${timeLeft}.` 
+        }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Close any expired active cycles (cleanup)
       await supabaseAdmin
         .from('welfare_contribution_cycles')
         .update({ status: 'completed' })
         .eq('welfare_id', welfare_id)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .lt('end_date', new Date().toISOString().split('T')[0]);
 
       // Insert new cycle
       const { data, error } = await supabaseAdmin
