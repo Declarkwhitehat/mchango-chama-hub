@@ -70,6 +70,24 @@ serve(async (req) => {
           })
           .eq('id', withdrawal_id);
 
+        // Refund the amount back to welfare available_balance
+        const cancelAmount = Number(withdrawal.amount || 0);
+        if (cancelAmount > 0 && withdrawal.welfare_id) {
+          const { data: welfare } = await supabaseAdmin
+            .from('welfares')
+            .select('available_balance')
+            .eq('id', withdrawal.welfare_id)
+            .single();
+
+          if (welfare) {
+            const restoredBalance = Number(welfare.available_balance || 0) + cancelAmount;
+            await supabaseAdmin
+              .from('welfares')
+              .update({ available_balance: restoredBalance })
+              .eq('id', withdrawal.welfare_id);
+          }
+        }
+
         // Notify requester
         if (withdrawal.requested_by) {
           await createNotification(supabaseAdmin, {
@@ -207,6 +225,7 @@ serve(async (req) => {
 
         // Set 24-hour cooling-off period instead of immediate B2C
         const coolingOffUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        const withdrawalAmount = Number(withdrawal?.amount || 0);
         
         await supabaseAdmin
           .from('withdrawals')
@@ -217,6 +236,23 @@ serve(async (req) => {
             notes: (withdrawal?.notes || '') + '\n[SYSTEM] Multi-sig approved by Secretary and Treasurer. 24-hour cooling-off period started.',
           })
           .eq('id', approval.withdrawal_id);
+
+        // Immediately deduct the amount from welfare available_balance
+        if (withdrawalAmount > 0) {
+          const { data: welfare } = await supabaseAdmin
+            .from('welfares')
+            .select('available_balance')
+            .eq('id', approval.welfare_id)
+            .single();
+
+          if (welfare) {
+            const newBalance = Math.max(0, Number(welfare.available_balance || 0) - withdrawalAmount);
+            await supabaseAdmin
+              .from('welfares')
+              .update({ available_balance: newBalance })
+              .eq('id', approval.welfare_id);
+          }
+        }
 
         // Notify requester about approval + cooling-off
         if (withdrawal) {
