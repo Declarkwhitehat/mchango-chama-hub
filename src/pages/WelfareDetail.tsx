@@ -295,6 +295,7 @@ const WelfareDetail = () => {
               <WelfareContributionForm
                 welfareId={welfare.id}
                 memberId={myMemberId!}
+                memberCode={activeMembers.find((m: any) => m.user_id === user?.id)?.member_code || ''}
                 contributionAmount={welfare.contribution_amount}
                 paybillAccountId={welfare.paybill_account_id}
                 onContributed={fetchWelfare}

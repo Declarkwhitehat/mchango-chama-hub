@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 interface Props {
   welfareId: string;
   memberId: string;
+  memberCode: string;
   contributionAmount: number;
   paybillAccountId: string;
   onContributed: () => void;
