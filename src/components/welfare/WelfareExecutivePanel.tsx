@@ -175,6 +175,7 @@ export const WelfareExecutivePanel = ({ members, welfareId, isChairman, isAdmin 
             </div>
           </div>
         )}
+          </CardContent>
         </CollapsibleContent>
       </Collapsible>
     </Card>
