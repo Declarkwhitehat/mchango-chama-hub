@@ -2118,6 +2118,24 @@ export type Database = {
         }
         Relationships: []
       }
+      security_questions: {
+        Row: {
+          created_at: string
+          id: string
+          question_text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          question_text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          question_text?: string
+        }
+        Relationships: []
+      }
       settlement_locks: {
         Row: {
           contribution_id: string
@@ -2289,6 +2307,44 @@ export type Database = {
           },
         ]
       }
+      user_pins: {
+        Row: {
+          failed_attempts: number
+          id: string
+          locked_until: string | null
+          pin_hash: string
+          pin_set_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          failed_attempts?: number
+          id?: string
+          locked_until?: string | null
+          pin_hash: string
+          pin_set_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          failed_attempts?: number
+          id?: string
+          locked_until?: string | null
+          pin_hash?: string
+          pin_set_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_pins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_risk_profiles: {
         Row: {
           created_at: string
@@ -2382,6 +2438,45 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_security_answers: {
+        Row: {
+          answer_hash: string
+          created_at: string
+          id: string
+          question_id: string
+          user_id: string
+        }
+        Insert: {
+          answer_hash: string
+          created_at?: string
+          id?: string
+          question_id: string
+          user_id: string
+        }
+        Update: {
+          answer_hash?: string
+          created_at?: string
+          id?: string
+          question_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_security_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "security_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_security_answers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       verification_requests: {
         Row: {
