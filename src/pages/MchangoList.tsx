@@ -141,10 +141,7 @@ const MchangoList = () => {
           <p className="text-muted-foreground">
             Support meaningful causes and make a difference in people's lives
           </p>
-          <Button variant="outline" onClick={handleSharePublicLink} className="gap-2">
-            <Share2 className="h-4 w-4" />
-            Share Public Link
-          </Button>
+          <ShareMenu url={publicShareUrl} title="Mchango Campaigns" text="Support meaningful causes on Pamoja Nova" label="Share Public Link" />
         </div>
 
         {/* Search and Filter */}

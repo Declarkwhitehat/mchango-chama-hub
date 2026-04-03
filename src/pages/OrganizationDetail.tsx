@@ -182,10 +182,7 @@ const OrganizationDetail = () => {
                 </CardDescription>
 
                 <div className="flex items-center gap-2 pt-2">
-                  <Button variant="outline" size="sm" onClick={handleShare}>
-                    <Share2 className="h-4 w-4 mr-1" />
-                    Share
-                  </Button>
+                  <ShareMenu url={shareUrl} title={organization?.name || "Organization"} text={`Support ${organization?.name} on Pamoja Nova`} />
                   {organization.website_url && (
                     <Button 
                       variant="outline" 

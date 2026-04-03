@@ -234,10 +234,7 @@ const MchangoDetail = () => {
                       {daysLeft} days left
                     </Badge>
                   )}
-                  <Button variant="outline" size="sm" onClick={handleShare}>
-                    <Share2 className="h-3 w-3 mr-1" />
-                    Share
-                  </Button>
+                  <ShareMenu url={shareUrl} title={campaign?.title || "Mchango Campaign"} text={`Support ${campaign?.title} on Pamoja Nova`} />
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">

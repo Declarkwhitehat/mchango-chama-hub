@@ -182,10 +182,7 @@ const OrganizationList = () => {
             Discover and support verified churches, schools, orphanages, NGOs and other organizations making a difference in their communities.
           </p>
           <div className="flex items-center justify-center gap-3">
-            <Button variant="outline" onClick={handleSharePublicLink} className="gap-2">
-              <Share2 className="h-4 w-4" />
-              Share Public Link
-            </Button>
+            <ShareMenu url={publicShareUrl} title="Support Organizations" text="Discover and support verified organizations on Pamoja Nova" label="Share Public Link" />
             {user && profile?.kyc_status === 'approved' && (
               <Button onClick={() => navigate('/organizations/create')} className="gap-2">
                 <Plus className="h-4 w-4" />

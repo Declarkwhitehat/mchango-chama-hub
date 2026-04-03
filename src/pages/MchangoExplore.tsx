@@ -112,10 +112,7 @@ const MchangoExplore = () => {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
             Browse active fundraising campaigns and make a difference. Every contribution counts!
           </p>
-          <Button onClick={handleSharePage} variant="outline" className="gap-2">
-            <Share2 className="h-4 w-4" />
-            Share This Page
-          </Button>
+          <ShareMenu url={exploreShareUrl} title="Explore Mchango" text="Browse active fundraising campaigns on Pamoja Nova" label="Share This Page" />
         </div>
       </div>
 
