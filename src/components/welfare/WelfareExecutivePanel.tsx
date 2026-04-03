@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Crown, BookOpen, Landmark, UserCheck, UserMinus, Loader2 } from "lucide-react";
+import { Crown, BookOpen, Landmark, UserCheck, UserMinus, Loader2, ChevronDown } from "lucide-react";
 
 interface Props {
   members: any[];
@@ -96,14 +97,17 @@ export const WelfareExecutivePanel = ({ members, welfareId, isChairman, isAdmin 
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <UserCheck className="h-4 w-4" />
-          Executive Panel
-          {isAdmin && <Badge variant="outline" className="text-xs">Admin Mode</Badge>}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      <Collapsible>
+        <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50 transition-colors rounded-t-lg">
+          <div className="flex items-center gap-2 text-base font-semibold">
+            <UserCheck className="h-4 w-4" />
+            Executive Panel
+            {isAdmin && <Badge variant="outline" className="text-xs">Admin Mode</Badge>}
+          </div>
+          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="space-y-3 pt-2">
         {roleCard("Chairman", <Crown className="h-4 w-4 text-primary" />, chairman, "chairman")}
         {roleCard("Secretary", <BookOpen className="h-4 w-4 text-primary" />, secretary, "secretary")}
         {roleCard("Treasurer", <Landmark className="h-4 w-4 text-primary" />, treasurer, "treasurer")}
@@ -171,7 +175,9 @@ export const WelfareExecutivePanel = ({ members, welfareId, isChairman, isAdmin 
             </div>
           </div>
         )}
-      </CardContent>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 };

@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { AlertTriangle, Clock, CheckCircle, Users } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle, Users, ChevronDown } from "lucide-react";
 import { differenceInDays, differenceInHours, format, parseISO } from "date-fns";
 
 interface Props {
@@ -165,11 +166,14 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
             )}
           </div>
 
-          {/* Unpaid members list */}
+          {/* Unpaid members collapsible */}
           {unpaidMembers.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-destructive">Unpaid Members:</p>
-              <div className="space-y-1">
+            <Collapsible>
+              <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                <span className="text-sm font-medium text-destructive">Unpaid Members ({unpaidMembers.length})</span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-1 mt-2">
                 {unpaidMembers.map((m: any) => (
                   <div key={m.id} className="flex items-center justify-between p-2 rounded bg-destructive/5 border border-destructive/20">
                     <div className="flex items-center gap-2">
@@ -182,15 +186,18 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                     </Badge>
                   </div>
                 ))}
-              </div>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
-          {/* Underpaid members */}
+          {/* Underpaid members collapsible */}
           {underpaidMembers.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-orange-600">Underpaid Members:</p>
-              <div className="space-y-1">
+            <Collapsible>
+              <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                <span className="text-sm font-medium text-orange-600">Underpaid Members ({underpaidMembers.length})</span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-1 mt-2">
                 {underpaidMembers.map((m: any) => {
                   const paid = memberPayments.get(m.id) || 0;
                   const remaining = activeCycle.amount - paid;
@@ -206,8 +213,8 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                     </div>
                   );
                 })}
-              </div>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </CardContent>
       </Card>
