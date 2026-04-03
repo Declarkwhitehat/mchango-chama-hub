@@ -209,9 +209,9 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
 
   return (
     <div className="space-y-4">
-      {/* Paybill Account ID for offline payments - only show if it looks like a real paybill ID, not a join code */}
-      {paybillAccountId && paybillAccountId.length > 6 && (
-        <CopyableUniqueId label="Paybill Account ID (for offline M-Pesa payments)" uniqueId={paybillAccountId} />
+      {/* Member ID for offline payments - always show so members know their correct account */}
+      {memberCode && (
+        <CopyableUniqueId label="Your Member ID (Account Number)" uniqueId={memberCode} />
       )}
 
       <Card>
