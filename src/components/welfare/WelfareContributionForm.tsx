@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 interface Props {
   welfareId: string;
   memberId: string;
+  memberCode: string;
   contributionAmount: number;
   paybillAccountId: string;
   onContributed: () => void;
@@ -20,7 +21,7 @@ interface Props {
 
 type PaymentStatus = "idle" | "sending" | "prompted" | "checking" | "success" | "failed";
 
-export const WelfareContributionForm = ({ welfareId, memberId, contributionAmount, paybillAccountId, onContributed }: Props) => {
+export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contributionAmount, paybillAccountId, onContributed }: Props) => {
   const { user, profile } = useAuth();
   const [amount, setAmount] = useState(contributionAmount > 0 ? String(contributionAmount) : "");
   const [phone, setPhone] = useState(profile?.phone || "");
@@ -208,9 +209,9 @@ export const WelfareContributionForm = ({ welfareId, memberId, contributionAmoun
 
   return (
     <div className="space-y-4">
-      {/* Paybill Account ID for offline payments - only show if it looks like a real paybill ID, not a join code */}
-      {paybillAccountId && paybillAccountId.length > 6 && (
-        <CopyableUniqueId label="Paybill Account ID (for offline M-Pesa payments)" uniqueId={paybillAccountId} />
+      {/* Member ID for offline payments - always show so members know their correct account */}
+      {memberCode && (
+        <CopyableUniqueId label="Your Member ID (Account Number)" uniqueId={memberCode} />
       )}
 
       <Card>
