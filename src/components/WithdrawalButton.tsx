@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { Wallet, Loader2, Clock, AlertCircle, Smartphone, Building2 } from "lucide-react";
 import { PAYMENT_METHOD_LIMITS, type PaymentMethodType } from "@/utils/paymentLimits";
 import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
+import { PinEntryDialog } from "@/components/PinEntryDialog";
 
 interface WithdrawalButtonProps {
   chamaId?: string;
@@ -43,6 +44,7 @@ export const WithdrawalButton = ({
   const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(true);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [show2FAConfirm, setShow2FAConfirm] = useState(false);
+  const [showPinConfirm, setShowPinConfirm] = useState(false);
 
   // For campaigns and organizations, allow custom amount; for chamas, use full balance
   const allowCustomAmount = !chamaId && (!!mchangoId || !!organizationId);
@@ -183,12 +185,17 @@ export const WithdrawalButton = ({
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // If 2FA is enabled, require verification first
+    // Always require PIN first
+    setShowPinConfirm(true);
+  };
+
+  const handlePinVerified = async () => {
+    setShowPinConfirm(false);
+    // After PIN, check 2FA
     if (is2FAEnabled) {
       setShow2FAConfirm(true);
       return;
     }
-
     await executeWithdraw();
   };
 
@@ -523,6 +530,15 @@ export const WithdrawalButton = ({
         )}
       </DialogContent>
     </Dialog>
+
+      {/* PIN Confirmation for Withdrawal */}
+      <PinEntryDialog
+        open={showPinConfirm}
+        onOpenChange={setShowPinConfirm}
+        onVerified={handlePinVerified}
+        title="Verify PIN to Withdraw"
+        description="Enter your 5-digit security PIN to confirm this withdrawal"
+      />
 
       {/* 2FA Confirmation for Withdrawal */}
       <TwoFactorConfirmDialog
