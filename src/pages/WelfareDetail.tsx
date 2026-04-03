@@ -260,7 +260,7 @@ const WelfareDetail = () => {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 5 + (isExecutive ? 1 : 0) + (isExecutive ? 1 : 0))}, 1fr)` }}>
+          <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 6 + (isExecutive ? 2 : 0))}, 1fr)` }}>
             <TabsTrigger value="overview" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Overview</TabsTrigger>
             <TabsTrigger value="contribute" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Contribute</TabsTrigger>
             <TabsTrigger value="transactions" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">History</TabsTrigger>
@@ -268,6 +268,7 @@ const WelfareDetail = () => {
             <TabsTrigger value="documents" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Documents</TabsTrigger>
             {isExecutive && <TabsTrigger value="withdraw" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Withdraw</TabsTrigger>}
             {isExecutive && <TabsTrigger value="manage" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Manage</TabsTrigger>}
+            <TabsTrigger value="members" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Members</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
