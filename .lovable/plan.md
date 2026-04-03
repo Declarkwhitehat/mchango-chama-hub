@@ -1,51 +1,41 @@
 
+# 24-Hour Welfare Withdrawal Cooling-Off Period
 
-# Fix Welfare Payment Matching & Withdrawal ID-Based Lookup
+## Overview
+After both Secretary and Treasurer approve a withdrawal, a 24-hour countdown begins. During this period, all welfare members can see the withdrawal details. Admin/customer care can cancel it. After 24 hours, B2C payout is automatically triggered.
 
-## Problems Identified
+## Changes
 
-1. **Offline payment with member ID `Q8KKUG7V` doesn't reflect**: The C2B confirm function currently matches welfare payments by **group-level** `paybill_account_id` or `group_code` (e.g., `WFYWFHXY` or `Q8KK`), but NOT by individual `member_code`. When someone pays using their member ID as the account number, no match is found.
+### Step 1: Database Migration
+- Add `cooling_off_until` (timestamptz) column to `withdrawals` table
+- Add new withdrawal status value: use existing `approved` status but with `cooling_off_until` set
+- After cooling period, status changes to `processing` when B2C is triggered
 
-2. **Payment lookup query uses wrong column**: `WelfarePaymentLookup` queries `welfare_contributions` for a column called `amount` which doesn't exist — the correct column is `gross_amount`.
+### Step 2: Update welfare-withdrawal-approve Edge Function
+- After both approvers agree, instead of immediately calling B2C:
+  - Set `cooling_off_until = now() + 24 hours`
+  - Keep status as `approved`
+  - Create a notification visible to all welfare members
 
-3. **Withdrawal uses phone number instead of member ID**: The withdrawal form asks for a raw phone number, which could send money to non-members. It should accept a member ID and auto-resolve the phone.
+### Step 3: Create welfare-cooling-off-payout Cron Edge Function
+- Runs every 15 minutes
+- Finds withdrawals where `cooling_off_until < now()` and status = `approved` and welfare_id is set
+- Triggers B2C payout for each
+- Updates status to `processing`
 
----
+### Step 4: Admin Cancel Endpoint
+- Add cancel capability to existing withdrawals-crud or welfare-withdrawal-approve function
+- Admin can set status to `cancelled` during cooling period
 
-## Plan
+### Step 5: UI - Welfare Withdrawal Status Component
+- New component `WelfareWithdrawalStatus` shown on welfare detail page
+- Shows active/recent withdrawals with:
+  - Who requested it
+  - Amount
+  - Approval status (pending both, one approved, both approved)
+  - 24-hour countdown timer (if both approved)
+  - Cancel button (admin only)
+- Visible to all welfare members
 
-### Step 1: Fix C2B to match welfare member IDs
-**File**: `supabase/functions/c2b-confirm-payment/index.ts`
-
-Before checking welfare group codes, add a lookup for `welfare_members.member_code` matching the normalized account number. If found, directly identify the welfare and member — skip the phone-matching loop entirely. This ensures paying with `Q8KKUG7V` correctly credits the right member.
-
-### Step 2: Fix payment lookup column reference
-**File**: `src/components/welfare/WelfarePaymentLookup.tsx`
-
-Change the query from selecting `amount` (doesn't exist) to `gross_amount`. Update the total calculation and table display to use `gross_amount` consistently. Remove `contribution_type` (also doesn't exist in the table).
-
-### Step 3: Replace phone input with member ID in withdrawals
-**File**: `src/components/welfare/WelfareWithdrawalRequest.tsx`
-
-- Replace the "Recipient Phone Number" field with a "Recipient Member ID" field
-- On form submit, look up the member ID in `welfare_members` to verify it belongs to this welfare and is active
-- Fetch the associated phone number from `profiles` via the member's `user_id`
-- Store both the member ID and resolved phone in the withdrawal notes
-- Show the resolved member name for confirmation before submitting
-
----
-
-## Technical Details
-
-**C2B member_code match** (before the existing welfare group_code/paybill match):
-```
-welfare_members.member_code = upperAccountNumber → get welfare_id, member_id, user_id
-```
-
-**Withdrawal phone resolution**:
-```
-welfare_members(member_code) → user_id → profiles(phone)
-```
-
-**No database migrations needed** — all required columns already exist.
-
+### Step 6: Integrate into WelfareDetail page
+- Add the new status component to the welfare detail page
