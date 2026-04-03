@@ -21,7 +21,7 @@ interface Props {
 
 type PaymentStatus = "idle" | "sending" | "prompted" | "checking" | "success" | "failed";
 
-export const WelfareContributionForm = ({ welfareId, memberId, contributionAmount, paybillAccountId, onContributed }: Props) => {
+export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contributionAmount, paybillAccountId, onContributed }: Props) => {
   const { user, profile } = useAuth();
   const [amount, setAmount] = useState(contributionAmount > 0 ? String(contributionAmount) : "");
   const [phone, setPhone] = useState(profile?.phone || "");
