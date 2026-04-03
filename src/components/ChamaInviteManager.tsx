@@ -260,10 +260,6 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
                         <X className="h-4 w-4 mr-1" />Delete
                       </Button>
                     </div>
-                    <Button size="sm" variant="destructive" onClick={() => deleteCode(inviteCode.id)}>
-                      <X className="h-4 w-4 mr-1" />Delete
-                    </Button>
-                  </div>
                 </div>
               ))}
             </div>
