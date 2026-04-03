@@ -2887,6 +2887,7 @@ export type Database = {
           chama_id: string | null
           commission_amount: number
           completed_at: string | null
+          cooling_off_until: string | null
           created_at: string
           cycle_id: string | null
           id: string
@@ -2916,6 +2917,7 @@ export type Database = {
           chama_id?: string | null
           commission_amount?: number
           completed_at?: string | null
+          cooling_off_until?: string | null
           created_at?: string
           cycle_id?: string | null
           id?: string
@@ -2945,6 +2947,7 @@ export type Database = {
           chama_id?: string | null
           commission_amount?: number
           completed_at?: string | null
+          cooling_off_until?: string | null
           created_at?: string
           cycle_id?: string | null
           id?: string
