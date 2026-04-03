@@ -100,12 +100,7 @@ const OrganizationDetail = () => {
     fetchOrganization();
   };
 
-  const handleShare = () => {
-    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    const shareUrl = `${baseUrl}/organizations/${organization?.slug}`;
-    navigator.clipboard.writeText(shareUrl);
-    toast.success("Link copied to clipboard!");
-  };
+  const shareUrl = `${import.meta.env.VITE_APP_URL || window.location.origin}/organizations/${organization?.slug}`;
 
   if (loading) {
     return (

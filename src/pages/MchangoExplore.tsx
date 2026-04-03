@@ -97,15 +97,7 @@ const MchangoExplore = () => {
     return diff > 0 ? diff : 0;
   };
 
-  const handleSharePage = async () => {
-    const url = window.location.href;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied! Share it with anyone.");
-    } catch {
-      toast.error("Failed to copy link");
-    }
-  };
+  const exploreShareUrl = window.location.href;
 
   return (
     <div className="min-h-screen bg-background">

@@ -85,15 +85,7 @@ const OrganizationList = () => {
 
   const categories = [...new Set(organizations.map(org => org.category).filter(Boolean))];
 
-  const handleSharePublicLink = async () => {
-    const publicUrl = `${window.location.origin}/organizations`;
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      toast.success("Public link copied! Share it with anyone.");
-    } catch {
-      toast.error("Failed to copy link");
-    }
-  };
+  const publicShareUrl = `${window.location.origin}/organizations`;
 
   const OrganizationCard = ({ org }: { org: Organization }) => (
     <Card

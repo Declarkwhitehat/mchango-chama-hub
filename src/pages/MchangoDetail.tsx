@@ -132,12 +132,7 @@ const MchangoDetail = () => {
     return diffDays > 0 ? diffDays : 0;
   };
 
-  const handleShare = () => {
-    const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    const shareUrl = `${baseUrl}/mchango/${campaign?.slug}`;
-    navigator.clipboard.writeText(shareUrl);
-    toast.success("Link copied to clipboard!");
-  };
+  const shareUrl = `${import.meta.env.VITE_APP_URL || window.location.origin}/mchango/${campaign?.slug}`;
 
   if (loading) {
     return (

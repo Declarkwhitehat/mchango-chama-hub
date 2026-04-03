@@ -115,15 +115,7 @@ const MchangoList = () => {
     return daysLeft === null || daysLeft > 0;
   });
 
-  const handleSharePublicLink = async () => {
-    const publicUrl = `${window.location.origin}/explore/mchango`;
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      toast.success("Public link copied! Share it with anyone.");
-    } catch {
-      toast.error("Failed to copy link");
-    }
-  };
+  const publicShareUrl = `${window.location.origin}/explore/mchango`;
 
   if (loading) {
     return (
