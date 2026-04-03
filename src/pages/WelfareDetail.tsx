@@ -20,6 +20,7 @@ import { VerificationRequestButton } from "@/components/VerificationRequestButto
 import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecutiveChangeBanner";
 import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
 import { WelfareConstitution } from "@/components/welfare/WelfareConstitution";
+import { WelfareWithdrawalStatus } from "@/components/welfare/WelfareWithdrawalStatus";
 
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
