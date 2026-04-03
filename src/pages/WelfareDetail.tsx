@@ -369,6 +369,78 @@ const WelfareDetail = () => {
               <WelfareContributionCycleManager welfareId={welfare.id} />
             </TabsContent>
           )}
+
+          <TabsContent value="members" className="space-y-4">
+            {/* Success Rate Summary */}
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">Total Members</p>
+                  <p className="text-2xl font-bold text-primary">{activeMembers.length}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">Avg Contribution</p>
+                  <p className="text-2xl font-bold">
+                    KES {activeMembers.length > 0
+                      ? Math.round(activeMembers.reduce((sum: number, m: any) => sum + Number(m.total_contributed || 0), 0) / activeMembers.length).toLocaleString()
+                      : '0'}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Members List with Success Rate */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Members ({activeMembers.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {activeMembers
+                    .slice()
+                    .sort((a: any, b: any) => Number(b.total_contributed || 0) - Number(a.total_contributed || 0))
+                    .map((member: any, index: number) => {
+                      const contributed = Number(member.total_contributed || 0);
+                      const maxContribution = Math.max(...activeMembers.map((m: any) => Number(m.total_contributed || 0)), 1);
+                      const successRate = Math.round((contributed / maxContribution) * 100);
+                      return (
+                        <div key={member.id} className="p-3 rounded-lg bg-muted/50 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-bold text-primary">#{index + 1}</span>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm">{member.profiles?.full_name || 'Unknown'}</p>
+                                <p className="text-xs text-muted-foreground font-mono">{member.member_code || 'No ID'}</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-sm font-bold">KES {contributed.toLocaleString()}</span>
+                              <Badge variant="outline" className="capitalize text-xs">{member.role}</Badge>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary rounded-full transition-all duration-500"
+                                style={{ width: `${successRate}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-muted-foreground w-10 text-right">{successRate}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
