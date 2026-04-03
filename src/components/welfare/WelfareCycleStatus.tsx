@@ -72,7 +72,8 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
   const memberPayments = new Map<string, number>();
   contributions.forEach((c: any) => {
     const key = c.member_id;
-    memberPayments.set(key, (memberPayments.get(key) || 0) + (c.net_amount || c.gross_amount || 0));
+    // Use gross_amount (what the member actually paid) to compare against the cycle requirement
+    memberPayments.set(key, (memberPayments.get(key) || 0) + (c.gross_amount || c.net_amount || 0));
   });
 
   const unpaidMembers = members.filter((m: any) =>
