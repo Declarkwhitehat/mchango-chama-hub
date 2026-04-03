@@ -180,3 +180,4 @@ export const WelfareExecutivePanel = ({ members, welfareId, isChairman, isAdmin 
       </Collapsible>
     </Card>
   );
+};
