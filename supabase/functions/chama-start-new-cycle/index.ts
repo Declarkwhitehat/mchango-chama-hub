@@ -28,6 +28,42 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
   }
 }
 
+function calculateCycleEndDate(
+  startDate: Date,
+  frequency: string,
+  everyNDays?: number,
+  monthlyDay?: number | null,
+  monthlyDay2?: number | null,
+): Date {
+  const endDate = new Date(startDate);
+  if (frequency === "daily") {
+    endDate.setHours(23, 59, 59, 999);
+  } else if (frequency === "monthly" && monthlyDay) {
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(monthlyDay - 1);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (frequency === "twice_monthly" && monthlyDay && monthlyDay2) {
+    const day1 = Math.min(monthlyDay, monthlyDay2);
+    const day2 = Math.max(monthlyDay, monthlyDay2);
+    const currentDay = startDate.getDate();
+    if (currentDay >= day1 && currentDay < day2) {
+      endDate.setDate(day2 - 1);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      if (currentDay >= day2) {
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
+      endDate.setDate(day1 - 1);
+      endDate.setHours(23, 59, 59, 999);
+    }
+  } else {
+    const cycleDays = getCycleLengthInDays(frequency, everyNDays);
+    endDate.setDate(endDate.getDate() + cycleDays - 1);
+    endDate.setHours(23, 59, 59, 999);
+  }
+  return endDate;
+}
+
 function throwIfError(error: unknown) {
   if (error) {
     throw error;
