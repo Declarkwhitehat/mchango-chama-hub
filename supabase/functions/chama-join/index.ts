@@ -169,13 +169,18 @@ serve(async (req) => {
         }
 
         // Update membership status
-        // IMPORTANT: Keep status as 'inactive' until first payment is made
+        // For pending/cycle_complete chamas, set active immediately (no payment gate)
+        // For active chamas (shouldn't reach here but safety), keep inactive until first payment
+        const chamaStatus = member.chama?.status;
+        const memberStatus = isApproved 
+          ? (chamaStatus === 'pending' || chamaStatus === 'cycle_complete' ? 'active' : 'inactive')
+          : 'inactive';
+
         const { data: updatedMember, error: updateError } = await supabaseClient
           .from('chama_members')
           .update({
             approval_status: isApproved ? 'approved' : 'rejected',
-            // Keep status inactive - member becomes active only after first payment
-            status: isApproved ? 'inactive' : 'inactive',
+            status: memberStatus,
           })
           .eq('id', memberId)
           .select()
