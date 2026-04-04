@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
       .eq('chama_id', chamaId)
       .eq('user_id', user.id)
       .eq('is_manager', true)
-      .in('status', ['active', 'removed'])
+      .in('status', ['active', 'removed', 'inactive'])
       .maybeSingle();
 
     if (!membership?.is_manager) {
