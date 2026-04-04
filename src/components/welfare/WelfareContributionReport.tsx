@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { FileText, Download, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { format, parseISO } from "date-fns";
-import { trackGeneratedDocument } from "@/utils/documentTracker";
+import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 
 interface Props {
   welfareId: string;
