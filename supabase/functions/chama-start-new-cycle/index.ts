@@ -320,7 +320,9 @@ Deno.serve(async (req) => {
 
     throwIfError(insertError);
 
-    if (!insertedMembers || insertedMembers.length === 0) {
+    const createdMembers = insertedMembers ?? [];
+
+    if (createdMembers.length === 0) {
       throw new Error("Failed to create members for the new cycle");
     }
 
@@ -358,7 +360,7 @@ Deno.serve(async (req) => {
       chama.every_n_days_count,
     );
 
-    const smsPromises = insertedMembers
+    const smsPromises = createdMembers
       .sort((a, b) => a.order_index - b.order_index)
       .map(async (member) => {
         const payoutDate = new Date();
@@ -391,13 +393,13 @@ Deno.serve(async (req) => {
     const successCount = smsResults.filter((r) => r.success).length;
 
     console.log(
-      `New cycle started FRESH. Sent ${successCount}/${insertedMembers.length} SMS notifications`,
+      `New cycle started FRESH. Sent ${successCount}/${createdMembers.length} SMS notifications`,
     );
 
     return new Response(
       JSON.stringify({
         success: true,
-        memberCount: insertedMembers.length,
+        memberCount: createdMembers.length,
         cycleRound: 1,
         notificationsSent: successCount,
       }),
