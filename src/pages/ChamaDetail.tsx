@@ -458,6 +458,7 @@ const ChamaDetail = () => {
   }
 
   const approvedMembers = chama.chama_members?.filter(m => m.approval_status === 'approved' && m.status === 'active') || [];
+  const displayMemberCount = isCycleComplete && rejoinSummary ? rejoinSummary.approvedCount : approvedMembers.length;
   const isManager = currentUserMembership?.is_manager && currentUserMembership?.approval_status === 'approved' && !['removed'].includes(currentUserMembership?.status);
   const isMember = currentUserMembership?.approval_status === 'approved' && !['removed'].includes(currentUserMembership?.status);
   const isRemovedMember = currentUserMembership?.status === 'removed';
