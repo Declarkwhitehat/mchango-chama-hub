@@ -11,7 +11,7 @@ import { Download, Loader2, FileText } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
-import { trackGeneratedDocument } from "@/utils/documentTracker";
+import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 
 interface Contribution {
   id: string;
