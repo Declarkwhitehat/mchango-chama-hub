@@ -22,6 +22,7 @@ import { ExtendCampaignDays } from "@/components/mchango/ExtendCampaignDays";
 import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { GroupDocuments } from "@/components/GroupDocuments";
 
 interface Campaign {
   id: string;

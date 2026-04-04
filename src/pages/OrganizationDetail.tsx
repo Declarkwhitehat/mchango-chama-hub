@@ -19,6 +19,7 @@ import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { useAuth } from "@/contexts/AuthContext";
+import { GroupDocuments } from "@/components/GroupDocuments";
 
 interface Organization {
   id: string;
