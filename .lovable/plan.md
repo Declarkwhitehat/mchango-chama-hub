@@ -1,94 +1,67 @@
 
 
-## Goal
+## Plan: Grace Period, UI Improvements, Commission Model Change, and Chat Auto-Delete
 
-Fix multiple bugs and UX issues on the member dashboard during the 24-hour grace period, and clean up the repetitive/cluttered layout for a more professional design.
+### Summary
+Fix grace period enforcement, add collapsible sections, change commission from additive (pay KES 105) to deductive (pay KES 100, 5% deducted = KES 95 to group), and auto-delete chat messages older than 1 week.
 
-## Problems Identified
+---
 
-1. **KES 105 amount**: `PaymentCountdownTimer` calculates `totalPayable = (totalOutstanding + cycleInfo.due_amount) * 1.05 = (0 + 100) * 1.05 = 105`. The 5% commission should not be shown as the "amount to pay" since commission is charged on top at payment time, not displayed as a lump sum here.
+### 1. Commission Model Change: Additive → Deductive
 
-2. **Outstanding balance of KES 100 during grace period**: The `MemberDashboard` shows an "Outstanding Balance" card because `member_cycle_payments` records exist with `is_paid: false` and `amount_remaining: 100`. The system treats unpaid cycle payment records as missed payments even though the grace period hasn't ended.
+The current system charges commission ON TOP (member pays KES 105 for a KES 100 contribution). The user wants members to pay exactly KES 100, with 5% deducted from that amount (KES 5 to platform, KES 95 to chama pool).
 
-3. **Missed payment record created prematurely**: The `member_cycle_payments` records are created at chama start with `is_paid: false`. The `daily-cycle-manager` `all-cycles` action likely marks them as `status: 'missed'` since `is_paid` is false, without checking whether the cycle's end date has passed.
+**Files:**
+- `supabase/functions/contributions-crud/index.ts` — Change settlement logic:
+  - Current: `grossNeeded = amountDue * (1 + ONTIME_RATE)` → New: `grossNeeded = amountDue` (member pays the base amount)
+  - Commission extracted from within: `commission = grossPaid * ONTIME_RATE`, `net = grossPaid - commission`
+  - Same for late payments: `commission = grossPaid * LATE_RATE`
+- `src/utils/commissionCalculator.ts` — Update `calculateGrossAmount` to return `baseAmount` (no markup), update `calculateCommission` to be deductive
+- `supabase/functions/_shared/commissionRates.ts` — No change to rates, just the model
+- `src/components/chama/PaymentCountdownTimer.tsx` — Display "Pay KES 100" (base amount), show "5% commission deducted" as info text
+- `src/components/chama/AmountToPayCard.tsx` — Update to show deductive breakdown
+- `src/components/CommissionDisplay.tsx` — Update labels from "added on top" to "deducted from"
 
-4. **Countdown timer shows "2 days 15 hours"**: The cycle `end_date` is `2026-04-05 22:00:00+00` and the timer counts down to 10PM cutoff on that date. Since the cutoff IS the end_date (already at 22:00), calling `cutoff.setHours(22,0,0,0)` on an already-22:00 date works correctly in UTC but may double-count in local timezone. The actual remaining time is ~1 day 18 hours, which aligns with the grace period ending tomorrow at 10PM.
+### 2. Grace Period: Enforce Until Next Day 10 PM
 
-5. **Repetitive tabs/cards**: The page shows `CyclePaymentStatus` (with countdown, payment history, financial summary, and detailed payment status) PLUS a separate `MemberDashboard` tab that duplicates outstanding balance, missed payments, and payment history. This creates massive visual clutter.
+Ensure no member is classified as unpaid/missed during the 24-hour grace period.
 
-## Implementation Plan
+**Files:**
+- `src/components/chama/DailyPaymentStatus.tsx` — Grace period logic already exists; verify `isGracePeriod` flag suppresses all missed/outstanding displays
+- `src/components/MemberDashboard.tsx` — Already has grace period check; ensure it covers all warning paths
+- `supabase/functions/daily-cycle-manager/index.ts` — In the `all-cycles` action, ensure cycles with `end_date` in the future return status `'pending'` not `'missed'`; also skip auto-advance during grace period
+- `supabase/functions/daily-reminder-cron/index.ts` — Ensure reminders are suppressed during the first 24 hours after `chama.start_date`
 
-### 1. Add grace period awareness to the frontend
+### 3. UI: Collapsible Dropdowns for Payment Status and Unpaid Members
 
-**Files**: `src/components/chama/DailyPaymentStatus.tsx`, `src/components/chama/PaymentCountdownTimer.tsx`
+Replace static "Today's Payment Status" card and "Unpaid Members" section with collapsible/accordion sections using the existing `Collapsible` component.
 
-- Detect if the chama is within its 24-hour grace period by comparing `now` against `chama.start_date + 24 hours`.
-- Pass a `isGracePeriod` flag from `CyclePaymentStatus` to `PaymentCountdownTimer`.
-- During grace period:
-  - Show the countdown as "Grace Period — First payment due by [date]" instead of urgency warnings.
-  - Suppress "missed cycles" alerts and outstanding balance displays.
-  - Change timer styling to informational (blue/neutral) rather than warning/urgent.
-  - Hide the "Unpaid Members" destructive list — everyone is unpaid during grace period.
+**File:** `src/components/chama/DailyPaymentStatus.tsx`
+- Wrap "Today's Payment Status" (detailed member list, lines 374-448) in a `Collapsible` with a clickable header showing summary (e.g., "4/6 paid") — collapsed by default
+- Wrap "Unpaid Members" section (lines 356-368) inside the financial summary in a `Collapsible` — collapsed by default
+- Wrap "Per-Cycle Payment History" (lines 258-317) in a `Collapsible` — collapsed by default
 
-### 2. Fix the KES 105 calculation
+### 4. "Time to Pay" Should Show Time Left for Next Payment
 
-**File**: `src/components/chama/DailyPaymentStatus.tsx`
+**File:** `src/components/chama/PaymentCountdownTimer.tsx`
+- Change the header label from "Time to pay" to show "Time left to make your next payment"
+- Ensure the countdown counts down to the current cycle's `end_date`
 
-- Change `totalPayable` to show the base contribution amount (KES 100) rather than `amount * 1.05`. Commission is an on-top charge handled at payment time, not a pre-displayed figure.
-- Only add commission/penalty multipliers when there are actual outstanding debts from previous cycles.
+### 5. Group Chat Auto-Delete After 1 Week
 
-### 3. Suppress false missed-payment data during grace period
+**New edge function:** `supabase/functions/cleanup-old-chat-messages/index.ts`
+- Delete all `chama_messages` where `created_at < NOW() - 7 days`
+- Schedule via pg_cron to run daily
 
-**File**: `src/components/MemberDashboard.tsx`
+**File:** `src/components/chama/ChamaChatPanel.tsx`
+- Add a small info note: "Messages are automatically deleted after 7 days"
 
-- Add grace period check: if `chama.status === 'active'` and `start_date` is within the last 24 hours, suppress the "Outstanding Balance" card, "Missed Payments Record" table, and warning banners.
-- The `member_cycle_payments` records with `is_paid: false` are expected during grace period — they should not trigger UI warnings.
+---
 
-**File**: `supabase/functions/daily-cycle-manager/index.ts` (the `all-cycles` action)
+### Technical Details
 
-- When determining cycle status (paid/missed/pending), check if the cycle's `end_date` is still in the future. If so, status should be `'pending'` not `'missed'`.
-
-### 4. Consolidate repetitive UI elements
-
-**File**: `src/pages/ChamaDetail.tsx`
-
-- Remove the standalone `CyclePaymentStatus` component that appears above the tabs (lines 576-585), since the `MemberDashboard` tab already includes it (line 347).
-- Remove the duplicate "Payment Required!" red banner (lines 766-792) since `PaymentCountdownTimer` already shows pay-now urgency.
-- The `MemberDashboard` tab becomes the single source for all payment-related information.
-
-**File**: `src/components/MemberDashboard.tsx`
-
-- Remove the duplicate "Outstanding Balance" card (lines 273-304) — the `CyclePaymentStatus`/`PaymentCountdownTimer` already shows what's due.
-- Remove the duplicate "Missed Payments Record" table (lines 306-344) — the per-cycle payment history in `CyclePaymentStatus` already shows this.
-- Remove the duplicate "Balance Information" card at the bottom (lines 535-567) — already shown in the member info grid.
-- Keep: Member info card, payout schedule, payment history table, and `CyclePaymentStatus` (which is the consolidated payment view).
-
-### 5. Professional design cleanup
-
-**File**: `src/components/MemberDashboard.tsx`
-
-- Reorder remaining cards for clarity: (1) Grace period or payment timer, (2) Member info with balance, (3) Payout schedule, (4) Payment history.
-- Use consistent spacing and card styling.
-
-**File**: `src/components/chama/PaymentCountdownTimer.tsx`
-
-- Add a grace period visual state: calming blue card with shield/info icon, clear "No payment penalties during this period" message.
-
-### 6. Fix countdown timezone handling
-
-**File**: `src/components/chama/PaymentCountdownTimer.tsx`
-
-- The `cutoff.setHours(22, 0, 0, 0)` call uses local timezone but `end_date` is already set to 22:00 UTC. Remove the redundant `setHours` call and use the `endDate` directly as the cutoff, since it already represents the payment deadline.
-
-## Technical Details
-
-- No database migrations needed.
-- Edge function `daily-cycle-manager` needs a small fix in the `all-cycles` action to not mark future-end-date cycles as "missed".
-- The grace period is determined client-side by checking if `Date.now() < new Date(chama.start_date).getTime() + 24*60*60*1000`.
-- Files affected:
-  - `src/pages/ChamaDetail.tsx`
-  - `src/components/MemberDashboard.tsx`
-  - `src/components/chama/DailyPaymentStatus.tsx`
-  - `src/components/chama/PaymentCountdownTimer.tsx`
-  - `supabase/functions/daily-cycle-manager/index.ts`
+- **Commission model change** is the most impactful: it affects the FIFO settlement engine, allocation preview, all display components. The core change is in `contributions-crud/index.ts` where `grossNeeded = amountDue * (1 + rate)` becomes `grossNeeded = amountDue` and commission is extracted as `amountDue * rate` from within.
+- **No database migrations needed** for commission or grace period changes.
+- **One new edge function** for chat cleanup + a cron job (via insert tool, not migration).
+- Files affected: ~8 files modified, 1 new edge function created.
 
