@@ -120,13 +120,13 @@ async function previewAllocation(
     }
   }
 
-  // Phase 2: Current cycle contribution (commission additive — on top of base)
+  // Phase 2: Current cycle contribution (deductive — commission extracted from within)
   if (remaining > 0 && cycle) {
     const amountDue = cycle.member_cycle_payments?.[0]?.amount_remaining || contributionAmount;
-    const grossNeeded = amountDue * (1 + ONTIME_RATE);
+    const grossNeeded = amountDue; // member pays the base amount
     const toApply = Math.min(remaining, grossNeeded);
-    const net = toApply / (1 + ONTIME_RATE);
-    const commission = toApply - net;
+    const commission = toApply * ONTIME_RATE; // deducted from within
+    const net = toApply - commission;
     remaining -= toApply;
     toCompany += commission;
     toCyclePot += net;
@@ -136,7 +136,7 @@ async function previewAllocation(
       cycle_number: cycle.cycle_number,
       amount: commission,
       destination: 'Platform fee',
-      description: `5% commission on current cycle contribution`
+      description: `5% commission deducted from current cycle contribution`
     });
     allocations.push({
       type: 'current_cycle',
