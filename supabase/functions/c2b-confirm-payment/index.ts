@@ -151,6 +151,14 @@ serve(async (req) => {
 
       console.log('Contribution recorded successfully');
 
+      // Mark first_payment_completed if not yet set
+      if (!chamaMemberData.first_payment_completed) {
+        await supabase.from('chama_members').update({
+          first_payment_completed: true,
+          first_payment_at: new Date().toISOString(),
+        }).eq('id', chamaMemberData.id);
+        console.log('✅ Marked first_payment_completed for member:', chamaMemberData.member_code);
+      }
       // Delegate ALL financial tracking to contributions-crud settle-only
       // This is the SINGLE SOURCE OF TRUTH for chama financial updates
       // It handles: chama totals, member_cycle_payments, commission, ledger
