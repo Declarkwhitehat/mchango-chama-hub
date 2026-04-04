@@ -265,11 +265,11 @@ serve(async (req) => {
         });
       }
 
-      // Check if invite code was already used
-      if (inviteCode.used_by) {
+      // Check if invite code has reached max uses
+      if (inviteCode.use_count >= inviteCode.max_uses) {
         return new Response(JSON.stringify({ 
-          error: 'Invite code already used',
-          details: 'This invite code has already been used by another member'
+          error: 'Invite code fully used',
+          details: 'This invite code has reached its maximum number of uses'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -404,13 +404,15 @@ serve(async (req) => {
           });
         }
 
-        // Mark invite code as used using admin client
+        // Increment use_count and deactivate if fully used
+        const newUseCount = (inviteCode.use_count || 0) + 1;
         await adminClient
           .from('chama_invite_codes')
           .update({
+            use_count: newUseCount,
             used_by: user.id,
             used_at: new Date().toISOString(),
-            is_active: false,
+            is_active: newUseCount < inviteCode.max_uses,
           })
           .eq('id', inviteCode.id);
 
@@ -458,13 +460,15 @@ serve(async (req) => {
         throw memberError;
       }
 
-      // Mark invite code as used using admin client
+      // Increment use_count and deactivate if fully used
+      const newUseCount = (inviteCode.use_count || 0) + 1;
       await adminClient
         .from('chama_invite_codes')
         .update({
+          use_count: newUseCount,
           used_by: user.id,
           used_at: new Date().toISOString(),
-          is_active: false,
+          is_active: newUseCount < inviteCode.max_uses,
         })
         .eq('id', inviteCode.id);
 

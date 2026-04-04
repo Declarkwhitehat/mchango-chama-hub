@@ -54,12 +54,18 @@ serve(async (req) => {
         .select(`*, chama (id, name, slug, description, contribution_amount, contribution_frequency, max_members, status)`)
         .eq('code', code.toUpperCase())
         .eq('is_active', true)
-        .is('used_by', null)
         .single();
 
       if (error || !data) {
         return new Response(JSON.stringify({ error: 'Invalid or expired invite code', valid: false, message: 'This invite code is not valid. Please check with the chama manager.' }), {
           status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Check if code has reached max uses
+      if (data.use_count >= data.max_uses) {
+        return new Response(JSON.stringify({ error: 'Invite code has been fully used', valid: false }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -75,7 +81,7 @@ serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ chama: data.chama, valid: true }), {
+      return new Response(JSON.stringify({ chama: data.chama, valid: true, uses_remaining: data.max_uses - data.use_count }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -97,13 +103,15 @@ serve(async (req) => {
 
     // Generate new invite code — SINGLE ACTIVE ONLY
     if (action === 'generate') {
-      const { chama_id, expires_in_days } = body;
+      const { chama_id, expires_in_days, max_uses } = body;
 
       if (!chama_id) {
         return new Response(JSON.stringify({ error: 'chama_id is required' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      const allowedMaxUses = Math.max(1, Math.min(Number(max_uses) || 1, 100));
 
       // Verify user is a manager
       const { data: membership, error: memberError } = await supabaseClient
@@ -120,13 +128,12 @@ serve(async (req) => {
         });
       }
 
-      // DEACTIVATE all existing active unused codes for this chama
+      // DEACTIVATE all existing active codes for this chama that still have remaining uses
       await supabaseClient
         .from('chama_invite_codes')
         .update({ is_active: false })
         .eq('chama_id', chama_id)
-        .eq('is_active', true)
-        .is('used_by', null);
+        .eq('is_active', true);
 
       console.log('Deactivated all previous active codes for chama', chama_id);
 
@@ -141,7 +148,7 @@ serve(async (req) => {
 
       const { data, error } = await supabaseClient
         .from('chama_invite_codes')
-        .insert({ chama_id, created_by: user.id, code, expires_at: expiresAt, is_active: true })
+        .insert({ chama_id, created_by: user.id, code, expires_at: expiresAt, is_active: true, max_uses: allowedMaxUses, use_count: 0 })
         .select(`*, chama (id, name, slug)`)
         .single();
 
@@ -180,13 +187,12 @@ serve(async (req) => {
         });
       }
 
-      // Only return active, unused codes
+      // Only return active codes that still have remaining uses
       const { data, error } = await supabaseClient
         .from('chama_invite_codes')
         .select('*')
         .eq('chama_id', chamaId)
         .eq('is_active', true)
-        .is('used_by', null)
         .order('created_at', { ascending: false })
         .limit(1);
 
