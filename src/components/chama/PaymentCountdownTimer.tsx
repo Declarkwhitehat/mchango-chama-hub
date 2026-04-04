@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 interface PaymentCountdownTimerProps {
   endDate: string;
+  countdownDeadline?: string;
   contributionAmount: number;
   totalPayable?: number;
   beneficiaryName: string;
@@ -20,6 +21,7 @@ interface PaymentCountdownTimerProps {
 
 export function PaymentCountdownTimer({
   endDate,
+  countdownDeadline,
   contributionAmount,
   totalPayable,
   beneficiaryName,
@@ -41,7 +43,14 @@ export function PaymentCountdownTimer({
   useEffect(() => {
     const calculateTimeRemaining = () => {
       const now = new Date();
-      const cutoff = new Date(endDate);
+      const targetDate = isGracePeriod && countdownDeadline ? countdownDeadline : endDate;
+      const cutoff = new Date(targetDate);
+
+      if (Number.isNaN(cutoff.getTime())) {
+        setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0, total: 0, isPassed: true });
+        return;
+      }
+
       const diff = cutoff.getTime() - now.getTime();
 
       if (diff <= 0) {
@@ -64,7 +73,7 @@ export function PaymentCountdownTimer({
     );
 
     return () => clearInterval(interval);
-  }, [endDate, timeRemaining.total]);
+  }, [countdownDeadline, endDate, isGracePeriod, timeRemaining.total]);
 
   if (isPaid) {
     return (

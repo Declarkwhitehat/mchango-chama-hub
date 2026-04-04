@@ -7,6 +7,7 @@ import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
 import { CheckCircle2, TrendingUp, CreditCard, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { getNextDay10PmKenyaDeadline } from "@/utils/chamaDeadlines";
 import { toast } from "@/hooks/use-toast";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -130,12 +131,10 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
   const totalOutstanding = member.total_outstanding || 0;
   const isCycleComplete = chama.status === 'cycle_complete';
 
-  // Grace period check
-  const isGracePeriod = (() => {
-    if (!chama.start_date || chama.status !== 'active') return false;
-    const startTime = new Date(chama.start_date).getTime();
-    return Date.now() < startTime + 24 * 60 * 60 * 1000;
-  })();
+  const graceDeadline = chama.status === 'active'
+    ? getNextDay10PmKenyaDeadline(chama.start_date)
+    : null;
+  const isGracePeriod = !!graceDeadline && Date.now() < graceDeadline.getTime();
 
   return (
     <div className="space-y-4">

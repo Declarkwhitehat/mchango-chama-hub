@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
+import { getNextDay10PmKenyaDeadline } from "../_shared/chamaDeadlines.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -148,12 +149,10 @@ serve(async (req) => {
     const startDate = new Date();
 
     // ============================================
-    // CALCULATE GRACE PERIOD END (24hrs from start, cutoff at 22:00)
+    // CALCULATE GRACE PERIOD END (next day at 10:00 PM Kenya time)
     // Members get until 10:00 PM the next day to make their first payment
     // ============================================
-    const graceDeadline = new Date(startDate);
-    graceDeadline.setDate(graceDeadline.getDate() + 1);
-    graceDeadline.setHours(22, 0, 0, 0); // 10:00 PM cutoff
+    const graceDeadline = getNextDay10PmKenyaDeadline(startDate);
 
     console.log('Grace period:', {
       startDate: startDate.toISOString(),

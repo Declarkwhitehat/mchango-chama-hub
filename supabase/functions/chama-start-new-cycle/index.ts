@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { getNextDay10PmKenyaDeadline } from "../_shared/chamaDeadlines.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -382,10 +383,8 @@ Deno.serve(async (req) => {
 
     throwIfError(updateError);
 
-    // ========== CALCULATE GRACE PERIOD (24hrs, cutoff at 22:00) ==========
-    const graceDeadline = new Date(startDate);
-    graceDeadline.setDate(graceDeadline.getDate() + 1);
-    graceDeadline.setHours(22, 0, 0, 0);
+    // ========== CALCULATE GRACE PERIOD (next day at 10:00 PM Kenya time) ==========
+    const graceDeadline = getNextDay10PmKenyaDeadline(startDate);
 
     // ========== CREATE FIRST CONTRIBUTION CYCLE ==========
     const cycleLength = getCycleLengthInDays(
