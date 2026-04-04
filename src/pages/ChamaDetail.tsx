@@ -21,7 +21,7 @@ import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
 import { WhatsAppLinkManager } from "@/components/chama/WhatsAppLinkManager";
 import { ChamaEndDate } from "@/components/chama/ChamaEndDate";
-import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
+// CyclePaymentStatus now used only inside MemberDashboard
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { ChamaChatPanel } from "@/components/chama/ChamaChatPanel";
