@@ -478,7 +478,7 @@ const ChamaDetail = () => {
             <div className="flex justify-between items-start mb-2">
               <div className="flex gap-2">
                 <Badge>
-                  {approvedMembers.length}/{chama.max_members} members
+                  {displayMemberCount}/{chama.max_members} members
                 </Badge>
                 {isPendingStatus && <Badge variant="secondary">Pending Start</Badge>}
                 {isActive && <Badge variant="default">Active</Badge>}
