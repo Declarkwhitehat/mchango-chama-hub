@@ -1070,6 +1070,7 @@ export type Database = {
           document_type: string
           entity_id: string | null
           entity_type: string | null
+          file_path: string | null
           generated_by: string
           id: string
           metadata: Json | null
@@ -1081,6 +1082,7 @@ export type Database = {
           document_type: string
           entity_id?: string | null
           entity_type?: string | null
+          file_path?: string | null
           generated_by: string
           id?: string
           metadata?: Json | null
@@ -1092,6 +1094,7 @@ export type Database = {
           document_type?: string
           entity_id?: string | null
           entity_type?: string | null
+          file_path?: string | null
           generated_by?: string
           id?: string
           metadata?: Json | null
