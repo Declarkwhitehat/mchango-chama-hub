@@ -265,7 +265,7 @@ export const VerificationRequestButton = ({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="outline" size="sm" className="gap-2 border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700">
           <BadgeCheck className="h-4 w-4" />
           Request Verification
         </Button>
