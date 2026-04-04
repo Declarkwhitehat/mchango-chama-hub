@@ -724,8 +724,19 @@ Deno.serve(async (req) => {
 
             const approvalPayoutAmount = chamaPoolForApproval?.available_balance || 0;
 
-            // Create the approval request
-            const { data: approvalReq, error: approvalError } = await supabase
+            // Skip creating approval request if there's nothing to pay out
+            if (approvalPayoutAmount <= 0) {
+              console.log(`ℹ️ Skipping admin approval for ${chama.name} cycle #${cycle.cycle_number} — KES 0 payout`);
+              await supabase.from('contribution_cycles').update({
+                payout_amount: 0,
+                payout_type: 'none',
+                members_skipped_count: ineligibleDetails.length
+              }).eq('id', cycle.id);
+              skipPayout = true;
+            }
+
+            // Create the approval request only if there's money to distribute
+            const { data: approvalReq, error: approvalError } = approvalPayoutAmount > 0 ? await supabase
               .from('payout_approval_requests')
               .insert({
                 chama_id: chama.id,
@@ -737,7 +748,7 @@ Deno.serve(async (req) => {
                 status: 'pending',
               })
               .select('id')
-              .single();
+              .single() : { data: null, error: null };
 
             if (approvalError) {
               if (approvalError.code === '23505') {
