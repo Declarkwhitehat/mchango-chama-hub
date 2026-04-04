@@ -855,11 +855,14 @@ const ChamaDetail = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Group Members ({approvedMembers.length})</CardTitle>
-                  <CardDescription>Approved members by join order</CardDescription>
+                  <CardTitle>
+                    {isCycleComplete ? `Confirmed Next Cycle Members (${displayMemberCount})` : `Group Members (${displayMemberCount})`}
+                  </CardTitle>
+                  <CardDescription>
+                    {isCycleComplete ? 'Members confirmed for the next cycle' : 'Approved members by join order'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* WhatsApp Group Join Button */}
                   {chama.whatsapp_link && (
                     <a
                       href={chama.whatsapp_link}
