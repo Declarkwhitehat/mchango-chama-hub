@@ -87,11 +87,9 @@ export const WelfareContributionReport = ({ welfareId, welfareName }: Props) => 
         pageWidth / 2, 33, { align: "center" }
       );
       doc.text(`Generated: ${format(new Date(), "MMM dd, yyyy HH:mm")}`, pageWidth / 2, 39, { align: "center" });
-      if (serialNumber) {
-        doc.setFont("helvetica", "bold");
-        doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, 45, { align: "center" });
-        doc.setFont("helvetica", "normal");
-      }
+      doc.setFont("helvetica", "bold");
+      doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, 45, { align: "center" });
+      doc.setFont("helvetica", "normal");
 
       // Table headers
       let y = 50;

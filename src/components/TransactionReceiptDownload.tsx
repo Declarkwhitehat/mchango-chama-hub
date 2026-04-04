@@ -68,10 +68,8 @@ export function TransactionReceiptDownload({
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Transaction ID: ${receiptData.transactionId}`, pageWidth / 2, 23, { align: 'center' });
-      if (serialNumber) {
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, 32, { align: 'center' });
-      }
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, 32, { align: 'center' });
 
       y = 50;
       doc.setTextColor(0, 0, 0);
