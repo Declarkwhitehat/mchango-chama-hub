@@ -1063,6 +1063,39 @@ export type Database = {
           },
         ]
       }
+      group_documents: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          file_name: string
+          file_path: string
+          id: string
+          title: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          file_name: string
+          file_path: string
+          id?: string
+          title: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          title?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
       mchango: {
         Row: {
           available_balance: number | null

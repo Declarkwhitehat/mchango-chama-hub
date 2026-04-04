@@ -26,6 +26,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { ChamaChatPanel } from "@/components/chama/ChamaChatPanel";
 import { TrustScoreBadge } from "@/components/chama/TrustScoreBadge";
+import { GroupDocuments } from "@/components/GroupDocuments";
 
 import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -784,6 +785,7 @@ const ChamaDetail = () => {
               {isManager && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               <TabsTrigger value="members" className="text-xs sm:text-sm">Members</TabsTrigger>
               {isMember && <TabsTrigger value="chat" className="text-xs sm:text-sm flex items-center gap-1"><MessageSquare className="h-3 w-3" />Chat</TabsTrigger>}
+              <TabsTrigger value="documents" className="text-xs sm:text-sm">Docs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard">
@@ -924,6 +926,14 @@ const ChamaDetail = () => {
                 <ChamaChatPanel chamaId={chama.id} isManager={isManager} />
               </TabsContent>
             )}
+
+            <TabsContent value="documents">
+              <GroupDocuments
+                entityType="chama"
+                entityId={chama.id}
+                canUpload={isManager}
+              />
+            </TabsContent>
 
           </Tabs>
         )}

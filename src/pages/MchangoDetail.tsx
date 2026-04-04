@@ -22,6 +22,7 @@ import { ExtendCampaignDays } from "@/components/mchango/ExtendCampaignDays";
 import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { GroupDocuments } from "@/components/GroupDocuments";
 
 interface Campaign {
   id: string;
@@ -335,6 +336,7 @@ const MchangoDetail = () => {
             <TabsList>
               <TabsTrigger value="details">Campaign</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+              <TabsTrigger value="documents">Docs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details" className="space-y-6">
@@ -459,6 +461,14 @@ const MchangoDetail = () => {
                 />
               )}
               <WithdrawalHistory mchangoId={campaign.id} />
+            </TabsContent>
+
+            <TabsContent value="documents" className="space-y-6">
+              <GroupDocuments
+                entityType="mchango"
+                entityId={campaign.id}
+                canUpload={isCreator}
+              />
             </TabsContent>
           </Tabs>
         </div>

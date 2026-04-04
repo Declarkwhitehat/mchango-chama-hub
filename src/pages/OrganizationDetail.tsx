@@ -19,6 +19,7 @@ import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { useAuth } from "@/contexts/AuthContext";
+import { GroupDocuments } from "@/components/GroupDocuments";
 
 interface Organization {
   id: string;
@@ -260,10 +261,11 @@ const OrganizationDetail = () => {
 
         {/* Tabs for About/Donate/Donors */}
         <Tabs defaultValue="about" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="donate">Donate</TabsTrigger>
             <TabsTrigger value="donors">Donors</TabsTrigger>
+            <TabsTrigger value="documents">Docs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="about" className="space-y-4">
@@ -338,6 +340,14 @@ const OrganizationDetail = () => {
               organizationId={organization.id} 
               totalAmount={Number(organization.total_gross_collected || 0)}
               organizationName={organization.name}
+            />
+          </TabsContent>
+
+          <TabsContent value="documents">
+            <GroupDocuments
+              entityType="organization"
+              entityId={organization.id}
+              canUpload={isCreator}
             />
           </TabsContent>
         </Tabs>
