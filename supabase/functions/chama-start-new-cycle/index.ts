@@ -23,6 +23,32 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
   }
 }
 
+function throwIfError(error: unknown) {
+  if (error) {
+    throw error;
+  }
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === 'object') {
+    const errorObject = error as { message?: unknown; details?: unknown };
+
+    if (typeof errorObject.message === 'string' && errorObject.message.trim()) {
+      return errorObject.message;
+    }
+
+    if (typeof errorObject.details === 'string' && errorObject.details.trim()) {
+      return errorObject.details;
+    }
+  }
+
+  return 'Unknown error occurred';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -59,7 +85,7 @@ Deno.serve(async (req) => {
       .eq('id', chamaId)
       .single();
 
-    if (chamaError) throw chamaError;
+    throwIfError(chamaError);
 
     // Verify user is manager (allow 'removed' status since cycle_complete sets all to removed)
     const { data: membership } = await supabase
@@ -85,7 +111,7 @@ Deno.serve(async (req) => {
       .eq('chama_id', chamaId)
       .eq('status', 'approved');
 
-    if (requestsError) throw requestsError;
+    throwIfError(requestsError);
 
     if (!approvedRequests || approvedRequests.length < (chama.min_members || 2)) {
       return new Response(
@@ -111,32 +137,85 @@ Deno.serve(async (req) => {
 
     // Delete old member_cycle_payments (depends on cycle IDs)
     if (oldCycleIds.length > 0) {
-      await supabase.from('member_cycle_payments').delete().in('cycle_id', oldCycleIds);
+      const { error: deleteMemberPaymentsError } = await supabase
+        .from('member_cycle_payments')
+        .delete()
+        .in('cycle_id', oldCycleIds);
+
+      throwIfError(deleteMemberPaymentsError);
     }
 
-    // Delete old chama_member_debts
-    await supabase.from('chama_member_debts').delete().eq('chama_id', chamaId);
-
     // Delete old chama_cycle_deficits
-    await supabase.from('chama_cycle_deficits').delete().eq('chama_id', chamaId);
+    const { error: deleteDeficitsError } = await supabase
+      .from('chama_cycle_deficits')
+      .delete()
+      .eq('chama_id', chamaId);
+
+    throwIfError(deleteDeficitsError);
+
+    // Delete old chama_member_debts
+    const { error: deleteDebtsError } = await supabase
+      .from('chama_member_debts')
+      .delete()
+      .eq('chama_id', chamaId);
+
+    throwIfError(deleteDebtsError);
 
     // Delete old payout_skips
-    await supabase.from('payout_skips').delete().eq('chama_id', chamaId);
+    const { error: deletePayoutSkipsError } = await supabase
+      .from('payout_skips')
+      .delete()
+      .eq('chama_id', chamaId);
+
+    throwIfError(deletePayoutSkipsError);
 
     // Delete old contributions (payment records from previous cycle)
-    await supabase.from('contributions').delete().eq('chama_id', chamaId);
+    const { error: deleteContributionsError } = await supabase
+      .from('contributions')
+      .delete()
+      .eq('chama_id', chamaId);
+
+    throwIfError(deleteContributionsError);
 
     // Delete old payout approval requests
-    await supabase.from('payout_approval_requests').delete().eq('chama_id', chamaId);
+    const { error: deletePayoutApprovalsError } = await supabase
+      .from('payout_approval_requests')
+      .delete()
+      .eq('chama_id', chamaId);
+
+    throwIfError(deletePayoutApprovalsError);
 
     // Delete old withdrawals
-    await supabase.from('withdrawals').delete().eq('chama_id', chamaId);
+    const { error: deleteWithdrawalsError } = await supabase
+      .from('withdrawals')
+      .delete()
+      .eq('chama_id', chamaId);
+
+    throwIfError(deleteWithdrawalsError);
 
     // Delete old contribution_cycles
-    await supabase.from('contribution_cycles').delete().eq('chama_id', chamaId);
+    const { error: deleteCyclesError } = await supabase
+      .from('contribution_cycles')
+      .delete()
+      .eq('chama_id', chamaId);
+
+    throwIfError(deleteCyclesError);
 
     // Clean up old chama_member_removals
-    await supabase.from('chama_member_removals').delete().eq('chama_id', chamaId);
+    const { error: deleteRemovalsError } = await supabase
+      .from('chama_member_removals')
+      .delete()
+      .eq('chama_id', chamaId);
+
+    throwIfError(deleteRemovalsError);
+
+    // Break foreign-key links to previous cycle members before removing those member rows
+    const { error: clearPreviousMemberRefsError } = await supabase
+      .from('chama_rejoin_requests')
+      .update({ previous_member_id: null })
+      .eq('chama_id', chamaId);
+
+    throwIfError(clearPreviousMemberRefsError);
 
     console.log('Old cycle data cleaned up.');
 
@@ -147,7 +226,7 @@ Deno.serve(async (req) => {
       .eq('chama_id', chamaId)
       .in('status', ['active', 'removed', 'inactive']);
 
-    if (deleteOldMembersError) throw deleteOldMembersError;
+    throwIfError(deleteOldMembersError);
 
     // Find manager ID (the user starting the cycle is the manager)
     const managerId = user.id;
@@ -208,7 +287,7 @@ Deno.serve(async (req) => {
       .insert(newMembers)
       .select('*, profiles!chama_members_user_id_fkey(*)');
 
-    if (insertError) throw insertError;
+    throwIfError(insertError);
 
     // ========== RESET CHAMA TO BRAND NEW ==========
     const { error: updateError } = await supabase
@@ -226,14 +305,13 @@ Deno.serve(async (req) => {
       })
       .eq('id', chamaId);
 
-    if (updateError) throw updateError;
+    throwIfError(updateError);
 
     // Mark rejoin requests as processed
     const { error: requestUpdateError } = await supabase
       .from('chama_rejoin_requests')
       .delete()
-      .eq('chama_id', chamaId)
-      .eq('status', 'approved');
+      .eq('chama_id', chamaId);
 
     if (requestUpdateError) console.error('Error cleaning up requests:', requestUpdateError);
 
@@ -280,7 +358,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error starting new cycle:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage = getErrorMessage(error);
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
