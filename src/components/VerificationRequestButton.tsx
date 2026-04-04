@@ -82,6 +82,9 @@ export const VerificationRequestButton = ({
     }
   };
 
+  const VERIFICATION_FEE = 200;
+  const requiresFee = entityType !== 'chama';
+
   const handleSubmit = async () => {
     if (!reason.trim()) {
       toast({
@@ -94,6 +97,52 @@ export const VerificationRequestButton = ({
 
     setIsSubmitting(true);
     try {
+      // For non-chama entities, check balance and deduct verification fee
+      if (requiresFee) {
+        let balance = 0;
+
+        if (entityType === 'mchango') {
+          const { data, error: e } = await supabase.from('mchango').select('available_balance').eq('id', entityId).single();
+          if (e) throw e;
+          balance = data?.available_balance ?? 0;
+        } else if (entityType === 'organization') {
+          const { data, error: e } = await supabase.from('organizations').select('available_balance').eq('id', entityId).single();
+          if (e) throw e;
+          balance = data?.available_balance ?? 0;
+        } else if (entityType === 'welfare') {
+          const { data, error: e } = await supabase.from('welfares').select('available_balance').eq('id', entityId).single();
+          if (e) throw e;
+          balance = data?.available_balance ?? 0;
+        }
+
+        if (balance < VERIFICATION_FEE) {
+          toast({
+            title: "Insufficient Balance",
+            description: `You need at least KSh ${VERIFICATION_FEE} in your ${entityType === 'mchango' ? 'campaign' : entityType} balance to request verification.`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Deduct fee from entity balance
+        if (entityType === 'mchango') {
+          await supabase.from('mchango').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+        } else if (entityType === 'organization') {
+          await supabase.from('organizations').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+        } else if (entityType === 'welfare') {
+          await supabase.from('welfares').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+        }
+
+        // Record fee as company revenue
+        await supabase.from('company_earnings').insert({
+          amount: VERIFICATION_FEE,
+          source: 'verification_fee',
+          description: `Verification fee for ${entityType}: ${entityName}`,
+          group_id: entityId,
+        });
+      }
+
       const { error } = await supabase
         .from('verification_requests')
         .insert({
@@ -118,7 +167,9 @@ export const VerificationRequestButton = ({
 
       toast({
         title: "Request Submitted",
-        description: "Your verification request has been submitted for admin review",
+        description: requiresFee
+          ? `KSh ${VERIFICATION_FEE} has been deducted. Your verification request has been submitted for admin review.`
+          : "Your verification request has been submitted for admin review",
       });
 
       setIsOpen(false);
@@ -167,6 +218,11 @@ export const VerificationRequestButton = ({
                 Your previous request was rejected: "{existingRequest.rejection_reason || 'No reason provided'}"
                 <br /><br />
                 Submit a new request with additional information.
+                {requiresFee && (
+                  <span className="block mt-2 font-medium text-foreground">
+                    A verification fee of KSh {VERIFICATION_FEE} will be deducted from your balance.
+                  </span>
+                )}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -219,6 +275,11 @@ export const VerificationRequestButton = ({
           <DialogTitle>Request Verification Badge</DialogTitle>
           <DialogDescription>
             A verified badge shows users that your {entityType === 'mchango' ? 'campaign' : entityType} is authentic and trustworthy.
+            {requiresFee && (
+              <span className="block mt-2 font-medium text-foreground">
+                A verification fee of KSh {VERIFICATION_FEE} will be deducted from your {entityType === 'mchango' ? 'campaign' : entityType} balance.
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
