@@ -97,7 +97,7 @@ export const ContributionsPDFDownload = ({
         return;
       }
 
-      const serialNumber = await trackGeneratedDocument({
+      const { serialNumber, documentId } = await trackDocumentWithId({
         documentType: "contributions_report",
         documentTitle: `${title} - ${getPeriodLabel()}`,
         metadata: { period, count: filtered.length },
