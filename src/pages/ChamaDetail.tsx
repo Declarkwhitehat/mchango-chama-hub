@@ -753,33 +753,7 @@ const ChamaDetail = () => {
           </Card>
         )}
 
-        {/* Red Banner for unpaid current user */}
-        {isMember && isActive && currentUserMembership?.id && 
-         currentUserMembership.id in memberPaymentStatuses && 
-         !memberPaymentStatuses[currentUserMembership.id] && (
-          <Card className="border-destructive bg-destructive/10">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-destructive p-2 rounded-full">
-                  <AlertTriangle className="h-5 w-5 text-destructive-foreground" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-destructive">Payment Required!</p>
-                  <p className="text-sm text-muted-foreground">
-                    You haven't paid KES {chama.contribution_amount.toLocaleString()} for this cycle. Pay now to avoid being marked as late.
-                  </p>
-                </div>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => document.getElementById('payment-form-section')?.scrollIntoView({ behavior: 'smooth' })}
-                >
-                  Pay Now
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Red payment banner removed — PaymentCountdownTimer in MemberDashboard handles this */}
 
         {/* Payment Form - Only visible to approved members when chama is active */}
         {isMember && isActive && (
