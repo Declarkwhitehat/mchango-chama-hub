@@ -1,118 +1,125 @@
 
 
-# Chama System Bug Fixes Plan
+# Chama Engine Deep Fix Plan
 
-This plan addresses the critical issues you reported with the Kings Self Help Group chama. There are multiple interconnected bugs across invite management, payment processing, cycle creation, and the dashboard display.
+## Root Cause Analysis from Database Evidence
 
----
+The "Kings Self Help Group" data reveals these concrete failures:
 
-## Problem Summary
-
-| # | Issue | Root Cause |
-|---|-------|------------|
-| 1 | Multiple invite links shown | `generate` action doesn't deactivate previous codes |
-| 2 | Member ID changed after first payment (GJ5XM0001 → GJ5XM0003) | `contributions-crud` re-assigns `order_index` and `member_code` on first payment even though `chama-start` already assigned them |
-| 3 | Payments not recognized / "KES 0 paid" | Payment recorded in `contributions` table but `settleDebts()` can't find active cycle (date mismatch during grace period) |
-| 4 | Unlimited cycles created (3+ cycles for 2 members) | GAP RECOVERY in `daily-payout-cron` creates cycles indefinitely — not bounded by member count |
-| 5 | Contradictory amounts (KES 205, 305, 405) | Penalty (10%) added on top of principal debt (KES 100 + KES 10 penalty = KES 110 per missed cycle), but amounts compound incorrectly |
-| 6 | Rescheduled to position #3 with only 2 members | Skip logic sets `newPosition = lastPosition + 1` without capping to member count |
-| 7 | Reminder sent during grace period | Reminder cron doesn't check if cycle is still in grace period |
-| 8 | No auto-removal after 3 missed payments | Members never removed because cycle payments are never marked as missed properly |
-| 9 | PDF missing reference and time | `ContributionsPDFDownload` doesn't include payment reference or timestamp |
-
----
+| Finding | Data Evidence | Root Cause |
+|---------|--------------|------------|
+| **15 cycles created** for 2 members | `contribution_cycles` has cycles #1-#15, all with `payout_amount: 0` | GAP RECOVERY fix was deployed after damage was done; also the cap logic `activeMembers.length - latestCycle.cycle_number` is wrong — it should cap total cycles to `activeMembers.length`, not calculate remaining |
+| **Payments not linked** | 2 contributions exist (KES 100 each) but all 30 `member_cycle_payments` show `amount_paid: 0` | C2B callback delegates to `settle-only`, but `settleDebts` Step 3 cycle lookup used date-only comparison before fix; also `first_payment_completed` is still `false` for both members |
+| **No auto-removal** | `missed_payments_count: 1` for both members, `chama_member_removals` is empty | The `missed_payments_count` should be ~14 but only incremented once — GAP RECOVERY creates cycles with `payout_processed: true` so they skip the TRACK MISSED PAYMENTS section entirely |
+| **KES 0 payout sent to admin** | `payout_approval_requests` with `payout_amount: 0` | `available_balance: 0` because payments never went through settlement |
+| **Member #1 rescheduled to position #3** | `rescheduled_to_position: 3` with only 2 members | Cap fix deployed but only for future — the data already has the wrong value |
+| **KES 5 outstanding on day 1** | Commission (5%) treated as outstanding | The dashboard shows `totalPayable = contribution + outstanding` where outstanding includes commission calculations |
 
 ## Implementation Plan
 
-### Step 1: Fix Invite Link — Single Active Code Only
+### Step 1: Fix GAP RECOVERY Cycle Cap Logic (Critical)
 
-**Files**: `supabase/functions/chama-invite/index.ts`, `src/components/ChamaInviteManager.tsx`
+**File**: `supabase/functions/daily-payout-cron/index.ts` (~line 338)
 
-- In the `generate` action handler, **deactivate all existing active unused codes** for the chama before inserting a new one:
-  ```sql
-  UPDATE chama_invite_codes SET is_active = false 
-  WHERE chama_id = ? AND is_active = true AND used_by IS NULL
-  ```
-- **Remove** the batch generate action from the edge function and the batch generate UI section from `ChamaInviteManager.tsx`
-- The UI will only ever show one active code at a time
+Current code: `MAX_CATCHUP_CYCLES = Math.min(50, activeMembers.length - latestCycle.cycle_number)`
 
-### Step 2: Fix Member ID Change on First Payment
+This is wrong. For a 2-member chama at cycle 15, this evaluates to `2 - 15 = -13`. The fix should count total existing cycles, not use subtraction from the latest:
 
-**File**: `supabase/functions/contributions-crud/index.ts` (lines 884-921)
+```
+const { count: existingCycleCount } = await supabase
+  .from('contribution_cycles')
+  .select('*', { count: 'exact', head: true })
+  .eq('chama_id', chama.id);
 
-- The `chama-start` function already assigns `order_index`, `member_code`, and marks members as active with `first_payment_completed` implicitly ready
-- However, `contributions-crud` checks `if (!member.first_payment_completed)` and **re-assigns** order index and member code
-- **Fix**: When the chama is already `active` (started), skip the first-payment activation block entirely — the member already has their assigned position from `chama-start`
-- Add a guard: only run first-payment activation if `chama.status === 'pending'` (pre-start joining flow, not applicable here)
+const maxTotalCycles = activeMembers.length; // Single round ROSCA
+const remainingCycles = maxTotalCycles - (existingCycleCount || 0);
 
-### Step 3: Fix Payment Not Linking to Cycle
+if (remainingCycles <= 0) {
+  // Mark as cycle_complete
+  continue;
+}
+const MAX_CATCHUP_CYCLES = Math.min(50, remainingCycles);
+```
 
-**File**: `supabase/functions/contributions-crud/index.ts` (settleDebts function, ~line 420-428)
+### Step 2: GAP RECOVERY Must Track Missed Payments
 
-- The cycle lookup uses `lte('start_date', today)` and `gte('end_date', today)` — but the grace period cycle's `end_date` is set to the next day at 10 PM
-- For a payment made on the start day (Mar 19), `today = '2026-03-19'` and `end_date = '2026-03-20T22:00:00'` — this should match correctly
-- **Actual issue**: The offline payment flow may be passing `gross_amount = 100` but the settlement expects `gross_amount = 105` (100 + 5% commission) to fully clear the cycle
-- **Fix**: Ensure the offline payment form sends `amount = contribution_amount * (1 + commission_rate)` as the gross, OR adjust the settlement to treat offline payments at face value (net = amount, deduct commission from the pool separately)
-- Also add an `actual_payment_date` field to contributions to support the user's choice of storing both dates
+**File**: `supabase/functions/daily-payout-cron/index.ts` (~lines 431-449)
 
-### Step 4: Bound Cycle Count to Member Count
+Gap-recovered cycles are created with `payout_processed: true`, so the NORMAL PROCESSING section (which increments `missed_payments_count` and triggers auto-removal) never sees them. 
 
-**File**: `supabase/functions/daily-payout-cron/index.ts` (GAP RECOVERY section, ~lines 310-445)
+**Fix**: After creating each gap-recovered cycle and its `member_cycle_payments`, immediately increment `missed_payments_count` for all members and check for auto-removal (>= 3 misses). Extract the missed-payment tracking + auto-removal logic into a reusable function called from both GAP RECOVERY and NORMAL PROCESSING.
 
-- Currently, GAP RECOVERY creates up to 50 catch-up cycles regardless of how many members exist
-- **Fix**: Add a check — total cycles should not exceed `memberCount * maxRounds` (for a single-round ROSCA, max cycles = member count)
-- After all members have had their turn (cycle_number > member_count), the chama should transition to `cycle_complete` status instead of creating more cycles
-- Add: `if (nextCycleNum > activeMembers.length) { mark chama as cycle_complete; break; }`
+### Step 3: Fix C2B Callback — Mark first_payment_completed
 
-### Step 5: Fix Outstanding Amount Calculations
+**File**: `supabase/functions/c2b-confirm-payment/index.ts` (~line 152, after contribution recorded)
 
-**Files**: `supabase/functions/member-dashboard/index.ts`, `src/components/chama/PaymentCountdownTimer.tsx`, `src/components/MemberDashboard.tsx`
+The C2B callback records the contribution but never marks `first_payment_completed = true`. Add:
+```typescript
+if (!chamaMemberData.first_payment_completed) {
+  await supabase.from('chama_members').update({
+    first_payment_completed: true,
+    first_payment_at: new Date().toISOString(),
+  }).eq('id', chamaMemberData.id);
+}
+```
 
-- The `totalOutstanding` in member-dashboard sums `amount_due - amount_paid` from `member_cycle_payments` where `is_paid = false`
-- But the `PaymentCountdownTimer` receives `totalPayable` which is `contributionAmount + totalOutstanding` — this double-counts the current cycle
-- **Fix**: `totalPayable` should be `totalOutstanding` (which already includes the current cycle's unpaid amount) — not `contributionAmount + totalOutstanding`
-- Ensure penalty amounts (10% per missed cycle) are only from `chama_member_debts`, not added again in the UI
-- The "Pay KES X" button in the M-Pesa form should show the **total gross payable** including commission and outstanding debts
+Also ensure the C2B callback does NOT reassign `order_index` or `member_code` (already handled by `chama-start`).
 
-### Step 6: Fix Rescheduled Position Exceeding Member Count
+### Step 4: Fix settle-only to Also Update first_payment_completed
 
-**File**: `supabase/functions/daily-payout-cron/index.ts` (~line 548-549)
+**File**: `supabase/functions/contributions-crud/index.ts` (~line 709, in settle-only block)
 
-- Currently: `newPosition = lastPosition + 1` which can go to 3 even with only 2 members
-- **Fix**: Cap `newPosition` to `activeMembers.length` (wrap around). For a 2-member chama, if member #1 is skipped, they become #2 (last position)
+When the `settle-only` action runs, check if the member's `first_payment_completed` is false and the chama is active. If so, mark it true without changing order_index/member_code.
 
-### Step 7: Skip Reminders During Grace Period
+### Step 5: Chama End Date — Auto-Complete When All Turns Done
 
-**File**: `supabase/functions/daily-reminder-cron/index.ts`
+**File**: `supabase/functions/daily-payout-cron/index.ts`
 
-- Add a check: if the cycle's `start_date` is within the last 24 hours (grace period), skip sending reminders for that cycle
-- Compare `cycle.start_date` + 24 hours against `now()` — only send reminders after grace period expires
+After processing a cycle where `cycle_number >= activeMembers.length`, check if all members have had their turn. If the final cycle is processed, update chama status to `cycle_complete` and set `last_cycle_completed_at`. This already exists in GAP RECOVERY but needs to also run after NORMAL PROCESSING completes the last cycle.
 
-### Step 8: Fix PDF Missing Reference and Time
+### Step 6: Clean Up the Broken Test Chama Data
 
-**File**: `src/components/ContributionsPDFDownload.tsx`
+**Migration**: Reset the "Kings Self Help Group" to a valid state:
+- Delete excess cycles (#3 through #15) — only 2 cycles should exist for 2 members
+- Update `member_cycle_payments` for cycles #1 and #2 to reflect the actual KES 100 payments made
+- Reset `missed_payments_count` to accurate values
+- Fix `rescheduled_to_position` from 3 to 2 (or null)
+- Set `first_payment_completed = true` for both members
+- Update `chama_member_debts` to cleared status since payments were made
+- Set chama status to `cycle_complete` since both cycles should be done
+- Update `available_balance` and `total_gross_collected` to reflect actual payments
 
-- Add `payment_reference` and `contribution_date` (with time) columns to the PDF table
-- Ensure the data passed to the PDF generator includes these fields from the contributions query
+### Step 7: Fix Admin Payout Approval for KES 0
+
+**File**: `supabase/functions/daily-payout-cron/index.ts` (~line 671-684)
+
+Currently creates an admin approval request even when `approvalPayoutAmount = 0`. Add a guard:
+```typescript
+if (approvalPayoutAmount <= 0) {
+  // Skip creating approval request — nothing to pay out
+  // Just mark cycle as processed with no payout
+}
+```
+
+### Step 8: Ensure Deployed Functions Are Current
+
+Deploy all modified edge functions after changes:
+- `daily-payout-cron`
+- `contributions-crud`
+- `c2b-confirm-payment`
 
 ---
 
-## Technical Details
-
-### Database Changes
-- Add `actual_payment_date` column to `contributions` table (timestamptz, nullable) for offline payment tracking
+## Technical Summary
 
 ### Edge Functions Modified
-1. `chama-invite/index.ts` — deactivate old codes on generate, remove batch
-2. `contributions-crud/index.ts` — fix first-payment guard, fix gross amount handling
-3. `daily-payout-cron/index.ts` — bound cycles to member count, fix skip position
-4. `daily-reminder-cron/index.ts` — grace period check
-5. `member-dashboard/index.ts` — fix outstanding calculation
+1. `daily-payout-cron/index.ts` — Fix cycle cap math, extract missed-payment tracker, auto-complete after final cycle, skip KES 0 approvals
+2. `contributions-crud/index.ts` — settle-only marks first_payment_completed
+3. `c2b-confirm-payment/index.ts` — Mark first_payment_completed on C2B payments
 
-### Frontend Components Modified
-1. `ChamaInviteManager.tsx` — remove batch UI, show single code
-2. `PaymentCountdownTimer.tsx` — fix totalPayable calculation
-3. `MemberDashboard.tsx` — consistent outstanding display
-4. `ContributionsPDFDownload.tsx` — add reference + time
-5. `ChamaPaymentForm.tsx` — send correct gross amount
+### Database Migration
+- Clean up Kings Self Help Group data (delete excess cycles, fix member records, settle actual payments, mark cycle_complete)
+
+### Files NOT Changed
+- Frontend components (previous fixes to `PaymentCountdownTimer`, `DailyPaymentStatus`, `ContributionsPDFDownload`, `ChamaInviteManager` remain as-is — they were correct)
 
