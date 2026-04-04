@@ -461,6 +461,14 @@ const MchangoDetail = () => {
               )}
               <WithdrawalHistory mchangoId={campaign.id} />
             </TabsContent>
+
+            <TabsContent value="documents" className="space-y-6">
+              <GroupDocuments
+                entityType="mchango"
+                entityId={campaign.id}
+                canUpload={isCreator}
+              />
+            </TabsContent>
           </Tabs>
         </div>
     </Layout>
