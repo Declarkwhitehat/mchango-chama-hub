@@ -85,7 +85,7 @@ serve(async (req) => {
     // Try to find member in chama first using full member code
     const { data: chamaMemberData } = await supabase
       .from('chama_members')
-      .select('id, user_id, chama_id, member_code')
+      .select('id, user_id, chama_id, member_code, first_payment_completed')
       .eq('member_code', upperAccountNumber)
       .maybeSingle();
 
