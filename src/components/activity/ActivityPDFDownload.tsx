@@ -3,7 +3,7 @@ import { Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import { format } from "date-fns";
-import { trackGeneratedDocument } from "@/utils/documentTracker";
+import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 
 interface ActivityPDFDownloadProps {
   data: any[];
