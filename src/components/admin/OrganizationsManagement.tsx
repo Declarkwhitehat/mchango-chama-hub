@@ -478,14 +478,11 @@ export const OrganizationsManagement = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmDialog?.action === 'verify' && 'Verify Organization'}
               {confirmDialog?.action === 'unverify' && 'Remove Verification'}
               {confirmDialog?.action === 'activate' && 'Activate Organization'}
               {confirmDialog?.action === 'deactivate' && 'Deactivate Organization'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmDialog?.action === 'verify' && 
-                `Are you sure you want to verify "${confirmDialog.orgName}"? This will show a verified badge on their public page.`}
               {confirmDialog?.action === 'unverify' && 
                 `Are you sure you want to remove verification from "${confirmDialog?.orgName}"?`}
               {confirmDialog?.action === 'activate' && 
@@ -497,7 +494,6 @@ export const OrganizationsManagement = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleAction}>
-              {confirmDialog?.action === 'verify' && 'Verify'}
               {confirmDialog?.action === 'unverify' && 'Remove'}
               {confirmDialog?.action === 'activate' && 'Activate'}
               {confirmDialog?.action === 'deactivate' && 'Deactivate'}
