@@ -187,13 +187,12 @@ serve(async (req) => {
         });
       }
 
-      // Only return active, unused codes
+      // Only return active codes that still have remaining uses
       const { data, error } = await supabaseClient
         .from('chama_invite_codes')
         .select('*')
         .eq('chama_id', chamaId)
         .eq('is_active', true)
-        .is('used_by', null)
         .order('created_at', { ascending: false })
         .limit(1);
 
