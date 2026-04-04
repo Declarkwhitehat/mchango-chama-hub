@@ -67,7 +67,7 @@ export const ActivityPDFDownload = ({
       }
       
       // Table headers and data based on type
-      let startY = 40;
+      let startY = serialY + 6;
       const lineHeight = 8;
       const margin = 14;
       

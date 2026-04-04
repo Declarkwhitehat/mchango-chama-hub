@@ -97,6 +97,12 @@ export const ContributionsPDFDownload = ({
         return;
       }
 
+      const serialNumber = await trackGeneratedDocument({
+        documentType: "contributions_report",
+        documentTitle: `${title} - ${getPeriodLabel()}`,
+        metadata: { period, count: filtered.length },
+      });
+
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 20;
@@ -114,10 +120,17 @@ export const ContributionsPDFDownload = ({
       doc.text(`Contributions Report - ${getPeriodLabel()}`, pageWidth / 2, yPos, { align: "center" });
       yPos += 8;
 
-      // Generated date
+      // Generated date + serial
       doc.setFontSize(10);
       doc.text(`Generated: ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}`, pageWidth / 2, yPos, { align: "center" });
-      yPos += 15;
+      yPos += 6;
+      if (serialNumber) {
+        doc.setFont("helvetica", "bold");
+        doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, yPos, { align: "center" });
+        doc.setFont("helvetica", "normal");
+        yPos += 6;
+      }
+      yPos += 9;
 
       // Summary section
       const totalAmount = filtered.reduce((sum, c) => sum + c.amount, 0);

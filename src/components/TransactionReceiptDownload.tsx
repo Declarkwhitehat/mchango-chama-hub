@@ -46,21 +46,32 @@ export function TransactionReceiptDownload({
   const generatePDF = async () => {
     setGenerating(true);
     try {
+      const serialNumber = await trackGeneratedDocument({
+        documentType: "payment_receipt",
+        documentTitle: `Receipt - ${receiptData.chamaName} - ${receiptData.memberCode}`,
+        entityType: "chama",
+        metadata: { transactionId: receiptData.transactionId, memberCode: receiptData.memberCode },
+      });
+
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 20;
       let y = margin;
 
       // ── Header ──
-      doc.setFillColor(22, 163, 74); // green-600
-      doc.rect(0, 0, pageWidth, 35, 'F');
+      doc.setFillColor(22, 163, 74);
+      doc.rect(0, 0, pageWidth, 40, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('CHAMA PAYMENT RECEIPT', pageWidth / 2, 15, { align: 'center' });
+      doc.text('CHAMA PAYMENT RECEIPT', pageWidth / 2, 13, { align: 'center' });
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Transaction ID: ${receiptData.transactionId}`, pageWidth / 2, 25, { align: 'center' });
+      doc.text(`Transaction ID: ${receiptData.transactionId}`, pageWidth / 2, 23, { align: 'center' });
+      if (serialNumber) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, 32, { align: 'center' });
+      }
 
       y = 45;
       doc.setTextColor(0, 0, 0);
