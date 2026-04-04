@@ -3,7 +3,7 @@ import { Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import { format } from "date-fns";
-import { trackGeneratedDocument } from "@/utils/documentTracker";
+import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 
 interface ActivityPDFDownloadProps {
   data: any[];
@@ -41,7 +41,7 @@ export const ActivityPDFDownload = ({
         all: "All Transactions Report",
       };
 
-      const serialNumber = await trackGeneratedDocument({
+      const { serialNumber, documentId } = await trackDocumentWithId({
         documentType: "activity_report",
         documentTitle: titles[type],
         metadata: { type, count: data.length },
@@ -215,9 +215,13 @@ export const ActivityPDFDownload = ({
       doc.text(`Total: KSh ${totalAmount.toLocaleString()}`, margin, startY);
       doc.text(`Transactions: ${data.length}`, margin + 80, startY);
       
-      // Save
+      // Get blob and save
+      const pdfBlob = doc.output('blob');
       const filename = `${type}-transactions-${format(new Date(), "yyyy-MM-dd")}.pdf`;
       doc.save(filename);
+
+      // Upload to storage in background
+      uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});
       
       toast({
         title: "Download complete",

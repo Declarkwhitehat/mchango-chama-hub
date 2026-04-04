@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { FileText, Download, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { format, parseISO } from "date-fns";
-import { trackGeneratedDocument } from "@/utils/documentTracker";
+import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 
 interface Props {
   welfareId: string;
@@ -59,7 +59,7 @@ export const WelfareContributionReport = ({ welfareId, welfareName }: Props) => 
       members?.forEach(m => memberMap.set(m.id, m));
 
       // Track document
-      const serialNumber = await trackGeneratedDocument({
+      const { serialNumber, documentId } = await trackDocumentWithId({
         documentType: "contribution_report",
         documentTitle: `${welfareName} - Contribution Report`,
         entityType: "welfare",
@@ -207,8 +207,12 @@ export const WelfareContributionReport = ({ welfareId, welfareName }: Props) => 
         y += lineHeight;
       });
 
+      const pdfBlob = doc.output('blob');
       const filename = `${welfareName.replace(/\s+/g, '-')}-contributions-${startDate}-to-${endDate}.pdf`;
       doc.save(filename);
+
+      // Upload to storage in background
+      uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});
 
       toast.success(`Report downloaded: ${filename}`);
     } catch (error: any) {

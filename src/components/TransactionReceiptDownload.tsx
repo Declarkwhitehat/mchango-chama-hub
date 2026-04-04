@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileDown, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
-import { trackGeneratedDocument } from "@/utils/documentTracker";
+import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 
 interface AllocationLine {
   type: string;
@@ -46,7 +46,7 @@ export function TransactionReceiptDownload({
   const generatePDF = async () => {
     setGenerating(true);
     try {
-      const serialNumber = await trackGeneratedDocument({
+      const { serialNumber, documentId } = await trackDocumentWithId({
         documentType: "payment_receipt",
         documentTitle: `Receipt - ${receiptData.chamaName} - ${receiptData.memberCode}`,
         entityType: "chama",
@@ -223,8 +223,13 @@ export function TransactionReceiptDownload({
       doc.text('All commissions are deducted at source. Only net funds are allocated to the chama pool.', pageWidth / 2, y + 5, { align: 'center' });
       doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, y + 10, { align: 'center' });
 
+      // Get blob and save
+      const pdfBlob = doc.output('blob');
       const filename = `receipt-${receiptData.memberCode}-${receiptData.transactionId.substring(0, 8)}.pdf`;
       doc.save(filename);
+
+      // Upload to storage in background
+      uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});
     } catch (err) {
       console.error('Error generating receipt PDF:', err);
     } finally {

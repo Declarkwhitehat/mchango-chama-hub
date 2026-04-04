@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Search, FileText, Loader2, Hash, ShieldCheck, AlertTriangle, Clock } from "lucide-react";
+import { Search, FileText, Loader2, Hash, ShieldCheck, AlertTriangle, Clock, Download } from "lucide-react";
 import { format, subMonths } from "date-fns";
 
 interface GeneratedDoc {
@@ -18,6 +18,7 @@ interface GeneratedDoc {
   entity_id: string | null;
   generated_by: string;
   generated_by_name?: string;
+  file_path?: string | null;
   metadata: Record<string, any>;
   created_at: string;
 }
@@ -28,6 +29,7 @@ const AdminDocuments = () => {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [searchedSerial, setSearchedSerial] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const handleSearch = async () => {
     const trimmed = serialQuery.trim();
@@ -42,7 +44,6 @@ const AdminDocuments = () => {
     setSearchedSerial(isSerialSearch);
 
     try {
-      // Only search within last 3 months
       const threeMonthsAgo = subMonths(new Date(), 3).toISOString();
 
       if (isSerialSearch) {
@@ -54,8 +55,6 @@ const AdminDocuments = () => {
           .limit(1);
 
         if (error) throw error;
-
-        // Fetch user profiles for results
         const docs = await enrichWithProfiles((data as GeneratedDoc[]) || []);
         setResults(docs);
       } else {
@@ -98,6 +97,39 @@ const AdminDocuments = () => {
     }));
   };
 
+  const handleDownloadPDF = async (doc: GeneratedDoc) => {
+    if (!doc.file_path) {
+      toast.error("PDF file not available for this document");
+      return;
+    }
+
+    setDownloading(doc.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from("generated-pdfs")
+        .download(doc.file_path);
+
+      if (error) throw error;
+
+      // Create download link
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `document-${doc.serial_number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("Document downloaded");
+    } catch (err: any) {
+      console.error("Download error:", err);
+      toast.error("Failed to download document");
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const typeColors: Record<string, string> = {
     contribution_report: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
     activity_report: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
@@ -114,7 +146,7 @@ const AdminDocuments = () => {
             Verify Document
           </h1>
           <p className="text-sm text-muted-foreground">
-            Enter a document serial number to verify its authenticity. Documents are retained for 3 months.
+            Enter a document serial number to verify its authenticity and view the original document. Documents are retained for 3 months.
           </p>
         </div>
 
@@ -225,11 +257,33 @@ const AdminDocuments = () => {
                         </div>
                       )}
 
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex items-center gap-2 pt-1 flex-wrap">
                         <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-green-200">
                           <ShieldCheck className="h-3 w-3 mr-1" />
                           Verified Authentic
                         </Badge>
+
+                        {doc.file_path ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs h-7"
+                            onClick={() => handleDownloadPDF(doc)}
+                            disabled={downloading === doc.id}
+                          >
+                            {downloading === doc.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Download className="h-3 w-3" />
+                            )}
+                            View Document
+                          </Button>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            <FileText className="h-3 w-3 mr-1" />
+                            PDF not stored
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   ))}
