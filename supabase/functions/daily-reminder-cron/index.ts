@@ -83,6 +83,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Skip reminders during grace period (first 24 hours of cycle)
+      const cycleStartDate = new Date(cycle.start_date || today);
+      const gracePeriodEnd = new Date(cycleStartDate.getTime() + 24 * 60 * 60 * 1000);
+      if (new Date() < gracePeriodEnd) {
+        console.log(`Skipping reminder for ${chama.name} — still in grace period`);
+        continue;
+      }
+
       // Get unpaid members
       const { data: unpaidPayments } = await supabase
         .from('member_cycle_payments')

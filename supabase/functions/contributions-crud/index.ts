@@ -415,14 +415,15 @@ async function settleDebts(
 
   // ── STEP 3: Apply remaining to current cycle ──
   const now = new Date();
-  const today = now.toISOString().split('T')[0];
+  const nowISO = now.toISOString();
 
+  // Use full timestamp comparison instead of date-only to handle grace period correctly
   const { data: cycle } = await supabase
     .from('contribution_cycles')
     .select('*, member_cycle_payments!inner(id, amount_due, amount_paid, amount_remaining, fully_paid, payment_allocations)')
     .eq('chama_id', chamaId)
-    .lte('start_date', today)
-    .gte('end_date', today)
+    .lte('start_date', nowISO)
+    .gte('end_date', nowISO)
     .eq('payout_processed', false)
     .eq('member_cycle_payments.member_id', memberId)
     .maybeSingle();

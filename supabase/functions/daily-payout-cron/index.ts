@@ -558,7 +558,14 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           const lastPosition = maxOrderResult?.order_index || scheduledBeneficiary.order_index;
-          const newPosition = lastPosition + 1;
+          // Cap newPosition to member count — can't go beyond the total number of active members
+          const { count: activeMemberCount } = await supabase
+            .from('chama_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('chama_id', chama.id)
+            .eq('status', 'active')
+            .eq('approval_status', 'approved');
+          const newPosition = Math.min(lastPosition + 1, activeMemberCount || lastPosition + 1);
 
           await recordPayoutSkip(
             supabase,
