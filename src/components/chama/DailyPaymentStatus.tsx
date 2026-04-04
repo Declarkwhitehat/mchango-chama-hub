@@ -231,11 +231,20 @@ export function CyclePaymentStatus({ chamaId, frequency, onPayNow }: CyclePaymen
       )}
 
       {/* Prominent Countdown Timer */}
+      {/* 
+        totalPayable = (missed cycles outstanding + current cycle due) × commission
+        totalOutstanding = sum of missed cycles only (not current)
+        If user already paid current cycle, only show outstanding debt.
+      */}
       <PaymentCountdownTimer
         endDate={cycleInfo.end_date}
         cutoffHour={22}
         contributionAmount={cycleInfo.due_amount}
-        totalPayable={missedCyclesCount > 0 ? totalOutstanding + (cycleInfo.due_amount * 1.05) : cycleInfo.due_amount * 1.05}
+        totalPayable={
+          currentUserPaid
+            ? (totalOutstanding > 0 ? totalOutstanding * 1.10 : 0) // paid current, only show debts with penalty
+            : ((totalOutstanding + cycleInfo.due_amount) * 1.05) // missed debt + current with 5% commission
+        }
         beneficiaryName={cycleInfo.beneficiary_name}
         paidCount={paidCount}
         totalCount={totalCount}

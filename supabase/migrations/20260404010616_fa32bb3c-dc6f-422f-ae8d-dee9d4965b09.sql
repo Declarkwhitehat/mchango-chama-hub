@@ -1,0 +1,1 @@
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS actual_payment_date timestamptz;

@@ -20,6 +20,7 @@ interface Contribution {
   created_at: string;
   payment_status?: string;
   phone?: string;
+  payment_reference?: string;
 }
 
 interface ContributionsPDFDownloadProps {
@@ -167,9 +168,10 @@ export const ContributionsPDFDownload = ({
       doc.setFontSize(10);
       
       doc.text("#", margin + 3, yPos + 5.5);
-      doc.text("Name", margin + 15, yPos + 5.5);
-      doc.text("Amount (KES)", margin + 90, yPos + 5.5);
-      doc.text("Date", margin + 130, yPos + 5.5);
+      doc.text("Name", margin + 12, yPos + 5.5);
+      doc.text("Amount (KES)", margin + 65, yPos + 5.5);
+      doc.text("Reference", margin + 100, yPos + 5.5);
+      doc.text("Date & Time", margin + 135, yPos + 5.5);
       
       yPos += 10;
       doc.setTextColor(0, 0, 0);
@@ -188,9 +190,10 @@ export const ContributionsPDFDownload = ({
           doc.setTextColor(255, 255, 255);
           doc.setFont("helvetica", "bold");
           doc.text("#", margin + 3, yPos + 5.5);
-          doc.text("Name", margin + 15, yPos + 5.5);
-          doc.text("Amount (KES)", margin + 90, yPos + 5.5);
-          doc.text("Date", margin + 130, yPos + 5.5);
+          doc.text("Name", margin + 12, yPos + 5.5);
+          doc.text("Amount (KES)", margin + 65, yPos + 5.5);
+          doc.text("Reference", margin + 100, yPos + 5.5);
+          doc.text("Date & Time", margin + 135, yPos + 5.5);
           yPos += 10;
           doc.setTextColor(0, 0, 0);
           doc.setFont("helvetica", "normal");
@@ -205,13 +208,21 @@ export const ContributionsPDFDownload = ({
         doc.text(`${index + 1}`, margin + 3, yPos);
         
         // Truncate long names
-        const name = contribution.display_name.length > 25 
-          ? contribution.display_name.substring(0, 25) + "..." 
+        const name = contribution.display_name.length > 20 
+          ? contribution.display_name.substring(0, 20) + "..." 
           : contribution.display_name;
-        doc.text(name, margin + 15, yPos);
+        doc.text(name, margin + 12, yPos);
         
-        doc.text(contribution.amount.toLocaleString(), margin + 90, yPos);
-        doc.text(format(new Date(contribution.created_at), "MMM d, yyyy"), margin + 130, yPos);
+        doc.text(contribution.amount.toLocaleString(), margin + 65, yPos);
+        
+        // Payment reference
+        const ref = contribution.payment_reference 
+          ? (contribution.payment_reference.length > 12 ? contribution.payment_reference.substring(0, 12) : contribution.payment_reference)
+          : '-';
+        doc.text(ref, margin + 100, yPos);
+        
+        // Date with time
+        doc.text(format(new Date(contribution.created_at), "MMM d, yyyy h:mm a"), margin + 135, yPos);
         
         yPos += 8;
       });
