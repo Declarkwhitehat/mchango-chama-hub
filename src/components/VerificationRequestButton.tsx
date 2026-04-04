@@ -85,15 +85,6 @@ export const VerificationRequestButton = ({
   const VERIFICATION_FEE = 200;
   const requiresFee = entityType !== 'chama';
 
-  const getEntityTable = () => {
-    switch (entityType) {
-      case 'mchango': return 'mchango';
-      case 'organization': return 'organizations';
-      case 'welfare': return 'welfare_groups';
-      default: return '';
-    }
-  };
-
   const handleSubmit = async () => {
     if (!reason.trim()) {
       toast({
