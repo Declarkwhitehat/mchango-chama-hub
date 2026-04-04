@@ -100,6 +100,7 @@ const ChamaDetail = () => {
   const [isStarting, setIsStarting] = useState(false);
   const [memberPaymentStatuses, setMemberPaymentStatuses] = useState<Record<string, boolean>>({});
   const [memberTrustScores, setMemberTrustScores] = useState<Record<string, number>>({});
+  const [rejoinSummary, setRejoinSummary] = useState<{ approvedCount: number; approvedMembers: Array<{ id: string; user_id: string; full_name: string }> } | null>(null);
 
   useEffect(() => {
     loadChama();
