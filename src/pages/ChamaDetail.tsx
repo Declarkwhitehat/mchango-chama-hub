@@ -211,8 +211,37 @@ const ChamaDetail = () => {
       const chamaAvailableBalance = Number(data.data.available_balance) || 0;
       setTotalContributions(Math.max(0, chamaAvailableBalance));
 
-      // Calculate whose turn it is and next turn dates
-      await calculateTurns(data.data);
+      // Calculate whose turn it is and next turn dates - only for active chamas
+      if (data.data.status === 'active') {
+        await calculateTurns(data.data);
+      } else {
+        // Clear stale turn data for non-active chamas
+        setCurrentTurnMemberId(null);
+        setNextTurnDates({});
+      }
+
+      // Load rejoin summary for cycle_complete chamas
+      if (data.data.status === 'cycle_complete') {
+        try {
+          const rejoinResponse = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-rejoin/summary/${data.data.id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+          if (rejoinResponse.ok) {
+            const rejoinData = await rejoinResponse.json();
+            setRejoinSummary(rejoinData);
+          }
+        } catch (e) {
+          console.error('Error loading rejoin summary:', e);
+        }
+      } else {
+        setRejoinSummary(null);
+      }
 
       // Load member payment statuses for current cycle
       if (data.data.status === 'active') {
