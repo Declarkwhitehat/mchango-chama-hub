@@ -927,6 +927,14 @@ const ChamaDetail = () => {
               </TabsContent>
             )}
 
+            <TabsContent value="documents">
+              <GroupDocuments
+                entityType="chama"
+                entityId={chama.id}
+                canUpload={isManager}
+              />
+            </TabsContent>
+
           </Tabs>
         )}
 
