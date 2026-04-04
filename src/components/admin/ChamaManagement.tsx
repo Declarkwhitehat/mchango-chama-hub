@@ -119,18 +119,19 @@ export const ChamaManagement = () => {
   };
 
   const toggleVerification = async (chamaId: string, currentStatus: boolean) => {
+    if (!currentStatus) return; // Can only unverify
     setProcessing(chamaId);
     try {
       const { error } = await supabase
         .from('chama')
-        .update({ is_verified: !currentStatus })
+        .update({ is_verified: false })
         .eq('id', chamaId);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: `Chama ${!currentStatus ? 'verified' : 'unverified'}`,
+        description: "Chama unverified",
       });
 
       await fetchChamas();

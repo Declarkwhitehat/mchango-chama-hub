@@ -114,18 +114,19 @@ export const CampaignsManagement = () => {
   };
 
   const toggleVerification = async (campaignId: string, currentStatus: boolean) => {
+    if (!currentStatus) return; // Can only unverify
     setProcessing(campaignId);
     try {
       const { error } = await supabase
         .from('mchango')
-        .update({ is_verified: !currentStatus })
+        .update({ is_verified: false })
         .eq('id', campaignId);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: `Campaign ${!currentStatus ? 'verified' : 'unverified'}`,
+        description: "Campaign unverified",
       });
 
       await fetchCampaigns();
