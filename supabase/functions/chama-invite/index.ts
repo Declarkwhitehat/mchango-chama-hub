@@ -54,12 +54,18 @@ serve(async (req) => {
         .select(`*, chama (id, name, slug, description, contribution_amount, contribution_frequency, max_members, status)`)
         .eq('code', code.toUpperCase())
         .eq('is_active', true)
-        .is('used_by', null)
         .single();
 
       if (error || !data) {
         return new Response(JSON.stringify({ error: 'Invalid or expired invite code', valid: false, message: 'This invite code is not valid. Please check with the chama manager.' }), {
           status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Check if code has reached max uses
+      if (data.use_count >= data.max_uses) {
+        return new Response(JSON.stringify({ error: 'Invite code has been fully used', valid: false }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -75,7 +81,7 @@ serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ chama: data.chama, valid: true }), {
+      return new Response(JSON.stringify({ chama: data.chama, valid: true, uses_remaining: data.max_uses - data.use_count }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
