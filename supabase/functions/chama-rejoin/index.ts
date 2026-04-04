@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
         `)
         .eq('id', chamaId)
         .eq('chama_members.is_manager', true)
-        .eq('chama_members.status', 'active')
+        .in('chama_members.status', ['active', 'inactive', 'removed'])
         .single();
 
       // Get requester profile
