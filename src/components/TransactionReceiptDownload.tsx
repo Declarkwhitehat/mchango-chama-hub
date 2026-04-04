@@ -73,7 +73,7 @@ export function TransactionReceiptDownload({
         doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, 32, { align: 'center' });
       }
 
-      y = 45;
+      y = 50;
       doc.setTextColor(0, 0, 0);
 
       // ── Meta info ──

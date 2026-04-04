@@ -175,6 +175,7 @@ export function AdminSidebar() {
 
   const systemItems: MenuItem[] = [
     { title: "Audit Logs", url: "/admin/audit", icon: FileText },
+    { title: "Documents", url: "/admin/documents", icon: FileText },
     { title: "Data Export", url: "/admin/export", icon: Download },
   ];
 
