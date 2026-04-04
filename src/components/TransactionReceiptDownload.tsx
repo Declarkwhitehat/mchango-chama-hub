@@ -46,7 +46,7 @@ export function TransactionReceiptDownload({
   const generatePDF = async () => {
     setGenerating(true);
     try {
-      const serialNumber = await trackGeneratedDocument({
+      const { serialNumber, documentId } = await trackDocumentWithId({
         documentType: "payment_receipt",
         documentTitle: `Receipt - ${receiptData.chamaName} - ${receiptData.memberCode}`,
         entityType: "chama",
