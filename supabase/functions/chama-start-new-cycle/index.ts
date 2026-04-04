@@ -320,6 +320,10 @@ Deno.serve(async (req) => {
 
     throwIfError(insertError);
 
+    if (!insertedMembers || insertedMembers.length === 0) {
+      throw new Error("Failed to create members for the new cycle");
+    }
+
     // ========== RESET CHAMA TO BRAND NEW ==========
     const { error: updateError } = await supabase
       .from("chama")
