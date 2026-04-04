@@ -300,22 +300,40 @@ serve(async (req) => {
         });
       }
 
-      // Only allow joining chamas that are 'pending' (not started yet)
-      // Once a chama is 'active' (started), no new members can join
+      // Allow joining for 'pending' (not started) and 'cycle_complete' (ended) chamas
+      // Block joining for 'active' (in progress), 'completed', and 'deleted' chamas
       if (chama.status === 'active') {
         return new Response(JSON.stringify({ 
           error: 'Chama already started',
-          details: 'This chama has already started and is no longer accepting new members. New members can only join before the chama starts.'
+          details: 'This chama has already started and is no longer accepting new members. New members can only join before the chama starts or after it ends.'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      if (chama.status === 'completed' || chama.status === 'deleted' || chama.status === 'cycle_complete') {
+      if (chama.status === 'completed' || chama.status === 'deleted') {
         return new Response(JSON.stringify({ 
           error: 'Chama not accepting members',
-          details: 'This chama is no longer accepting new members'
+          details: 'This chama has been permanently closed and is no longer accepting new members'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // For both 'pending' and 'cycle_complete' statuses, check max member limit
+      const { count: currentMemberCount } = await adminClient
+        .from('chama_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('chama_id', chama_id)
+        .in('approval_status', ['approved', 'pending'])
+        .neq('status', 'removed');
+
+      if ((currentMemberCount || 0) >= chama.max_members) {
+        return new Response(JSON.stringify({ 
+          error: 'Chama is full',
+          details: `This chama has reached its maximum of ${chama.max_members} members`
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
