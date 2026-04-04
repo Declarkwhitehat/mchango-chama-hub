@@ -882,37 +882,61 @@ serve(async (req) => {
       const contributionAmount = member.chama.contribution_amount;
 
       // ── FIRST PAYMENT ACTIVATION ──
+      // Only run first-payment activation if the chama is still in 'pending' status.
+      // If the chama is already 'active' (started by manager via chama-start),
+      // members already have their order_index and member_code assigned.
       let isFirstPayment = false;
       let assignedOrderIndex: number | null = null;
       let assignedMemberCode: string | null = null;
 
+      // Fetch chama status to check if it's already active
+      const { data: chamaStatusCheck } = await supabaseClient
+        .from('chama')
+        .select('status')
+        .eq('id', member.chama_id)
+        .single();
+
+      const chamaIsActive = chamaStatusCheck?.status === 'active';
+
       if (!member.first_payment_completed) {
         isFirstPayment = true;
 
-        const { data: nextIndex } = await supabaseClient
-          .rpc('get_next_order_index', { p_chama_id: member.chama_id });
+        if (!chamaIsActive) {
+          // Pre-start flow: assign order_index and member_code on first payment
+          const { data: nextIndex } = await supabaseClient
+            .rpc('get_next_order_index', { p_chama_id: member.chama_id });
 
-        assignedOrderIndex = nextIndex || 1;
+          assignedOrderIndex = nextIndex || 1;
 
-        const { data: memberCode } = await supabaseClient
-          .rpc('generate_member_code', { p_chama_id: member.chama_id, p_order_index: assignedOrderIndex });
+          const { data: memberCode } = await supabaseClient
+            .rpc('generate_member_code', { p_chama_id: member.chama_id, p_order_index: assignedOrderIndex });
 
-        assignedMemberCode = memberCode || member.member_code;
+          assignedMemberCode = memberCode || member.member_code;
 
-        await supabaseClient.from('chama_members').update({
-          first_payment_completed: true,
-          first_payment_at: new Date().toISOString(),
-          order_index: assignedOrderIndex,
-          member_code: assignedMemberCode,
-          status: 'active',
-        }).eq('id', member.id);
+          await supabaseClient.from('chama_members').update({
+            first_payment_completed: true,
+            first_payment_at: new Date().toISOString(),
+            order_index: assignedOrderIndex,
+            member_code: assignedMemberCode,
+            status: 'active',
+          }).eq('id', member.id);
+        } else {
+          // Chama already active: just mark first payment as completed, keep existing order_index/member_code
+          assignedOrderIndex = member.order_index;
+          assignedMemberCode = member.member_code;
+
+          await supabaseClient.from('chama_members').update({
+            first_payment_completed: true,
+            first_payment_at: new Date().toISOString(),
+          }).eq('id', member.id);
+        }
 
         if (profile?.phone) {
           try {
             await supabaseClient.functions.invoke('send-transactional-sms', {
               body: {
                 phone: profile.phone,
-                message: `Payment received! You are now Member #${assignedOrderIndex} in "${member.chama.name}". Your member code is ${assignedMemberCode}.`,
+                message: `Payment received! You are Member #${assignedOrderIndex} in "${member.chama.name}". Your member code is ${assignedMemberCode}.`,
                 eventType: 'first_payment_received'
               }
             });
