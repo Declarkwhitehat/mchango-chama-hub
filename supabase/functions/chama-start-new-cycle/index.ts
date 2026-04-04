@@ -140,14 +140,14 @@ Deno.serve(async (req) => {
 
     console.log('Old cycle data cleaned up.');
 
-    // ========== ARCHIVE OLD MEMBERS ==========
-    const { error: archiveError } = await supabase
+    // ========== DELETE OLD MEMBERS ==========
+    const { error: deleteOldMembersError } = await supabase
       .from('chama_members')
-      .update({ status: 'inactive' })
+      .delete()
       .eq('chama_id', chamaId)
-      .in('status', ['active', 'removed']);
+      .in('status', ['active', 'removed', 'inactive']);
 
-    if (archiveError) throw archiveError;
+    if (deleteOldMembersError) throw deleteOldMembersError;
 
     // Find manager ID (the user starting the cycle is the manager)
     const managerId = user.id;
