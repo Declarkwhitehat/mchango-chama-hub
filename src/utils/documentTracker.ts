@@ -6,10 +6,11 @@ interface TrackDocumentParams {
   entityType?: string;
   entityId?: string;
   metadata?: Record<string, any>;
+  pdfBlob?: Blob;
 }
 
 /**
- * Records a generated document and returns its serial number.
+ * Records a generated document, optionally uploads the PDF, and returns its serial number.
  * If database tracking fails, generates a local serial number so PDFs always have one.
  */
 export async function trackGeneratedDocument(params: TrackDocumentParams): Promise<string> {
@@ -30,7 +31,7 @@ export async function trackGeneratedDocument(params: TrackDocumentParams): Promi
         generated_by: user.id,
         metadata: params.metadata || {},
       })
-      .select("serial_number")
+      .select("serial_number, id")
       .single();
 
     if (error) {
@@ -43,7 +44,34 @@ export async function trackGeneratedDocument(params: TrackDocumentParams): Promi
       return generateLocalSerial();
     }
 
-    return String(data.serial_number);
+    const serialStr = String(data.serial_number);
+
+    // Upload PDF blob to storage if provided
+    if (params.pdfBlob) {
+      try {
+        const filePath = `${user.id}/${serialStr}.pdf`;
+        const { error: uploadError } = await supabase.storage
+          .from("generated-pdfs")
+          .upload(filePath, params.pdfBlob, {
+            contentType: "application/pdf",
+            upsert: true,
+          });
+
+        if (uploadError) {
+          console.error("PDF upload error:", uploadError.message);
+        } else {
+          // Update the record with the file path
+          await supabase
+            .from("generated_documents")
+            .update({ file_path: filePath })
+            .eq("id", data.id);
+        }
+      } catch (uploadErr) {
+        console.error("PDF upload unexpected error:", uploadErr);
+      }
+    }
+
+    return serialStr;
   } catch (err) {
     console.error("Document tracking unexpected error:", err);
     return generateLocalSerial();
@@ -53,6 +81,5 @@ export async function trackGeneratedDocument(params: TrackDocumentParams): Promi
 /** Fallback serial: timestamp-based unique number */
 function generateLocalSerial(): string {
   const now = Date.now();
-  // Use last 8 digits of timestamp to create a unique-ish number
   return String(now).slice(-8);
 }
