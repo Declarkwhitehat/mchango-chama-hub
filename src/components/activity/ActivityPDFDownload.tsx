@@ -59,12 +59,10 @@ export const ActivityPDFDownload = ({
       doc.text(`Generated: ${format(new Date(), "MMM dd, yyyy HH:mm")}`, pageWidth / 2, 28, { align: "center" });
 
       let serialY = 34;
-      if (serialNumber) {
-        doc.setFont("helvetica", "bold");
-        doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, serialY, { align: "center" });
-        doc.setFont("helvetica", "normal");
-        serialY += 6;
-      }
+      doc.setFont("helvetica", "bold");
+      doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, serialY, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      serialY += 6;
       
       // Table headers and data based on type
       let startY = serialY + 6;

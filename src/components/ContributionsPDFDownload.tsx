@@ -124,12 +124,10 @@ export const ContributionsPDFDownload = ({
       doc.setFontSize(10);
       doc.text(`Generated: ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}`, pageWidth / 2, yPos, { align: "center" });
       yPos += 6;
-      if (serialNumber) {
-        doc.setFont("helvetica", "bold");
-        doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, yPos, { align: "center" });
-        doc.setFont("helvetica", "normal");
-        yPos += 6;
-      }
+      doc.setFont("helvetica", "bold");
+      doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, yPos, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      yPos += 6;
       yPos += 9;
 
       // Summary section
