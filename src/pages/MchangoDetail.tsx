@@ -335,6 +335,7 @@ const MchangoDetail = () => {
             <TabsList>
               <TabsTrigger value="details">Campaign</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+              <TabsTrigger value="documents">Docs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details" className="space-y-6">

@@ -26,6 +26,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { ChamaChatPanel } from "@/components/chama/ChamaChatPanel";
 import { TrustScoreBadge } from "@/components/chama/TrustScoreBadge";
+import { GroupDocuments } from "@/components/GroupDocuments";
 
 import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";

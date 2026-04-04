@@ -260,10 +260,11 @@ const OrganizationDetail = () => {
 
         {/* Tabs for About/Donate/Donors */}
         <Tabs defaultValue="about" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="donate">Donate</TabsTrigger>
             <TabsTrigger value="donors">Donors</TabsTrigger>
+            <TabsTrigger value="documents">Docs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="about" className="space-y-4">
