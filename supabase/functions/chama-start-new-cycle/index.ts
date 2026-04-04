@@ -123,8 +123,20 @@ Deno.serve(async (req) => {
     // Delete old payout_skips
     await supabase.from('payout_skips').delete().eq('chama_id', chamaId);
 
+    // Delete old contributions (payment records from previous cycle)
+    await supabase.from('contributions').delete().eq('chama_id', chamaId);
+
+    // Delete old payout approval requests
+    await supabase.from('payout_approval_requests').delete().eq('chama_id', chamaId);
+
+    // Delete old withdrawals
+    await supabase.from('withdrawals').delete().eq('chama_id', chamaId);
+
     // Delete old contribution_cycles
     await supabase.from('contribution_cycles').delete().eq('chama_id', chamaId);
+
+    // Clean up old chama_member_removals
+    await supabase.from('chama_member_removals').delete().eq('chama_id', chamaId);
 
     console.log('Old cycle data cleaned up.');
 
