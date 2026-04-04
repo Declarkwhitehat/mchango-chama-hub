@@ -208,13 +208,21 @@ export const ContributionsPDFDownload = ({
         doc.text(`${index + 1}`, margin + 3, yPos);
         
         // Truncate long names
-        const name = contribution.display_name.length > 25 
-          ? contribution.display_name.substring(0, 25) + "..." 
+        const name = contribution.display_name.length > 20 
+          ? contribution.display_name.substring(0, 20) + "..." 
           : contribution.display_name;
-        doc.text(name, margin + 15, yPos);
+        doc.text(name, margin + 12, yPos);
         
-        doc.text(contribution.amount.toLocaleString(), margin + 90, yPos);
-        doc.text(format(new Date(contribution.created_at), "MMM d, yyyy"), margin + 130, yPos);
+        doc.text(contribution.amount.toLocaleString(), margin + 65, yPos);
+        
+        // Payment reference
+        const ref = contribution.payment_reference 
+          ? (contribution.payment_reference.length > 12 ? contribution.payment_reference.substring(0, 12) : contribution.payment_reference)
+          : '-';
+        doc.text(ref, margin + 100, yPos);
+        
+        // Date with time
+        doc.text(format(new Date(contribution.created_at), "MMM d, yyyy h:mm a"), margin + 135, yPos);
         
         yPos += 8;
       });
