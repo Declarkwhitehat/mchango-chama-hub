@@ -199,6 +199,23 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Check if all members have already had their turn (single-round ROSCA)
+    if (nextCycleNumber > members.length) {
+      console.log(`[CYCLE-AUTO-CREATE] All ${members.length} members have had their turn. Skipping cycle ${nextCycleNumber}. Marking chama as cycle_complete.`);
+      await supabase.from('chama').update({
+        status: 'cycle_complete',
+        last_cycle_completed_at: new Date().toISOString(),
+        accepting_rejoin_requests: true
+      }).eq('id', chamaId);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'All members completed. Chama marked as cycle_complete.',
+        cycle_complete: true
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Determine next beneficiary based on cycle number
     const beneficiaryIndex = (nextCycleNumber - 1) % members.length;
     const beneficiary = members[beneficiaryIndex];
