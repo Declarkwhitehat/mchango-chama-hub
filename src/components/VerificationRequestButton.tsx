@@ -99,16 +99,22 @@ export const VerificationRequestButton = ({
     try {
       // For non-chama entities, check balance and deduct verification fee
       if (requiresFee) {
-        const table = getEntityTable();
-        const { data: entityData, error: fetchError } = await supabase
-          .from(table)
-          .select('available_balance')
-          .eq('id', entityId)
-          .single();
+        let balance = 0;
 
-        if (fetchError) throw fetchError;
+        if (entityType === 'mchango') {
+          const { data, error: e } = await supabase.from('mchango').select('available_balance').eq('id', entityId).single();
+          if (e) throw e;
+          balance = data?.available_balance ?? 0;
+        } else if (entityType === 'organization') {
+          const { data, error: e } = await supabase.from('organizations').select('available_balance').eq('id', entityId).single();
+          if (e) throw e;
+          balance = data?.available_balance ?? 0;
+        } else if (entityType === 'welfare') {
+          const { data, error: e } = await supabase.from('welfares').select('available_balance').eq('id', entityId).single();
+          if (e) throw e;
+          balance = data?.available_balance ?? 0;
+        }
 
-        const balance = entityData?.available_balance ?? 0;
         if (balance < VERIFICATION_FEE) {
           toast({
             title: "Insufficient Balance",
@@ -120,26 +126,21 @@ export const VerificationRequestButton = ({
         }
 
         // Deduct fee from entity balance
-        const { error: deductError } = await supabase
-          .from(table)
-          .update({ available_balance: balance - VERIFICATION_FEE })
-          .eq('id', entityId);
-
-        if (deductError) throw deductError;
+        if (entityType === 'mchango') {
+          await supabase.from('mchango').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+        } else if (entityType === 'organization') {
+          await supabase.from('organizations').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+        } else if (entityType === 'welfare') {
+          await supabase.from('welfares').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+        }
 
         // Record fee as company revenue
-        const { error: revenueError } = await supabase
-          .from('company_earnings')
-          .insert({
-            amount: VERIFICATION_FEE,
-            source: 'verification_fee',
-            description: `Verification fee for ${entityType}: ${entityName}`,
-            group_id: entityId,
-          });
-
-        if (revenueError) {
-          console.error('Failed to record verification revenue:', revenueError);
-        }
+        await supabase.from('company_earnings').insert({
+          amount: VERIFICATION_FEE,
+          source: 'verification_fee',
+          description: `Verification fee for ${entityType}: ${entityName}`,
+          group_id: entityId,
+        });
       }
 
       const { error } = await supabase
