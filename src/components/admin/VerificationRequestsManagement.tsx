@@ -257,6 +257,65 @@ export const VerificationRequestsManagement = () => {
     }
   };
 
+  const handleUnverify = async (request: VerificationRequest) => {
+    setProcessing(request.id);
+    try {
+      const table = request.entity_type === 'mchango' ? 'mchango' : 
+                   request.entity_type === 'chama' ? 'chama' : 
+                   request.entity_type === 'welfare' ? 'welfares' : 'organizations';
+      
+      const { error: entityError } = await supabase
+        .from(table)
+        .update({ is_verified: false })
+        .eq('id', request.entity_id);
+
+      if (entityError) throw entityError;
+
+      // Update request status back to rejected so user must re-apply
+      const { error: requestError } = await supabase
+        .from('verification_requests')
+        .update({
+          status: 'rejected',
+          rejection_reason: 'Verification removed by admin',
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', request.id);
+
+      if (requestError) throw requestError;
+
+      const entityTypeLabel = request.entity_type === 'mchango' ? 'Campaign' : 
+                              request.entity_type === 'chama' ? 'Chama' : 
+                              request.entity_type === 'welfare' ? 'Welfare' : 'Organization';
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: request.requested_by,
+          title: 'Verification Removed',
+          message: `The verification badge for your ${entityTypeLabel} "${request.entity_name}" has been removed by admin.`,
+          type: 'warning',
+          category: 'verification',
+          related_entity_id: request.entity_id,
+          related_entity_type: request.entity_type,
+        });
+
+      toast({
+        title: "Unverified",
+        description: `${request.entity_name} verification has been removed`,
+      });
+
+      fetchRequests();
+    } catch (error: any) {
+      console.error('Error unverifying:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove verification",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const getEntityLink = (request: VerificationRequest) => {
     if (request.entity_type === 'chama') return `/chama/${request.entity_slug}`;
     if (request.entity_type === 'mchango') return `/mchango/${request.entity_slug}`;
