@@ -20,15 +20,12 @@ export const CommissionDisplay = ({
   totalWithdrawn,
   actualCommission,
 }: CommissionDisplayProps) => {
-  // Use actual DB commission if provided, otherwise calculate
   const commissionAmount = actualCommission ?? (totalCollected * commissionRate);
   const netAfterCommission = totalCollected - commissionAmount;
   
-  // Use actual available_balance from DB if provided, otherwise fall back to calculated
   const isCreatorView = availableBalance !== undefined;
   const netBalance = isCreatorView ? availableBalance : netAfterCommission;
   
-  // Auto-derive totalWithdrawn so breakdown always sums: Total - Commission - Withdrawn = Available
   const derivedWithdrawn = isCreatorView
     ? (totalWithdrawn ?? Math.max(0, totalCollected - commissionAmount - availableBalance))
     : 0;
@@ -43,12 +40,11 @@ export const CommissionDisplay = ({
           Balance & Commission
         </CardTitle>
         <CardDescription>
-          {type === 'mchango' ? '7%' : '5%'} commission deducted at payment
+          {type === 'mchango' ? '7%' : '5%'} commission deducted from each payment
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Total Collected */}
           <div className="p-4 bg-muted/50 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -59,7 +55,6 @@ export const CommissionDisplay = ({
             </p>
           </div>
 
-          {/* Commission */}
           <div className="p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
               <TrendingDown className="h-4 w-4 text-orange-600" />
@@ -72,7 +67,6 @@ export const CommissionDisplay = ({
             </p>
           </div>
 
-          {/* Net Balance */}
           <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
               <Wallet className="h-4 w-4 text-primary" />
@@ -107,16 +101,16 @@ export const CommissionDisplay = ({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Commission ({commissionPercentage}%):</span>
+                <span>Commission ({commissionPercentage}% deducted):</span>
                 <span className="font-medium text-orange-600">
-                  - KES {commissionAmount.toLocaleString()}
+                  − KES {commissionAmount.toLocaleString()}
                 </span>
               </div>
               {derivedWithdrawn > 0 && (
                 <div className="flex justify-between">
                   <span>Withdrawn:</span>
                   <span className="font-medium text-orange-600">
-                    - KES {derivedWithdrawn.toLocaleString()}
+                    − KES {derivedWithdrawn.toLocaleString()}
                   </span>
                 </div>
               )}
@@ -130,7 +124,7 @@ export const CommissionDisplay = ({
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-3 italic">
-              * Commission is deducted at the time of payout/withdrawal
+              * Commission is automatically deducted from each payment received
             </p>
           </div>
         )}

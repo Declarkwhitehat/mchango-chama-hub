@@ -41,7 +41,6 @@ export function PaymentCountdownTimer({
   useEffect(() => {
     const calculateTimeRemaining = () => {
       const now = new Date();
-      // Use endDate directly as the cutoff — it already represents the payment deadline
       const cutoff = new Date(endDate);
       const diff = cutoff.getTime() - now.getTime();
 
@@ -67,7 +66,6 @@ export function PaymentCountdownTimer({
     return () => clearInterval(interval);
   }, [endDate, timeRemaining.total]);
 
-  // If already paid, show success state
   if (isPaid) {
     return (
       <Card className="border-green-500/30 bg-green-500/5">
@@ -86,7 +84,6 @@ export function PaymentCountdownTimer({
     );
   }
 
-  // Grace period state — calming informational card
   if (isGracePeriod) {
     return (
       <Card className="border-blue-500/30 bg-blue-500/5">
@@ -104,7 +101,10 @@ export function PaymentCountdownTimer({
               </Badge>
             </div>
 
-            {/* Countdown */}
+            <div className="text-center text-sm text-blue-600 dark:text-blue-400 font-medium">
+              Time left to make your first payment
+            </div>
+
             <div className="flex items-center justify-center gap-1 sm:gap-2">
               {timeRemaining.days > 0 && (
                 <>
@@ -125,7 +125,10 @@ export function PaymentCountdownTimer({
 
             <div className="text-center space-y-1">
               <p className="text-lg font-semibold">
-                First payment: KES {Math.round(contributionAmount).toLocaleString()}
+                Pay KES {Math.round(contributionAmount).toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                5% commission deducted · KES {Math.round(contributionAmount * 0.95).toLocaleString()} goes to the pool
               </p>
               <p className="text-sm text-muted-foreground">
                 Today's beneficiary: <span className="font-medium text-foreground">{beneficiaryName}</span>
@@ -148,7 +151,6 @@ export function PaymentCountdownTimer({
     );
   }
 
-  // Cutoff passed and not paid
   if (timeRemaining.isPassed) {
     return (
       <Card className="border-muted bg-muted/50">
@@ -170,7 +172,6 @@ export function PaymentCountdownTimer({
     );
   }
 
-  // Determine urgency level
   const getUrgencyLevel = () => {
     if (timeRemaining.total < 5 * 60 * 1000) return 'critical';
     if (timeRemaining.total < 15 * 60 * 1000) return 'urgent';
@@ -186,7 +187,7 @@ export function PaymentCountdownTimer({
     urgent: { card: 'border-destructive/70 bg-destructive/5', text: 'text-destructive', icon: AlertTriangle, message: 'Payment deadline approaching!' },
     warning: { card: 'border-orange-500 bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', icon: Clock, message: 'Less than 1 hour remaining' },
     caution: { card: 'border-yellow-500 bg-yellow-500/10', text: 'text-yellow-600 dark:text-yellow-400', icon: Clock, message: 'Make your payment soon' },
-    normal: { card: 'border-primary/30 bg-primary/5', text: 'text-primary', icon: Clock, message: 'Time to pay' },
+    normal: { card: 'border-primary/30 bg-primary/5', text: 'text-primary', icon: Clock, message: 'Time left to make your next payment' },
   };
 
   const styles = urgencyConfig[urgency];
@@ -197,7 +198,6 @@ export function PaymentCountdownTimer({
     <Card className={cn("transition-all duration-300", styles.card)}>
       <CardContent className="pt-6">
         <div className="space-y-4">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <IconComponent className={cn("h-5 w-5", styles.text)} />
@@ -206,7 +206,6 @@ export function PaymentCountdownTimer({
             <Badge variant="outline" className="text-xs">10:00 PM Cutoff</Badge>
           </div>
 
-          {/* Countdown */}
           <div className="flex items-center justify-center gap-1 sm:gap-2">
             {timeRemaining.days > 0 && (
               <>
@@ -225,7 +224,6 @@ export function PaymentCountdownTimer({
             )}
           </div>
 
-          {/* Payment Info */}
           <div className="text-center space-y-1">
             <p className="text-lg font-semibold">
               Pay KES {Math.round(totalPayable || contributionAmount).toLocaleString()}
@@ -235,12 +233,16 @@ export function PaymentCountdownTimer({
                 Includes KES {Math.round(totalPayable - contributionAmount).toLocaleString()} outstanding debt + penalties
               </p>
             )}
+            {(!totalPayable || totalPayable <= contributionAmount) && (
+              <p className="text-xs text-muted-foreground">
+                5% commission deducted · KES {Math.round(contributionAmount * 0.95).toLocaleString()} goes to the pool
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">
               Today's beneficiary: <span className="font-medium text-foreground">{beneficiaryName}</span>
             </p>
           </div>
 
-          {/* Progress Bar */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Members paid</span>
@@ -249,7 +251,6 @@ export function PaymentCountdownTimer({
             <Progress value={progressPercentage} className="h-2" />
           </div>
 
-          {/* Pay Now Button */}
           {onPayNow && (
             <Button
               onClick={onPayNow}
@@ -261,10 +262,9 @@ export function PaymentCountdownTimer({
             </Button>
           )}
 
-          {/* Warning Message */}
           {(urgency === 'critical' || urgency === 'urgent') && (
             <p className="text-xs text-center text-destructive">
-              ⚠️ Payments after 10:00 PM will be marked as LATE and charged a 10% penalty
+              ⚠️ Payments after 10:00 PM will be marked as LATE and 10% penalty deducted
             </p>
           )}
         </div>

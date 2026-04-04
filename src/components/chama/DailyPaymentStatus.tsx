@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, XCircle, AlertCircle, Clock, TrendingUp, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, AlertCircle, Clock, TrendingUp, AlertTriangle, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
 import { PaymentCountdownTimer } from "./PaymentCountdownTimer";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface CyclePaymentStatusProps {
   chamaId: string;
@@ -80,7 +81,6 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
-      // Auto-advance expired cycles before loading current
       if (!isGracePeriod) {
         try {
           await supabase.functions.invoke('daily-cycle-manager', {
@@ -91,7 +91,6 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
         }
       }
 
-      // Load current cycle
       const { data, error } = await supabase.functions.invoke('daily-cycle-manager', {
         body: { action: 'current', chamaId }
       });
@@ -138,7 +137,6 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
         }
       }
 
-      // Load ALL cycles with per-cycle payment history
       if (session?.user?.id) {
         const { data: historyData, error: historyError } = await supabase.functions.invoke('daily-cycle-manager', {
           body: { action: 'all-cycles', chamaId, userId: session.user.id }
@@ -147,7 +145,6 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
         if (!historyError && historyData?.cycles) {
           setCycleHistory(historyData.cycles);
           
-          // During grace period, don't count anything as missed
           if (isGracePeriod) {
             setMissedCyclesCount(0);
             setTotalOutstanding(0);
@@ -212,8 +209,9 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
   const paidLateCount = payments.filter(p => p.is_paid && p.is_late_payment).length;
   const totalCount = payments.length;
   const allPaid = paidCount === totalCount;
+  const unpaidMembers = payments.filter(p => !p.is_paid);
 
-  // Calculate totalPayable: base contribution + actual outstanding debts (no commission markup on display)
+  // Display base amount (no commission markup) — deductive model
   const displayTotalPayable = currentUserPaid
     ? (totalOutstanding > 0 ? totalOutstanding : 0)
     : (totalOutstanding + cycleInfo.due_amount);
@@ -254,198 +252,238 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
         onPayNow={onPayNow}
       />
 
-      {/* Per-Cycle Payment History */}
+      {/* Per-Cycle Payment History — Collapsible */}
       {cycleHistory.length > 0 && (
+        <Collapsible>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors rounded-t-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg text-left">Payment History</CardTitle>
+                    <CardDescription className="text-left">
+                      {cycleHistory.filter(c => c.status === 'paid' || c.status === 'late').length}/{cycleHistory.length} cycles paid
+                    </CardDescription>
+                  </div>
+                  <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <div className="space-y-2">
+                  {cycleHistory.slice(0, 10).map((cycle) => {
+                    const displayStatus = isGracePeriod && cycle.status === 'missed' ? 'pending' : cycle.status;
+                    return (
+                      <div
+                        key={cycle.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                          displayStatus === 'paid' ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
+                          displayStatus === 'missed' ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
+                          displayStatus === 'late' ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' :
+                          'border-border'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-medium text-sm">Cycle #{cycle.cycle_number}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(cycle.start_date)} - {formatDate(cycle.end_date)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Beneficiary: {cycle.beneficiary_name}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-sm font-medium">KES {cycle.due_amount.toLocaleString()}</span>
+                          {displayStatus === 'paid' ? (
+                            <Badge variant="default" className="gap-1 bg-green-600 text-xs">
+                              <CheckCircle2 className="h-3 w-3" />Paid
+                            </Badge>
+                          ) : displayStatus === 'late' ? (
+                            <Badge variant="outline" className="gap-1 text-xs border-yellow-500 text-yellow-700">
+                              <AlertCircle className="h-3 w-3" />Late
+                            </Badge>
+                          ) : displayStatus === 'missed' ? (
+                            <Badge variant="destructive" className="gap-1 text-xs">
+                              <XCircle className="h-3 w-3" />Missed
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="gap-1 text-xs">
+                              <Clock className="h-3 w-3" />Pending
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
+
+      {/* Financial Summary — suppressed during grace period, collapsible */}
+      {!isGracePeriod && (
+        <Collapsible>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="pb-3 cursor-pointer hover:bg-muted/30 transition-colors rounded-t-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-base">Cycle Financial Summary</CardTitle>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{paidCount}/{totalCount} paid</span>
+                    <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200" />
+                  </div>
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-lg border bg-muted/40 p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Total Expected</p>
+                    <p className="text-lg font-bold text-foreground">
+                      KES {(totalCount * (cycleInfo?.due_amount || 0)).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/40 p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Total Collected</p>
+                    <p className="text-lg font-bold text-foreground">
+                      KES {payments.filter(p => p.is_paid).reduce((s, p) => s + p.amount_due, 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{paidCount}/{totalCount} paid</p>
+                  </div>
+                  <div className={`rounded-lg border p-3 text-center ${paidLateCount > 0 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-muted/40'}`}>
+                    <p className="text-xs text-muted-foreground">Late Penalties</p>
+                    <p className={`text-lg font-bold ${paidLateCount > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-foreground'}`}>
+                      KES {(paidLateCount * (cycleInfo?.due_amount || 0) * 0.10).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className={`rounded-lg border p-3 text-center ${unpaidMembers.length > 0 ? 'bg-destructive/10 border-destructive/30' : 'bg-green-500/10 border-green-500/30'}`}>
+                    <p className="text-xs text-muted-foreground">Unpaid</p>
+                    <p className={`text-lg font-bold ${unpaidMembers.length > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                      {unpaidMembers.length}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Unpaid Members — collapsible within */}
+                {unpaidMembers.length > 0 && (
+                  <Collapsible className="mt-3">
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-3 cursor-pointer hover:bg-destructive/10 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-destructive" />
+                          <p className="text-sm font-medium text-destructive">Unpaid Members ({unpaidMembers.length})</p>
+                        </div>
+                        <ChevronDown className="h-4 w-4 text-destructive transition-transform duration-200" />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="flex flex-wrap gap-2 mt-2 px-3">
+                        {unpaidMembers.map(p => (
+                          <Badge key={p.id} variant="destructive" className="text-xs">{p.full_name}</Badge>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
+
+      {/* Detailed Payment Status — Collapsible */}
+      <Collapsible>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Your Payment History (Per Cycle)</CardTitle>
-            <CardDescription>
-              Each cycle is tracked independently. Missed cycles must be cleared individually.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {cycleHistory.slice(0, 10).map((cycle) => {
-                // During grace period, override status to 'pending' for unpaid cycles
-                const displayStatus = isGracePeriod && cycle.status === 'missed' ? 'pending' : cycle.status;
-                return (
+          <CollapsibleTrigger className="w-full">
+            <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors rounded-t-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-left">{frequency === 'daily' ? "Today's" : "Current Cycle"} Payment Status</CardTitle>
+                  <CardDescription className="text-left">
+                    Beneficiary: <span className="font-medium text-foreground">{cycleInfo.beneficiary_name}</span> ({cycleInfo.beneficiary_code})
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{paidCount}/{totalCount}</span>
+                  <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200" />
+                </div>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent>
+              {cycleInfo.payout_processed && (
+                <div className="mb-4 p-3 rounded-lg bg-muted border">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-medium">
+                      {cycleInfo.payout_type === 'full' ? 'Full payout processed' : 'Partial payout processed'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {allPaid && !cycleInfo.payout_processed && (
+                <div className="mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span className="text-sm font-medium">All members paid! Processing payout...</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {payments.map((payment) => (
                   <div
-                    key={cycle.id}
-                    className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                      displayStatus === 'paid' ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
-                      displayStatus === 'missed' ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
-                      displayStatus === 'late' ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' :
-                      'border-border'
+                    key={payment.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${
+                      payment.is_paid
+                        ? payment.is_late_payment
+                          ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
+                          : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                        : 'border-border'
                     }`}
                   >
-                    <div>
-                      <div className="font-medium text-sm">Cycle #{cycle.cycle_number}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatDate(cycle.start_date)} - {formatDate(cycle.end_date)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Beneficiary: {cycle.beneficiary_name}
+                    <div className="flex items-center gap-3">
+                      {payment.is_paid ? (
+                        payment.is_late_payment ? (
+                          <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+                        ) : (
+                          <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                        )
+                      ) : (
+                        <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-medium text-sm">{payment.full_name}</p>
+                        <p className="text-xs text-muted-foreground">{payment.member_code}</p>
                       </div>
                     </div>
-                    
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-sm font-medium">KES {cycle.due_amount.toLocaleString()}</span>
-                      {displayStatus === 'paid' ? (
-                        <Badge variant="default" className="gap-1 bg-green-600 text-xs">
-                          <CheckCircle2 className="h-3 w-3" />Paid
-                        </Badge>
-                      ) : displayStatus === 'late' ? (
-                        <Badge variant="outline" className="gap-1 text-xs border-yellow-500 text-yellow-700">
-                          <AlertCircle className="h-3 w-3" />Late
-                        </Badge>
-                      ) : displayStatus === 'missed' ? (
-                        <Badge variant="destructive" className="gap-1 text-xs">
-                          <XCircle className="h-3 w-3" />Missed
+                    <div className="text-right">
+                      <p className="text-sm font-medium">KES {payment.amount_due.toLocaleString()}</p>
+                      {payment.is_paid ? (
+                        <Badge variant="default" className={`text-xs ${payment.is_late_payment ? 'bg-yellow-600' : 'bg-green-600'}`}>
+                          {payment.is_late_payment ? 'Late' : 'Paid'}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="gap-1 text-xs">
-                          <Clock className="h-3 w-3" />Pending
-                        </Badge>
+                        <Badge variant="secondary" className="text-xs">Pending</Badge>
                       )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
+                ))}
+              </div>
+            </CardContent>
+          </CollapsibleContent>
         </Card>
-      )}
-
-      {/* Financial Summary — suppressed during grace period */}
-      {!isGracePeriod && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <CardTitle className="text-base">Cycle Financial Summary</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-lg border bg-muted/40 p-3 text-center">
-                <p className="text-xs text-muted-foreground">Total Expected</p>
-                <p className="text-lg font-bold text-foreground">
-                  KES {(totalCount * (cycleInfo?.due_amount || 0)).toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-lg border bg-muted/40 p-3 text-center">
-                <p className="text-xs text-muted-foreground">Total Collected</p>
-                <p className="text-lg font-bold text-foreground">
-                  KES {payments.filter(p => p.is_paid).reduce((s, p) => s + p.amount_due, 0).toLocaleString()}
-                </p>
-                <p className="text-xs text-muted-foreground">{paidCount}/{totalCount} paid</p>
-              </div>
-              <div className={`rounded-lg border p-3 text-center ${paidLateCount > 0 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-muted/40'}`}>
-                <p className="text-xs text-muted-foreground">Late Penalties</p>
-                <p className={`text-lg font-bold ${paidLateCount > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-foreground'}`}>
-                  KES {(paidLateCount * (cycleInfo?.due_amount || 0) * 0.10).toLocaleString()}
-                </p>
-              </div>
-              <div className={`rounded-lg border p-3 text-center ${payments.filter(p => !p.is_paid).length > 0 ? 'bg-destructive/10 border-destructive/30' : 'bg-green-500/10 border-green-500/30'}`}>
-                <p className="text-xs text-muted-foreground">Unpaid</p>
-                <p className={`text-lg font-bold ${payments.filter(p => !p.is_paid).length > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                  {payments.filter(p => !p.is_paid).length}
-                </p>
-              </div>
-            </div>
-            {payments.filter(p => !p.is_paid).length > 0 && (
-              <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                  <p className="text-sm font-medium text-destructive">Unpaid Members</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {payments.filter(p => !p.is_paid).map(p => (
-                    <Badge key={p.id} variant="destructive" className="text-xs">{p.full_name}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Detailed Payment Status Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>{frequency === 'daily' ? "Today's" : "Current Cycle"} Payment Status</CardTitle>
-              <CardDescription>
-                Beneficiary: <span className="font-medium text-foreground">{cycleInfo.beneficiary_name}</span> ({cycleInfo.beneficiary_code})
-              </CardDescription>
-            </div>
-            <div className="text-sm font-medium">{paidCount}/{totalCount} paid</div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {cycleInfo.payout_processed && (
-            <div className="mb-4 p-3 rounded-lg bg-muted border">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className="text-sm font-medium">
-                  {cycleInfo.payout_type === 'full' ? 'Full payout processed' : 'Partial payout processed'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {allPaid && !cycleInfo.payout_processed && (
-            <div className="mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
-                <CheckCircle2 className="h-4 w-4" />
-                <span className="text-sm font-medium">All members paid! Processing payout...</span>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {payments.map((payment) => (
-              <div
-                key={payment.id}
-                className={`flex items-center justify-between p-3 rounded-lg border ${
-                  payment.is_paid
-                    ? payment.is_late_payment
-                      ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
-                      : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
-                    : 'border-border'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {payment.is_paid ? (
-                    payment.is_late_payment ? (
-                      <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
-                    ) : (
-                      <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-                    )
-                  ) : (
-                    <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                  )}
-                  <div>
-                    <p className="font-medium text-sm">{payment.full_name}</p>
-                    <p className="text-xs text-muted-foreground">{payment.member_code}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium">KES {payment.amount_due.toLocaleString()}</p>
-                  {payment.is_paid ? (
-                    <Badge variant="default" className={`text-xs ${payment.is_late_payment ? 'bg-yellow-600' : 'bg-green-600'}`}>
-                      {payment.is_late_payment ? 'Late' : 'Paid'}
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="text-xs">Pending</Badge>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      </Collapsible>
     </div>
   );
 }
