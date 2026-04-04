@@ -93,12 +93,12 @@ Deno.serve(async (req) => {
       await supabase.from('payout_skips').delete().eq('chama_id', chama.id);
       await supabase.from('contribution_cycles').delete().eq('chama_id', chama.id);
 
-      // Archive old members
+      // Delete old members
       await supabase
         .from('chama_members')
-        .update({ status: 'inactive' })
+        .delete()
         .eq('chama_id', chama.id)
-        .in('status', ['active', 'removed']);
+        .in('status', ['active', 'removed', 'inactive']);
 
       // Find the manager (original creator or first approved)
       const managerId = chama.created_by;
