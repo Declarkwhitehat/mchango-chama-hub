@@ -114,18 +114,19 @@ export const CampaignsManagement = () => {
   };
 
   const toggleVerification = async (campaignId: string, currentStatus: boolean) => {
+    if (!currentStatus) return; // Can only unverify
     setProcessing(campaignId);
     try {
       const { error } = await supabase
         .from('mchango')
-        .update({ is_verified: !currentStatus })
+        .update({ is_verified: false })
         .eq('id', campaignId);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: `Campaign ${!currentStatus ? 'verified' : 'unverified'}`,
+        description: "Campaign unverified",
       });
 
       await fetchCampaigns();
@@ -328,27 +329,24 @@ export const CampaignsManagement = () => {
                       Public View
                     </Button>
 
-                    <Button
-                      size="sm"
-                      variant={campaign.is_verified ? "outline" : "default"}
-                      onClick={() => toggleVerification(campaign.id, campaign.is_verified)}
-                      disabled={processing === campaign.id}
-                      className={campaign.is_verified ? "text-muted-foreground" : "bg-blue-500 hover:bg-blue-600"}
-                    >
-                      {processing === campaign.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : campaign.is_verified ? (
-                        <>
-                          <BadgeX className="h-4 w-4 mr-1" />
-                          Unverify
-                        </>
-                      ) : (
-                        <>
-                          <BadgeCheck className="h-4 w-4 mr-1" />
-                          Verify
-                        </>
-                      )}
-                    </Button>
+                    {campaign.is_verified && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleVerification(campaign.id, campaign.is_verified)}
+                        disabled={processing === campaign.id}
+                        className="text-muted-foreground"
+                      >
+                        {processing === campaign.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <BadgeX className="h-4 w-4 mr-1" />
+                            Unverify
+                          </>
+                        )}
+                      </Button>
+                    )}
                     
                     {campaign.status === 'active' && (
                       <Button

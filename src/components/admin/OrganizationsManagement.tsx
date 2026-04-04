@@ -53,7 +53,7 @@ export const OrganizationsManagement = () => {
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     orgId: string;
-    action: 'verify' | 'unverify' | 'deactivate' | 'activate';
+    action: 'unverify' | 'deactivate' | 'activate';
     orgName: string;
   } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; org: Organization | null; confirmText: string }>({
@@ -121,9 +121,6 @@ export const OrganizationsManagement = () => {
       let updateData: any = {};
 
       switch (action) {
-        case 'verify':
-          updateData = { is_verified: true };
-          break;
         case 'unverify':
           updateData = { is_verified: false };
           break;
@@ -403,23 +400,7 @@ export const OrganizationsManagement = () => {
                       Public View
                     </Button>
                     
-                    {!org.is_verified ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-accent border-accent hover:bg-accent/10"
-                        onClick={() => setConfirmDialog({ 
-                          open: true, 
-                          orgId: org.id, 
-                          action: 'verify',
-                          orgName: org.name 
-                        })}
-                        disabled={processing === org.id}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Verify
-                      </Button>
-                    ) : (
+                    {org.is_verified && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -497,14 +478,11 @@ export const OrganizationsManagement = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmDialog?.action === 'verify' && 'Verify Organization'}
               {confirmDialog?.action === 'unverify' && 'Remove Verification'}
               {confirmDialog?.action === 'activate' && 'Activate Organization'}
               {confirmDialog?.action === 'deactivate' && 'Deactivate Organization'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmDialog?.action === 'verify' && 
-                `Are you sure you want to verify "${confirmDialog.orgName}"? This will show a verified badge on their public page.`}
               {confirmDialog?.action === 'unverify' && 
                 `Are you sure you want to remove verification from "${confirmDialog?.orgName}"?`}
               {confirmDialog?.action === 'activate' && 
@@ -516,7 +494,6 @@ export const OrganizationsManagement = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleAction}>
-              {confirmDialog?.action === 'verify' && 'Verify'}
               {confirmDialog?.action === 'unverify' && 'Remove'}
               {confirmDialog?.action === 'activate' && 'Activate'}
               {confirmDialog?.action === 'deactivate' && 'Deactivate'}
