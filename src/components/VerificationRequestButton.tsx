@@ -270,6 +270,11 @@ export const VerificationRequestButton = ({
           <DialogTitle>Request Verification Badge</DialogTitle>
           <DialogDescription>
             A verified badge shows users that your {entityType === 'mchango' ? 'campaign' : entityType} is authentic and trustworthy.
+            {requiresFee && (
+              <span className="block mt-2 font-medium text-foreground">
+                A verification fee of KSh {VERIFICATION_FEE} will be deducted from your {entityType === 'mchango' ? 'campaign' : entityType} balance.
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
