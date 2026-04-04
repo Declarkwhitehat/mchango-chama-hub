@@ -39,6 +39,47 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // GET /chama-rejoin/summary/:chamaId - Public summary for any member
+    if (req.method === 'GET' && pathParts.length === 2 && pathParts[0] === 'summary') {
+      const chamaId = pathParts[1];
+
+      // Get approved count
+      const { count: approvedCount } = await supabase
+        .from('chama_rejoin_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('chama_id', chamaId)
+        .eq('status', 'approved');
+
+      // Get approved members with profiles
+      const { data: approvedMembers } = await supabase
+        .from('chama_rejoin_requests')
+        .select('id, user_id, status, profiles!chama_rejoin_requests_user_id_fkey(full_name)')
+        .eq('chama_id', chamaId)
+        .eq('status', 'approved');
+
+      // Get current user's own request
+      const { data: myRequest } = await supabase
+        .from('chama_rejoin_requests')
+        .select('id, status, requested_at')
+        .eq('chama_id', chamaId)
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'approved'])
+        .maybeSingle();
+
+      return new Response(
+        JSON.stringify({
+          approvedCount: approvedCount || 0,
+          approvedMembers: (approvedMembers || []).map(m => ({
+            id: m.id,
+            user_id: m.user_id,
+            full_name: (m.profiles as any)?.full_name || 'Unknown',
+          })),
+          myRequest,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // POST /chama-rejoin - Submit rejoin request
     if (req.method === 'POST' && pathParts.length === 0) {
       const { chamaId } = await req.json();

@@ -100,6 +100,7 @@ const ChamaDetail = () => {
   const [isStarting, setIsStarting] = useState(false);
   const [memberPaymentStatuses, setMemberPaymentStatuses] = useState<Record<string, boolean>>({});
   const [memberTrustScores, setMemberTrustScores] = useState<Record<string, number>>({});
+  const [rejoinSummary, setRejoinSummary] = useState<{ approvedCount: number; approvedMembers: Array<{ id: string; user_id: string; full_name: string }> } | null>(null);
 
   useEffect(() => {
     loadChama();
@@ -210,8 +211,37 @@ const ChamaDetail = () => {
       const chamaAvailableBalance = Number(data.data.available_balance) || 0;
       setTotalContributions(Math.max(0, chamaAvailableBalance));
 
-      // Calculate whose turn it is and next turn dates
-      await calculateTurns(data.data);
+      // Calculate whose turn it is and next turn dates - only for active chamas
+      if (data.data.status === 'active') {
+        await calculateTurns(data.data);
+      } else {
+        // Clear stale turn data for non-active chamas
+        setCurrentTurnMemberId(null);
+        setNextTurnDates({});
+      }
+
+      // Load rejoin summary for cycle_complete chamas
+      if (data.data.status === 'cycle_complete') {
+        try {
+          const rejoinResponse = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-rejoin/summary/${data.data.id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+          if (rejoinResponse.ok) {
+            const rejoinData = await rejoinResponse.json();
+            setRejoinSummary(rejoinData);
+          }
+        } catch (e) {
+          console.error('Error loading rejoin summary:', e);
+        }
+      } else {
+        setRejoinSummary(null);
+      }
 
       // Load member payment statuses for current cycle
       if (data.data.status === 'active') {
@@ -433,10 +463,11 @@ const ChamaDetail = () => {
   const isRemovedMember = currentUserMembership?.status === 'removed';
   const isPending = currentUserMembership?.approval_status === 'pending';
   const isMyTurn = currentUserMembership?.id === currentTurnMemberId;
-  const hasViewAccess = isAdmin || isMember || isRemovedMember; // Removed members get limited view
+  const hasViewAccess = isAdmin || isMember || isRemovedMember;
   const isPendingStatus = chama.status === 'pending';
   const isActive = chama.status === 'active';
   const isCycleComplete = chama.status === 'cycle_complete';
+  const displayMemberCount = isCycleComplete && rejoinSummary ? rejoinSummary.approvedCount : approvedMembers.length;
 
   return (
     <Layout showBackButton>
@@ -447,7 +478,7 @@ const ChamaDetail = () => {
             <div className="flex justify-between items-start mb-2">
               <div className="flex gap-2">
                 <Badge>
-                  {approvedMembers.length}/{chama.max_members} members
+                  {displayMemberCount}/{chama.max_members} members
                 </Badge>
                 {isPendingStatus && <Badge variant="secondary">Pending Start</Badge>}
                 {isActive && <Badge variant="default">Active</Badge>}
@@ -824,11 +855,14 @@ const ChamaDetail = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Group Members ({approvedMembers.length})</CardTitle>
-                  <CardDescription>Approved members by join order</CardDescription>
+                  <CardTitle>
+                    {isCycleComplete ? `Confirmed Next Cycle Members (${displayMemberCount})` : `Group Members (${displayMemberCount})`}
+                  </CardTitle>
+                  <CardDescription>
+                    {isCycleComplete ? 'Members confirmed for the next cycle' : 'Approved members by join order'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* WhatsApp Group Join Button */}
                   {chama.whatsapp_link && (
                     <a
                       href={chama.whatsapp_link}
@@ -841,6 +875,32 @@ const ChamaDetail = () => {
                     </a>
                   )}
 
+                  {/* Cycle Complete: show rejoin-confirmed members */}
+                  {isCycleComplete && rejoinSummary ? (
+                    <div className="space-y-3">
+                      {rejoinSummary.approvedMembers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No members have confirmed for the next cycle yet.
+                        </p>
+                      ) : (
+                        rejoinSummary.approvedMembers.map((member) => (
+                          <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg border border-border">
+                            <Avatar>
+                              <AvatarFallback>
+                                {member.full_name?.charAt(0) || '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-foreground">{member.full_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                <Badge variant="outline" className="text-xs">Confirmed</Badge>
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
                   <div className="space-y-3">
                      {approvedMembers
                       .sort((a, b) => {
@@ -917,6 +977,7 @@ const ChamaDetail = () => {
                         );
                       })}
                   </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
