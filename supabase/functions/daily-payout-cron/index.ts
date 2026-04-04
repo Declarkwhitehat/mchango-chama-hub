@@ -334,7 +334,19 @@ Deno.serve(async (req) => {
             let lastEndDate = latestEndDate;
             let lastCycleNum = latestCycle.cycle_number;
             let cyclesCreated = 0;
-            const MAX_CATCHUP_CYCLES = 50;
+            // Cap total cycles to member count (single-round ROSCA)
+            const MAX_CATCHUP_CYCLES = Math.min(50, activeMembers.length - latestCycle.cycle_number);
+
+            // If all members already had their turn, mark chama as cycle_complete
+            if (MAX_CATCHUP_CYCLES <= 0) {
+              console.log(`[GAP RECOVERY] All ${activeMembers.length} members have had their turn in ${chama.name}. Marking as cycle_complete.`);
+              await supabase.from('chama').update({
+                status: 'cycle_complete',
+                last_cycle_completed_at: new Date().toISOString(),
+                accepting_rejoin_requests: true
+              }).eq('id', chama.id);
+              continue;
+            }
 
             while (cyclesCreated < MAX_CATCHUP_CYCLES) {
               const nextStart = new Date(lastEndDate);
