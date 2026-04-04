@@ -530,8 +530,8 @@ async function settleDebts(
       .maybeSingle();
 
     if (pendingCyclePayment && remaining > 0) {
-      const net = remaining / (1 + ONTIME_RATE);
-      const commission = remaining - net;
+      const commission = remaining * ONTIME_RATE;
+      const net = remaining - commission;
       toCompany += commission;
       toCyclePot += net;
 

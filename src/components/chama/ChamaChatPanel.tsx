@@ -146,7 +146,10 @@ export const ChamaChatPanel = ({ chamaId, isManager }: ChamaChatPanelProps) => {
   return (
     <Card className="flex flex-col h-[500px]">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Group Chat</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Group Chat</CardTitle>
+          <span className="text-[10px] text-muted-foreground">Messages auto-delete after 7 days</span>
+        </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col overflow-hidden p-0 px-6 pb-4">
         <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
