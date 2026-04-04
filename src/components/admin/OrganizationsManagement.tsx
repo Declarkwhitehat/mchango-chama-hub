@@ -53,7 +53,7 @@ export const OrganizationsManagement = () => {
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     orgId: string;
-    action: 'verify' | 'unverify' | 'deactivate' | 'activate';
+    action: 'unverify' | 'deactivate' | 'activate';
     orgName: string;
   } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; org: Organization | null; confirmText: string }>({
