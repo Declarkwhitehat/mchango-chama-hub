@@ -14,8 +14,15 @@ interface TrackDocumentParams {
  */
 export async function trackGeneratedDocument(params: TrackDocumentParams): Promise<string | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError) {
+      console.warn("Document tracking: auth error", authError.message);
+      return null;
+    }
+    if (!user) {
+      console.warn("Document tracking: no authenticated user");
+      return null;
+    }
 
     const { data, error } = await supabase
       .from("generated_documents")
@@ -31,13 +38,18 @@ export async function trackGeneratedDocument(params: TrackDocumentParams): Promi
       .single();
 
     if (error) {
-      console.error("Document tracking error:", error);
+      console.error("Document tracking insert error:", error.message, error.details, error.hint);
+      return null;
+    }
+
+    if (!data?.serial_number) {
+      console.warn("Document tracking: no serial_number returned", data);
       return null;
     }
 
     return String(data.serial_number);
   } catch (err) {
-    console.error("Document tracking error:", err);
+    console.error("Document tracking unexpected error:", err);
     return null;
   }
 }
