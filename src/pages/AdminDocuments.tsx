@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Search, FileText, Loader2, Hash } from "lucide-react";
-import { format } from "date-fns";
+import { Search, FileText, Loader2, Hash, ShieldCheck, AlertTriangle, Clock } from "lucide-react";
+import { format, subMonths } from "date-fns";
 
 interface GeneratedDoc {
   id: string;
@@ -17,6 +17,7 @@ interface GeneratedDoc {
   entity_type: string | null;
   entity_id: string | null;
   generated_by: string;
+  generated_by_name?: string;
   metadata: Record<string, any>;
   created_at: string;
 }
@@ -26,6 +27,7 @@ const AdminDocuments = () => {
   const [results, setResults] = useState<GeneratedDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [searchedSerial, setSearchedSerial] = useState(false);
 
   const handleSearch = async () => {
     const trimmed = serialQuery.trim();
@@ -36,29 +38,38 @@ const AdminDocuments = () => {
 
     setLoading(true);
     setSearched(true);
+    const isSerialSearch = /^\d+$/.test(trimmed);
+    setSearchedSerial(isSerialSearch);
 
     try {
-      if (/^\d+$/.test(trimmed)) {
-        // Exact serial number search
+      // Only search within last 3 months
+      const threeMonthsAgo = subMonths(new Date(), 3).toISOString();
+
+      if (isSerialSearch) {
         const { data, error } = await supabase
           .from("generated_documents")
           .select("*")
           .eq("serial_number", parseInt(trimmed, 10))
+          .gte("created_at", threeMonthsAgo)
           .limit(1);
 
         if (error) throw error;
-        setResults((data as GeneratedDoc[]) || []);
+
+        // Fetch user profiles for results
+        const docs = await enrichWithProfiles((data as GeneratedDoc[]) || []);
+        setResults(docs);
       } else {
-        // Search by title
         const { data, error } = await supabase
           .from("generated_documents")
           .select("*")
           .ilike("document_title", `%${trimmed}%`)
+          .gte("created_at", threeMonthsAgo)
           .order("created_at", { ascending: false })
           .limit(50);
 
         if (error) throw error;
-        setResults((data as GeneratedDoc[]) || []);
+        const docs = await enrichWithProfiles((data as GeneratedDoc[]) || []);
+        setResults(docs);
       }
     } catch (err: any) {
       console.error(err);
@@ -66,6 +77,25 @@ const AdminDocuments = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const enrichWithProfiles = async (docs: GeneratedDoc[]): Promise<GeneratedDoc[]> => {
+    if (docs.length === 0) return docs;
+    const userIds = [...new Set(docs.map((d) => d.generated_by))];
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, phone")
+      .in("id", userIds);
+
+    const profileMap = new Map<string, string>();
+    profiles?.forEach((p: any) => {
+      profileMap.set(p.id, p.full_name || p.phone || "Unknown");
+    });
+
+    return docs.map((d) => ({
+      ...d,
+      generated_by_name: profileMap.get(d.generated_by) || d.generated_by,
+    }));
   };
 
   const typeColors: Record<string, string> = {
@@ -79,8 +109,13 @@ const AdminDocuments = () => {
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Generated Documents</h1>
-          <p className="text-sm text-muted-foreground">Search documents by serial number or title</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <ShieldCheck className="h-6 w-6 text-primary" />
+            Verify Document
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Enter a document serial number to verify its authenticity. Documents are retained for 3 months.
+          </p>
         </div>
 
         <Card>
@@ -90,19 +125,23 @@ const AdminDocuments = () => {
               Document Lookup
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="flex gap-2">
               <Input
-                placeholder="Enter serial number or document title..."
+                placeholder="Enter serial number (e.g. 10000001)..."
                 value={serialQuery}
                 onChange={(e) => setSerialQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="flex-1"
+                className="flex-1 font-mono"
               />
               <Button onClick={handleSearch} disabled={loading} className="gap-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                Search
+                Verify
               </Button>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              Documents older than 3 months are automatically removed from the system.
             </div>
           </CardContent>
         </Card>
@@ -111,14 +150,25 @@ const AdminDocuments = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                {results.length > 0 ? `${results.length} document(s) found` : "No documents found"}
+                {results.length > 0
+                  ? `✅ ${results.length} document(s) verified`
+                  : "❌ Document not found"}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {results.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">No documents match that serial number or title.</p>
+                <div className="text-center py-8 space-y-3">
+                  <div className="h-14 w-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+                    <AlertTriangle className="h-7 w-7 text-destructive" />
+                  </div>
+                  <p className="text-sm font-medium text-destructive">
+                    {searchedSerial
+                      ? "Document not found or expired (older than 3 months)."
+                      : "No documents match that search within the last 3 months."}
+                  </p>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    All system-generated documents are retained for 3 months only. If the document was generated more than 3 months ago, it has been automatically deleted from the system.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -127,12 +177,12 @@ const AdminDocuments = () => {
                       <div className="flex items-start justify-between gap-3 flex-wrap">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <FileText className="h-5 w-5 text-primary" />
+                            <ShieldCheck className="h-5 w-5 text-primary" />
                           </div>
                           <div>
                             <p className="font-semibold text-sm">{doc.document_title}</p>
-                            <p className="text-xs text-muted-foreground font-mono">
-                              Serial: {doc.serial_number}
+                            <p className="text-xs text-muted-foreground font-mono font-bold">
+                              Serial No: {doc.serial_number}
                             </p>
                           </div>
                         </div>
@@ -141,27 +191,27 @@ const AdminDocuments = () => {
                         </Badge>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                         <div>
                           <span className="text-muted-foreground">Generated:</span>{" "}
-                          {format(new Date(doc.created_at), "MMM dd, yyyy HH:mm")}
+                          <strong>{format(new Date(doc.created_at), "MMM dd, yyyy HH:mm")}</strong>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Generated By:</span>{" "}
+                          <strong>{doc.generated_by_name || doc.generated_by}</strong>
                         </div>
                         {doc.entity_type && (
                           <div>
-                            <span className="text-muted-foreground">Entity:</span>{" "}
-                            {doc.entity_type}
+                            <span className="text-muted-foreground">Type:</span>{" "}
+                            <strong className="capitalize">{doc.entity_type}</strong>
                           </div>
                         )}
                         {doc.entity_id && (
-                          <div className="col-span-2">
+                          <div>
                             <span className="text-muted-foreground">Entity ID:</span>{" "}
-                            <span className="font-mono text-xs">{doc.entity_id}</span>
+                            <span className="font-mono">{doc.entity_id.substring(0, 8)}...</span>
                           </div>
                         )}
-                        <div className="col-span-2">
-                          <span className="text-muted-foreground">Generated By:</span>{" "}
-                          <span className="font-mono text-xs">{doc.generated_by}</span>
-                        </div>
                       </div>
 
                       {doc.metadata && Object.keys(doc.metadata).length > 0 && (
@@ -174,6 +224,13 @@ const AdminDocuments = () => {
                           ))}
                         </div>
                       )}
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-green-200">
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                          Verified Authentic
+                        </Badge>
+                      </div>
                     </div>
                   ))}
                 </div>
