@@ -458,16 +458,16 @@ const ChamaDetail = () => {
   }
 
   const approvedMembers = chama.chama_members?.filter(m => m.approval_status === 'approved' && m.status === 'active') || [];
-  const displayMemberCount = isCycleComplete && rejoinSummary ? rejoinSummary.approvedCount : approvedMembers.length;
   const isManager = currentUserMembership?.is_manager && currentUserMembership?.approval_status === 'approved' && !['removed'].includes(currentUserMembership?.status);
   const isMember = currentUserMembership?.approval_status === 'approved' && !['removed'].includes(currentUserMembership?.status);
   const isRemovedMember = currentUserMembership?.status === 'removed';
   const isPending = currentUserMembership?.approval_status === 'pending';
   const isMyTurn = currentUserMembership?.id === currentTurnMemberId;
-  const hasViewAccess = isAdmin || isMember || isRemovedMember; // Removed members get limited view
+  const hasViewAccess = isAdmin || isMember || isRemovedMember;
   const isPendingStatus = chama.status === 'pending';
   const isActive = chama.status === 'active';
   const isCycleComplete = chama.status === 'cycle_complete';
+  const displayMemberCount = isCycleComplete && rejoinSummary ? rejoinSummary.approvedCount : approvedMembers.length;
 
   return (
     <Layout showBackButton>
