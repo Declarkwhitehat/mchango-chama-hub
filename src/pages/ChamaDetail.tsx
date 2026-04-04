@@ -427,9 +427,9 @@ const ChamaDetail = () => {
     );
   }
 
-  const approvedMembers = chama.chama_members?.filter(m => m.approval_status === 'approved' && m.status !== 'removed') || [];
-  const isManager = currentUserMembership?.is_manager && currentUserMembership?.approval_status === 'approved' && currentUserMembership?.status !== 'removed';
-  const isMember = currentUserMembership?.approval_status === 'approved' && currentUserMembership?.status !== 'removed';
+  const approvedMembers = chama.chama_members?.filter(m => m.approval_status === 'approved' && m.status === 'active') || [];
+  const isManager = currentUserMembership?.is_manager && currentUserMembership?.approval_status === 'approved' && !['removed'].includes(currentUserMembership?.status);
+  const isMember = currentUserMembership?.approval_status === 'approved' && !['removed'].includes(currentUserMembership?.status);
   const isRemovedMember = currentUserMembership?.status === 'removed';
   const isPending = currentUserMembership?.approval_status === 'pending';
   const isMyTurn = currentUserMembership?.id === currentTurnMemberId;
