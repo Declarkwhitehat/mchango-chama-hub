@@ -784,6 +784,7 @@ const ChamaDetail = () => {
               {isManager && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               <TabsTrigger value="members" className="text-xs sm:text-sm">Members</TabsTrigger>
               {isMember && <TabsTrigger value="chat" className="text-xs sm:text-sm flex items-center gap-1"><MessageSquare className="h-3 w-3" />Chat</TabsTrigger>}
+              <TabsTrigger value="documents" className="text-xs sm:text-sm">Docs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard">
