@@ -1063,6 +1063,42 @@ export type Database = {
           },
         ]
       }
+      generated_documents: {
+        Row: {
+          created_at: string
+          document_title: string
+          document_type: string
+          entity_id: string | null
+          entity_type: string | null
+          generated_by: string
+          id: string
+          metadata: Json | null
+          serial_number: number
+        }
+        Insert: {
+          created_at?: string
+          document_title: string
+          document_type: string
+          entity_id?: string | null
+          entity_type?: string | null
+          generated_by: string
+          id?: string
+          metadata?: Json | null
+          serial_number?: number
+        }
+        Update: {
+          created_at?: string
+          document_title?: string
+          document_type?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          generated_by?: string
+          id?: string
+          metadata?: Json | null
+          serial_number?: number
+        }
+        Relationships: []
+      }
       group_documents: {
         Row: {
           created_at: string

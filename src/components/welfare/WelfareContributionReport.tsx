@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { FileText, Download, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { format, parseISO } from "date-fns";
+import { trackGeneratedDocument } from "@/utils/documentTracker";
 
 interface Props {
   welfareId: string;
@@ -57,6 +58,15 @@ export const WelfareContributionReport = ({ welfareId, welfareName }: Props) => 
       const memberMap = new Map<string, any>();
       members?.forEach(m => memberMap.set(m.id, m));
 
+      // Track document
+      const serialNumber = await trackGeneratedDocument({
+        documentType: "contribution_report",
+        documentTitle: `${welfareName} - Contribution Report`,
+        entityType: "welfare",
+        entityId: welfareId,
+        metadata: { startDate, endDate, count: contributions.length },
+      });
+
       // Generate PDF
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -77,6 +87,11 @@ export const WelfareContributionReport = ({ welfareId, welfareName }: Props) => 
         pageWidth / 2, 33, { align: "center" }
       );
       doc.text(`Generated: ${format(new Date(), "MMM dd, yyyy HH:mm")}`, pageWidth / 2, 39, { align: "center" });
+      if (serialNumber) {
+        doc.setFont("helvetica", "bold");
+        doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, 45, { align: "center" });
+        doc.setFont("helvetica", "normal");
+      }
 
       // Table headers
       let y = 50;

@@ -3,6 +3,7 @@ import { Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import { format } from "date-fns";
+import { trackGeneratedDocument } from "@/utils/documentTracker";
 
 interface ActivityPDFDownloadProps {
   data: any[];
@@ -21,7 +22,7 @@ export const ActivityPDFDownload = ({
 }: ActivityPDFDownloadProps) => {
   const { toast } = useToast();
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     if (data.length === 0) {
       toast({
         title: "No data",
@@ -32,10 +33,6 @@ export const ActivityPDFDownload = ({
     }
 
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      
-      // Title
       const titles: Record<string, string> = {
         chama: "Chama Contributions Report",
         mchango: "Campaign Donations Report",
@@ -43,18 +40,34 @@ export const ActivityPDFDownload = ({
         withdrawals: "Withdrawals Report",
         all: "All Transactions Report",
       };
+
+      const serialNumber = await trackGeneratedDocument({
+        documentType: "activity_report",
+        documentTitle: titles[type],
+        metadata: { type, count: data.length },
+      });
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
       
       doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
       doc.text(titles[type], pageWidth / 2, 20, { align: "center" });
       
-      // Generated date
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.text(`Generated: ${format(new Date(), "MMM dd, yyyy HH:mm")}`, pageWidth / 2, 28, { align: "center" });
+
+      let serialY = 34;
+      if (serialNumber) {
+        doc.setFont("helvetica", "bold");
+        doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, serialY, { align: "center" });
+        doc.setFont("helvetica", "normal");
+        serialY += 6;
+      }
       
       // Table headers and data based on type
-      let startY = 40;
+      let startY = serialY + 6;
       const lineHeight = 8;
       const margin = 14;
       
