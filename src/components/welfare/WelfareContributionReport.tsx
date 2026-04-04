@@ -59,7 +59,7 @@ export const WelfareContributionReport = ({ welfareId, welfareName }: Props) => 
       members?.forEach(m => memberMap.set(m.id, m));
 
       // Track document
-      const serialNumber = await trackGeneratedDocument({
+      const { serialNumber, documentId } = await trackDocumentWithId({
         documentType: "contribution_report",
         documentTitle: `${welfareName} - Contribution Report`,
         entityType: "welfare",
