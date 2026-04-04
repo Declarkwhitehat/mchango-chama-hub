@@ -20,6 +20,7 @@ interface Contribution {
   created_at: string;
   payment_status?: string;
   phone?: string;
+  payment_reference?: string;
 }
 
 interface ContributionsPDFDownloadProps {
