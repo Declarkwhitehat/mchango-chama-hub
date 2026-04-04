@@ -460,13 +460,15 @@ serve(async (req) => {
         throw memberError;
       }
 
-      // Mark invite code as used using admin client
+      // Increment use_count and deactivate if fully used
+      const newUseCount = (inviteCode.use_count || 0) + 1;
       await adminClient
         .from('chama_invite_codes')
         .update({
+          use_count: newUseCount,
           used_by: user.id,
           used_at: new Date().toISOString(),
-          is_active: false,
+          is_active: newUseCount < inviteCode.max_uses,
         })
         .eq('id', inviteCode.id);
 
