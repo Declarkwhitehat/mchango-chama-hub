@@ -341,6 +341,14 @@ const OrganizationDetail = () => {
               organizationName={organization.name}
             />
           </TabsContent>
+
+          <TabsContent value="documents">
+            <GroupDocuments
+              entityType="organization"
+              entityId={organization.id}
+              canUpload={isCreator}
+            />
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
