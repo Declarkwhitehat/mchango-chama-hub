@@ -218,6 +218,11 @@ export const VerificationRequestButton = ({
                 Your previous request was rejected: "{existingRequest.rejection_reason || 'No reason provided'}"
                 <br /><br />
                 Submit a new request with additional information.
+                {requiresFee && (
+                  <span className="block mt-2 font-medium text-foreground">
+                    A verification fee of KSh {VERIFICATION_FEE} will be deducted from your balance.
+                  </span>
+                )}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
