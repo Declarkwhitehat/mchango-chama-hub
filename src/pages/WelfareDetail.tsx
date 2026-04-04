@@ -19,7 +19,7 @@ import { WelfareTransactionLog } from "@/components/welfare/WelfareTransactionLo
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecutiveChangeBanner";
 import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
-import { WelfareConstitution } from "@/components/welfare/WelfareConstitution";
+import { GroupDocuments } from "@/components/GroupDocuments";
 import { WelfareWithdrawalStatus } from "@/components/welfare/WelfareWithdrawalStatus";
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
