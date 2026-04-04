@@ -715,6 +715,21 @@ serve(async (req) => {
             contribution_id
           );
 
+          // Mark first_payment_completed if not yet set (without changing order_index/member_code)
+          const { data: memberCheck } = await supabaseAdmin
+            .from('chama_members')
+            .select('first_payment_completed')
+            .eq('id', member_id)
+            .single();
+
+          if (memberCheck && !memberCheck.first_payment_completed) {
+            await supabaseAdmin.from('chama_members').update({
+              first_payment_completed: true,
+              first_payment_at: new Date().toISOString(),
+            }).eq('id', member_id);
+            console.log('✅ settle-only: Marked first_payment_completed for member:', member_id);
+          }
+
           console.log('Settle-only complete:', {
             contribution_id,
             periodsCleared: settleResult.periods_cleared,
