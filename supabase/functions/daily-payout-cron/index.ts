@@ -334,8 +334,16 @@ Deno.serve(async (req) => {
             let lastEndDate = latestEndDate;
             let lastCycleNum = latestCycle.cycle_number;
             let cyclesCreated = 0;
-            // Cap total cycles to member count (single-round ROSCA)
-            const MAX_CATCHUP_CYCLES = Math.min(50, activeMembers.length - latestCycle.cycle_number);
+
+            // Count total existing cycles (not just latest cycle_number)
+            const { count: existingCycleCount } = await supabase
+              .from('contribution_cycles')
+              .select('*', { count: 'exact', head: true })
+              .eq('chama_id', chama.id);
+
+            const maxTotalCycles = activeMembers.length; // Single round ROSCA
+            const remainingCycles = maxTotalCycles - (existingCycleCount || 0);
+            const MAX_CATCHUP_CYCLES = Math.min(50, remainingCycles);
 
             // If all members already had their turn, mark chama as cycle_complete
             if (MAX_CATCHUP_CYCLES <= 0) {
