@@ -450,6 +450,50 @@ Deno.serve(async (req) => {
 
               await supabase.from('member_cycle_payments').insert(paymentRecords);
 
+              // ========== GAP RECOVERY: Track missed payments + auto-remove ==========
+              for (const member of activeMembers) {
+                const currentMissed = member.missed_payments_count || 0;
+                const newMissedCount = currentMissed + 1;
+                const totalOutstanding = newMissedCount * chama.contribution_amount;
+
+                await supabase.from('chama_members').update({
+                  missed_payments_count: newMissedCount,
+                  requires_admin_verification: newMissedCount >= 1,
+                  balance_deficit: totalOutstanding
+                }).eq('id', member.id);
+
+                // Update local reference for subsequent iterations
+                member.missed_payments_count = newMissedCount;
+
+                if (newMissedCount >= 3) {
+                  console.log(`🚫 [GAP RECOVERY] AUTO-REMOVING member ${member.id} - ${newMissedCount} missed payments`);
+
+                  const { data: memberProfile } = await supabase
+                    .from('chama_members')
+                    .select('member_code, user_id, is_manager, profiles!chama_members_user_id_fkey(full_name, phone)')
+                    .eq('id', member.id)
+                    .single();
+
+                  await supabase.from('chama_member_removals').insert({
+                    chama_id: chama.id,
+                    member_id: member.id,
+                    user_id: memberProfile?.user_id,
+                    removal_reason: `Auto-removed (gap recovery): ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding}`,
+                    chama_name: chama.name,
+                    member_name: memberProfile?.profiles?.full_name,
+                    member_phone: memberProfile?.profiles?.phone,
+                    was_manager: memberProfile?.is_manager || false,
+                    removed_at: new Date().toISOString()
+                  });
+
+                  await supabase.from('chama_members').update({
+                    status: 'removed',
+                    removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments`,
+                    removed_at: new Date().toISOString()
+                  }).eq('id', member.id);
+                }
+              }
+
               console.log(`[GAP RECOVERY] Created cycle ${nextCycleNum} for ${chama.name} (${nextStart.toISOString().split('T')[0]})`);
               
               lastEndDate = nextEnd;
@@ -459,6 +503,8 @@ Deno.serve(async (req) => {
 
             if (cyclesCreated > 0) {
               console.log(`[GAP RECOVERY] Created ${cyclesCreated} missing cycles for ${chama.name}`);
+              // Resequence after potential removals
+              await supabase.rpc('resequence_member_order', { p_chama_id: chama.id });
             }
           }
         }
