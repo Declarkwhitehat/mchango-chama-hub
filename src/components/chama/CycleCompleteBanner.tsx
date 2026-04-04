@@ -36,25 +36,24 @@ export function CycleCompleteBanner({
 
   const loadRejoinStatus = async () => {
     try {
-      const { data, error } = await supabase
-        .from('chama_rejoin_requests')
-        .select('*')
-        .eq('chama_id', chamaId)
-        .eq('user_id', userId)
-        .in('status', ['pending', 'approved'])
-        .maybeSingle();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-      if (error) throw error;
-      setRejoinRequest(data);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chama-rejoin/summary/${chamaId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      // Get approved count
-      const { count } = await supabase
-        .from('chama_rejoin_requests')
-        .select('id', { count: 'exact', head: true })
-        .eq('chama_id', chamaId)
-        .eq('status', 'approved');
+      if (!response.ok) throw new Error('Failed to load rejoin status');
+      const result = await response.json();
 
-      setApprovedCount(count || 0);
+      setRejoinRequest(result.myRequest || null);
+      setApprovedCount(result.approvedCount || 0);
     } catch (error) {
       console.error('Error loading rejoin status:', error);
     } finally {
