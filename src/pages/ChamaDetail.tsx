@@ -572,17 +572,7 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Prominent Countdown Timer - Visible to all members when active */}
-        {isMember && isActive && (
-          <CyclePaymentStatus
-            chamaId={chama.id}
-            frequency={chama.contribution_frequency}
-            onPayNow={() => {
-              // Scroll to payment form
-              document.getElementById('payment-form-section')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          />
-        )}
+        {/* CyclePaymentStatus removed from here — consolidated into MemberDashboard tab */}
 
         {/* Chama End Date - Show when chama is active */}
         {isActive && (
