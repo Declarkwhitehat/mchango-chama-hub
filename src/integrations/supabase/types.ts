@@ -823,6 +823,7 @@ export type Database = {
       }
       contributions: {
         Row: {
+          actual_payment_date: string | null
           amount: number
           chama_id: string
           contribution_date: string
@@ -837,6 +838,7 @@ export type Database = {
           status: Database["public"]["Enums"]["transaction_status"]
         }
         Insert: {
+          actual_payment_date?: string | null
           amount: number
           chama_id: string
           contribution_date?: string
@@ -851,6 +853,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["transaction_status"]
         }
         Update: {
+          actual_payment_date?: string | null
           amount?: number
           chama_id?: string
           contribution_date?: string
