@@ -121,9 +121,6 @@ export const OrganizationsManagement = () => {
       let updateData: any = {};
 
       switch (action) {
-        case 'verify':
-          updateData = { is_verified: true };
-          break;
         case 'unverify':
           updateData = { is_verified: false };
           break;
