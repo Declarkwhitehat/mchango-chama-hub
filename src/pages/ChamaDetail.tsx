@@ -875,6 +875,32 @@ const ChamaDetail = () => {
                     </a>
                   )}
 
+                  {/* Cycle Complete: show rejoin-confirmed members */}
+                  {isCycleComplete && rejoinSummary ? (
+                    <div className="space-y-3">
+                      {rejoinSummary.approvedMembers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No members have confirmed for the next cycle yet.
+                        </p>
+                      ) : (
+                        rejoinSummary.approvedMembers.map((member) => (
+                          <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg border border-border">
+                            <Avatar>
+                              <AvatarFallback>
+                                {member.full_name?.charAt(0) || '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-foreground">{member.full_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                <Badge variant="outline" className="text-xs">Confirmed</Badge>
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
                   <div className="space-y-3">
                      {approvedMembers
                       .sort((a, b) => {
@@ -951,6 +977,7 @@ const ChamaDetail = () => {
                         );
                       })}
                   </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
