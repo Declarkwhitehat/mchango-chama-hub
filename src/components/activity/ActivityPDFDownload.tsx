@@ -215,9 +215,13 @@ export const ActivityPDFDownload = ({
       doc.text(`Total: KSh ${totalAmount.toLocaleString()}`, margin, startY);
       doc.text(`Transactions: ${data.length}`, margin + 80, startY);
       
-      // Save
+      // Get blob and save
+      const pdfBlob = doc.output('blob');
       const filename = `${type}-transactions-${format(new Date(), "yyyy-MM-dd")}.pdf`;
       doc.save(filename);
+
+      // Upload to storage in background
+      uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});
       
       toast({
         title: "Download complete",

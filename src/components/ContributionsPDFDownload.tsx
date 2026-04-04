@@ -228,12 +228,7 @@ export const ContributionsPDFDownload = ({
       doc.save(fileName);
 
       // Upload to storage in background
-      trackGeneratedDocument({
-        documentType: "contributions_report",
-        documentTitle: `${title} - ${getPeriodLabel()}`,
-        metadata: { period, count: filtered.length },
-        pdfBlob,
-      }).catch(() => {});
+      uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});
       
       toast.success("PDF downloaded successfully!");
     } catch (error) {
