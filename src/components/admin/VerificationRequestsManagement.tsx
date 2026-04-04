@@ -490,6 +490,24 @@ export const VerificationRequestsManagement = () => {
                         </Button>
                       </>
                     )}
+
+                    {request.status === 'approved' && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleUnverify(request)}
+                        disabled={processing === request.id}
+                      >
+                        {processing === request.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Unverify
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))
