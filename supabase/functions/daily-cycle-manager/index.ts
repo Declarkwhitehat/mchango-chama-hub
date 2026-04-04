@@ -383,7 +383,7 @@ Deno.serve(async (req) => {
             ? (payment.is_late_payment ? 'late' : 'paid')
             : isPastDue 
               ? 'missed' 
-              : 'pending'
+              : 'pending' as const
         };
       });
 
