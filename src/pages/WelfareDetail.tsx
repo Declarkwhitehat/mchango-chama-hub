@@ -318,14 +318,10 @@ const WelfareDetail = () => {
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-4">
-            <WelfareConstitution
-              welfareId={welfare.id}
-              welfareName={welfare.name}
-              constitutionFilePath={welfare.constitution_file_path}
-              constitutionFileName={welfare.constitution_file_name}
-              constitutionUploadedAt={welfare.constitution_uploaded_at}
-              isExecutive={isExecutive}
-              onUploaded={fetchWelfare}
+            <GroupDocuments
+              entityType="welfare"
+              entityId={welfare.id}
+              canUpload={isExecutive}
             />
             {/* PDF Report for all members */}
             {isMember && (
