@@ -22,7 +22,7 @@ export const ActivityPDFDownload = ({
 }: ActivityPDFDownloadProps) => {
   const { toast } = useToast();
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     if (data.length === 0) {
       toast({
         title: "No data",
