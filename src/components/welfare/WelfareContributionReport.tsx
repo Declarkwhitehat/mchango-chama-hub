@@ -207,8 +207,12 @@ export const WelfareContributionReport = ({ welfareId, welfareName }: Props) => 
         y += lineHeight;
       });
 
+      const pdfBlob = doc.output('blob');
       const filename = `${welfareName.replace(/\s+/g, '-')}-contributions-${startDate}-to-${endDate}.pdf`;
       doc.save(filename);
+
+      // Upload to storage in background
+      uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});
 
       toast.success(`Report downloaded: ${filename}`);
     } catch (error: any) {
