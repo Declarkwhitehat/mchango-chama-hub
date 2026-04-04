@@ -10,18 +10,14 @@ interface TrackDocumentParams {
 
 /**
  * Records a generated document and returns its serial number.
- * Returns null if tracking fails (PDF should still be generated).
+ * If database tracking fails, generates a local serial number so PDFs always have one.
  */
-export async function trackGeneratedDocument(params: TrackDocumentParams): Promise<string | null> {
+export async function trackGeneratedDocument(params: TrackDocumentParams): Promise<string> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.warn("Document tracking: auth error", authError.message);
-      return null;
-    }
-    if (!user) {
-      console.warn("Document tracking: no authenticated user");
-      return null;
+    if (authError || !user) {
+      console.warn("Document tracking: no authenticated user, using local serial");
+      return generateLocalSerial();
     }
 
     const { data, error } = await supabase
@@ -39,17 +35,24 @@ export async function trackGeneratedDocument(params: TrackDocumentParams): Promi
 
     if (error) {
       console.error("Document tracking insert error:", error.message, error.details, error.hint);
-      return null;
+      return generateLocalSerial();
     }
 
     if (!data?.serial_number) {
       console.warn("Document tracking: no serial_number returned", data);
-      return null;
+      return generateLocalSerial();
     }
 
     return String(data.serial_number);
   } catch (err) {
     console.error("Document tracking unexpected error:", err);
-    return null;
+    return generateLocalSerial();
   }
+}
+
+/** Fallback serial: timestamp-based unique number */
+function generateLocalSerial(): string {
+  const now = Date.now();
+  // Use last 8 digits of timestamp to create a unique-ish number
+  return String(now).slice(-8);
 }
