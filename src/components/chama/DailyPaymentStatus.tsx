@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
 import { PaymentCountdownTimer } from "./PaymentCountdownTimer";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { getNextDay10PmKenyaDeadline, getSameDay10PmKenyaCutoff } from "@/utils/chamaDeadlines";
 
 interface CyclePaymentStatusProps {
   chamaId: string;
@@ -69,13 +70,8 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
   const [totalOutstanding, setTotalOutstanding] = useState(0);
   const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
 
-  // Determine grace period: within 24 hours of chama start
-  const isGracePeriod = (() => {
-    if (!chamaStartDate) return false;
-    const startTime = new Date(chamaStartDate).getTime();
-    const gracePeriodEnd = startTime + 24 * 60 * 60 * 1000;
-    return Date.now() < gracePeriodEnd;
-  })();
+  const graceDeadline = getNextDay10PmKenyaDeadline(chamaStartDate);
+  const isGracePeriod = !!graceDeadline && Date.now() < graceDeadline.getTime();
 
   const loadPaymentStatus = async () => {
     try {
@@ -242,6 +238,12 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
       {/* Countdown Timer */}
       <PaymentCountdownTimer
         endDate={cycleInfo.end_date}
+        countdownDeadline={(isGracePeriod
+          ? graceDeadline
+          : frequency === 'daily'
+            ? getSameDay10PmKenyaCutoff(cycleInfo.end_date)
+            : null
+        )?.toISOString()}
         contributionAmount={cycleInfo.due_amount}
         totalPayable={displayTotalPayable > 0 ? displayTotalPayable : undefined}
         beneficiaryName={cycleInfo.beneficiary_name}
