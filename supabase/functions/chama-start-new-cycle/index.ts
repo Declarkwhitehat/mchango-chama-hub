@@ -28,6 +28,42 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
   }
 }
 
+function calculateCycleEndDate(
+  startDate: Date,
+  frequency: string,
+  everyNDays?: number,
+  monthlyDay?: number | null,
+  monthlyDay2?: number | null,
+): Date {
+  const endDate = new Date(startDate);
+  if (frequency === "daily") {
+    endDate.setHours(23, 59, 59, 999);
+  } else if (frequency === "monthly" && monthlyDay) {
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(monthlyDay - 1);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (frequency === "twice_monthly" && monthlyDay && monthlyDay2) {
+    const day1 = Math.min(monthlyDay, monthlyDay2);
+    const day2 = Math.max(monthlyDay, monthlyDay2);
+    const currentDay = startDate.getDate();
+    if (currentDay >= day1 && currentDay < day2) {
+      endDate.setDate(day2 - 1);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      if (currentDay >= day2) {
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
+      endDate.setDate(day1 - 1);
+      endDate.setHours(23, 59, 59, 999);
+    }
+  } else {
+    const cycleDays = getCycleLengthInDays(frequency, everyNDays);
+    endDate.setDate(endDate.getDate() + cycleDays - 1);
+    endDate.setHours(23, 59, 59, 999);
+  }
+  return endDate;
+}
+
 function throwIfError(error: unknown) {
   if (error) {
     throw error;
@@ -327,22 +363,94 @@ Deno.serve(async (req) => {
     }
 
     // ========== RESET CHAMA TO BRAND NEW ==========
+    const startDate = new Date();
+
     const { error: updateError } = await supabase
       .from("chama")
       .update({
         current_cycle_round: 1,
         accepting_rejoin_requests: false,
         status: "active",
-        start_date: new Date().toISOString(),
+        start_date: startDate.toISOString(),
         total_gross_collected: 0,
         total_commission_paid: 0,
         available_balance: 0,
         total_withdrawn: 0,
-        updated_at: new Date().toISOString(),
+        updated_at: startDate.toISOString(),
       })
       .eq("id", chamaId);
 
     throwIfError(updateError);
+
+    // ========== CALCULATE GRACE PERIOD (24hrs, cutoff at 22:00) ==========
+    const graceDeadline = new Date(startDate);
+    graceDeadline.setDate(graceDeadline.getDate() + 1);
+    graceDeadline.setHours(22, 0, 0, 0);
+
+    // ========== CREATE FIRST CONTRIBUTION CYCLE ==========
+    const cycleLength = getCycleLengthInDays(
+      chama.contribution_frequency,
+      chama.every_n_days_count,
+    );
+
+    const normalCycleEndDate = calculateCycleEndDate(
+      startDate,
+      chama.contribution_frequency,
+      chama.every_n_days_count,
+      chama.monthly_contribution_day,
+      chama.monthly_contribution_day_2,
+    );
+    // Ensure first cycle end is at least the grace deadline
+    const cycleEndDate = normalCycleEndDate > graceDeadline ? normalCycleEndDate : graceDeadline;
+
+    // Sort members by order_index to find first beneficiary
+    const sortedMembers = [...createdMembers].sort((a, b) => a.order_index - b.order_index);
+
+    console.log("Creating first contribution cycle with grace period until:", graceDeadline.toISOString());
+
+    const { data: firstCycle, error: cycleCreateError } = await supabase
+      .from("contribution_cycles")
+      .insert({
+        chama_id: chamaId,
+        cycle_number: 1,
+        start_date: startDate.toISOString(),
+        end_date: cycleEndDate.toISOString(),
+        due_amount: chama.contribution_amount,
+        beneficiary_member_id: sortedMembers[0]?.id || null,
+        total_expected_amount: chama.contribution_amount * sortedMembers.length,
+        total_collected_amount: 0,
+        members_paid_count: 0,
+        members_skipped_count: 0,
+      })
+      .select()
+      .single();
+
+    throwIfError(cycleCreateError);
+
+    // ========== CREATE MEMBER CYCLE PAYMENTS ==========
+    if (firstCycle) {
+      const memberPayments = sortedMembers.map((member) => ({
+        member_id: member.id,
+        cycle_id: firstCycle.id,
+        amount_due: chama.contribution_amount,
+        amount_paid: 0,
+        amount_remaining: chama.contribution_amount,
+        is_paid: false,
+        fully_paid: false,
+        is_late_payment: false,
+        payment_allocations: [],
+      }));
+
+      const { error: paymentsError } = await supabase
+        .from("member_cycle_payments")
+        .insert(memberPayments);
+
+      if (paymentsError) {
+        console.error("Error creating member cycle payments:", paymentsError);
+      } else {
+        console.log(`Created ${memberPayments.length} member_cycle_payments for cycle 1`);
+      }
+    }
 
     // Mark rejoin requests as processed
     const { error: requestUpdateError } = await supabase
@@ -354,40 +462,40 @@ Deno.serve(async (req) => {
       console.error("Error cleaning up requests:", requestUpdateError);
     }
 
-    // Send SMS notifications
-    const cycleLength = getCycleLengthInDays(
-      chama.contribution_frequency,
-      chama.every_n_days_count,
-    );
+    // Send SMS notifications with grace period info
+    const graceDeadlineStr = graceDeadline.toLocaleDateString("en-US", {
+      weekday: "long",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
 
-    const smsPromises = createdMembers
-      .sort((a, b) => a.order_index - b.order_index)
-      .map(async (member) => {
-        const payoutDate = new Date();
-        payoutDate.setDate(
-          payoutDate.getDate() + (member.order_index - 1) * cycleLength,
+    const smsPromises = sortedMembers.map(async (member) => {
+      const payoutDate = new Date(startDate);
+      payoutDate.setDate(
+        payoutDate.getDate() + (member.order_index - 1) * cycleLength,
+      );
+
+      const message =
+        `🔄 New cycle started for "${chama.name}"! You're member #${member.order_index}. You have a 24hr grace period - first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 10:00 PM. Your payout date: ${payoutDate.toLocaleDateString()}. Good luck! 🎯`;
+
+      try {
+        await supabase.functions.invoke("send-transactional-sms", {
+          body: {
+            phone: member.profiles.phone,
+            message,
+            eventType: "new_cycle_started",
+          },
+        });
+        return { success: true, phone: member.profiles.phone };
+      } catch (error) {
+        console.error(
+          `Failed to send SMS to ${member.profiles.phone}:`,
+          error,
         );
-
-        const message =
-          `🔄 New cycle started for "${chama.name}"! You're member #${member.order_index}. Your payout date: ${payoutDate.toLocaleDateString()}. Everything starts fresh. Good luck! 🎯`;
-
-        try {
-          await supabase.functions.invoke("send-transactional-sms", {
-            body: {
-              phone: member.profiles.phone,
-              message,
-              eventType: "new_cycle_started",
-            },
-          });
-          return { success: true, phone: member.profiles.phone };
-        } catch (error) {
-          console.error(
-            `Failed to send SMS to ${member.profiles.phone}:`,
-            error,
-          );
-          return { success: false, phone: member.profiles.phone, error };
-        }
-      });
+        return { success: false, phone: member.profiles.phone, error };
+      }
+    });
 
     const smsResults = await Promise.all(smsPromises);
     const successCount = smsResults.filter((r) => r.success).length;
@@ -402,6 +510,8 @@ Deno.serve(async (req) => {
         memberCount: createdMembers.length,
         cycleRound: 1,
         notificationsSent: successCount,
+        firstCycleId: firstCycle?.id || null,
+        graceDeadline: graceDeadline.toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
