@@ -41,7 +41,7 @@ export const ActivityPDFDownload = ({
         all: "All Transactions Report",
       };
 
-      const serialNumber = await trackGeneratedDocument({
+      const { serialNumber, documentId } = await trackDocumentWithId({
         documentType: "activity_report",
         documentTitle: titles[type],
         metadata: { type, count: data.length },
