@@ -265,11 +265,11 @@ serve(async (req) => {
         });
       }
 
-      // Check if invite code was already used
-      if (inviteCode.used_by) {
+      // Check if invite code has reached max uses
+      if (inviteCode.use_count >= inviteCode.max_uses) {
         return new Response(JSON.stringify({ 
-          error: 'Invite code already used',
-          details: 'This invite code has already been used by another member'
+          error: 'Invite code fully used',
+          details: 'This invite code has reached its maximum number of uses'
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
