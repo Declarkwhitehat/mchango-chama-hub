@@ -45,10 +45,10 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
   const totalLateCommission = debts.reduce((s, d) => s + d.penalty_remaining, 0);
   const totalNetToRecipients = debts.reduce((s, d) => s + d.principal_remaining, 0);
   const currentCycleBase = currentCycleDue ? contributionAmount : 0;
+  // Deductive model: member pays KES 100, 5% deducted from within
   const currentCycleCommission = currentCycleBase * 0.05;
-  const currentCycleGross = currentCycleBase + currentCycleCommission;
-  const totalPayable = totalNetToRecipients + totalLateCommission + currentCycleGross;
-  const totalCommission = totalLateCommission + currentCycleCommission;
+  const currentCycleNet = currentCycleBase - currentCycleCommission;
+  const totalPayable = totalNetToRecipients + totalLateCommission + currentCycleBase;
 
   if (!loading && debts.length === 0 && !currentCycleDue) {
     return (
@@ -107,7 +107,7 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
           );
         })}
 
-        {/* Current cycle */}
+        {/* Current cycle — deductive model */}
         {currentCycleDue && (
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm font-medium">
@@ -116,16 +116,16 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
             </div>
             <div className="ml-6 space-y-0.5 text-sm">
               <div className="flex justify-between text-muted-foreground">
-                <span>Base contribution</span>
+                <span>You pay</span>
                 <span>KES {contributionAmount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-orange-600 dark:text-orange-400">
-                <span>Commission (5%, added on top)</span>
-                <span>+ KES {currentCycleCommission.toFixed(2)}</span>
+                <span>Commission (5%, deducted)</span>
+                <span>− KES {currentCycleCommission.toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-medium">
-                <span>Gross to pay</span>
-                <span>KES {currentCycleGross.toFixed(2)}</span>
+                <span>Net to group pool</span>
+                <span>KES {currentCycleNet.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -143,14 +143,14 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
           )}
           {totalLateCommission > 0 && (
             <div className="flex justify-between text-orange-600 dark:text-orange-400">
-              <span>Late commissions (10% to platform)</span>
+              <span>Late penalties (10% to platform)</span>
               <span>KES {totalLateCommission.toFixed(2)}</span>
             </div>
           )}
           {currentCycleDue && (
             <div className="flex justify-between text-muted-foreground">
-              <span>Current cycle + 5% commission</span>
-              <span>KES {currentCycleGross.toFixed(2)}</span>
+              <span>Current cycle contribution</span>
+              <span>KES {currentCycleBase.toLocaleString()}</span>
             </div>
           )}
           <div className="flex justify-between font-bold text-lg pt-1 border-t border-border">
@@ -165,6 +165,11 @@ export function AmountToPayCard({ memberId, contributionAmount, missedCycles, cu
             <span>Late payments use a 10% commission rate. The commission goes to the platform, and the net amount goes directly to the member who received less on payout day.</span>
           </div>
         )}
+
+        <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">
+          <ArrowRight className="h-3 w-3 mt-0.5 shrink-0" />
+          <span>Commission is deducted from your payment. You pay the base amount and 5% goes to the platform, 95% goes to the group pool.</span>
+        </div>
       </CardContent>
     </Card>
   );

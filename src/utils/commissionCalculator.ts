@@ -7,32 +7,34 @@ export const CHAMA_LATE_COMMISSION_RATE = 0.10; // 10% late
 export const ORGANIZATION_COMMISSION_RATE = 0.05; // 5%
 
 /**
- * Calculate commission amount (additive — on top of base)
+ * Calculate commission amount (deductive — from within the payment)
+ * Commission = grossPaid * rate
  */
-export const calculateCommission = (amount: number, rate: number): number => {
-  return amount * rate;
+export const calculateCommission = (grossAmount: number, rate: number): number => {
+  return grossAmount * rate;
 };
 
 /**
- * Calculate gross amount including commission (additive model)
- * Member pays: base + commission
+ * Calculate gross amount (deductive model)
+ * Member pays the base amount — commission is deducted from within.
  */
-export const calculateGrossAmount = (baseAmount: number, rate: number): number => {
-  return baseAmount + calculateCommission(baseAmount, rate);
+export const calculateGrossAmount = (baseAmount: number, _rate: number): number => {
+  return baseAmount; // no markup — member pays exact base
 };
 
 /**
- * Calculate net balance (base amount, since commission is added on top)
+ * Calculate net balance after commission deduction
+ * Net = grossPaid - commission = grossPaid * (1 - rate)
  */
 export const calculateNetBalance = (grossAmount: number, rate: number): number => {
-  return grossAmount / (1 + rate);
+  return grossAmount * (1 - rate);
 };
 
 /**
- * Calculate per-transaction net amount from gross
+ * Calculate per-transaction net amount from gross (deductive)
  */
 export const calculateTransactionNet = (grossAmount: number, rate: number): number => {
-  return grossAmount / (1 + rate);
+  return grossAmount * (1 - rate);
 };
 
 /**
@@ -45,6 +47,7 @@ export const formatCommissionPercentage = (rate: number): string => {
 /**
  * Calculate the total amount a member needs to pay for N cycles,
  * factoring in tiered commission (5% on-time, 10% late).
+ * Deductive model: member pays base amount, commission deducted from within.
  */
 export const calculateAmountToPay = (
   baseContribution: number,
@@ -66,7 +69,7 @@ export const calculateAmountToPay = (
   const lateBase = lateCycles * baseContribution;
   const baseTotal = onTimeBase + lateBase;
   
-  // Additive model: commission is ON TOP of base
+  // Deductive model: commission is extracted FROM the base
   const onTimeCommission = onTimeBase * CHAMA_DEFAULT_COMMISSION_RATE;
   const lateCommission = lateBase * CHAMA_LATE_COMMISSION_RATE;
   const totalCommission = onTimeCommission + lateCommission;
@@ -78,40 +81,40 @@ export const calculateAmountToPay = (
     onTimeCommission,
     lateCommission,
     totalCommission,
-    totalPayable: baseTotal + totalCommission, // commission added on top
+    totalPayable: baseTotal, // member pays the base amount; commission deducted from within
   };
 };
 
 /**
- * Get commission info for Mchango
+ * Get commission info for Mchango (deductive)
  */
 export const getMchangoCommissionInfo = (totalAmount: number) => {
   const commission = calculateCommission(totalAmount, MCHANGO_COMMISSION_RATE);
-  const grossAmount = totalAmount + commission;
+  const netBalance = totalAmount - commission;
   
   return {
     totalAmount,
     commission,
-    grossAmount,
-    netBalance: totalAmount, // base amount goes to campaign
+    grossAmount: totalAmount,
+    netBalance, // what goes to campaign after deduction
     rate: MCHANGO_COMMISSION_RATE,
     percentage: formatCommissionPercentage(MCHANGO_COMMISSION_RATE),
   };
 };
 
 /**
- * Get commission info for Chama
+ * Get commission info for Chama (deductive)
  */
 export const getChamaCommissionInfo = (totalAmount: number, customRate?: number) => {
   const rate = customRate || CHAMA_DEFAULT_COMMISSION_RATE;
   const commission = calculateCommission(totalAmount, rate);
-  const grossAmount = totalAmount + commission;
+  const netBalance = totalAmount - commission;
   
   return {
     totalAmount,
     commission,
-    grossAmount,
-    netBalance: totalAmount, // base amount goes to pool
+    grossAmount: totalAmount,
+    netBalance, // what goes to pool after deduction
     rate,
     percentage: formatCommissionPercentage(rate),
   };
