@@ -3310,6 +3310,7 @@ export type Database = {
         Args: { p_cycle_id: string }
         Returns: boolean
       }
+      cleanup_expired_documents: { Args: never; Returns: undefined }
       cleanup_expired_otps: { Args: never; Returns: undefined }
       cleanup_old_chat_messages: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
