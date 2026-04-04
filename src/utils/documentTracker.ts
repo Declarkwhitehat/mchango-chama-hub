@@ -6,19 +6,30 @@ interface TrackDocumentParams {
   entityType?: string;
   entityId?: string;
   metadata?: Record<string, any>;
-  pdfBlob?: Blob;
+}
+
+interface TrackResult {
+  serialNumber: string;
+  documentId: string | null;
 }
 
 /**
- * Records a generated document, optionally uploads the PDF, and returns its serial number.
+ * Records a generated document and returns its serial number.
  * If database tracking fails, generates a local serial number so PDFs always have one.
  */
 export async function trackGeneratedDocument(params: TrackDocumentParams): Promise<string> {
+  const result = await trackDocumentWithId(params);
+  return result.serialNumber;
+}
+
+/**
+ * Same as trackGeneratedDocument but also returns the document ID for subsequent blob upload.
+ */
+export async function trackDocumentWithId(params: TrackDocumentParams): Promise<TrackResult> {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      console.warn("Document tracking: no authenticated user, using local serial");
-      return generateLocalSerial();
+      return { serialNumber: generateLocalSerial(), documentId: null };
     }
 
     const { data, error } = await supabase
@@ -36,45 +47,50 @@ export async function trackGeneratedDocument(params: TrackDocumentParams): Promi
 
     if (error) {
       console.error("Document tracking insert error:", error.message, error.details, error.hint);
-      return generateLocalSerial();
+      return { serialNumber: generateLocalSerial(), documentId: null };
     }
 
     if (!data?.serial_number) {
-      console.warn("Document tracking: no serial_number returned", data);
-      return generateLocalSerial();
+      return { serialNumber: generateLocalSerial(), documentId: null };
     }
 
-    const serialStr = String(data.serial_number);
-
-    // Upload PDF blob to storage if provided
-    if (params.pdfBlob) {
-      try {
-        const filePath = `${user.id}/${serialStr}.pdf`;
-        const { error: uploadError } = await supabase.storage
-          .from("generated-pdfs")
-          .upload(filePath, params.pdfBlob, {
-            contentType: "application/pdf",
-            upsert: true,
-          });
-
-        if (uploadError) {
-          console.error("PDF upload error:", uploadError.message);
-        } else {
-          // Update the record with the file path
-          await supabase
-            .from("generated_documents")
-            .update({ file_path: filePath })
-            .eq("id", data.id);
-        }
-      } catch (uploadErr) {
-        console.error("PDF upload unexpected error:", uploadErr);
-      }
-    }
-
-    return serialStr;
+    return { serialNumber: String(data.serial_number), documentId: data.id };
   } catch (err) {
     console.error("Document tracking unexpected error:", err);
-    return generateLocalSerial();
+    return { serialNumber: generateLocalSerial(), documentId: null };
+  }
+}
+
+/**
+ * Uploads the PDF blob to storage and links it to the document record.
+ * Call this after the PDF has been generated with the serial number.
+ */
+export async function uploadDocumentPDF(documentId: string | null, serialNumber: string, pdfBlob: Blob): Promise<void> {
+  if (!documentId) return;
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const filePath = `${user.id}/${serialNumber}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from("generated-pdfs")
+      .upload(filePath, pdfBlob, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("PDF upload error:", uploadError.message);
+      return;
+    }
+
+    await supabase
+      .from("generated_documents")
+      .update({ file_path: filePath } as any)
+      .eq("id", documentId);
+  } catch (err) {
+    console.error("PDF upload unexpected error:", err);
   }
 }
 
