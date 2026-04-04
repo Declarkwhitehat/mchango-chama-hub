@@ -168,9 +168,10 @@ export const ContributionsPDFDownload = ({
       doc.setFontSize(10);
       
       doc.text("#", margin + 3, yPos + 5.5);
-      doc.text("Name", margin + 15, yPos + 5.5);
-      doc.text("Amount (KES)", margin + 90, yPos + 5.5);
-      doc.text("Date", margin + 130, yPos + 5.5);
+      doc.text("Name", margin + 12, yPos + 5.5);
+      doc.text("Amount (KES)", margin + 65, yPos + 5.5);
+      doc.text("Reference", margin + 100, yPos + 5.5);
+      doc.text("Date & Time", margin + 135, yPos + 5.5);
       
       yPos += 10;
       doc.setTextColor(0, 0, 0);
