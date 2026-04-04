@@ -403,23 +403,7 @@ export const OrganizationsManagement = () => {
                       Public View
                     </Button>
                     
-                    {!org.is_verified ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-accent border-accent hover:bg-accent/10"
-                        onClick={() => setConfirmDialog({ 
-                          open: true, 
-                          orgId: org.id, 
-                          action: 'verify',
-                          orgName: org.name 
-                        })}
-                        disabled={processing === org.id}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Verify
-                      </Button>
-                    ) : (
+                    {org.is_verified && (
                       <Button
                         size="sm"
                         variant="outline"

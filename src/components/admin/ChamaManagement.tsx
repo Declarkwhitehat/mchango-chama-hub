@@ -405,27 +405,24 @@ export const ChamaManagement = () => {
                       onSuccess={fetchChamas}
                     />
 
-                    <Button
-                      size="sm"
-                      variant={chama.is_verified ? "outline" : "default"}
-                      onClick={() => toggleVerification(chama.id, chama.is_verified)}
-                      disabled={processing === chama.id}
-                      className={chama.is_verified ? "text-muted-foreground" : "bg-blue-500 hover:bg-blue-600"}
-                    >
-                      {processing === chama.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : chama.is_verified ? (
-                        <>
-                          <BadgeX className="h-4 w-4 mr-1" />
-                          Unverify
-                        </>
-                      ) : (
-                        <>
-                          <BadgeCheck className="h-4 w-4 mr-1" />
-                          Verify
-                        </>
-                      )}
-                    </Button>
+                    {chama.is_verified && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleVerification(chama.id, chama.is_verified)}
+                        disabled={processing === chama.id}
+                        className="text-muted-foreground"
+                      >
+                        {processing === chama.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <BadgeX className="h-4 w-4 mr-1" />
+                            Unverify
+                          </>
+                        )}
+                      </Button>
+                    )}
                     
                     {chama.status === 'active' && (
                       <Button
