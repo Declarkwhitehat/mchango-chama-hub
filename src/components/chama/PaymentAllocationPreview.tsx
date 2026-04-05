@@ -109,6 +109,8 @@ export function PaymentAllocationPreview({ memberId, chamaId, grossAmount }: Pay
   );
   const currentCycleLines = preview.allocations.filter(a => a.type === 'current_cycle');
   const carryForwardLines = preview.allocations.filter(a => a.type === 'carry_forward');
+  const walletLines = preview.allocations.filter(a => a.type === 'overpayment_wallet');
+  const walletCommLines = preview.allocations.filter(a => a.type === 'overpayment_commission');
 
   const hasDebotsToSettle = penaltyLines.length > 0 || principalLines.length > 0;
 
