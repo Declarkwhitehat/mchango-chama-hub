@@ -447,7 +447,7 @@ async function settleDebts(
     toCompany += commission;
     toCyclePot += net;
 
-    const newAmountPaid = (cyclePayment?.amount_paid || 0) + net;
+    const newAmountPaid = (cyclePayment?.amount_paid || 0) + toApply;
     const isFullyPaid = newAmountPaid >= (cyclePayment?.amount_due || contributionAmount);
 
     // Update or create cycle payment record
@@ -474,9 +474,9 @@ async function settleDebts(
       await supabase.from('member_cycle_payments').insert({
         member_id: memberId,
         cycle_id: cycle.id,
-        amount_paid: net,
+        amount_paid: toApply,
         amount_due: cycle.due_amount || contributionAmount,
-        amount_remaining: Math.max(0, (cycle.due_amount || contributionAmount) - net),
+        amount_remaining: Math.max(0, (cycle.due_amount || contributionAmount) - toApply),
         is_paid: isFullyPaid,
         fully_paid: isFullyPaid,
         is_late_payment: isLate,
