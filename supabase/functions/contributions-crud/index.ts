@@ -447,7 +447,7 @@ async function settleDebts(
     toCompany += commission;
     toCyclePot += net;
 
-    const newAmountPaid = (cyclePayment?.amount_paid || 0) + net;
+    const newAmountPaid = (cyclePayment?.amount_paid || 0) + toApply;
     const isFullyPaid = newAmountPaid >= (cyclePayment?.amount_due || contributionAmount);
 
     // Update or create cycle payment record
