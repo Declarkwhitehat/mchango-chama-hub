@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
         const totalCredit = carryForward + nextCycleCredit;
         
         if (totalCredit > 0) {
-          const creditUsed = Math.min(totalCredit, chama.contribution_amount);
+          const creditUsed = Math.min(totalCredit, netCycleCost);
           const remainingCarryForward = Math.max(0, totalCredit - creditUsed);
           
           await supabase
