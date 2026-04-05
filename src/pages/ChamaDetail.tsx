@@ -298,22 +298,35 @@ const ChamaDetail = () => {
       let currentCycleNumber: number | null = null;
 
       try {
-        const { data: currentCycle } = await supabase
+        // Fetch all cycles to count completed ones
+        const { data: allCycles } = await supabase
           .from('contribution_cycles')
-          .select('beneficiary_member_id, end_date, cycle_number')
+          .select('id, beneficiary_member_id, end_date, cycle_number, is_complete, payout_processed')
           .eq('chama_id', chamaData.id)
-          .eq('is_complete', false)
-          .order('cycle_number', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order('cycle_number', { ascending: true });
 
-        if (currentCycle) {
-          currentBeneficiaryId = currentCycle.beneficiary_member_id;
-          currentCycleEndDate = currentCycle.end_date;
-          currentCycleNumber = currentCycle.cycle_number;
+        if (allCycles) {
+          const completed = allCycles.filter(c => c.is_complete || c.payout_processed);
+          setCompletedCyclesCount(completed.length);
+          setTotalCyclesCount(approvedMembers.length);
+
+          // Track which members already received payouts
+          const paidMembers = new Set<string>();
+          completed.forEach(c => {
+            if (c.beneficiary_member_id) paidMembers.add(c.beneficiary_member_id);
+          });
+          setPaidOutMemberIds(paidMembers);
+
+          // Find the current active (incomplete) cycle
+          const activeCycle = allCycles.find(c => !c.is_complete);
+          if (activeCycle) {
+            currentBeneficiaryId = activeCycle.beneficiary_member_id;
+            currentCycleEndDate = activeCycle.end_date;
+            currentCycleNumber = activeCycle.cycle_number;
+          }
         }
       } catch (e) {
-        console.error('Error fetching current cycle for turns:', e);
+        console.error('Error fetching cycles for turns:', e);
       }
 
       // If we have an actual beneficiary from the cycle, use that as current turn
