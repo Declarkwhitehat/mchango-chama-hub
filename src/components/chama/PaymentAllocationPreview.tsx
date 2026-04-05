@@ -41,6 +41,8 @@ const typeConfig: Record<string, { icon: any; color: string; label: string }> = 
   current_cycle_commission:{ icon: Building2,     color: 'text-orange-500',  label: 'Commission' },
   current_cycle:           { icon: Coins,         color: 'text-green-600',   label: 'Current Cycle' },
   carry_forward:           { icon: PiggyBank,     color: 'text-blue-500',    label: 'Carry-forward' },
+  overpayment_commission:  { icon: Building2,     color: 'text-orange-500',  label: 'Overpayment Commission' },
+  overpayment_wallet:      { icon: PiggyBank,     color: 'text-blue-500',    label: 'Overpayment Wallet' },
   pending_cycle:           { icon: Coins,         color: 'text-green-600',   label: 'Pending Cycle' },
 };
 
