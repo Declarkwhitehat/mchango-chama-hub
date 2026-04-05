@@ -220,16 +220,50 @@ export const VerificationRequestsManagement = () => {
 
       if (error) throw error;
 
+      // Refund KSh 200 for non-chama entities
+      const VERIFICATION_FEE = 200;
+      const requiresRefund = selectedRequest.entity_type !== 'chama';
+      
+      if (requiresRefund) {
+        const tableName = selectedRequest.entity_type === 'mchango' ? 'mchango' 
+          : selectedRequest.entity_type === 'organization' ? 'organizations' 
+          : 'welfares';
+
+        // Get current balance
+        const { data: entityData } = await supabase
+          .from(tableName)
+          .select('available_balance')
+          .eq('id', selectedRequest.entity_id)
+          .single();
+
+        const currentBalance = entityData?.available_balance ?? 0;
+
+        // Refund the fee
+        await supabase
+          .from(tableName)
+          .update({ available_balance: currentBalance + VERIFICATION_FEE })
+          .eq('id', selectedRequest.entity_id);
+
+        // Record refund in company_earnings as negative amount
+        await supabase.from('company_earnings').insert({
+          amount: -VERIFICATION_FEE,
+          source: 'VERIFICATION_FEE_REFUND',
+          description: `Verification fee refund for rejected ${selectedRequest.entity_type}: ${selectedRequest.entity_name}`,
+          group_id: selectedRequest.entity_id,
+        });
+      }
+
       // Create notification for the requester
       const entityTypeLabel = selectedRequest.entity_type === 'mchango' ? 'Campaign' : 
                               selectedRequest.entity_type === 'chama' ? 'Chama' : 
                               selectedRequest.entity_type === 'welfare' ? 'Welfare' : 'Organization';
+      const refundMsg = requiresRefund ? ' KSh 200 verification fee has been refunded to your balance.' : '';
       await supabase
         .from('notifications')
         .insert({
           user_id: selectedRequest.requested_by,
           title: 'Verification Request Rejected',
-          message: `Your verification request for ${entityTypeLabel} "${selectedRequest.entity_name}" was not approved.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`,
+          message: `Your verification request for ${entityTypeLabel} "${selectedRequest.entity_name}" was not approved.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}${refundMsg}`,
           type: 'error',
           category: 'verification',
           related_entity_id: selectedRequest.entity_id,
@@ -238,7 +272,9 @@ export const VerificationRequestsManagement = () => {
 
       toast({
         title: "Rejected",
-        description: "Verification request has been rejected",
+        description: requiresRefund 
+          ? "Verification request rejected. KSh 200 has been refunded." 
+          : "Verification request has been rejected",
       });
 
       setRejectDialogOpen(false);
