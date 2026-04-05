@@ -1060,20 +1060,12 @@ Deno.serve(async (req) => {
               : `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}`;
 
             console.log(`🚫 ${isFirstCycle ? '[DAY 1 RULE]' : ''} AUTO-REMOVING member ${member.member_code} - ${isFirstCycle ? 'first payment missed' : `${newMissedCount} consecutive missed payments`}`);
-              missed_payments_count: newMissedCount,
-              requires_admin_verification: newMissedCount >= 1,
-              balance_deficit: totalOutstanding
-            })
-            .eq('id', member.id);
-
-          if (newMissedCount >= 3) {
-            console.log(`🚫 AUTO-REMOVING member ${member.member_code} - 3 consecutive missed payments`);
 
             await supabase.from('chama_member_removals').insert({
               chama_id: chama.id,
               member_id: member.id,
               user_id: member.user_id,
-              removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}`,
+              removal_reason: removalReason,
               chama_name: chama.name,
               member_name: member.profiles?.full_name,
               member_phone: member.profiles?.phone,
@@ -1083,7 +1075,7 @@ Deno.serve(async (req) => {
 
             await supabase.from('chama_members').update({
               status: 'removed',
-              removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}`,
+              removal_reason: removalReason,
               removed_at: new Date().toISOString()
             }).eq('id', member.id);
 
