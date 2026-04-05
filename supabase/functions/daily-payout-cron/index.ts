@@ -1036,6 +1036,9 @@ Deno.serve(async (req) => {
         );
 
         // ========== TRACK MISSED PAYMENTS + AUTO-REMOVE ==========
+        // Day 1 rule: cycle_number === 1 → immediate removal for non-payers
+        const isFirstCycle = cycle.cycle_number === 1;
+
         for (const unpaid of unpaidMembers) {
           const member = unpaid.chama_members;
           const newMissedCount = (member.missed_payments_count || 0) + 1;
@@ -1044,6 +1047,19 @@ Deno.serve(async (req) => {
           await supabase
             .from('chama_members')
             .update({
+              missed_payments_count: newMissedCount,
+              requires_admin_verification: newMissedCount >= 1,
+              balance_deficit: totalOutstanding
+            })
+            .eq('id', member.id);
+
+          // First cycle: immediate removal; subsequent cycles: removal after 3 misses
+          if (isFirstCycle || newMissedCount >= 3) {
+            const removalReason = isFirstCycle
+              ? `Auto-removed: Did not pay by first deadline (Day 1 rule)`
+              : `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}`;
+
+            console.log(`🚫 ${isFirstCycle ? '[DAY 1 RULE]' : ''} AUTO-REMOVING member ${member.member_code} - ${isFirstCycle ? 'first payment missed' : `${newMissedCount} consecutive missed payments`}`);
               missed_payments_count: newMissedCount,
               requires_admin_verification: newMissedCount >= 1,
               balance_deficit: totalOutstanding
