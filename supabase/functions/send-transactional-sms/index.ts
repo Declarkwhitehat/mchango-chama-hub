@@ -18,9 +18,31 @@ interface TransactionalSMSRequest {
   eventType?: string;
 }
 
+interface OnfonMessageResult {
+  MessageErrorCode?: string | number | null;
+  MessageErrorDescription?: string | null;
+  MessageId?: string | null;
+}
+
+interface OnfonSMSResponse {
+  ErrorCode?: string | number | null;
+  ErrorDescription?: string | null;
+  Data?: OnfonMessageResult[];
+}
+
+const isOnfonSuccessCode = (code: unknown): boolean => code === 0 || code === '0' || code === '000';
+
+const getProviderMessage = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'null') return undefined;
+
+  return trimmed;
+};
+
 const sendSMS = async (phone: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> => {
   try {
-    // Normalize phone: remove + prefix for Onfon (expects 254...)
     const normalizedPhone = phone.startsWith('+') ? phone.substring(1) : phone;
 
     const response = await fetch('https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS', {
@@ -43,16 +65,30 @@ const sendSMS = async (phone: string, message: string): Promise<{ success: boole
       }),
     });
 
-    const result = await response.json();
+    const result: OnfonSMSResponse = await response.json();
     console.log('Onfon Media SMS response:', JSON.stringify(result));
 
-    // Onfon returns ErrorCode "000" for success
-    if (result.ErrorCode === '000' || result.ErrorCode === 0 || response.ok) {
-      const messageId = result.Data?.[0]?.MessageId || `onfon-${Date.now()}`;
-      return { success: true, messageId };
-    } else {
-      return { success: false, error: result.ErrorDescription || result.ErrorCode || 'Unknown error' };
+    const firstMessage = Array.isArray(result.Data) ? result.Data[0] : undefined;
+    const messageAccepted =
+      firstMessage?.MessageErrorCode === undefined ||
+      firstMessage?.MessageErrorCode === null ||
+      firstMessage?.MessageErrorCode === '' ||
+      isOnfonSuccessCode(firstMessage.MessageErrorCode);
+
+    if (response.ok && isOnfonSuccessCode(result.ErrorCode) && messageAccepted) {
+      return {
+        success: true,
+        messageId: firstMessage?.MessageId || `onfon-${Date.now()}`,
+      };
     }
+
+    return {
+      success: false,
+      error:
+        getProviderMessage(firstMessage?.MessageErrorDescription) ||
+        getProviderMessage(result.ErrorDescription) ||
+        `Onfon request failed with status ${response.status}`,
+    };
   } catch (error) {
     console.error('SMS sending error:', (error as Error).message);
     return { success: false, error: (error as Error).message };
@@ -90,6 +126,7 @@ serve(async (req) => {
     const result = await sendSMS(phone, message);
 
     if (!result.success) {
+      console.error('Onfon Media rejected transactional SMS:', result.error);
       return new Response(
         JSON.stringify({ error: 'Failed to send SMS', details: result.error }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

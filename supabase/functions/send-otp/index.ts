@@ -19,7 +19,36 @@ interface SendOTPRequest {
   purpose?: string;
 }
 
-const sendSMS = async (phone: string, message: string): Promise<boolean> => {
+interface OnfonMessageResult {
+  MessageErrorCode?: string | number | null;
+  MessageErrorDescription?: string | null;
+  MessageId?: string | null;
+}
+
+interface OnfonSMSResponse {
+  ErrorCode?: string | number | null;
+  ErrorDescription?: string | null;
+  Data?: OnfonMessageResult[];
+}
+
+interface SMSResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+const isOnfonSuccessCode = (code: unknown): boolean => code === 0 || code === '0' || code === '000';
+
+const getProviderMessage = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'null') return undefined;
+
+  return trimmed;
+};
+
+const sendSMS = async (phone: string, message: string): Promise<SMSResult> => {
   try {
     const normalizedPhone = phone.startsWith('+') ? phone.substring(1) : phone;
 
@@ -43,13 +72,33 @@ const sendSMS = async (phone: string, message: string): Promise<boolean> => {
       }),
     });
 
-    const result = await response.json();
+    const result: OnfonSMSResponse = await response.json();
     console.log('Onfon Media SMS response:', JSON.stringify(result));
 
-    return result.ErrorCode === '000' || result.ErrorCode === 0 || response.ok;
+    const firstMessage = Array.isArray(result.Data) ? result.Data[0] : undefined;
+    const messageAccepted =
+      firstMessage?.MessageErrorCode === undefined ||
+      firstMessage?.MessageErrorCode === null ||
+      firstMessage?.MessageErrorCode === '' ||
+      isOnfonSuccessCode(firstMessage.MessageErrorCode);
+
+    if (response.ok && isOnfonSuccessCode(result.ErrorCode) && messageAccepted) {
+      return {
+        success: true,
+        messageId: firstMessage?.MessageId || `onfon-${Date.now()}`,
+      };
+    }
+
+    return {
+      success: false,
+      error:
+        getProviderMessage(firstMessage?.MessageErrorDescription) ||
+        getProviderMessage(result.ErrorDescription) ||
+        `Onfon request failed with status ${response.status}`,
+    };
   } catch (error) {
     console.error('SMS sending error:', error);
-    return false;
+    return { success: false, error: (error as Error).message };
   }
 };
 
@@ -65,7 +114,6 @@ serve(async (req) => {
 
     let phone = rawPhone;
 
-    // If email provided, look up the associated phone number
     if (email && !phone) {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -95,11 +143,10 @@ serve(async (req) => {
       );
     }
 
-    // Check rate limit for phone
     const phoneRateLimit = await checkRateLimit(supabase, phone, 'phone', 'forgot_password');
     if (!phoneRateLimit.allowed) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: phoneRateLimit.error || 'Too many OTP requests. Please try again later.',
           remainingAttempts: phoneRateLimit.remainingAttempts,
           resetTime: phoneRateLimit.resetTime
@@ -108,12 +155,11 @@ serve(async (req) => {
       );
     }
 
-    // Check rate limit for IP
     const clientIP = getClientIP(req);
     const ipRateLimit = await checkRateLimit(supabase, clientIP, 'ip', 'forgot_password');
     if (!ipRateLimit.allowed) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: ipRateLimit.error || 'Too many requests from your location. Please try again later.',
           remainingAttempts: ipRateLimit.remainingAttempts,
           resetTime: ipRateLimit.resetTime
@@ -122,7 +168,6 @@ serve(async (req) => {
       );
     }
 
-    // For password reset, verify the phone exists in profiles first
     if (purpose === 'password_reset') {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -138,14 +183,11 @@ serve(async (req) => {
       }
     }
 
-    // Clean up expired OTPs
     await supabase.rpc('cleanup_expired_otps');
 
-    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-    // Store OTP in database
     const { error: insertError } = await supabase
       .from('otp_verifications')
       .insert({
@@ -162,11 +204,11 @@ serve(async (req) => {
       );
     }
 
-    // Send SMS via Onfon Media
     const message = `Your verification code is: ${otp}. Valid for 5 minutes. Do not share this code with anyone.`;
-    const smsSent = await sendSMS(phone, message);
+    const smsResult = await sendSMS(phone, message);
 
-    if (!smsSent) {
+    if (!smsResult.success) {
+      console.error('Onfon Media rejected OTP SMS:', smsResult.error);
       return new Response(
         JSON.stringify({ error: 'Failed to send SMS. Please try again.' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
@@ -178,8 +220,8 @@ serve(async (req) => {
     const maskedPhone = phone.substring(0, 4) + '****' + phone.substring(phone.length - 4);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: 'OTP sent successfully',
         expiresIn: 300,
         maskedPhone,
