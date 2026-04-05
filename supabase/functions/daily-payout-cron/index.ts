@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { getSameDay10PmKenyaCutoff } from '../_shared/chamaDeadlines.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -365,8 +366,15 @@ Deno.serve(async (req) => {
 
               const nextEnd = new Date(nextStart);
               switch (chama.contribution_frequency) {
-                case 'daily':
-                  nextEnd.setHours(22, 0, 0, 0);
+                case 'daily': {
+                  const cutoff = getSameDay10PmKenyaCutoff(nextEnd);
+                  if (cutoff) {
+                    nextEnd.setTime(cutoff.getTime());
+                  } else {
+                    nextEnd.setUTCHours(19, 0, 0, 0);
+                  }
+                  break;
+                }
                   break;
                 case 'weekly':
                   nextEnd.setDate(nextEnd.getDate() + 6);
@@ -1028,6 +1036,9 @@ Deno.serve(async (req) => {
         );
 
         // ========== TRACK MISSED PAYMENTS + AUTO-REMOVE ==========
+        // Day 1 rule: cycle_number === 1 → immediate removal for non-payers
+        const isFirstCycle = cycle.cycle_number === 1;
+
         for (const unpaid of unpaidMembers) {
           const member = unpaid.chama_members;
           const newMissedCount = (member.missed_payments_count || 0) + 1;
@@ -1042,14 +1053,19 @@ Deno.serve(async (req) => {
             })
             .eq('id', member.id);
 
-          if (newMissedCount >= 3) {
-            console.log(`🚫 AUTO-REMOVING member ${member.member_code} - 3 consecutive missed payments`);
+          // First cycle: immediate removal; subsequent cycles: removal after 3 misses
+          if (isFirstCycle || newMissedCount >= 3) {
+            const removalReason = isFirstCycle
+              ? `Auto-removed: Did not pay by first deadline (Day 1 rule)`
+              : `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}`;
+
+            console.log(`🚫 ${isFirstCycle ? '[DAY 1 RULE]' : ''} AUTO-REMOVING member ${member.member_code} - ${isFirstCycle ? 'first payment missed' : `${newMissedCount} consecutive missed payments`}`);
 
             await supabase.from('chama_member_removals').insert({
               chama_id: chama.id,
               member_id: member.id,
               user_id: member.user_id,
-              removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}`,
+              removal_reason: removalReason,
               chama_name: chama.name,
               member_name: member.profiles?.full_name,
               member_phone: member.profiles?.phone,
@@ -1059,7 +1075,7 @@ Deno.serve(async (req) => {
 
             await supabase.from('chama_members').update({
               status: 'removed',
-              removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}`,
+              removal_reason: removalReason,
               removed_at: new Date().toISOString()
             }).eq('id', member.id);
 
@@ -1073,9 +1089,10 @@ Deno.serve(async (req) => {
 
             const memberPhone = member.profiles?.phone;
             if (memberPhone) {
-              await sendSMS(memberPhone,
-                `❌ You have been removed from "${chama.name}" after ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}.`
-              );
+              const smsMsg = isFirstCycle
+                ? `❌ You have been removed from "${chama.name}" for not paying by the first deadline. All members must pay before the first 10 PM cutoff.`
+                : `❌ You have been removed from "${chama.name}" after ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}.`;
+              await sendSMS(memberPhone, smsMsg);
             }
 
             if (member.user_id) {

@@ -180,18 +180,18 @@ export function PaymentAllocationPreview({ memberId, chamaId, grossAmount }: Pay
         {/* Summary totals */}
         <div className="space-y-1 text-xs">
           <div className="flex justify-between text-muted-foreground">
-            <span>Total commissions to platform</span>
+            <span>Platform commission (5%)</span>
             <span className="font-medium text-orange-600">KES {preview.total_to_company.toFixed(2)}</span>
           </div>
           {preview.total_to_recipients > 0 && (
             <div className="flex justify-between text-muted-foreground">
-              <span>Net to deficit recipients</span>
+              <span>To deficit recipients</span>
               <span className="font-medium text-primary">KES {preview.total_to_recipients.toFixed(2)}</span>
             </div>
           )}
           {preview.total_to_cycle_pot > 0 && (
             <div className="flex justify-between text-muted-foreground">
-              <span>Net to cycle collection pot</span>
+              <span>To chama pool (for beneficiary payout)</span>
               <span className="font-medium text-green-600">KES {preview.total_to_cycle_pot.toFixed(2)}</span>
             </div>
           )}

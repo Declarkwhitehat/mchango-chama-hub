@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { getSameDay10PmKenyaCutoff } from '../_shared/chamaDeadlines.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -92,8 +93,15 @@ Deno.serve(async (req) => {
       const endDate = new Date();
       
       switch (chama.contribution_frequency) {
-        case 'daily':
-          endDate.setHours(22, 0, 0, 0);
+        case 'daily': {
+          const cutoff = getSameDay10PmKenyaCutoff(endDate);
+          if (cutoff) {
+            endDate.setTime(cutoff.getTime());
+          } else {
+            endDate.setUTCHours(19, 0, 0, 0); // fallback: 10 PM Kenya = 19:00 UTC
+          }
+          break;
+        }
           break;
         case 'weekly':
           endDate.setDate(endDate.getDate() + 6);
