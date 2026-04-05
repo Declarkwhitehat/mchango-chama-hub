@@ -999,6 +999,7 @@ Deno.serve(async (req) => {
             await supabase
               .from('contribution_cycles')
               .update({
+                is_complete: true,
                 payout_amount: payoutAmount,
                 payout_type: payoutType,
                 members_paid_count: paidCount,
