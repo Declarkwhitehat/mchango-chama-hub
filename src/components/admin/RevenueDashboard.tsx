@@ -191,7 +191,7 @@ export function RevenueDashboard() {
       countPct: pctChange(count, prevCount),
       avgPct: pctChange(avgCommission, prevAvg),
     };
-  }, [entries, prevEntries]);
+  }, [entries, prevEntries, earnings, prevEarnings]);
 
   // Chart data - time series
   const trendData = useMemo(() => {
