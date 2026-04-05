@@ -53,6 +53,15 @@ const SOURCE_LABELS: Record<string, string> = {
   welfare: "Welfare",
 };
 
+interface EarningsEntry {
+  id: string;
+  amount: number;
+  source: string;
+  description: string | null;
+  group_id: string | null;
+  created_at: string;
+}
+
 export function RevenueDashboard() {
   const [period, setPeriod] = useState<PeriodPreset>("month");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -60,6 +69,8 @@ export function RevenueDashboard() {
   const [customTo, setCustomTo] = useState<Date>();
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [prevEntries, setPrevEntries] = useState<LedgerEntry[]>([]);
+  const [earnings, setEarnings] = useState<EarningsEntry[]>([]);
+  const [prevEarnings, setPrevEarnings] = useState<EarningsEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
