@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Send transactional SMS using Celcom Africa
+ * Send transactional SMS using Onfon Media
  * @param phone - Phone number in international format (e.g., +254712345678)
  * @param message - SMS message content (max 160 chars for single SMS)
  * @param eventType - Optional event type for logging (e.g., 'registration', 'chama_created')
