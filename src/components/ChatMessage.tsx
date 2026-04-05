@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { User, FileDown } from 'lucide-react';
-import chatBotAvatar from '@/assets/chat-bot-avatar.png';
+import chatBotAvatar from '@/assets/chat-bot-avatar.jpg';
 import { Button } from './ui/button';
 
 interface Message {

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { X, Languages, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import chatBotAvatar from '@/assets/chat-bot-avatar.png';
+import chatBotAvatar from '@/assets/chat-bot-avatar.jpg';
 import { ChatMessage } from './ChatMessage';
 import { CallbackForm } from './CallbackForm';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
