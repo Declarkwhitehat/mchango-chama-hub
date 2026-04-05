@@ -359,6 +359,16 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
                       KES {payments.filter(p => p.is_paid).reduce((s, p) => s + p.amount_due, 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-muted-foreground">{paidCount}/{totalCount} paid</p>
+                    {payments.filter(p => p.is_paid).length > 0 && (
+                      <div className="mt-1 text-xs text-muted-foreground text-left">
+                        {payments.filter(p => p.is_paid).map((p, i) => (
+                          <span key={p.id}>
+                            {p.full_name} (KES {p.amount_due.toLocaleString()})
+                            {i < payments.filter(pp => pp.is_paid).length - 1 ? ', ' : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className={`rounded-lg border p-3 text-center ${paidLateCount > 0 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-muted/40'}`}>
                     <p className="text-xs text-muted-foreground">Late Penalties</p>

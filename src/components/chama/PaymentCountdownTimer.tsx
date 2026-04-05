@@ -145,7 +145,7 @@ export function PaymentCountdownTimer({
             </div>
 
             <p className="text-xs text-center text-blue-600 dark:text-blue-400">
-              🛡️ This is your first cycle. No penalties will apply during the grace period.
+              🛡️ First cycle — members who don't pay by the deadline will be removed from the chama.
             </p>
 
             {onPayNow && (
