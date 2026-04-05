@@ -366,8 +366,15 @@ Deno.serve(async (req) => {
 
               const nextEnd = new Date(nextStart);
               switch (chama.contribution_frequency) {
-                case 'daily':
-                  nextEnd.setHours(22, 0, 0, 0);
+                case 'daily': {
+                  const cutoff = getSameDay10PmKenyaCutoff(nextEnd);
+                  if (cutoff) {
+                    nextEnd.setTime(cutoff.getTime());
+                  } else {
+                    nextEnd.setUTCHours(19, 0, 0, 0);
+                  }
+                  break;
+                }
                   break;
                 case 'weekly':
                   nextEnd.setDate(nextEnd.getDate() + 6);
