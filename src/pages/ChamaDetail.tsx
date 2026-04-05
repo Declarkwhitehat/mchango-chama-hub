@@ -755,6 +755,11 @@ const ChamaDetail = () => {
 
         {/* Red payment banner removed — PaymentCountdownTimer in MemberDashboard handles this */}
 
+        {/* Overpayment Wallet - visible to approved members */}
+        {isMember && isActive && (
+          <OverpaymentWallet chamaId={chama.id} memberId={currentUserMembership.id} />
+        )}
+
         {/* Payment Form - Only visible to approved members when chama is active */}
         {isMember && isActive && (
           <div id="payment-form-section">
