@@ -60,14 +60,15 @@ function calculateNextCycleDates(
   monthlyDay?: number | null,
   monthlyDay2?: number | null
 ): { startDate: Date; endDate: Date } {
-  const startDate = new Date(lastEndDate);
-  startDate.setDate(startDate.getDate() + 1);
+  // Start the next cycle IMMEDIATELY (same moment payout completes)
+  const startDate = new Date();
   startDate.setHours(0, 0, 0, 0);
 
   const endDate = new Date(startDate);
   
   switch (frequency) {
     case 'daily':
+      // End today at 10 PM Kenya time (19:00 UTC)
       endDate.setHours(22, 0, 0, 0);
       break;
     case 'weekly':
@@ -76,7 +77,6 @@ function calculateNextCycleDates(
       break;
     case 'monthly':
       if (monthlyDay) {
-        // Next cycle ends on the day before monthlyDay of the following month
         endDate.setMonth(endDate.getMonth() + 1);
         endDate.setDate(monthlyDay - 1);
         endDate.setHours(23, 59, 59, 999);
