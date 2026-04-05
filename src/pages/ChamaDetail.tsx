@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,7 +30,7 @@ import { ChamaChatPanel } from "@/components/chama/ChamaChatPanel";
 import { TrustScoreBadge } from "@/components/chama/TrustScoreBadge";
 import { GroupDocuments } from "@/components/GroupDocuments";
 
-import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, MessageSquare } from "lucide-react";
+import { Users, Calendar, TrendingUp, Loader2, Info, Clock, AlertTriangle, Wallet, MessageCircle, XCircle, CheckCircle2, CheckCircle, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
@@ -102,6 +103,9 @@ const ChamaDetail = () => {
   const [memberPaymentStatuses, setMemberPaymentStatuses] = useState<Record<string, boolean>>({});
   const [memberTrustScores, setMemberTrustScores] = useState<Record<string, number>>({});
   const [rejoinSummary, setRejoinSummary] = useState<{ approvedCount: number; approvedMembers: Array<{ id: string; user_id: string; full_name: string }> } | null>(null);
+  const [completedCyclesCount, setCompletedCyclesCount] = useState(0);
+  const [totalCyclesCount, setTotalCyclesCount] = useState(0);
+  const [paidOutMemberIds, setPaidOutMemberIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadChama();
@@ -295,22 +299,35 @@ const ChamaDetail = () => {
       let currentCycleNumber: number | null = null;
 
       try {
-        const { data: currentCycle } = await supabase
+        // Fetch all cycles to count completed ones
+        const { data: allCycles } = await supabase
           .from('contribution_cycles')
-          .select('beneficiary_member_id, end_date, cycle_number')
+          .select('id, beneficiary_member_id, end_date, cycle_number, is_complete, payout_processed')
           .eq('chama_id', chamaData.id)
-          .eq('is_complete', false)
-          .order('cycle_number', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order('cycle_number', { ascending: true });
 
-        if (currentCycle) {
-          currentBeneficiaryId = currentCycle.beneficiary_member_id;
-          currentCycleEndDate = currentCycle.end_date;
-          currentCycleNumber = currentCycle.cycle_number;
+        if (allCycles) {
+          const completed = allCycles.filter(c => c.is_complete || c.payout_processed);
+          setCompletedCyclesCount(completed.length);
+          setTotalCyclesCount(approvedMembers.length);
+
+          // Track which members already received payouts
+          const paidMembers = new Set<string>();
+          completed.forEach(c => {
+            if (c.beneficiary_member_id) paidMembers.add(c.beneficiary_member_id);
+          });
+          setPaidOutMemberIds(paidMembers);
+
+          // Find the current active (incomplete) cycle
+          const activeCycle = allCycles.find(c => !c.is_complete);
+          if (activeCycle) {
+            currentBeneficiaryId = activeCycle.beneficiary_member_id;
+            currentCycleEndDate = activeCycle.end_date;
+            currentCycleNumber = activeCycle.cycle_number;
+          }
         }
       } catch (e) {
-        console.error('Error fetching current cycle for turns:', e);
+        console.error('Error fetching cycles for turns:', e);
       }
 
       // If we have an actual beneficiary from the cycle, use that as current turn
@@ -634,6 +651,14 @@ const ChamaDetail = () => {
                 <Wallet className="h-5 w-5" />
                 Payout Schedule
               </CardTitle>
+              {totalCyclesCount > 0 && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Progress value={(completedCyclesCount / totalCyclesCount) * 100} className="flex-1 h-2" />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {completedCyclesCount}/{totalCyclesCount} cycles completed
+                  </span>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {isMyTurn ? (
@@ -658,13 +683,18 @@ const ChamaDetail = () => {
                       <p className="font-medium">
                         Current recipient: {approvedMembers.find(m => m.id === currentTurnMemberId)?.profiles?.full_name || 'Unknown'}
                       </p>
-                      {currentUserMembership && nextTurnDates[currentUserMembership.id] && (
+                      {currentUserMembership && paidOutMemberIds.has(currentUserMembership.id) ? (
+                        <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4" />
+                          You already received your payout this round
+                        </p>
+                      ) : currentUserMembership && nextTurnDates[currentUserMembership.id] ? (
                         <p className="text-sm text-muted-foreground mt-1">
                           Your estimated turn: <span className="font-medium text-primary">
                             {formatDate(nextTurnDates[currentUserMembership.id])}
                           </span>
                         </p>
-                      )}
+                      ) : null}
                       <p className="text-xs text-muted-foreground mt-2">
                         Payouts are automatic. When all members pay, funds are sent to the scheduled recipient's M-Pesa.
                       </p>
@@ -921,11 +951,20 @@ const ChamaDetail = () => {
                                   Outstanding: KES {(member.balance_deficit || 0).toLocaleString()}
                                 </p>
                               )}
-                              {nextTurnDates[member.id] && (
+                              {paidOutMemberIds.has(member.id) ? (
+                                <p className="text-xs text-green-600 flex items-center gap-1">
+                                  <CheckCircle className="h-3 w-3" />
+                                  Payout received
+                                </p>
+                              ) : member.id === currentTurnMemberId ? (
+                                <p className="text-xs text-primary font-medium">
+                                  Receiving payout this cycle
+                                </p>
+                              ) : nextTurnDates[member.id] ? (
                                 <p className="text-xs text-muted-foreground">
                                   Next turn: {formatDate(nextTurnDates[member.id])}
                                 </p>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                           {isActive && isPaidKnown && (
