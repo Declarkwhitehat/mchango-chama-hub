@@ -53,6 +53,15 @@ const SOURCE_LABELS: Record<string, string> = {
   welfare: "Welfare",
 };
 
+interface EarningsEntry {
+  id: string;
+  amount: number;
+  source: string;
+  description: string | null;
+  group_id: string | null;
+  created_at: string;
+}
+
 export function RevenueDashboard() {
   const [period, setPeriod] = useState<PeriodPreset>("month");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -60,6 +69,8 @@ export function RevenueDashboard() {
   const [customTo, setCustomTo] = useState<Date>();
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [prevEntries, setPrevEntries] = useState<LedgerEntry[]>([]);
+  const [earnings, setEarnings] = useState<EarningsEntry[]>([]);
+  const [prevEarnings, setPrevEarnings] = useState<EarningsEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
@@ -124,31 +135,51 @@ export function RevenueDashboard() {
     return all;
   }, []);
 
+  // Fetch company_earnings (verification fees, etc.) for a date range
+  const fetchEarnings = useCallback(async (start: Date, end: Date): Promise<EarningsEntry[]> => {
+    const { data, error } = await supabase
+      .from("company_earnings")
+      .select("*")
+      .gte("created_at", start.toISOString())
+      .lte("created_at", end.toISOString())
+      .order("created_at", { ascending: false });
+    if (error || !data) return [];
+    return data as EarningsEntry[];
+  }, []);
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [current, previous] = await Promise.all([
+      const [current, previous, currentEarnings, previousEarnings] = await Promise.all([
         fetchAllEntries(from, to, sourceFilter),
         fetchAllEntries(prevFrom, prevTo, sourceFilter),
+        fetchEarnings(from, to),
+        fetchEarnings(prevFrom, prevTo),
       ]);
       setEntries(current);
       setPrevEntries(previous);
+      setEarnings(currentEarnings);
+      setPrevEarnings(previousEarnings);
       setCurrentPage(0);
       setLoading(false);
     };
     load();
-  }, [from, to, prevFrom, prevTo, sourceFilter, fetchAllEntries]);
+  }, [from, to, prevFrom, prevTo, sourceFilter, fetchAllEntries, fetchEarnings]);
 
   // KPI calculations
   const kpis = useMemo(() => {
-    const totalRevenue = entries.reduce((s, e) => s + Number(e.commission_amount), 0);
+    const commissionRevenue = entries.reduce((s, e) => s + Number(e.commission_amount), 0);
+    const feesRevenue = earnings.reduce((s, e) => s + Number(e.amount), 0);
+    const totalRevenue = commissionRevenue + feesRevenue;
     const totalGross = entries.reduce((s, e) => s + Number(e.gross_amount), 0);
-    const count = entries.length;
+    const count = entries.length + earnings.length;
     const avgCommission = count > 0 ? totalRevenue / count : 0;
 
-    const prevRevenue = prevEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
+    const prevCommissionRevenue = prevEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
+    const prevFeesRevenue = prevEarnings.reduce((s, e) => s + Number(e.amount), 0);
+    const prevRevenue = prevCommissionRevenue + prevFeesRevenue;
     const prevGross = prevEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
-    const prevCount = prevEntries.length;
+    const prevCount = prevEntries.length + prevEarnings.length;
     const prevAvg = prevCount > 0 ? prevRevenue / prevCount : 0;
 
     const pctChange = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev) * 100;
@@ -160,7 +191,7 @@ export function RevenueDashboard() {
       countPct: pctChange(count, prevCount),
       avgPct: pctChange(avgCommission, prevAvg),
     };
-  }, [entries, prevEntries]);
+  }, [entries, prevEntries, earnings, prevEarnings]);
 
   // Chart data - time series
   const trendData = useMemo(() => {
