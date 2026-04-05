@@ -116,6 +116,41 @@ serve(async (req) => {
 
       console.log('Contribution updated:', updatedContribution);
 
+      // ═══ CLEANUP: Delete any other pending contributions for same member/chama ═══
+      // This handles cases where STK push created a pending record but C2B or another callback confirmed it separately
+      if (status === 'completed' && updatedContribution) {
+        const { data: stalePending, error: cleanupError } = await supabaseClient
+          .from('contributions')
+          .delete()
+          .eq('member_id', contribution.member_id)
+          .eq('chama_id', contribution.chama_id)
+          .eq('status', 'pending')
+          .is('mpesa_receipt_number', null)
+          .neq('id', updatedContribution.id)
+          .select('id');
+
+        if (cleanupError) {
+          console.error('Error cleaning up stale pending contributions:', cleanupError);
+        } else if (stalePending && stalePending.length > 0) {
+          console.log(`🧹 Cleaned up ${stalePending.length} stale pending contribution(s):`, stalePending.map(p => p.id));
+        }
+      }
+
+      // ═══ CLEANUP: Delete the original pending if payment failed ═══
+      if (status === 'failed') {
+        const { error: failCleanupError } = await supabaseClient
+          .from('contributions')
+          .delete()
+          .eq('id', contribution.id)
+          .eq('status', 'failed');
+
+        if (failCleanupError) {
+          console.error('Error deleting failed contribution:', failCleanupError);
+        } else {
+          console.log('🧹 Deleted failed contribution:', contribution.id);
+        }
+      }
+
       // If successful, delegate financial tracking to contributions-crud settleDebts
       if (status === 'completed') {
         const actualAmount = paidAmount || contribution.amount;

@@ -151,6 +151,23 @@ serve(async (req) => {
 
       console.log('Contribution recorded successfully');
 
+      // ═══ CLEANUP: Delete any orphaned pending contributions for same member/chama ═══
+      // STK push creates pending records; if C2B confirms payment, those pending records are stale
+      const { data: stalePending, error: cleanupError } = await supabase
+        .from('contributions')
+        .delete()
+        .eq('member_id', chamaMemberData.id)
+        .eq('chama_id', chamaMemberData.chama_id)
+        .eq('status', 'pending')
+        .is('mpesa_receipt_number', null)
+        .select('id');
+
+      if (cleanupError) {
+        console.error('Error cleaning up stale pending contributions:', cleanupError);
+      } else if (stalePending && stalePending.length > 0) {
+        console.log(`🧹 Cleaned up ${stalePending.length} stale pending contribution(s):`, stalePending.map(p => p.id));
+      }
+
       // Mark first_payment_completed if not yet set
       if (!chamaMemberData.first_payment_completed) {
         await supabase.from('chama_members').update({
