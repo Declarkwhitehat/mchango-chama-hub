@@ -951,11 +951,20 @@ const ChamaDetail = () => {
                                   Outstanding: KES {(member.balance_deficit || 0).toLocaleString()}
                                 </p>
                               )}
-                              {nextTurnDates[member.id] && (
+                              {paidOutMemberIds.has(member.id) ? (
+                                <p className="text-xs text-green-600 flex items-center gap-1">
+                                  <CheckCircle className="h-3 w-3" />
+                                  Payout received
+                                </p>
+                              ) : member.id === currentTurnMemberId ? (
+                                <p className="text-xs text-primary font-medium">
+                                  Receiving payout this cycle
+                                </p>
+                              ) : nextTurnDates[member.id] ? (
                                 <p className="text-xs text-muted-foreground">
                                   Next turn: {formatDate(nextTurnDates[member.id])}
                                 </p>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                           {isActive && isPaidKnown && (
