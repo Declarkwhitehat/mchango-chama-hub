@@ -650,6 +650,14 @@ const ChamaDetail = () => {
                 <Wallet className="h-5 w-5" />
                 Payout Schedule
               </CardTitle>
+              {totalCyclesCount > 0 && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Progress value={(completedCyclesCount / totalCyclesCount) * 100} className="flex-1 h-2" />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {completedCyclesCount}/{totalCyclesCount} cycles completed
+                  </span>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {isMyTurn ? (
@@ -674,13 +682,18 @@ const ChamaDetail = () => {
                       <p className="font-medium">
                         Current recipient: {approvedMembers.find(m => m.id === currentTurnMemberId)?.profiles?.full_name || 'Unknown'}
                       </p>
-                      {currentUserMembership && nextTurnDates[currentUserMembership.id] && (
+                      {currentUserMembership && paidOutMemberIds.has(currentUserMembership.id) ? (
+                        <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4" />
+                          You already received your payout this round
+                        </p>
+                      ) : currentUserMembership && nextTurnDates[currentUserMembership.id] ? (
                         <p className="text-sm text-muted-foreground mt-1">
                           Your estimated turn: <span className="font-medium text-primary">
                             {formatDate(nextTurnDates[currentUserMembership.id])}
                           </span>
                         </p>
-                      )}
+                      ) : null}
                       <p className="text-xs text-muted-foreground mt-2">
                         Payouts are automatic. When all members pay, funds are sent to the scheduled recipient's M-Pesa.
                       </p>
