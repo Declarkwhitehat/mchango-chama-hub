@@ -90,6 +90,7 @@ export const ChamaPaymentForm = ({
         `)
         .eq('chama_id', chamaId)
         .eq('approval_status', 'approved')
+        .eq('status', 'active')
         .order('order_index');
 
       if (error) throw error;
