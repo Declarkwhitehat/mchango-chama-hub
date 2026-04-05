@@ -161,7 +161,7 @@ export const VerificationRequestButton = ({
         // Record fee as company revenue
         await supabase.from('company_earnings').insert({
           amount: VERIFICATION_FEE,
-          source: 'OTHER',
+          source: 'VERIFICATION_FEE',
           description: `Verification fee for ${entityType}: ${entityName}`,
           group_id: entityId,
         });
