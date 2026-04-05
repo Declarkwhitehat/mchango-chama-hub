@@ -970,8 +970,15 @@ serve(async (req) => {
       if (contribError) throw contribError;
 
       // ── FIFO DEBT SETTLEMENT ──
+      // Use admin client for settlement to bypass RLS — settlement updates
+      // member_cycle_payments, chama_member_debts, contribution_cycles, chama
+      // which require elevated privileges.
+      const supabaseSettleAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      );
       const settleResult = await settleDebts(
-        supabaseClient,
+        supabaseSettleAdmin,
         body.member_id,
         body.chama_id,
         body.amount,
