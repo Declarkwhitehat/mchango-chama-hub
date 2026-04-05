@@ -60,6 +60,7 @@ const AdminDashboard = () => {
         transactionsResult,
         ledgerResult,
         execChangesResult,
+        earningsResult,
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
@@ -72,9 +73,12 @@ const AdminDashboard = () => {
         supabase.from('transactions').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
         supabase.from('financial_ledger').select('commission_amount'),
         supabase.from('welfare_executive_changes').select('*', { count: 'exact', head: true }).eq('admin_decision', 'pending'),
+        supabase.from('company_earnings').select('amount'),
       ]);
 
-      const totalPlatformRevenue = ledgerResult.data?.reduce((sum, item) => sum + (item.commission_amount || 0), 0) || 0;
+      const ledgerRevenue = ledgerResult.data?.reduce((sum, item) => sum + (item.commission_amount || 0), 0) || 0;
+      const earningsRevenue = earningsResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
+      const totalPlatformRevenue = ledgerRevenue + earningsRevenue;
 
       setStats({
         totalUsers: usersResult.count || 0,

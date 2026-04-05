@@ -69,7 +69,7 @@ export const CommissionOverview = () => {
   const fetchCommissionData = async () => {
     try {
       // Fetch all data in parallel
-      const [donationsResult, contributionsResult, orgDonationsResult] = await Promise.all([
+      const [donationsResult, contributionsResult, orgDonationsResult, earningsResult] = await Promise.all([
         // Mchango donations (completed only)
         supabase
           .from('mchango_donations')
@@ -85,6 +85,10 @@ export const CommissionOverview = () => {
           .from('organization_donations')
           .select('gross_amount, commission_amount')
           .eq('payment_status', 'completed'),
+        // Company earnings (verification fees, etc.)
+        supabase
+          .from('company_earnings')
+          .select('amount'),
       ]);
 
       if (donationsResult.error) throw donationsResult.error;
@@ -100,8 +104,10 @@ export const CommissionOverview = () => {
       const organizationDonations = orgDonationsResult.data?.reduce((sum, d) => sum + Number(d.gross_amount || 0), 0) || 0;
       const organizationCommission = orgDonationsResult.data?.reduce((sum, d) => sum + Number(d.commission_amount || 0), 0) || 0;
 
-      // Calculate totals
-      const totalCommission = mchangoCommission + chamaCommission + organizationCommission;
+      const feesRevenue = earningsResult.data?.reduce((sum, e) => sum + Number(e.amount || 0), 0) || 0;
+
+      // Calculate totals (commission + fees)
+      const totalCommission = mchangoCommission + chamaCommission + organizationCommission + feesRevenue;
 
       setData({
         mchangoCommission,
