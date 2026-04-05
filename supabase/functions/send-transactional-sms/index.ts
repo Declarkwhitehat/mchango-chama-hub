@@ -6,50 +6,56 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const CELCOM_API_KEY = Deno.env.get('CELCOM_API_KEY');
-const CELCOM_PARTNER_ID = Deno.env.get('CELCOM_PARTNER_ID');
-const CELCOM_SHORTCODE = Deno.env.get('CELCOM_SHORTCODE');
+const ONFON_API_KEY = Deno.env.get('ONFON_API_KEY');
+const ONFON_CLIENT_ID = Deno.env.get('ONFON_CLIENT_ID');
+const ONFON_SENDER_ID = Deno.env.get('ONFON_SENDER_ID');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 interface TransactionalSMSRequest {
   phone: string;
   message: string;
-  eventType?: string; // e.g., 'registration', 'chama_created', 'payment_success'
+  eventType?: string;
 }
 
 const sendSMS = async (phone: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> => {
   try {
-    const clientSmsId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-    
-    const response = await fetch('https://isms.celcomafrica.com/api/services/sendsms/', {
+    // Normalize phone: remove + prefix for Onfon (expects 254...)
+    const normalizedPhone = phone.startsWith('+') ? phone.substring(1) : phone;
+
+    const response = await fetch('https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'h_api_key': CELCOM_API_KEY!,
       },
       body: JSON.stringify({
-        partnerID: CELCOM_PARTNER_ID,
-        apikey: CELCOM_API_KEY,
-        pass_type: 'plain',
-        clientsmsid: clientSmsId,
-        mobile: phone,
-        message: message,
-        shortcode: CELCOM_SHORTCODE,
+        SenderId: ONFON_SENDER_ID,
+        IsUnicode: false,
+        IsFlash: false,
+        MessageParameters: [
+          {
+            Number: normalizedPhone,
+            Text: message,
+          },
+        ],
+        ApiKey: ONFON_API_KEY,
+        ClientId: ONFON_CLIENT_ID,
       }),
     });
 
     const result = await response.json();
-    console.log('Celcom SMS response:', result);
-    
-    if (result.success === true || response.ok) {
-      return { success: true, messageId: clientSmsId };
+    console.log('Onfon Media SMS response:', JSON.stringify(result));
+
+    // Onfon returns ErrorCode "000" for success
+    if (result.ErrorCode === '000' || result.ErrorCode === 0 || response.ok) {
+      const messageId = result.Data?.[0]?.MessageId || `onfon-${Date.now()}`;
+      return { success: true, messageId };
     } else {
-      return { success: false, error: result.message || 'Unknown error' };
+      return { success: false, error: result.ErrorDescription || result.ErrorCode || 'Unknown error' };
     }
-  } catch (error: any) {
-    console.error('SMS sending error:', error);
-    return { success: false, error: error.message };
+  } catch (error) {
+    console.error('SMS sending error:', (error as Error).message);
+    return { success: false, error: (error as Error).message };
   }
 };
 
@@ -63,7 +69,6 @@ serve(async (req) => {
   try {
     const { phone, message, eventType }: TransactionalSMSRequest = await req.json();
 
-    // Validate inputs
     if (!phone || !/^\+\d{10,15}$/.test(phone)) {
       return new Response(
         JSON.stringify({ error: 'Invalid phone number format. Use international format (e.g., +254712345678)' }),
@@ -82,15 +87,11 @@ serve(async (req) => {
       console.warn(`Message length exceeds 160 characters (${message.length}). This may be split into multiple SMS.`);
     }
 
-    // Send SMS
     const result = await sendSMS(phone, message);
 
     if (!result.success) {
       return new Response(
-        JSON.stringify({ 
-          error: 'Failed to send SMS', 
-          details: result.error 
-        }),
+        JSON.stringify({ error: 'Failed to send SMS', details: result.error }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
@@ -98,27 +99,16 @@ serve(async (req) => {
     console.log(`Transactional SMS sent successfully to ${phone}${eventType ? ` (Event: ${eventType})` : ''}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'SMS sent successfully',
-        messageId: result.messageId
-      }),
+      JSON.stringify({ success: true, message: 'SMS sent successfully', messageId: result.messageId }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in send-transactional-sms:', {
-      message: error.message,
-      code: error.code,
-      details: error.details
+      message: (error as Error).message,
     });
-    
-    let safeMessage = 'An error occurred processing your request';
-    if (error.code === '23505') safeMessage = 'Duplicate record';
-    else if (error.code === '23503') safeMessage = 'Referenced record not found';
-    else if (error.code === '42501') safeMessage = 'Permission denied';
-    
+
     return new Response(
-      JSON.stringify({ error: safeMessage }),
+      JSON.stringify({ error: 'An error occurred processing your request' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

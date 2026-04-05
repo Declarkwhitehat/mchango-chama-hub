@@ -7,9 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const CELCOM_API_KEY = Deno.env.get('CELCOM_API_KEY');
-const CELCOM_PARTNER_ID = Deno.env.get('CELCOM_PARTNER_ID');
-const CELCOM_SHORTCODE = Deno.env.get('CELCOM_SHORTCODE');
+const ONFON_API_KEY = Deno.env.get('ONFON_API_KEY');
+const ONFON_CLIENT_ID = Deno.env.get('ONFON_CLIENT_ID');
+const ONFON_SENDER_ID = Deno.env.get('ONFON_SENDER_ID');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -21,28 +21,32 @@ interface SendOTPRequest {
 
 const sendSMS = async (phone: string, message: string): Promise<boolean> => {
   try {
-    const response = await fetch('https://isms.celcomafrica.com/api/services/sendsms/', {
+    const normalizedPhone = phone.startsWith('+') ? phone.substring(1) : phone;
+
+    const response = await fetch('https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'h_api_key': CELCOM_API_KEY!,
       },
       body: JSON.stringify({
-        partnerID: CELCOM_PARTNER_ID,
-        apikey: CELCOM_API_KEY,
-        pass_type: 'plain',
-        clientsmsid: Math.random().toString(36).substring(7),
-        mobile: phone,
-        message: message,
-        shortcode: CELCOM_SHORTCODE,
+        SenderId: ONFON_SENDER_ID,
+        IsUnicode: false,
+        IsFlash: false,
+        MessageParameters: [
+          {
+            Number: normalizedPhone,
+            Text: message,
+          },
+        ],
+        ApiKey: ONFON_API_KEY,
+        ClientId: ONFON_CLIENT_ID,
       }),
     });
 
     const result = await response.json();
-    console.log('Celcom SMS response:', result);
-    
-    // Celcom returns success: true on success
-    return result.success === true || response.ok;
+    console.log('Onfon Media SMS response:', JSON.stringify(result));
+
+    return result.ErrorCode === '000' || result.ErrorCode === 0 || response.ok;
   } catch (error) {
     console.error('SMS sending error:', error);
     return false;
@@ -77,7 +81,6 @@ serve(async (req) => {
       }
 
       phone = profile.phone;
-      // Normalize if needed
       if (phone && !phone.startsWith('+')) {
         if (phone.startsWith('0')) phone = '+254' + phone.substring(1);
         else if (phone.startsWith('7') || phone.startsWith('1')) phone = '+254' + phone;
@@ -140,7 +143,7 @@ serve(async (req) => {
 
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
     // Store OTP in database
     const { error: insertError } = await supabase
@@ -159,7 +162,7 @@ serve(async (req) => {
       );
     }
 
-    // Send SMS via Celcom
+    // Send SMS via Onfon Media
     const message = `Your verification code is: ${otp}. Valid for 5 minutes. Do not share this code with anyone.`;
     const smsSent = await sendSMS(phone, message);
 
@@ -172,7 +175,6 @@ serve(async (req) => {
 
     console.log(`OTP sent successfully to ${phone}`);
 
-    // Mask phone for display (e.g., +254****5678)
     const maskedPhone = phone.substring(0, 4) + '****' + phone.substring(phone.length - 4);
 
     return new Response(
@@ -181,24 +183,17 @@ serve(async (req) => {
         message: 'OTP sent successfully',
         expiresIn: 300,
         maskedPhone,
-        phone, // needed for OTP verification
+        phone,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in send-otp:', {
-      message: error.message,
-      code: error.code,
-      details: error.details
+      message: (error as Error).message,
     });
-    
-    let safeMessage = 'An error occurred processing your request';
-    if (error.code === '23505') safeMessage = 'Duplicate record';
-    else if (error.code === '23503') safeMessage = 'Referenced record not found';
-    else if (error.code === '42501') safeMessage = 'Permission denied';
-    
+
     return new Response(
-      JSON.stringify({ error: safeMessage }),
+      JSON.stringify({ error: 'An error occurred processing your request' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
