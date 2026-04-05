@@ -317,9 +317,9 @@ Deno.serve(async (req) => {
         cycle = latestCycles?.[0] || null;
       }
 
-      if (error) {
-        console.error('Error fetching cycle:', error);
-        return new Response(JSON.stringify({ error: error.message }), {
+      if (incError) {
+        console.error('Error fetching cycle:', incError);
+        return new Response(JSON.stringify({ error: incError.message }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
