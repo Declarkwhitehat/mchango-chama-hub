@@ -147,15 +147,24 @@ async function previewAllocation(
     });
   }
 
-  // Phase 3: Carry-forward overage — store full amount, commission deferred to cycle application
+  // Phase 3: Overpayment → commission deducted NOW, net goes to Overpayment Wallet
   if (remaining > 0) {
-    carryForward += remaining;
+    const overpaymentCommission = remaining * ONTIME_RATE;
+    const overpaymentNet = remaining - overpaymentCommission;
+    toCompany += overpaymentCommission;
+    carryForward += overpaymentNet;
 
     allocations.push({
-      type: 'carry_forward',
-      amount: remaining,
-      destination: 'Your credit balance',
-      description: `Credited to your next cycle (5% commission deducted when applied)`
+      type: 'overpayment_commission',
+      amount: overpaymentCommission,
+      destination: 'Platform fee',
+      description: `5% commission on overpayment`
+    });
+    allocations.push({
+      type: 'overpayment_wallet',
+      amount: overpaymentNet,
+      destination: 'Overpayment Wallet',
+      description: `KES ${overpaymentNet.toFixed(2)} saved to wallet — auto-applied after next payout (no extra commission)`
     });
   }
 
