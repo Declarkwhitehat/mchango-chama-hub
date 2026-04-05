@@ -1089,9 +1089,10 @@ Deno.serve(async (req) => {
 
             const memberPhone = member.profiles?.phone;
             if (memberPhone) {
-              await sendSMS(memberPhone,
-                `❌ You have been removed from "${chama.name}" after ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}.`
-              );
+              const smsMsg = isFirstCycle
+                ? `❌ You have been removed from "${chama.name}" for not paying by the first deadline. All members must pay before the first 10 PM cutoff.`
+                : `❌ You have been removed from "${chama.name}" after ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}.`;
+              await sendSMS(memberPhone, smsMsg);
             }
 
             if (member.user_id) {
