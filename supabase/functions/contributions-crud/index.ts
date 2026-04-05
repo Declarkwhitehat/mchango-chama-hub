@@ -147,15 +147,24 @@ async function previewAllocation(
     });
   }
 
-  // Phase 3: Carry-forward overage — store full amount, commission deferred to cycle application
+  // Phase 3: Overpayment → commission deducted NOW, net goes to Overpayment Wallet
   if (remaining > 0) {
-    carryForward += remaining;
+    const overpaymentCommission = remaining * ONTIME_RATE;
+    const overpaymentNet = remaining - overpaymentCommission;
+    toCompany += overpaymentCommission;
+    carryForward += overpaymentNet;
 
     allocations.push({
-      type: 'carry_forward',
-      amount: remaining,
-      destination: 'Your credit balance',
-      description: `Credited to your next cycle (5% commission deducted when applied)`
+      type: 'overpayment_commission',
+      amount: overpaymentCommission,
+      destination: 'Platform fee',
+      description: `5% commission on overpayment`
+    });
+    allocations.push({
+      type: 'overpayment_wallet',
+      amount: overpaymentNet,
+      destination: 'Overpayment Wallet',
+      description: `KES ${overpaymentNet.toFixed(2)} saved to wallet — auto-applied after next payout (no extra commission)`
     });
   }
 
@@ -560,18 +569,56 @@ async function settleDebts(
     }
   }
 
-  // ── STEP 4: Any remaining → carry-forward (stored at FULL amount, commission deferred) ──
+  // ── STEP 4: Any remaining → Overpayment Wallet (commission deducted NOW) ──
   if (remaining > 0) {
-    carryForward += remaining;
+    const overpaymentCommission = remaining * ONTIME_RATE;
+    const overpaymentNet = remaining - overpaymentCommission;
+    toCompany += overpaymentCommission;
+    carryForward += overpaymentNet;
 
     allocations.push({
-      type: 'carry_forward',
-      amount: remaining,
-      destination: 'Your credit balance',
-      description: 'Credited to your next cycle (5% commission deducted when applied)'
+      type: 'overpayment_commission',
+      amount: overpaymentCommission,
+      destination: 'Platform fee',
+      description: `5% commission on overpayment`
+    });
+    allocations.push({
+      type: 'overpayment_wallet',
+      amount: overpaymentNet,
+      destination: 'Overpayment Wallet',
+      description: `KES ${overpaymentNet.toFixed(2)} saved to wallet — auto-applied after next payout (no extra commission)`
     });
 
-    // Update carry-forward on member at full amount (no commission deducted now)
+    // Record commission earning
+    await supabase.from('company_earnings').insert({
+      source: 'chama_overpayment_commission',
+      amount: overpaymentCommission,
+      group_id: chamaId,
+      description: `Commission on overpayment — KES ${remaining.toFixed(2)} gross, KES ${overpaymentCommission.toFixed(2)} commission`
+    });
+
+    // Get current active cycle for reference
+    const { data: currentCycleForWallet } = await supabase
+      .from('contribution_cycles')
+      .select('id')
+      .eq('chama_id', chamaId)
+      .eq('payout_processed', false)
+      .order('cycle_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Insert into overpayment wallet
+    await supabase.from('chama_overpayment_wallet').insert({
+      member_id: memberId,
+      chama_id: chamaId,
+      amount: overpaymentNet,
+      source_contribution_id: contributionId || null,
+      cycle_id: currentCycleForWallet?.id || null,
+      status: 'pending',
+      description: `Overpayment of KES ${remaining.toFixed(2)} → commission KES ${overpaymentCommission.toFixed(2)} deducted → KES ${overpaymentNet.toFixed(2)} stored in wallet`
+    });
+
+    // Also update carry_forward_credit on member for backward compatibility
     const { data: memberData } = await supabase
       .from('chama_members')
       .select('carry_forward_credit')
@@ -579,9 +626,28 @@ async function settleDebts(
       .single();
 
     await supabase.from('chama_members').update({
-      carry_forward_credit: (memberData?.carry_forward_credit || 0) + remaining,
+      carry_forward_credit: (memberData?.carry_forward_credit || 0) + overpaymentNet,
       last_payment_date: new Date().toISOString()
     }).eq('id', memberId);
+
+    // Notify member about overpayment wallet deposit
+    const { data: memberForNotif } = await supabase
+      .from('chama_members')
+      .select('user_id')
+      .eq('id', memberId)
+      .single();
+
+    if (memberForNotif?.user_id) {
+      await supabase.from('notifications').insert({
+        user_id: memberForNotif.user_id,
+        title: '💰 Overpayment Wallet Credited',
+        message: `KES ${overpaymentNet.toFixed(2)} has been added to your Overpayment Wallet (5% commission already deducted from KES ${remaining.toFixed(2)}). This will be automatically applied to your next cycle after payout — no extra commission.`,
+        type: 'info',
+        category: 'chama',
+        related_entity_id: chamaId,
+        related_entity_type: 'chama'
+      });
+    }
   } else {
     // Still update last payment date
     await supabase.from('chama_members').update({

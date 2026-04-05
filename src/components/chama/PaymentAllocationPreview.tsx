@@ -41,6 +41,8 @@ const typeConfig: Record<string, { icon: any; color: string; label: string }> = 
   current_cycle_commission:{ icon: Building2,     color: 'text-orange-500',  label: 'Commission' },
   current_cycle:           { icon: Coins,         color: 'text-green-600',   label: 'Current Cycle' },
   carry_forward:           { icon: PiggyBank,     color: 'text-blue-500',    label: 'Carry-forward' },
+  overpayment_commission:  { icon: Building2,     color: 'text-orange-500',  label: 'Overpayment Commission' },
+  overpayment_wallet:      { icon: PiggyBank,     color: 'text-blue-500',    label: 'Overpayment Wallet' },
   pending_cycle:           { icon: Coins,         color: 'text-green-600',   label: 'Pending Cycle' },
 };
 
@@ -107,6 +109,8 @@ export function PaymentAllocationPreview({ memberId, chamaId, grossAmount }: Pay
   );
   const currentCycleLines = preview.allocations.filter(a => a.type === 'current_cycle');
   const carryForwardLines = preview.allocations.filter(a => a.type === 'carry_forward');
+  const walletLines = preview.allocations.filter(a => a.type === 'overpayment_wallet');
+  const walletCommLines = preview.allocations.filter(a => a.type === 'overpayment_commission');
 
   const hasDebotsToSettle = penaltyLines.length > 0 || principalLines.length > 0;
 
@@ -160,7 +164,32 @@ export function PaymentAllocationPreview({ memberId, chamaId, grossAmount }: Pay
           </div>
         )}
 
-        {/* Carry-forward */}
+        {/* Overpayment Wallet */}
+        {walletLines.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overpayment Wallet</p>
+            {walletCommLines.map((line, i) => (
+              <div key={`wc-${i}`} className="flex items-center justify-between text-sm bg-orange-500/10 rounded px-2 py-1">
+                <span className="flex items-center gap-1.5 text-orange-600">
+                  <Building2 className="h-3 w-3" />
+                  {line.description}
+                </span>
+                <span className="font-semibold text-orange-600">KES {line.amount.toFixed(2)}</span>
+              </div>
+            ))}
+            {walletLines.map((line, i) => (
+              <div key={`w-${i}`} className="flex items-center justify-between text-sm bg-blue-500/10 rounded px-2 py-1">
+                <span className="flex items-center gap-1.5 text-blue-600">
+                  <PiggyBank className="h-3 w-3" />
+                  {line.description}
+                </span>
+                <span className="font-semibold text-blue-600">KES {line.amount.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Legacy Carry-forward */}
         {carryForwardLines.length > 0 && (
           <div className="space-y-1">
             {carryForwardLines.map((line, i) => (

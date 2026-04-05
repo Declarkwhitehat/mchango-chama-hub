@@ -1254,6 +1254,7 @@ Deno.serve(async (req) => {
         }
 
         // ========== AUTO-CREATE NEXT CYCLE ==========
+        let newCycleId: string | null = null;
         try {
           const createCycleResponse = await fetch(`${supabaseUrl}/functions/v1/cycle-auto-create`, {
             method: 'POST',
@@ -1267,12 +1268,170 @@ Deno.serve(async (req) => {
           const createCycleResult = await createCycleResponse.json();
           if (createCycleResponse.ok && createCycleResult.success) {
             console.log(`✅ Next cycle created for ${chama.name}`);
+            newCycleId = createCycleResult.cycleId || null;
           } else {
             console.error(`⚠️ Failed to create next cycle:`, createCycleResult);
           }
         } catch (createError: any) {
           console.error(`⚠️ Error creating next cycle:`, createError);
         }
+
+        // ========== AUTO-APPLY OVERPAYMENT WALLET CREDITS ==========
+        // After payout and next cycle creation, apply pending wallet balances
+        try {
+          // Get all pending wallet entries for members in this chama
+          const { data: pendingWalletEntries } = await supabase
+            .from('chama_overpayment_wallet')
+            .select('id, member_id, amount')
+            .eq('chama_id', chama.id)
+            .eq('status', 'pending');
+
+          if (pendingWalletEntries && pendingWalletEntries.length > 0 && newCycleId) {
+            console.log(`💰 Applying ${pendingWalletEntries.length} wallet entries for ${chama.name}`);
+
+            for (const walletEntry of pendingWalletEntries) {
+              // Find the member's payment record for the new cycle
+              const { data: nextCyclePayment } = await supabase
+                .from('member_cycle_payments')
+                .select('id, amount_due, amount_paid, amount_remaining, fully_paid, payment_allocations')
+                .eq('member_id', walletEntry.member_id)
+                .eq('cycle_id', newCycleId)
+                .maybeSingle();
+
+              if (!nextCyclePayment) {
+                console.log(`ℹ️ No payment record for member ${walletEntry.member_id} in new cycle — skipping wallet apply`);
+                continue;
+              }
+
+              if (nextCyclePayment.fully_paid) {
+                console.log(`ℹ️ Member ${walletEntry.member_id} already fully paid for next cycle — keeping wallet`);
+                continue;
+              }
+
+              const amountToApply = Math.min(walletEntry.amount, nextCyclePayment.amount_remaining || nextCyclePayment.amount_due);
+              
+              // NO COMMISSION — already deducted at deposit time
+              const newAmountPaid = (nextCyclePayment.amount_paid || 0) + amountToApply;
+              const isFullyPaid = newAmountPaid >= nextCyclePayment.amount_due;
+              const existingAllocs = nextCyclePayment.payment_allocations || [];
+
+              await supabase.from('member_cycle_payments').update({
+                amount_paid: newAmountPaid,
+                amount_remaining: Math.max(0, nextCyclePayment.amount_due - newAmountPaid),
+                fully_paid: isFullyPaid,
+                is_paid: isFullyPaid,
+                paid_at: isFullyPaid ? new Date().toISOString() : null,
+                payment_allocations: JSON.stringify([...existingAllocs, {
+                  amount: amountToApply,
+                  gross_paid: amountToApply,
+                  commission: 0,
+                  commission_rate: 0,
+                  timestamp: new Date().toISOString(),
+                  source: 'overpayment_wallet',
+                  wallet_entry_id: walletEntry.id,
+                  note: 'Commission already deducted at deposit — no extra charge'
+                }])
+              }).eq('id', nextCyclePayment.id);
+
+              // Also add net to chama pool (since this is already net of commission)
+              const { data: chamaPoolData } = await supabase
+                .from('chama')
+                .select('available_balance, total_gross_collected')
+                .eq('id', chama.id)
+                .single();
+
+              if (chamaPoolData) {
+                await supabase.from('chama').update({
+                  available_balance: (chamaPoolData.available_balance || 0) + amountToApply,
+                  total_gross_collected: (chamaPoolData.total_gross_collected || 0) + amountToApply,
+                }).eq('id', chama.id);
+              }
+
+              // Update member's total_contributed
+              const { data: memberContrib } = await supabase
+                .from('chama_members')
+                .select('total_contributed, carry_forward_credit')
+                .eq('id', walletEntry.member_id)
+                .single();
+
+              if (memberContrib) {
+                await supabase.from('chama_members').update({
+                  total_contributed: (memberContrib.total_contributed || 0) + amountToApply,
+                  carry_forward_credit: Math.max(0, (memberContrib.carry_forward_credit || 0) - amountToApply),
+                }).eq('id', walletEntry.member_id);
+              }
+
+              // Check if wallet entry is fully consumed or partial
+              const walletRemainder = walletEntry.amount - amountToApply;
+
+              if (walletRemainder <= 0) {
+                // Fully applied
+                await supabase.from('chama_overpayment_wallet').update({
+                  status: 'applied',
+                  applied_to_cycle_id: newCycleId,
+                  applied_at: new Date().toISOString()
+                }).eq('id', walletEntry.id);
+              } else {
+                // Partially applied — update amount to remainder
+                await supabase.from('chama_overpayment_wallet').update({
+                  amount: walletRemainder,
+                  description: `Partially applied: KES ${amountToApply.toFixed(2)} to next cycle. KES ${walletRemainder.toFixed(2)} remaining.`
+                }).eq('id', walletEntry.id);
+              }
+
+              // Ledger entry
+              await supabase.from('financial_ledger').insert({
+                transaction_type: 'wallet_auto_apply',
+                source_type: 'chama',
+                source_id: chama.id,
+                gross_amount: amountToApply,
+                commission_amount: 0,
+                net_amount: amountToApply,
+                commission_rate: 0,
+                description: `Overpayment wallet auto-applied: KES ${amountToApply.toFixed(2)} to next cycle (no commission — already deducted at deposit)`
+              });
+
+              // Notify member
+              const { data: walletMember } = await supabase
+                .from('chama_members')
+                .select('user_id')
+                .eq('id', walletEntry.member_id)
+                .single();
+
+              if (walletMember?.user_id) {
+                await supabase.from('notifications').insert({
+                  user_id: walletMember.user_id,
+                  title: '✅ Wallet Auto-Applied',
+                  message: `KES ${amountToApply.toFixed(2)} from your Overpayment Wallet was automatically applied to your next cycle contribution. No extra commission charged.${isFullyPaid ? ' Your next cycle is fully paid!' : ` Remaining due: KES ${Math.max(0, nextCyclePayment.amount_due - newAmountPaid).toFixed(2)}`}`,
+                  type: 'info',
+                  category: 'chama',
+                  related_entity_id: chama.id,
+                  related_entity_type: 'chama'
+                });
+              }
+
+              // Update contribution cycle paid count if fully paid
+              if (isFullyPaid) {
+                const { data: cycleData } = await supabase
+                  .from('contribution_cycles')
+                  .select('members_paid_count')
+                  .eq('id', newCycleId)
+                  .single();
+
+                if (cycleData) {
+                  await supabase.from('contribution_cycles').update({
+                    members_paid_count: (cycleData.members_paid_count || 0) + 1
+                  }).eq('id', newCycleId);
+                }
+              }
+
+              console.log(`✅ Wallet entry ${walletEntry.id}: KES ${amountToApply.toFixed(2)} applied to member ${walletEntry.member_id}'s next cycle. Fully paid: ${isFullyPaid}`);
+            }
+          }
+        } catch (walletError: any) {
+          console.error(`⚠️ Error applying overpayment wallet:`, walletError);
+        }
+
 
         // ========== CHECK CYCLE COMPLETION ==========
         const { data: allProcessedCycles } = await supabase

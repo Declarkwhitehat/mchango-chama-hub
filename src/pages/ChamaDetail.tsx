@@ -11,6 +11,7 @@ import { ChamaPendingRequests } from "@/components/ChamaPendingRequests";
 import { MemberDashboard } from "@/components/MemberDashboard";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
+import { OverpaymentWallet } from "@/components/chama/OverpaymentWallet";
 
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
@@ -754,6 +755,11 @@ const ChamaDetail = () => {
         )}
 
         {/* Red payment banner removed — PaymentCountdownTimer in MemberDashboard handles this */}
+
+        {/* Overpayment Wallet - visible to approved members */}
+        {isMember && isActive && (
+          <OverpaymentWallet chamaId={chama.id} memberId={currentUserMembership.id} />
+        )}
 
         {/* Payment Form - Only visible to approved members when chama is active */}
         {isMember && isActive && (
