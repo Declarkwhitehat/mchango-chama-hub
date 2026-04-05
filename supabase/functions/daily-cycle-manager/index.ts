@@ -146,16 +146,21 @@ Deno.serve(async (req) => {
 
       // Create payment records with carry-forward credit applied
       // IMPORTANT: carry_forward_credit is ALREADY net of commission (deducted at overpayment deposit time)
-      // Do NOT charge commission again — this would be double-charging
+      // Compare wallet credit (NET) against NET cycle cost, not gross contribution_amount
+      const ONTIME_RATE = chama.commission_rate || 0.05;
+      const netCycleCost = chama.contribution_amount * (1 - ONTIME_RATE); // e.g. 100 * 0.95 = 95
       let totalNetCreditApplied = 0;
 
       const paymentRecords = members.map((member: any) => {
         const carryForward = member.carry_forward_credit || 0;
         const nextCycleCredit = member.next_cycle_credit || 0;
         const totalCredit = carryForward + nextCycleCredit;
-        const creditToUse = Math.min(totalCredit, chama.contribution_amount);
-        const amountRemaining = Math.max(0, chama.contribution_amount - creditToUse);
-        const isFullyPaid = amountRemaining <= 0;
+        // Credit is already net — compare against net cycle cost (95), not gross (100)
+        const creditToUse = Math.min(totalCredit, netCycleCost);
+        const isFullyPaid = creditToUse >= netCycleCost;
+        const netRemaining = netCycleCost - creditToUse;
+        const grossRemaining = netRemaining > 0 ? Math.ceil(netRemaining / (1 - ONTIME_RATE)) : 0;
+        const grossEquivalentPaid = isFullyPaid ? chama.contribution_amount : Math.round((creditToUse / (1 - ONTIME_RATE)) * 100) / 100;
         
         if (creditToUse > 0) {
           totalNetCreditApplied += creditToUse;
@@ -165,19 +170,20 @@ Deno.serve(async (req) => {
           member_id: member.id,
           cycle_id: newCycle.id,
           amount_due: chama.contribution_amount,
-          amount_paid: creditToUse,
-          amount_remaining: amountRemaining,
+          amount_paid: grossEquivalentPaid,
+          amount_remaining: isFullyPaid ? 0 : grossRemaining,
           is_paid: isFullyPaid,
           fully_paid: isFullyPaid,
           is_late_payment: false,
           payment_allocations: creditToUse > 0 ? [{
             amount: creditToUse,
-            gross_credit_used: creditToUse,
+            net_credit_used: creditToUse,
+            gross_equivalent: grossEquivalentPaid,
             commission: 0,
             commission_rate: 0,
             timestamp: new Date().toISOString(),
             source: 'carry_forward',
-            note: 'Commission already deducted at overpayment deposit — no extra charge'
+            note: `Wallet credit (already net of ${ONTIME_RATE * 100}% commission). ${netCycleCost} net needed, ${creditToUse} applied.`
           }] : []
         };
       });
@@ -197,7 +203,7 @@ Deno.serve(async (req) => {
         const totalCredit = carryForward + nextCycleCredit;
         
         if (totalCredit > 0) {
-          const creditUsed = Math.min(totalCredit, chama.contribution_amount);
+          const creditUsed = Math.min(totalCredit, netCycleCost);
           const remainingCarryForward = Math.max(0, totalCredit - creditUsed);
           
           await supabase
