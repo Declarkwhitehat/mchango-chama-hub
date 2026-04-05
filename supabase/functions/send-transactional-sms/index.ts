@@ -9,7 +9,7 @@ const corsHeaders = {
 const ONFON_API_KEY = Deno.env.get('ONFON_API_KEY');
 const ONFON_CLIENT_ID = Deno.env.get('ONFON_CLIENT_ID');
 const ONFON_SENDER_ID = Deno.env.get('ONFON_SENDER_ID');
-console.log('DEBUG: ONFON_SENDER_ID value is:', JSON.stringify(ONFON_SENDER_ID));
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
