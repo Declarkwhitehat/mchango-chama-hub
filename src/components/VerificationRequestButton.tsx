@@ -97,10 +97,9 @@ export const VerificationRequestButton = ({
 
     setIsSubmitting(true);
     try {
-      // For non-chama entities, check balance and deduct verification fee
+      // For non-chama entities, check balance BEFORE attempting insert
+      let balance = 0;
       if (requiresFee) {
-        let balance = 0;
-
         if (entityType === 'mchango') {
           const { data, error: e } = await supabase.from('mchango').select('available_balance').eq('id', entityId).single();
           if (e) throw e;
@@ -124,25 +123,9 @@ export const VerificationRequestButton = ({
           setIsSubmitting(false);
           return;
         }
-
-        // Deduct fee from entity balance
-        if (entityType === 'mchango') {
-          await supabase.from('mchango').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
-        } else if (entityType === 'organization') {
-          await supabase.from('organizations').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
-        } else if (entityType === 'welfare') {
-          await supabase.from('welfares').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
-        }
-
-        // Record fee as company revenue
-        await supabase.from('company_earnings').insert({
-          amount: VERIFICATION_FEE,
-          source: 'OTHER',
-          description: `Verification fee for ${entityType}: ${entityName}`,
-          group_id: entityId,
-        });
       }
 
+      // Insert request FIRST — only deduct fee if insert succeeds
       const { error } = await supabase
         .from('verification_requests')
         .insert({
@@ -163,6 +146,25 @@ export const VerificationRequestButton = ({
           throw error;
         }
         return;
+      }
+
+      // Deduct fee AFTER successful insert
+      if (requiresFee) {
+        if (entityType === 'mchango') {
+          await supabase.from('mchango').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+        } else if (entityType === 'organization') {
+          await supabase.from('organizations').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+        } else if (entityType === 'welfare') {
+          await supabase.from('welfares').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+        }
+
+        // Record fee as company revenue
+        await supabase.from('company_earnings').insert({
+          amount: VERIFICATION_FEE,
+          source: 'OTHER',
+          description: `Verification fee for ${entityType}: ${entityName}`,
+          group_id: entityId,
+        });
       }
 
       toast({
