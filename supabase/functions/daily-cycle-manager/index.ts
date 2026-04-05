@@ -276,12 +276,9 @@ Deno.serve(async (req) => {
     // GET CURRENT CYCLE
     if (action === 'current' && req.method === 'POST') {
       const { chamaId } = requestBody;
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
 
-      const { data: cycles, error } = await supabase
+      // First try: find the latest incomplete cycle (not yet paid out)
+      const { data: incompleteCycles, error: incError } = await supabase
         .from('contribution_cycles')
         .select(`
           *,
@@ -293,16 +290,36 @@ Deno.serve(async (req) => {
           )
         `)
         .eq('chama_id', chamaId)
-        .lte('start_date', todayEnd.toISOString())
-        .gte('end_date', todayStart.toISOString())
+        .eq('is_complete', false)
+        .eq('payout_processed', false)
         .order('cycle_number', { ascending: false })
         .limit(1);
 
-      const cycle = cycles?.[0] || null;
+      let cycle = incompleteCycles?.[0] || null;
 
-      if (error) {
-        console.error('Error fetching cycle:', error);
-        return new Response(JSON.stringify({ error: error.message }), {
+      // Fallback: if no incomplete cycle, get the latest cycle overall (for completed chamas)
+      if (!cycle) {
+        const { data: latestCycles } = await supabase
+          .from('contribution_cycles')
+          .select(`
+            *,
+            beneficiary:chama_members!beneficiary_member_id(
+              id,
+              member_code,
+              user_id,
+              profiles!chama_members_user_id_fkey(full_name)
+            )
+          `)
+          .eq('chama_id', chamaId)
+          .order('cycle_number', { ascending: false })
+          .limit(1);
+
+        cycle = latestCycles?.[0] || null;
+      }
+
+      if (incError) {
+        console.error('Error fetching cycle:', incError);
+        return new Response(JSON.stringify({ error: incError.message }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

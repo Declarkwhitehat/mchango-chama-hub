@@ -736,6 +736,7 @@ Deno.serve(async (req) => {
             if (approvalPayoutAmount <= 0) {
               console.log(`ℹ️ Skipping admin approval for ${chama.name} cycle #${cycle.cycle_number} — KES 0 payout`);
               await supabase.from('contribution_cycles').update({
+                is_complete: true,
                 payout_amount: 0,
                 payout_type: 'none',
                 members_skipped_count: ineligibleDetails.length
@@ -999,6 +1000,7 @@ Deno.serve(async (req) => {
             await supabase
               .from('contribution_cycles')
               .update({
+                is_complete: true,
                 payout_amount: payoutAmount,
                 payout_type: payoutType,
                 members_paid_count: paidCount,
