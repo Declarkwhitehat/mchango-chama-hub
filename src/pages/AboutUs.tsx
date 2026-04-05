@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Users, Target, Heart, Shield, Award, CheckCircle, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import declarkPhoto from "@/assets/declark-chacha-ceo.png";
+import declarkPhoto from "@/assets/declark-chacha-ceo.jpg";
 import { Button } from "@/components/ui/button";
 
 export default function AboutUs() {

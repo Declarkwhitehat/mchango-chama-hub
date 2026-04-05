@@ -20,7 +20,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import heroImage from "@/assets/hero-image.jpg";
-import profilePhoto from "@/assets/profile-photo.png";
+import profilePhoto from "@/assets/profile-photo.jpg";
 
 const Index = () => {
   const [isFaqOpen, setIsFaqOpen] = useState(false);
