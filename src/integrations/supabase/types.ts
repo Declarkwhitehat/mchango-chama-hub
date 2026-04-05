@@ -637,6 +637,84 @@ export type Database = {
           },
         ]
       }
+      chama_overpayment_wallet: {
+        Row: {
+          amount: number
+          applied_at: string | null
+          applied_to_cycle_id: string | null
+          chama_id: string
+          created_at: string
+          cycle_id: string | null
+          description: string | null
+          id: string
+          member_id: string
+          source_contribution_id: string | null
+          status: string
+        }
+        Insert: {
+          amount?: number
+          applied_at?: string | null
+          applied_to_cycle_id?: string | null
+          chama_id: string
+          created_at?: string
+          cycle_id?: string | null
+          description?: string | null
+          id?: string
+          member_id: string
+          source_contribution_id?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          applied_at?: string | null
+          applied_to_cycle_id?: string | null
+          chama_id?: string
+          created_at?: string
+          cycle_id?: string | null
+          description?: string | null
+          id?: string
+          member_id?: string
+          source_contribution_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_overpayment_wallet_applied_to_cycle_id_fkey"
+            columns: ["applied_to_cycle_id"]
+            isOneToOne: false
+            referencedRelation: "contribution_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_overpayment_wallet_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_overpayment_wallet_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "contribution_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_overpayment_wallet_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_overpayment_wallet_source_contribution_id_fkey"
+            columns: ["source_contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chama_rejoin_requests: {
         Row: {
           chama_id: string
