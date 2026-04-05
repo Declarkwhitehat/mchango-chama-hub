@@ -164,7 +164,32 @@ export function PaymentAllocationPreview({ memberId, chamaId, grossAmount }: Pay
           </div>
         )}
 
-        {/* Carry-forward */}
+        {/* Overpayment Wallet */}
+        {walletLines.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overpayment Wallet</p>
+            {walletCommLines.map((line, i) => (
+              <div key={`wc-${i}`} className="flex items-center justify-between text-sm bg-orange-500/10 rounded px-2 py-1">
+                <span className="flex items-center gap-1.5 text-orange-600">
+                  <Building2 className="h-3 w-3" />
+                  {line.description}
+                </span>
+                <span className="font-semibold text-orange-600">KES {line.amount.toFixed(2)}</span>
+              </div>
+            ))}
+            {walletLines.map((line, i) => (
+              <div key={`w-${i}`} className="flex items-center justify-between text-sm bg-blue-500/10 rounded px-2 py-1">
+                <span className="flex items-center gap-1.5 text-blue-600">
+                  <PiggyBank className="h-3 w-3" />
+                  {line.description}
+                </span>
+                <span className="font-semibold text-blue-600">KES {line.amount.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Legacy Carry-forward */}
         {carryForwardLines.length > 0 && (
           <div className="space-y-1">
             {carryForwardLines.map((line, i) => (
