@@ -105,7 +105,7 @@ const MchangoCreate = () => {
       }
 
       // Upload images
-      const imageUrls: (string | null)[] = [null, null, null];
+      const imageUrls: (string | null)[] = [null];
       
       for (let i = 0; i < imageFiles.length; i++) {
         const file = imageFiles[i];
