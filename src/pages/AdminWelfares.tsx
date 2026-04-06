@@ -215,14 +215,16 @@ const AdminWelfares = () => {
                           >
                             {w.is_frozen ? "Unfreeze" : "Freeze"}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => toggleVerify(w)}
-                          >
-                            {w.is_verified ? "Unverify" : "Verify"}
-                          </Button>
+                          {w.is_verified && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs text-destructive"
+                              onClick={() => handleUnverify(w)}
+                            >
+                              Unverify
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
