@@ -176,16 +176,6 @@ const AppContent = () => {
 };
 
 const App = () => {
-  const [splashDone, setSplashDone] = useState(() => {
-    // Only show splash once per session
-    if (sessionStorage.getItem("splash-shown")) return true;
-    return false;
-  });
-
-  const handleSplashComplete = useCallback(() => {
-    sessionStorage.setItem("splash-shown", "1");
-    setSplashDone(true);
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
