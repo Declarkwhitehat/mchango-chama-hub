@@ -46,14 +46,32 @@ export const VerificationRequestButton = ({
   const [reason, setReason] = useState("");
   const [existingRequest, setExistingRequest] = useState<VerificationRequest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [verificationFee, setVerificationFee] = useState(200);
 
   useEffect(() => {
     if (user && isOwner) {
       fetchExistingRequest();
+      fetchVerificationFee();
     } else {
       setLoading(false);
     }
   }, [user, entityId, entityType, isOwner]);
+
+  const fetchVerificationFee = async () => {
+    try {
+      const { data } = await supabase
+        .from('platform_settings')
+        .select('setting_value')
+        .eq('setting_key', 'verification_fee')
+        .maybeSingle();
+      if (data && typeof data.setting_value === 'object' && data.setting_value !== null) {
+        const val = data.setting_value as { amount?: number };
+        if (val.amount) setVerificationFee(val.amount);
+      }
+    } catch (e) {
+      console.error('Error fetching verification fee:', e);
+    }
+  };
 
   const fetchExistingRequest = async () => {
     try {
