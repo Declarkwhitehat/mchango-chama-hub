@@ -342,7 +342,7 @@ const Index = () => {
                 size="lg"
                 className="gap-2 hover:bg-accent/50 transition-all"
               >
-                <span className="font-semibold">Frequently Asked Questions</span>
+                <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2">Frequently Asked Questions</h2>
                 <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isFaqOpen ? 'rotate-180' : ''}`} />
               </Button>
             </CollapsibleTrigger>
