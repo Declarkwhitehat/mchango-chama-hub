@@ -171,16 +171,30 @@ const AppContent = () => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [splashDone, setSplashDone] = useState(() => {
+    // Only show splash once per session
+    if (sessionStorage.getItem("splash-shown")) return true;
+    return false;
+  });
+
+  const handleSplashComplete = useCallback(() => {
+    sessionStorage.setItem("splash-shown", "1");
+    setSplashDone(true);
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
