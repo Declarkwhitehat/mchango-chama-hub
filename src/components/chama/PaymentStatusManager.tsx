@@ -147,8 +147,20 @@ export const PaymentStatusManager = ({
   const getDateRange = (p: PeriodType) => {
     const now = new Date();
     switch (p) {
-      case "today":
-        return { start: startOfDay(now), end: endOfDay(now) };
+      case "today": {
+        // Payout cycle runs 10 PM EAT (19:00 UTC) to 10 PM EAT next day
+        // So "today" means from yesterday 19:00 UTC to today 19:00 UTC
+        const todayCycleEnd = new Date(now);
+        todayCycleEnd.setUTCHours(19, 0, 0, 0);
+        const todayCycleStart = new Date(todayCycleEnd);
+        todayCycleStart.setUTCDate(todayCycleStart.getUTCDate() - 1);
+        // If we haven't reached today's 10 PM EAT yet, use current window
+        // If past 10 PM EAT, shift forward
+        if (now >= todayCycleEnd) {
+          return { start: todayCycleEnd, end: new Date(todayCycleEnd.getTime() + 24 * 60 * 60 * 1000) };
+        }
+        return { start: todayCycleStart, end: todayCycleEnd };
+      }
       case "week":
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
       case "month":
