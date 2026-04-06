@@ -127,12 +127,12 @@ export const WithdrawalsManagement = () => {
   const checkDuplicate = async (withdrawal: any): Promise<boolean> => {
     try {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { data } = await supabase
+      const { data } = await (supabase
         .from('withdrawals')
-        .select('id, status')
+        .select('id, status') as any)
         .eq('user_id', withdrawal.user_id)
         .neq('id', withdrawal.id)
-        .in('status', ['processing', 'completed'] as any)
+        .in('status', ['processing', 'completed'])
         .gte('requested_at', oneHourAgo);
 
       if (data && data.length > 0) {
