@@ -43,6 +43,14 @@ interface Contribution {
   payment_reference: string;
 }
 
+interface CyclePayment {
+  member_id: string;
+  is_paid: boolean;
+  amount_paid: number;
+  paid_at: string | null;
+  cycle_id: string;
+}
+
 interface PaymentStatusManagerProps {
   chamaId: string;
   chamaName: string;
