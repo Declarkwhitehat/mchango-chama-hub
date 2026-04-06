@@ -127,6 +127,35 @@ export const PaymentStatusManager = ({
 
       if (contributionsError) throw contributionsError;
 
+      // Fetch the most recent cycles to find active/current cycle
+      const { data: cyclesData } = await supabase
+        .from("contribution_cycles")
+        .select("id, cycle_number, start_date, end_date, is_complete")
+        .eq("chama_id", chamaId)
+        .order("cycle_number", { ascending: false })
+        .limit(3);
+
+      // Find the current active cycle or most recently completed one
+      const currentCycle = cyclesData?.find(c => !c.is_complete) || cyclesData?.[0];
+      const recentCycleIds = (cyclesData || []).map(c => c.id);
+      setActiveCycleId(currentCycle?.id || null);
+
+      // Fetch member_cycle_payments for recent cycles (authoritative payment source)
+      let cyclePaymentsData: CyclePayment[] = [];
+      if (recentCycleIds.length > 0) {
+        const { data: mcpData } = await supabase
+          .from("member_cycle_payments")
+          .select("member_id, is_paid, amount_paid, paid_at, cycle_id")
+          .in("cycle_id", recentCycleIds);
+        cyclePaymentsData = (mcpData || []).map((m: any) => ({
+          member_id: m.member_id,
+          is_paid: m.is_paid,
+          amount_paid: m.amount_paid || 0,
+          paid_at: m.paid_at,
+          cycle_id: m.cycle_id,
+        }));
+      }
+
       // Fetch overpayment wallet applications for the current month
       const { data: walletData } = await supabase
         .from("chama_overpayment_wallet")
@@ -147,6 +176,7 @@ export const PaymentStatusManager = ({
 
       setMembers(membersData || []);
       setContributions([...(contributionsData || []), ...walletContributions]);
+      setCyclePayments(cyclePaymentsData);
     } catch (error) {
       console.error("Error fetching payment data:", error);
     } finally {
