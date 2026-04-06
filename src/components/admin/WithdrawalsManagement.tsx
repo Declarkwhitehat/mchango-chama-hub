@@ -132,7 +132,7 @@ export const WithdrawalsManagement = () => {
         .select('id, status')
         .eq('user_id', withdrawal.user_id)
         .neq('id', withdrawal.id)
-        .in('status', ['processing', 'completed'])
+        .in('status', ['processing', 'completed'] as any)
         .gte('requested_at', oneHourAgo);
 
       if (data && data.length > 0) {
