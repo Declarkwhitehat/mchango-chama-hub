@@ -100,7 +100,6 @@ export const VerificationRequestButton = ({
     }
   };
 
-  const VERIFICATION_FEE = 200;
   const requiresFee = entityType !== 'chama';
 
   const handleSubmit = async () => {
