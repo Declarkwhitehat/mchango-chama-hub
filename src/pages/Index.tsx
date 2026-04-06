@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/collapsible";
 // heroImage is available for future use
 import heroImage from "@/assets/hero-image.jpg";
-import profilePhoto from "@/assets/profile-photo.jpg";
+
 
 const Index = () => {
   const [isFaqOpen, setIsFaqOpen] = useState(false);
