@@ -85,7 +85,6 @@ const AdminDashboard = () => {
       const totalPlatformRevenue = ledgerRevenue + earningsRevenue;
 
       // Count distinct active users from chama_members
-      const activeAccountsResult = results[12];
       const uniqueUserIds = new Set<string>();
       if (activeAccountsResult.data) {
         for (const row of activeAccountsResult.data as any[]) {
