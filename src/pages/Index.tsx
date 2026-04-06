@@ -437,7 +437,7 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <img 
                 src={profilePhoto} 
-                alt="Declark Chacha" 
+                alt="Declark Chacha - Pamojanova website creator and digital chama management expert" 
                 className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-primary/20 shadow-md"
               />
               <p className="text-xs sm:text-sm text-muted-foreground">
