@@ -33,6 +33,12 @@ interface VerificationRequest {
   entity_name?: string;
   entity_slug?: string;
   requester_name?: string;
+  requester_phone?: string;
+  requester_id_number?: string;
+  requester_created_at?: string;
+  entity_collected?: number;
+  entity_balance?: number;
+  entity_created_at?: string;
 }
 
 export const VerificationRequestsManagement = () => {
