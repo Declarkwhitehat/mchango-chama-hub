@@ -10,7 +10,7 @@ import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { ChatSupport } from "./components/ChatSupport";
 import { Loader2 } from "lucide-react";
-import SplashScreen from "./components/SplashScreen";
+
 
 // Lazy load all pages for better initial load performance
 const Index = lazy(() => import("./pages/Index"));
