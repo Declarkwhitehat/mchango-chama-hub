@@ -41,6 +41,7 @@ const AdminDashboard = () => {
     pendingCallbacks: 0,
     recentTransactions: 0,
     pendingExecChanges: 0,
+    activeAccounts: 0,
   });
 
   const fetchDashboardData = useCallback(async (isAutoRefresh = false) => {
