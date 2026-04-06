@@ -233,6 +233,22 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {/* Active Accounts Banner */}
+        <div className="p-4 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Active Accounts</p>
+              <p className="text-3xl font-bold text-primary">{stats.activeAccounts.toLocaleString()}</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground max-w-xs text-right">
+            Users participating in at least one active Chama, Welfare, Campaign, or Organization
+          </p>
+        </div>
+
         {/* 4 Key Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total Users */}
