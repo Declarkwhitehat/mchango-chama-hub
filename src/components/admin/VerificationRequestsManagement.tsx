@@ -257,8 +257,18 @@ export const VerificationRequestsManagement = () => {
 
       if (error) throw error;
 
-      // Refund KSh 200 for non-chama entities
-      const VERIFICATION_FEE = 200;
+      // Fetch verification fee from platform settings
+      let verificationFee = 200;
+      const { data: feeSetting } = await supabase
+        .from('platform_settings')
+        .select('setting_value')
+        .eq('setting_key', 'verification_fee')
+        .maybeSingle();
+      if (feeSetting && typeof feeSetting.setting_value === 'object' && feeSetting.setting_value !== null) {
+        const val = feeSetting.setting_value as { amount?: number };
+        if (val.amount) verificationFee = val.amount;
+      }
+
       const requiresRefund = selectedRequest.entity_type !== 'chama';
       
       if (requiresRefund) {
@@ -278,12 +288,12 @@ export const VerificationRequestsManagement = () => {
         // Refund the fee
         await supabase
           .from(tableName)
-          .update({ available_balance: currentBalance + VERIFICATION_FEE })
+          .update({ available_balance: currentBalance + verificationFee })
           .eq('id', selectedRequest.entity_id);
 
         // Record refund in company_earnings as negative amount
         await supabase.from('company_earnings').insert({
-          amount: -VERIFICATION_FEE,
+          amount: -verificationFee,
           source: 'VERIFICATION_FEE_REFUND',
           description: `Verification fee refund for rejected ${selectedRequest.entity_type}: ${selectedRequest.entity_name}`,
           group_id: selectedRequest.entity_id,
@@ -294,7 +304,7 @@ export const VerificationRequestsManagement = () => {
       const entityTypeLabel = selectedRequest.entity_type === 'mchango' ? 'Campaign' : 
                               selectedRequest.entity_type === 'chama' ? 'Chama' : 
                               selectedRequest.entity_type === 'welfare' ? 'Welfare' : 'Organization';
-      const refundMsg = requiresRefund ? ' KSh 200 verification fee has been refunded to your balance.' : '';
+      const refundMsg = requiresRefund ? ` KSh ${verificationFee} verification fee has been refunded to your balance.` : '';
       await supabase
         .from('notifications')
         .insert({
