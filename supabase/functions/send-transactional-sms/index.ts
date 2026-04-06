@@ -9,6 +9,7 @@ const corsHeaders = {
 const ONFON_API_KEY = Deno.env.get('ONFON_API_KEY');
 const ONFON_CLIENT_ID = Deno.env.get('ONFON_CLIENT_ID');
 const ONFON_SENDER_ID = Deno.env.get('ONFON_SENDER_ID');
+const ONFON_ACCESS_KEY = Deno.env.get('ONFON_CLIENT_ID'); // AccessKey = ClientId per provider docs
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -50,11 +51,10 @@ const sendSMS = async (phone: string, message: string): Promise<{ success: boole
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accesskey': ONFON_ACCESS_KEY || '',
       },
       body: JSON.stringify({
         SenderId: ONFON_SENDER_ID,
-        IsUnicode: false,
-        IsFlash: false,
         MessageParameters: [
           {
             Number: normalizedPhone,
