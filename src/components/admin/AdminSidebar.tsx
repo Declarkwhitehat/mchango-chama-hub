@@ -117,6 +117,7 @@ export function AdminSidebar() {
     },
     { title: "Users Management", url: "/admin/users", icon: Users },
     { title: "Member Search", url: "/admin/search", icon: Search },
+    { title: "Super Managers", url: "/admin/super-managers", icon: TrendingUp },
   ];
 
   const groupsItems: MenuItem[] = [
