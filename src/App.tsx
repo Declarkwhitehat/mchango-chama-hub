@@ -181,7 +181,7 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>
-          {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
+          
           <BrowserRouter>
             <AppContent />
           </BrowserRouter>
