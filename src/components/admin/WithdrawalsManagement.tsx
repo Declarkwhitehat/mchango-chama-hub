@@ -56,6 +56,7 @@ export const WithdrawalsManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedWithdrawal, setSelectedWithdrawal] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingLock, setProcessingLock] = useState<Set<string>>(new Set());
   const [paymentReference, setPaymentReference] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [skipToNext, setSkipToNext] = useState(true);
