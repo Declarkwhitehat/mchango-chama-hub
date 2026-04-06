@@ -216,6 +216,9 @@ export const ActivityPDFDownload = ({
       doc.text(`Total: KSh ${totalAmount.toLocaleString()}`, margin, startY);
       doc.text(`Transactions: ${data.length}`, margin + 80, startY);
       
+      // Branded footer with QR code
+      addPDFBrandingFooter(doc, serialNumber);
+
       // Get blob and save
       const pdfBlob = doc.output('blob');
       const filename = `${type}-transactions-${format(new Date(), "yyyy-MM-dd")}.pdf`;
