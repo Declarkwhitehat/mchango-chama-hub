@@ -1,79 +1,105 @@
 
 
-## Plan: Chama Payment System Overhaul
+# Admin Dashboard Power Upgrades
 
-### Summary
-Fix allocation preview labels, correct the "Total Collected" display to show who paid, and implement the strict first-payment removal rule (Day 1 defaulters removed at 10 PM). The core payout, debt, skip, carry-forward, auto-remove, and manager succession logic is already implemented correctly. This plan focuses on the UI/label bugs and the missing Day 1 removal enforcement.
-
----
-
-### What's Already Working (No Changes Needed)
-
-Reviewing the codebase against your 10-point spec, most rules are already implemented:
-
-- Daily cycle at 10 PM cutoff (daily-cycle-manager, daily-payout-cron)
-- Missed payment tracking with debt + 10% penalty (accrueDebtsForCycle)
-- FIFO settlement: penalties → principal → current cycle → carry-forward (contributions-crud settleDebts)
-- Payout from available_balance (partial if shortage)
-- Skip ineligible beneficiaries to end of queue (findNextEligibleMember, recordPayoutSkip)
-- Overpayment → carry-forward credit (never covers other members)
-- 3 missed payments → auto-removal
-- Manager auto-succession (best candidate by missed count + order)
-- Late payment = original + 10% penalty (LATE_RATE = 0.10)
-- Deductive commission model (5% deducted from payment)
+## Overview
+Seven enhancements to make the admin panel more powerful: enriched verification requests, active account metrics, commission management, withdrawal double-transaction protection, super managers leaderboard, deadline adjustments, and document deletion.
 
 ---
 
-### Issues to Fix
+## 1. Verification Requests — Enriched Detail View
 
-#### 1. Fix Allocation Preview Labels
-**File:** `src/components/chama/PaymentAllocationPreview.tsx`
+**What**: When reviewing a verification request, show account creation date, creator's ID/photo, phone number, and amount collected for the entity.
 
-The label "Net to cycle collection pot KES 4.75" is confusing. When someone pays KES 100:
-- KES 5 (5%) → Platform revenue
-- KES 95 → Chama pool (goes to beneficiary at payout)
+**How**: In `VerificationRequestsManagement.tsx`, expand the `fetchRequests` enrichment to also pull:
+- `profiles.created_at`, `profiles.phone`, `profiles.id_number`, `profiles.kyc_front_id`, `profiles.kyc_back_id` for the requester
+- Entity's `current_amount` / `available_balance` and `created_at`
+- Display these in the request card (expandable detail section) with KYC photo previews from storage
 
-Change labels:
-- "Total commissions to platform" → "Platform commission (5%)"
-- "Net to cycle collection pot" → "To chama pool (for beneficiary payout)"
-- Remove the word "net" from user-facing text
-
-#### 2. Fix "Total Collected" to Show Who Paid
-**File:** `src/components/chama/DailyPaymentStatus.tsx`
-
-The Financial Summary shows "Total Collected: KES 190" but doesn't say who contributed. Change the "Total Collected" card to list paid members and their amounts, or add a subtitle showing paid member names.
-
-#### 3. Implement Day 1 First-Payment Removal Rule
-**Files:** `supabase/functions/daily-payout-cron/index.ts`, `supabase/functions/chama-start/index.ts`
-
-Currently, members who don't pay by the first deadline are treated like any other missed payment (tracked as debt, removed after 3 misses). The user wants **immediate removal** of anyone who doesn't pay by the first 10 PM deadline.
-
-Changes:
-- In `daily-payout-cron`, when processing the **first cycle** (cycle_number === 1), any unpaid member is immediately removed (not just debt-accrued). This is different from subsequent cycles where they get 3 chances.
-- After removing Day 1 defaulters, resequence remaining members and recalculate the beneficiary for the payout.
-- Update the grace period UI messaging to make clear: "Members who don't pay by the deadline will be removed."
-
-#### 4. Fix Daily Cycle Timing
-**File:** `supabase/functions/daily-cycle-manager/index.ts` (create-today action)
-
-For daily chamas, cycle end_date uses `setHours(22, 0, 0, 0)` which is local timezone, not Kenya time. Should use UTC 19:00 (Kenya 10 PM) consistently.
-
-Change line 96: `endDate.setHours(22, 0, 0, 0)` → set to Kenya 10 PM (19:00 UTC) using the chamaDeadlines utility.
-
-Similarly fix gap recovery cycle creation in `daily-payout-cron` (line 369).
+**Files**: `src/components/admin/VerificationRequestsManagement.tsx`
 
 ---
 
-### Technical Details
+## 2. Active Account Metrics Banner
 
-**Files modified:**
-- `src/components/chama/PaymentAllocationPreview.tsx` — Fix labels
-- `src/components/chama/DailyPaymentStatus.tsx` — Show who paid in financial summary
-- `supabase/functions/daily-payout-cron/index.ts` — Add Day 1 removal logic for cycle_number === 1
-- `supabase/functions/daily-cycle-manager/index.ts` — Fix daily cycle end_date to Kenya 10 PM UTC
-- `src/components/chama/PaymentCountdownTimer.tsx` — Update grace period warning text
+**What**: Show a prominent metric at the top of the admin dashboard: "X active accounts" — users who are members of at least one active Chama, Welfare, Campaign, or Organization.
 
-**No database migrations needed.**
+**How**: Add a new query in `AdminDashboard.tsx` that counts distinct user IDs across `chama_members` (active), `welfare_members` (active), `mchango` creators/donors, and `organization_donations` donors. Display as a highlighted card or banner above the existing metric cards.
 
-**Edge functions to deploy:** daily-payout-cron, daily-cycle-manager
+**Files**: `src/pages/AdminDashboard.tsx`
+
+---
+
+## 3. Commission Management (Password-Protected)
+
+**What**: Admin can change global commission rates (Chama, Mchango, Organization, Welfare). Secured with a Super Admin password dialog.
+
+**How**:
+- Create a new DB table `platform_settings` with key-value rows for each commission rate (via migration)
+- Create a new admin page `AdminCommissionConfig.tsx` with rate inputs and a password confirmation dialog (using the existing admin privilege code pattern)
+- Update `commissionCalculator.ts` and edge functions to read rates from DB instead of hardcoded constants
+- Add sidebar entry under "Financial" group
+
+**Files**: New `src/pages/AdminCommissionConfig.tsx`, migration for `platform_settings` table, update `src/utils/commissionCalculator.ts`, update edge function commission logic, `src/components/admin/AdminSidebar.tsx`
+
+---
+
+## 4. Withdrawal Double-Transaction Protection
+
+**What**: Prevent duplicate withdrawal processing — disable action buttons while processing, check for existing completed withdrawals with the same payment reference.
+
+**How**: In `WithdrawalsManagement.tsx`:
+- Add a processing lock map to disable approve/retry buttons for any withdrawal already being actioned
+- Before processing, query for existing completed withdrawals with the same `user_id` + `entity_id` + status `processing`/`completed` within the last hour
+- Show a warning if a duplicate is detected
+- The backend `process_withdrawal_completion` RPC already checks for duplicate receipts — add a frontend guard layer too
+
+**Files**: `src/components/admin/WithdrawalsManagement.tsx`
+
+---
+
+## 5. Super Managers Section (Top 100)
+
+**What**: A new admin page showing the top 100 group creators ranked by success rate (completion rate, total collected, member activity).
+
+**How**:
+- New page `AdminSuperManagers.tsx` that queries creators across Chamas, Welfares, and Organizations
+- Calculate success metrics: total amount collected, member count, completion percentage
+- Rank and display top 100 with their entity names, type, and metrics
+- Add sidebar entry under "Users & KYC" group
+
+**Files**: New `src/pages/AdminSuperManagers.tsx`, `src/components/admin/AdminSidebar.tsx`, route in `src/App.tsx`
+
+---
+
+## 6. Deadline Adjustments (Admin Override)
+
+**What**: Admin can reduce/adjust deadlines (time and amount) set by group executives for Welfare contribution cycles and Chama cycles.
+
+**How**:
+- New component `AdminDeadlineAdjust.tsx` — a dialog accessible from the Chama/Welfare detail admin pages
+- Allows editing `contribution_amount`, `end_date`, or cycle deadlines
+- Logs the change in `audit_logs` for accountability
+- Accessible from `AdminChamaDetail` and `AdminWelfares` pages
+
+**Files**: New `src/components/admin/AdminDeadlineAdjust.tsx`, update `src/pages/AdminChamaDetail.tsx`, update `src/pages/AdminWelfares.tsx`
+
+---
+
+## 7. Document Management — Admin Delete
+
+**What**: Admin can delete group documents from the system.
+
+**How**: In `GroupDocuments.tsx`, add a delete button visible only to admin users. Also add delete capability to `AdminDocuments.tsx` for verified documents. The delete action removes both the storage file and the DB record, with a confirmation dialog.
+
+**Files**: `src/components/GroupDocuments.tsx`, `src/pages/AdminDocuments.tsx`
+
+---
+
+## Technical Notes
+
+- Commission rate changes require a new `platform_settings` table (migration) and updates to multiple edge functions that currently import from `_shared/commissionRates.ts`
+- The Super Admin password protection reuses the existing admin privilege code pattern (`D3E9C0L1A3R9K`)
+- All admin-only mutations will be guarded by the `has_role` check
+- New routes will be added to `src/App.tsx` wrapped in `AdminProtectedRoute`
 
