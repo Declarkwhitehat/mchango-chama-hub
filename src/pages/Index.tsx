@@ -423,7 +423,7 @@ const Index = () => {
         <div className="container mx-auto px-4 sm:px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 text-center md:text-left">
             <p className="text-muted-foreground text-sm sm:text-base">
-              &copy; 2025 Chama & Mchango. Building financial futures together.
+              &copy; 2025 Pamojanova. Building financial futures together.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <img 
