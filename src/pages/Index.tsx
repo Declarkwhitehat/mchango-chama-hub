@@ -126,7 +126,7 @@ const Index = () => {
       <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-24">
         <div className="text-center mb-8 sm:mb-12">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4">
-            Why Choose Us?
+            Start a Transparent Mchango Campaign Today
           </h2>
           <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto px-4">
             Empowering communities with secure, transparent financial tools
