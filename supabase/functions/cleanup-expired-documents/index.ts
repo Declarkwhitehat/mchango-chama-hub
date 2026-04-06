@@ -11,14 +11,15 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    // Retention: 1 month
+    const cutoffDate = new Date();
+    cutoffDate.setMonth(cutoffDate.getMonth() - 1);
 
     // Get documents to delete (with file paths for storage cleanup)
     const { data: expiredDocs, error: fetchError } = await supabase
       .from("generated_documents")
       .select("id, file_path")
-      .lt("created_at", threeMonthsAgo.toISOString());
+      .lt("created_at", cutoffDate.toISOString());
 
     if (fetchError) throw fetchError;
 

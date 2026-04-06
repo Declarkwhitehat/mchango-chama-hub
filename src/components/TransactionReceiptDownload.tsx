@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FileDown, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
+import { addPDFBrandingFooter } from "@/utils/pdfBranding";
 
 interface AllocationLine {
   type: string;
@@ -215,13 +216,8 @@ export function TransactionReceiptDownload({
 
       y = totalY + 15;
 
-      // ── Footer ──
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'italic');
-      doc.setTextColor(120, 120, 120);
-      doc.text('This receipt is an official record of your chama contribution and payment allocation.', pageWidth / 2, y, { align: 'center' });
-      doc.text('All commissions are deducted at source. Only net funds are allocated to the chama pool.', pageWidth / 2, y + 5, { align: 'center' });
-      doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, y + 10, { align: 'center' });
+      // Branded footer with QR code
+      addPDFBrandingFooter(doc, serialNumber);
 
       // Get blob and save
       const pdfBlob = doc.output('blob');
