@@ -23,6 +23,8 @@ interface GeneratedDoc {
   created_at: string;
 }
 
+const RETENTION_MONTHS = 1;
+
 const AdminDocuments = () => {
   const [serialQuery, setSerialQuery] = useState("");
   const [results, setResults] = useState<GeneratedDoc[]>([]);
@@ -44,14 +46,14 @@ const AdminDocuments = () => {
     setSearchedSerial(isSerialSearch);
 
     try {
-      const threeMonthsAgo = subMonths(new Date(), 3).toISOString();
+      const cutoff = subMonths(new Date(), RETENTION_MONTHS).toISOString();
 
       if (isSerialSearch) {
         const { data, error } = await supabase
           .from("generated_documents")
           .select("*")
           .eq("serial_number", parseInt(trimmed, 10))
-          .gte("created_at", threeMonthsAgo)
+          .gte("created_at", cutoff)
           .limit(1);
 
         if (error) throw error;
@@ -62,7 +64,7 @@ const AdminDocuments = () => {
           .from("generated_documents")
           .select("*")
           .ilike("document_title", `%${trimmed}%`)
-          .gte("created_at", threeMonthsAgo)
+          .gte("created_at", cutoff)
           .order("created_at", { ascending: false })
           .limit(50);
 
@@ -111,7 +113,6 @@ const AdminDocuments = () => {
 
       if (error) throw error;
 
-      // Create download link
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
       a.href = url;
@@ -146,7 +147,7 @@ const AdminDocuments = () => {
             Verify Document
           </h1>
           <p className="text-sm text-muted-foreground">
-            Enter a document serial number to verify its authenticity and view the original document. Documents are retained for 3 months.
+            Enter a document serial number to verify its authenticity. Documents are retained for {RETENTION_MONTHS} month only.
           </p>
         </div>
 
@@ -173,7 +174,7 @@ const AdminDocuments = () => {
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              Documents older than 3 months are automatically removed from the system.
+              Documents older than {RETENTION_MONTHS} month are automatically removed from the system.
             </div>
           </CardContent>
         </Card>
@@ -195,11 +196,11 @@ const AdminDocuments = () => {
                   </div>
                   <p className="text-sm font-medium text-destructive">
                     {searchedSerial
-                      ? "Document not found or expired (older than 3 months)."
-                      : "No documents match that search within the last 3 months."}
+                      ? `Document not found or expired (older than ${RETENTION_MONTHS} month).`
+                      : `No documents match that search within the last ${RETENTION_MONTHS} month.`}
                   </p>
                   <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    All system-generated documents are retained for 3 months only. If the document was generated more than 3 months ago, it has been automatically deleted from the system.
+                    All system-generated documents are retained for {RETENTION_MONTHS} month only. If the document was generated more than {RETENTION_MONTHS} month ago, it has been automatically deleted from the system.
                   </p>
                 </div>
               ) : (
