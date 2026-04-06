@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useCallback } from "react";
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,7 +10,7 @@ import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { ChatSupport } from "./components/ChatSupport";
 import { Loader2 } from "lucide-react";
-import SplashScreen from "./components/SplashScreen";
+
 
 // Lazy load all pages for better initial load performance
 const Index = lazy(() => import("./pages/Index"));
@@ -176,22 +176,12 @@ const AppContent = () => {
 };
 
 const App = () => {
-  const [splashDone, setSplashDone] = useState(() => {
-    // Only show splash once per session
-    if (sessionStorage.getItem("splash-shown")) return true;
-    return false;
-  });
-
-  const handleSplashComplete = useCallback(() => {
-    sessionStorage.setItem("splash-shown", "1");
-    setSplashDone(true);
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>
-          {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
+          
           <BrowserRouter>
             <AppContent />
           </BrowserRouter>
