@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { jsPDF } from "jspdf";
 import { toast } from "sonner";
+import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
+import { addPDFBrandingFooter } from "@/utils/pdfBranding";
 
 interface Member {
   id: string;
