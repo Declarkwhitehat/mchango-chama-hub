@@ -30,12 +30,13 @@ interface DocRecord {
   created_at: string;
 }
 
-export const GroupDocuments = ({ entityType, entityId, canUpload }: GroupDocumentsProps) => {
+export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = false }: GroupDocumentsProps) => {
   const { user } = useAuth();
   const [documents, setDocuments] = useState<DocRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
