@@ -15,6 +15,7 @@ interface GroupDocumentsProps {
   entityType: "welfare" | "chama" | "mchango" | "organization";
   entityId: string;
   canUpload: boolean;
+  isAdmin?: boolean;
 }
 
 const MAX_FILE_SIZE = 3 * 1024 * 1024;
