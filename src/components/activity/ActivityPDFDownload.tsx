@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
+import { addPDFBrandingFooter } from "@/utils/pdfBranding";
 
 interface ActivityPDFDownloadProps {
   data: any[];
