@@ -41,6 +41,7 @@ const AdminDashboard = () => {
     pendingCallbacks: 0,
     recentTransactions: 0,
     pendingExecChanges: 0,
+    activeAccounts: 0,
   });
 
   const fetchDashboardData = useCallback(async (isAutoRefresh = false) => {
@@ -61,6 +62,7 @@ const AdminDashboard = () => {
         ledgerResult,
         execChangesResult,
         earningsResult,
+        activeAccountsResult,
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
@@ -74,11 +76,21 @@ const AdminDashboard = () => {
         supabase.from('financial_ledger').select('commission_amount'),
         supabase.from('welfare_executive_changes').select('*', { count: 'exact', head: true }).eq('admin_decision', 'pending'),
         supabase.from('company_earnings').select('amount'),
+        // Active accounts: distinct users across chama_members(active)
+        supabase.from('chama_members').select('user_id', { count: 'exact', head: false }).eq('status', 'active').not('user_id', 'is', null),
       ]);
 
       const ledgerRevenue = ledgerResult.data?.reduce((sum, item) => sum + (item.commission_amount || 0), 0) || 0;
       const earningsRevenue = earningsResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
       const totalPlatformRevenue = ledgerRevenue + earningsRevenue;
+
+      // Count distinct active users from chama_members
+      const uniqueUserIds = new Set<string>();
+      if (activeAccountsResult.data) {
+        for (const row of activeAccountsResult.data as any[]) {
+          if (row.user_id) uniqueUserIds.add(row.user_id);
+        }
+      }
 
       setStats({
         totalUsers: usersResult.count || 0,
@@ -92,6 +104,7 @@ const AdminDashboard = () => {
         pendingCallbacks: callbacksResult.count || 0,
         recentTransactions: transactionsResult.count || 0,
         pendingExecChanges: execChangesResult.count || 0,
+        activeAccounts: uniqueUserIds.size,
       });
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -219,6 +232,22 @@ const AdminDashboard = () => {
             </div>
           </div>
         )}
+
+        {/* Active Accounts Banner */}
+        <div className="p-4 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Active Accounts</p>
+              <p className="text-3xl font-bold text-primary">{stats.activeAccounts.toLocaleString()}</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground max-w-xs text-right">
+            Users participating in at least one active Chama, Welfare, Campaign, or Organization
+          </p>
+        </div>
 
         {/* 4 Key Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

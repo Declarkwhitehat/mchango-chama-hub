@@ -33,6 +33,12 @@ interface VerificationRequest {
   entity_name?: string;
   entity_slug?: string;
   requester_name?: string;
+  requester_phone?: string;
+  requester_id_number?: string;
+  requester_created_at?: string;
+  entity_collected?: number;
+  entity_balance?: number;
+  entity_created_at?: string;
 }
 
 export const VerificationRequestsManagement = () => {
@@ -110,14 +116,39 @@ export const VerificationRequestsManagement = () => {
             }
           }
 
-          // Get requester name
+          // Get requester details
           const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name')
+            .select('full_name, phone, id_number, created_at')
             .eq('id', request.requested_by)
             .maybeSingle();
+
+          let requesterPhone = '';
+          let requesterIdNumber = '';
+          let requesterCreatedAt = '';
           if (profile) {
             requesterName = profile.full_name;
+            requesterPhone = profile.phone || '';
+            requesterIdNumber = profile.id_number || '';
+            requesterCreatedAt = profile.created_at || '';
+          }
+
+          // Get entity financial data
+          let entityCollected = 0;
+          let entityBalance = 0;
+          let entityCreatedAt = '';
+          if (request.entity_type === 'chama') {
+            const { data: d } = await supabase.from('chama').select('total_gross_collected, available_balance, created_at').eq('id', request.entity_id).maybeSingle();
+            if (d) { entityCollected = Number(d.total_gross_collected || 0); entityBalance = Number(d.available_balance || 0); entityCreatedAt = d.created_at; }
+          } else if (request.entity_type === 'mchango') {
+            const { data: d } = await supabase.from('mchango').select('total_gross_collected, available_balance, created_at').eq('id', request.entity_id).maybeSingle();
+            if (d) { entityCollected = Number(d.total_gross_collected || 0); entityBalance = Number(d.available_balance || 0); entityCreatedAt = d.created_at; }
+          } else if (request.entity_type === 'organization') {
+            const { data: d } = await supabase.from('organizations').select('total_gross_collected, available_balance, created_at').eq('id', request.entity_id).maybeSingle();
+            if (d) { entityCollected = Number(d.total_gross_collected || 0); entityBalance = Number(d.available_balance || 0); entityCreatedAt = d.created_at; }
+          } else if (request.entity_type === 'welfare') {
+            const { data: d } = await supabase.from('welfares').select('available_balance, created_at').eq('id', request.entity_id).maybeSingle();
+            if (d) { entityBalance = Number(d.available_balance || 0); entityCreatedAt = d.created_at; }
           }
 
           return {
@@ -127,6 +158,12 @@ export const VerificationRequestsManagement = () => {
             entity_name: entityName,
             entity_slug: entitySlug,
             requester_name: requesterName,
+            requester_phone: requesterPhone,
+            requester_id_number: requesterIdNumber,
+            requester_created_at: requesterCreatedAt,
+            entity_collected: entityCollected,
+            entity_balance: entityBalance,
+            entity_created_at: entityCreatedAt,
           };
         })
       );
@@ -471,6 +508,34 @@ export const VerificationRequestsManagement = () => {
                     <Badge variant="outline" className="capitalize">
                       {request.entity_type === 'mchango' ? 'Campaign' : request.entity_type}
                     </Badge>
+                  </div>
+
+                  {/* Requester & Entity Details */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-lg border bg-muted/30 text-xs">
+                    <div>
+                      <p className="text-muted-foreground font-medium">Phone</p>
+                      <p className="font-mono font-bold">{request.requester_phone || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">ID Number</p>
+                      <p className="font-bold">{request.requester_id_number || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">Account Created</p>
+                      <p className="font-bold">{request.requester_created_at ? format(new Date(request.requester_created_at), "MMM d, yyyy") : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">Entity Created</p>
+                      <p className="font-bold">{request.entity_created_at ? format(new Date(request.entity_created_at), "MMM d, yyyy") : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">Total Collected</p>
+                      <p className="font-bold text-primary">KES {(request.entity_collected || 0).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">Available Balance</p>
+                      <p className="font-bold">KES {(request.entity_balance || 0).toLocaleString()}</p>
+                    </div>
                   </div>
 
                   <div className="bg-muted/50 p-3 rounded text-sm">

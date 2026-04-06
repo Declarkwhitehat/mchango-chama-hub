@@ -56,6 +56,7 @@ export const WithdrawalsManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedWithdrawal, setSelectedWithdrawal] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingLock, setProcessingLock] = useState<Set<string>>(new Set());
   const [paymentReference, setPaymentReference] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [skipToNext, setSkipToNext] = useState(true);
@@ -122,7 +123,50 @@ export const WithdrawalsManagement = () => {
     setActiveTab("details");
   };
 
+  // Check for potential duplicate transaction
+  const checkDuplicate = async (withdrawal: any): Promise<boolean> => {
+    try {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { data } = await (supabase
+        .from('withdrawals')
+        .select('id, status') as any)
+        .eq('user_id', withdrawal.user_id)
+        .neq('id', withdrawal.id)
+        .in('status', ['processing', 'completed'])
+        .gte('requested_at', oneHourAgo);
+
+      if (data && data.length > 0) {
+        toast({
+          title: "⚠️ Potential Duplicate",
+          description: `Found ${data.length} other processing/completed withdrawal(s) for this user in the last hour. Please verify before proceeding.`,
+          variant: "destructive",
+        });
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  const lockWithdrawal = (id: string) => {
+    setProcessingLock(prev => new Set(prev).add(id));
+  };
+
+  const unlockWithdrawal = (id: string) => {
+    setProcessingLock(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
   const handleSendViaMpesa = async () => {
+    if (processingLock.has(selectedWithdrawal.id)) return;
+    const isDupe = await checkDuplicate(selectedWithdrawal);
+    if (isDupe) return;
+
+    lockWithdrawal(selectedWithdrawal.id);
     setIsProcessing(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -145,6 +189,7 @@ export const WithdrawalsManagement = () => {
       toast({ title: "Error", description: error.message || "Failed to initiate M-Pesa payout", variant: "destructive" });
     } finally {
       setIsProcessing(false);
+      unlockWithdrawal(selectedWithdrawal?.id);
     }
   };
 
@@ -439,8 +484,12 @@ export const WithdrawalsManagement = () => {
                     </TableCell>
                     <TableCell>
                       {canReview(withdrawal.status) && (
-                        <Button size="sm" onClick={() => handleSelectWithdrawal(withdrawal)}>
-                          Review
+                        <Button
+                          size="sm"
+                          onClick={() => handleSelectWithdrawal(withdrawal)}
+                          disabled={processingLock.has(withdrawal.id)}
+                        >
+                          {processingLock.has(withdrawal.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Review'}
                         </Button>
                       )}
                     </TableCell>

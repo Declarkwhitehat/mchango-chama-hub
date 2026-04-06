@@ -2124,6 +2124,44 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

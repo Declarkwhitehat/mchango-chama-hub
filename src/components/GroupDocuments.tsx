@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, Upload, Download, Loader2, AlertCircle, Plus } from "lucide-react";
+import { FileText, Upload, Download, Loader2, AlertCircle, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -15,6 +15,7 @@ interface GroupDocumentsProps {
   entityType: "welfare" | "chama" | "mchango" | "organization";
   entityId: string;
   canUpload: boolean;
+  isAdmin?: boolean;
 }
 
 const MAX_FILE_SIZE = 3 * 1024 * 1024;
@@ -29,12 +30,13 @@ interface DocRecord {
   created_at: string;
 }
 
-export const GroupDocuments = ({ entityType, entityId, canUpload }: GroupDocumentsProps) => {
+export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = false }: GroupDocumentsProps) => {
   const { user } = useAuth();
   const [documents, setDocuments] = useState<DocRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -248,6 +250,34 @@ export const GroupDocuments = ({ entityType, entityId, canUpload }: GroupDocumen
                     <Download className="h-4 w-4" />
                   )}
                 </Button>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={async () => {
+                      if (!confirm("Delete this document permanently?")) return;
+                      setDeletingId(doc.id);
+                      try {
+                        await supabase.storage.from("group-documents").remove([doc.file_path]);
+                        await supabase.from("group_documents").delete().eq("id", doc.id);
+                        toast.success("Document deleted");
+                        fetchDocuments();
+                      } catch {
+                        toast.error("Failed to delete document");
+                      } finally {
+                        setDeletingId(null);
+                      }
+                    }}
+                    disabled={deletingId === doc.id}
+                  >
+                    {deletingId === doc.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
               </div>
             ))}
           </div>
