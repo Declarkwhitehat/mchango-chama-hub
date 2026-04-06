@@ -75,6 +75,8 @@ const AdminDashboard = () => {
         supabase.from('financial_ledger').select('commission_amount'),
         supabase.from('welfare_executive_changes').select('*', { count: 'exact', head: true }).eq('admin_decision', 'pending'),
         supabase.from('company_earnings').select('amount'),
+        // Active accounts: distinct users across chama_members(active)
+        supabase.from('chama_members').select('user_id', { count: 'exact', head: false }).eq('status', 'active').not('user_id', 'is', null),
       ]);
 
       const ledgerRevenue = ledgerResult.data?.reduce((sum, item) => sum + (item.commission_amount || 0), 0) || 0;
