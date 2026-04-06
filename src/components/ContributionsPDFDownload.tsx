@@ -12,6 +12,7 @@ import { jsPDF } from "jspdf";
 import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
+import { addPDFBrandingFooter } from "@/utils/pdfBranding";
 
 interface Contribution {
   id: string;
