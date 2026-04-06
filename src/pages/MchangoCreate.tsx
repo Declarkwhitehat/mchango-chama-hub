@@ -143,8 +143,6 @@ const MchangoCreate = () => {
         target_amount: Number(formData.get("goal")),
         category: formData.get("category") as string,
         image_url: imageUrls[0],
-        image_url_2: imageUrls[1],
-        image_url_3: imageUrls[2],
         youtube_url: youtubeUrl || null,
         end_date: new Date(Date.now() + Number(formData.get("duration")) * 24 * 60 * 60 * 1000).toISOString(),
       };
