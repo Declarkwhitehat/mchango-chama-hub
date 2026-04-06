@@ -230,6 +230,10 @@ const Index = () => {
               </div>
             </div>
 
+            {/* Digital Tools for Welfare & Organizations */}
+            <div className="col-span-1 sm:col-span-2 lg:col-span-2">
+              <h2 className="text-xl sm:text-2xl font-bold text-card-foreground mb-4 sm:mb-6 text-center">Digital Tools for Welfare Organizations</h2>
+            </div>
             {/* Welfare */}
             <div className="space-y-4 sm:space-y-6">
               <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-destructive/80 to-destructive/60 rounded-full">
