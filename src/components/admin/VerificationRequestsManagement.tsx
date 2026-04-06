@@ -510,6 +510,34 @@ export const VerificationRequestsManagement = () => {
                     </Badge>
                   </div>
 
+                  {/* Requester & Entity Details */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-lg border bg-muted/30 text-xs">
+                    <div>
+                      <p className="text-muted-foreground font-medium">Phone</p>
+                      <p className="font-mono font-bold">{request.requester_phone || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">ID Number</p>
+                      <p className="font-bold">{request.requester_id_number || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">Account Created</p>
+                      <p className="font-bold">{request.requester_created_at ? format(new Date(request.requester_created_at), "MMM d, yyyy") : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">Entity Created</p>
+                      <p className="font-bold">{request.entity_created_at ? format(new Date(request.entity_created_at), "MMM d, yyyy") : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">Total Collected</p>
+                      <p className="font-bold text-primary">KES {(request.entity_collected || 0).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground font-medium">Available Balance</p>
+                      <p className="font-bold">KES {(request.entity_balance || 0).toLocaleString()}</p>
+                    </div>
+                  </div>
+
                   <div className="bg-muted/50 p-3 rounded text-sm">
                     <p className="font-medium text-xs text-muted-foreground mb-1">Reason for verification:</p>
                     <p>{request.request_reason}</p>
