@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FileDown, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
+import { addPDFBrandingFooter } from "@/utils/pdfBranding";
 
 interface AllocationLine {
   type: string;
