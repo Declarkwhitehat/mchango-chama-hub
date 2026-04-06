@@ -165,6 +165,8 @@ const AppContent = () => {
           <Route path="/admin/revenue" element={<AdminProtectedRoute><AdminRevenue /></AdminProtectedRoute>} />
           <Route path="/admin/welfare-executive-changes" element={<AdminProtectedRoute><AdminWelfareExecutiveChanges /></AdminProtectedRoute>} />
           <Route path="/admin/documents" element={<AdminProtectedRoute><AdminDocuments /></AdminProtectedRoute>} />
+          <Route path="/admin/commission-config" element={<AdminProtectedRoute><AdminCommissionConfig /></AdminProtectedRoute>} />
+          <Route path="/admin/super-managers" element={<AdminProtectedRoute><AdminSuperManagers /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

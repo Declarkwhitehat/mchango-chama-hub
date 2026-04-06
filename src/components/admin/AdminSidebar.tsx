@@ -149,6 +149,7 @@ export function AdminSidebar() {
       badge: pendingPayoutApprovals > 0 ? pendingPayoutApprovals : null
     },
     { title: "Commission Analytics", url: "/admin/commission-analytics", icon: TrendingUp },
+    { title: "Commission Config", url: "/admin/commission-config", icon: Settings },
     { title: "Financial Ledger", url: "/admin/ledger", icon: Landmark },
     { title: "Payment Config", url: "/admin/payment-config", icon: Settings },
     { title: "Payment Search", url: "/admin/payment-search", icon: Search },
