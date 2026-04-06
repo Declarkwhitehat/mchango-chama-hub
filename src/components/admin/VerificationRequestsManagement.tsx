@@ -116,14 +116,39 @@ export const VerificationRequestsManagement = () => {
             }
           }
 
-          // Get requester name
+          // Get requester details
           const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name')
+            .select('full_name, phone, id_number, created_at')
             .eq('id', request.requested_by)
             .maybeSingle();
+
+          let requesterPhone = '';
+          let requesterIdNumber = '';
+          let requesterCreatedAt = '';
           if (profile) {
             requesterName = profile.full_name;
+            requesterPhone = profile.phone || '';
+            requesterIdNumber = profile.id_number || '';
+            requesterCreatedAt = profile.created_at || '';
+          }
+
+          // Get entity financial data
+          let entityCollected = 0;
+          let entityBalance = 0;
+          let entityCreatedAt = '';
+          if (request.entity_type === 'chama') {
+            const { data: d } = await supabase.from('chama').select('total_gross_collected, available_balance, created_at').eq('id', request.entity_id).maybeSingle();
+            if (d) { entityCollected = Number(d.total_gross_collected || 0); entityBalance = Number(d.available_balance || 0); entityCreatedAt = d.created_at; }
+          } else if (request.entity_type === 'mchango') {
+            const { data: d } = await supabase.from('mchango').select('total_gross_collected, available_balance, created_at').eq('id', request.entity_id).maybeSingle();
+            if (d) { entityCollected = Number(d.total_gross_collected || 0); entityBalance = Number(d.available_balance || 0); entityCreatedAt = d.created_at; }
+          } else if (request.entity_type === 'organization') {
+            const { data: d } = await supabase.from('organizations').select('total_gross_collected, available_balance, created_at').eq('id', request.entity_id).maybeSingle();
+            if (d) { entityCollected = Number(d.total_gross_collected || 0); entityBalance = Number(d.available_balance || 0); entityCreatedAt = d.created_at; }
+          } else if (request.entity_type === 'welfare') {
+            const { data: d } = await supabase.from('welfares').select('available_balance, created_at').eq('id', request.entity_id).maybeSingle();
+            if (d) { entityBalance = Number(d.available_balance || 0); entityCreatedAt = d.created_at; }
           }
 
           return {
@@ -133,6 +158,12 @@ export const VerificationRequestsManagement = () => {
             entity_name: entityName,
             entity_slug: entitySlug,
             requester_name: requesterName,
+            requester_phone: requesterPhone,
+            requester_id_number: requesterIdNumber,
+            requester_created_at: requesterCreatedAt,
+            entity_collected: entityCollected,
+            entity_balance: entityBalance,
+            entity_created_at: entityCreatedAt,
           };
         })
       );
