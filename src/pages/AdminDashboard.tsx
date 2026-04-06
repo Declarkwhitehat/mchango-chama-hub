@@ -62,6 +62,7 @@ const AdminDashboard = () => {
         ledgerResult,
         execChangesResult,
         earningsResult,
+        activeAccountsResult,
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
