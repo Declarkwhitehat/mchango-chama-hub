@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     const { data: expiredDocs, error: fetchError } = await supabase
       .from("generated_documents")
       .select("id, file_path")
-      .lt("created_at", threeMonthsAgo.toISOString());
+      .lt("created_at", cutoffDate.toISOString());
 
     if (fetchError) throw fetchError;
 
