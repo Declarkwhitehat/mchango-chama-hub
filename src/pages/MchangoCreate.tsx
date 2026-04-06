@@ -316,48 +316,42 @@ const MchangoCreate = () => {
               </div>
 
               <div className="space-y-4">
-                <Label>Campaign Images (up to 3)</Label>
+                <Label>Campaign Image</Label>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Add photos to tell your story. Recommended: At least 800x800px, max 5MB each
+                  Add a photo to tell your story. Recommended: At least 800x800px, max 5MB
                 </p>
                 
-                <div className="grid grid-cols-3 gap-4">
-                  {[0, 1, 2].map((index) => (
-                    <div key={index} className="relative">
-                      {imagePreviews[index] ? (
-                        <div className="border rounded-lg overflow-hidden">
-                          <img 
-                            src={imagePreviews[index]} 
-                            alt={`Preview ${index + 1}`} 
-                            className="w-full h-24 object-cover"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeImage(index)}
-                            className="absolute top-1 right-1 h-6 w-6 p-0 bg-background/80 hover:bg-background"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors">
-                          <ImagePlus className="h-6 w-6 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground mt-1">
-                            {index === 0 ? "Main" : `Photo ${index + 1}`}
-                          </span>
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageChange(index)}
-                            disabled={kycStatus !== "approved"}
-                            className="hidden"
-                          />
-                        </label>
-                      )}
+                <div className="w-full max-w-[200px]">
+                  {imagePreviews[0] ? (
+                    <div className="relative border rounded-lg overflow-hidden">
+                      <img 
+                        src={imagePreviews[0]} 
+                        alt="Preview" 
+                        className="w-full h-32 object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeImage(0)}
+                        className="absolute top-1 right-1 h-6 w-6 p-0 bg-background/80 hover:bg-background"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                  ))}
+                  ) : (
+                    <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors">
+                      <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground mt-1">Upload Photo</span>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange(0)}
+                        disabled={kycStatus !== "approved"}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
 
