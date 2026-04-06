@@ -72,6 +72,8 @@ const AdminPayoutApprovals = lazy(() => import("./pages/AdminPayoutApprovals"));
 const AdminRevenue = lazy(() => import("./pages/AdminRevenue"));
 const AdminWelfareExecutiveChanges = lazy(() => import("./pages/AdminWelfareExecutiveChanges"));
 const AdminDocuments = lazy(() => import("./pages/AdminDocuments"));
+const AdminCommissionConfig = lazy(() => import("./pages/AdminCommissionConfig"));
+const AdminSuperManagers = lazy(() => import("./pages/AdminSuperManagers"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
