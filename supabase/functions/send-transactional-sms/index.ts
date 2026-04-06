@@ -51,11 +51,10 @@ const sendSMS = async (phone: string, message: string): Promise<{ success: boole
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accesskey': ONFON_ACCESS_KEY || '',
       },
       body: JSON.stringify({
         SenderId: ONFON_SENDER_ID,
-        IsUnicode: false,
-        IsFlash: false,
         MessageParameters: [
           {
             Number: normalizedPhone,
