@@ -83,6 +83,15 @@ const AdminDashboard = () => {
       const earningsRevenue = earningsResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
       const totalPlatformRevenue = ledgerRevenue + earningsRevenue;
 
+      // Count distinct active users from chama_members
+      const activeAccountsResult = results[12];
+      const uniqueUserIds = new Set<string>();
+      if (activeAccountsResult.data) {
+        for (const row of activeAccountsResult.data as any[]) {
+          if (row.user_id) uniqueUserIds.add(row.user_id);
+        }
+      }
+
       setStats({
         totalUsers: usersResult.count || 0,
         verifiedUsers: verifiedUsersResult.count || 0,
@@ -95,6 +104,7 @@ const AdminDashboard = () => {
         pendingCallbacks: callbacksResult.count || 0,
         recentTransactions: transactionsResult.count || 0,
         pendingExecChanges: execChangesResult.count || 0,
+        activeAccounts: uniqueUserIds.size,
       });
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
