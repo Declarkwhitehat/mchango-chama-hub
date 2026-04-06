@@ -217,11 +217,60 @@ export const PaymentStatusManager = ({
   };
 
   const getMemberPaymentStatus = (memberId: string, p: PeriodType) => {
+    // For "today" view, use member_cycle_payments as the authoritative source
+    // This correctly handles wallet credits, carry-forward, and settlement allocations
+    if (p === "today" && activeCycleId) {
+      const mcp = cyclePayments.find(
+        (cp) => cp.member_id === memberId && cp.cycle_id === activeCycleId
+      );
+      if (mcp) {
+        // Build synthetic contribution for display
+        const syntheticContributions: Contribution[] = mcp.is_paid
+          ? [{
+              id: `mcp-${mcp.cycle_id}-${memberId}`,
+              member_id: memberId,
+              amount: mcp.amount_paid,
+              contribution_date: mcp.paid_at || new Date().toISOString(),
+              status: "completed",
+              payment_reference: "CYCLE-PAYMENT",
+            }]
+          : [];
+        return {
+          paid: mcp.is_paid,
+          amount: mcp.amount_paid,
+          contributions: syntheticContributions,
+        };
+      }
+    }
+
+    // Fallback: use contributions + wallet data for week/month views
     const periodContributions = getContributionsForPeriod(p);
     const memberContributions = periodContributions.filter(
       (c) => c.member_id === memberId
     );
     const totalPaid = memberContributions.reduce((sum, c) => sum + c.amount, 0);
+
+    // Also check if member_cycle_payments marks them as paid for any cycle in range
+    if (p !== "today") {
+      const memberCyclePayment = cyclePayments.find(
+        (cp) => cp.member_id === memberId && cp.is_paid
+      );
+      if (memberCyclePayment && totalPaid < contributionAmount) {
+        return {
+          paid: true,
+          amount: Math.max(totalPaid, memberCyclePayment.amount_paid),
+          contributions: memberContributions.length > 0 ? memberContributions : [{
+            id: `mcp-fallback-${memberId}`,
+            member_id: memberId,
+            amount: memberCyclePayment.amount_paid,
+            contribution_date: memberCyclePayment.paid_at || new Date().toISOString(),
+            status: "completed",
+            payment_reference: "CYCLE-PAYMENT",
+          }],
+        };
+      }
+    }
+
     return {
       paid: totalPaid >= contributionAmount,
       amount: totalPaid,
