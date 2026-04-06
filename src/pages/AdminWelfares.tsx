@@ -59,15 +59,16 @@ const AdminWelfares = () => {
     }
   };
 
-  const toggleVerify = async (welfare: any) => {
+  const handleUnverify = async (welfare: any) => {
+    if (!welfare.is_verified) return; // Can only unverify — verification requires a customer request
     try {
       const { error } = await supabase
         .from('welfares')
-        .update({ is_verified: !welfare.is_verified })
+        .update({ is_verified: false })
         .eq('id', welfare.id);
 
       if (error) throw error;
-      toast.success(welfare.is_verified ? "Verification removed" : "Welfare verified");
+      toast.success("Verification removed");
       fetchWelfares();
     } catch (e: any) {
       toast.error("Failed to update welfare");
