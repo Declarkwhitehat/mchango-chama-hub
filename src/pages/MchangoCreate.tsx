@@ -16,8 +16,8 @@ const MchangoCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
-  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>(["", "", ""]);
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([""]);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -105,7 +105,7 @@ const MchangoCreate = () => {
       }
 
       // Upload images
-      const imageUrls: (string | null)[] = [null, null, null];
+      const imageUrls: (string | null)[] = [null];
       
       for (let i = 0; i < imageFiles.length; i++) {
         const file = imageFiles[i];
@@ -143,8 +143,6 @@ const MchangoCreate = () => {
         target_amount: Number(formData.get("goal")),
         category: formData.get("category") as string,
         image_url: imageUrls[0],
-        image_url_2: imageUrls[1],
-        image_url_3: imageUrls[2],
         youtube_url: youtubeUrl || null,
         end_date: new Date(Date.now() + Number(formData.get("duration")) * 24 * 60 * 60 * 1000).toISOString(),
       };
@@ -318,48 +316,42 @@ const MchangoCreate = () => {
               </div>
 
               <div className="space-y-4">
-                <Label>Campaign Images (up to 3)</Label>
+                <Label>Campaign Image</Label>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Add photos to tell your story. Recommended: At least 800x800px, max 5MB each
+                  Add a photo to tell your story. Recommended: At least 800x800px, max 5MB
                 </p>
                 
-                <div className="grid grid-cols-3 gap-4">
-                  {[0, 1, 2].map((index) => (
-                    <div key={index} className="relative">
-                      {imagePreviews[index] ? (
-                        <div className="border rounded-lg overflow-hidden">
-                          <img 
-                            src={imagePreviews[index]} 
-                            alt={`Preview ${index + 1}`} 
-                            className="w-full h-24 object-cover"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeImage(index)}
-                            className="absolute top-1 right-1 h-6 w-6 p-0 bg-background/80 hover:bg-background"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors">
-                          <ImagePlus className="h-6 w-6 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground mt-1">
-                            {index === 0 ? "Main" : `Photo ${index + 1}`}
-                          </span>
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageChange(index)}
-                            disabled={kycStatus !== "approved"}
-                            className="hidden"
-                          />
-                        </label>
-                      )}
+                <div className="w-full max-w-[200px]">
+                  {imagePreviews[0] ? (
+                    <div className="relative border rounded-lg overflow-hidden">
+                      <img 
+                        src={imagePreviews[0]} 
+                        alt="Preview" 
+                        className="w-full h-32 object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeImage(0)}
+                        className="absolute top-1 right-1 h-6 w-6 p-0 bg-background/80 hover:bg-background"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                  ))}
+                  ) : (
+                    <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors">
+                      <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground mt-1">Upload Photo</span>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange(0)}
+                        disabled={kycStatus !== "approved"}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
 
