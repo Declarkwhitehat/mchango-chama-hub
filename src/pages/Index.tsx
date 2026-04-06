@@ -78,6 +78,33 @@ const Index = () => {
               <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto px-4">
                 Join thousands building wealth through secure online Chama groups and Mchango campaigns in Kenya
               </p>
+              <p className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-wider text-center px-4 mt-3">
+                <span style={{ color: "hsl(142, 76%, 46%)" }}>s</span>
+                <span style={{ color: "hsl(48, 96%, 53%)" }}>i</span>
+                <span style={{ color: "hsl(199, 89%, 48%)" }}>s</span>
+                <span style={{ color: "hsl(340, 82%, 52%)" }}>i</span>
+                {" "}
+                <span style={{ color: "hsl(262, 83%, 58%)" }}>t</span>
+                <span style={{ color: "hsl(25, 95%, 53%)" }}>u</span>
+                <span style={{ color: "hsl(172, 66%, 50%)" }}>k</span>
+                <span style={{ color: "hsl(0, 84%, 60%)" }}>o</span>
+                {" "}
+                <span style={{ color: "hsl(142, 76%, 46%)" }}>p</span>
+                <span style={{ color: "hsl(48, 96%, 53%)" }}>a</span>
+                <span style={{ color: "hsl(199, 89%, 48%)" }}>m</span>
+                <span style={{ color: "hsl(340, 82%, 52%)" }}>o</span>
+                <span style={{ color: "hsl(262, 83%, 58%)" }}>j</span>
+                <span style={{ color: "hsl(25, 95%, 53%)" }}>a</span>
+                {" "}
+                <span style={{ color: "hsl(172, 66%, 50%)" }}>j</span>
+                <span style={{ color: "hsl(0, 84%, 60%)" }}>e</span>
+                {" "}
+                <span style={{ color: "hsl(142, 76%, 46%)" }}>w</span>
+                <span style={{ color: "hsl(48, 96%, 53%)" }}>e</span>
+                <span style={{ color: "hsl(199, 89%, 48%)" }}>w</span>
+                <span style={{ color: "hsl(340, 82%, 52%)" }}>e</span>
+                <span style={{ color: "hsl(262, 83%, 58%)" }}>?</span>
+              </p>
               
               {/* CTA Buttons */}
               <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 sm:gap-4 justify-center items-center pt-4 sm:pt-6 max-w-4xl mx-auto">
