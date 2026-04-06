@@ -484,8 +484,12 @@ export const WithdrawalsManagement = () => {
                     </TableCell>
                     <TableCell>
                       {canReview(withdrawal.status) && (
-                        <Button size="sm" onClick={() => handleSelectWithdrawal(withdrawal)}>
-                          Review
+                        <Button
+                          size="sm"
+                          onClick={() => handleSelectWithdrawal(withdrawal)}
+                          disabled={processingLock.has(withdrawal.id)}
+                        >
+                          {processingLock.has(withdrawal.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Review'}
                         </Button>
                       )}
                     </TableCell>
