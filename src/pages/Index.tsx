@@ -19,6 +19,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+// heroImage is available for future use
 import heroImage from "@/assets/hero-image.jpg";
 import profilePhoto from "@/assets/profile-photo.jpg";
 
@@ -69,13 +70,13 @@ const Index = () => {
             {/* Content */}
             <div className="space-y-6 sm:space-y-8 text-center">
               <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight">
-                Build Your Financial Future{" "}
+                The All-in-One Digital Hub for{" "}
                 <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  Together
+                  Chamas and Mchango Campaigns
                 </span>
               </h1>
               <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto px-4">
-                Join thousands building wealth through community chamas, crowdfunding campaigns, and organizations
+                Join thousands building wealth through secure online Chama groups and Mchango campaigns in Kenya
               </p>
               
               {/* CTA Buttons */}
@@ -126,7 +127,7 @@ const Index = () => {
       <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-24">
         <div className="text-center mb-8 sm:mb-12">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4">
-            Why Choose Us?
+            Start a Transparent Mchango Campaign Today
           </h2>
           <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto px-4">
             Empowering communities with secure, transparent financial tools
@@ -162,7 +163,7 @@ const Index = () => {
         <div className="container mx-auto px-4 sm:px-6">
           <div className="text-center mb-8 sm:mb-12">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-card-foreground mb-3 sm:mb-4">
-              How It Works
+              Manage Your Online Chama with Ease
             </h2>
           </div>
 
@@ -229,6 +230,10 @@ const Index = () => {
               </div>
             </div>
 
+            {/* Digital Tools for Welfare & Organizations */}
+            <div className="col-span-1 sm:col-span-2 lg:col-span-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-card-foreground mb-2 text-center">Digital Tools for Welfare Organizations</h2>
+            </div>
             {/* Welfare */}
             <div className="space-y-4 sm:space-y-6">
               <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-destructive/80 to-destructive/60 rounded-full">
@@ -337,7 +342,7 @@ const Index = () => {
                 size="lg"
                 className="gap-2 hover:bg-accent/50 transition-all"
               >
-                <span className="font-semibold">Frequently Asked Questions</span>
+                <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2">Frequently Asked Questions</h2>
                 <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isFaqOpen ? 'rotate-180' : ''}`} />
               </Button>
             </CollapsibleTrigger>
@@ -353,28 +358,28 @@ const Index = () => {
             <Accordion type="single" collapsible className="w-full space-y-2">
               <AccordionItem value="item-1" className="border rounded-lg px-4 py-1 bg-card">
                 <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  What is Mchango?
+                  What is the best platform for Mchango campaigns?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  Mchango is our crowdfunding feature that allows you to create fundraising campaigns for any cause - medical bills, education, weddings, or community projects.
+                  Pamojanova is the leading digital platform in Kenya for secure, transparent, and mobile-money integrated Mchango campaigns. Create your campaign, share it with supporters, and receive contributions directly via M-Pesa.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-2" className="border rounded-lg px-4 py-1 bg-card">
                 <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  What are Chamas?
+                  Can organizations manage welfare groups digitally?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  Chamas are rotating savings and credit associations (ROSCAs) where members contribute a fixed amount regularly. Each cycle, one member receives the total pot.
+                  Yes, our platform provides specialized tools for organizations to track contributions and ensure accountability. Welfare groups, NGOs, churches, and schools can all manage their funds transparently.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-3" className="border rounded-lg px-4 py-1 bg-card">
                 <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  What are Organizations?
+                  What is the best online Chama platform in Kenya?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  Organizations are verified entities (NGOs, churches, schools, etc.) that can receive donations through our platform. They provide transparency and accountability for their supporters.
+                  Pamojanova offers the most trusted digital chama management system with automated rotating savings, M-Pesa integration, and transparent contribution tracking for groups across Kenya.
                 </AccordionContent>
               </AccordionItem>
 
@@ -407,19 +412,10 @@ const Index = () => {
 
               <AccordionItem value="item-7" className="border rounded-lg px-4 py-1 bg-card">
                 <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  What are the fees?
+                  Is my money safe on Pamojanova?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  We charge a small commission on transactions to maintain the platform. Rates are displayed before you complete any transaction.
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-8" className="border rounded-lg px-4 py-1 bg-card">
-                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  Is my money safe?
-                </AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  Yes! We use bank-grade security, encrypted connections, and secure payment gateways. All transactions are tracked and auditable.
+                  Yes! We use bank-grade security, encrypted connections, and secure payment gateways. All transactions are tracked and auditable for complete transparency.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -432,12 +428,12 @@ const Index = () => {
         <div className="container mx-auto px-4 sm:px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 text-center md:text-left">
             <p className="text-muted-foreground text-sm sm:text-base">
-              &copy; 2025 Chama & Mchango. Building financial futures together.
+              &copy; 2025 Pamojanova. Building financial futures together.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <img 
                 src={profilePhoto} 
-                alt="Declark Chacha" 
+                alt="Declark Chacha - Pamojanova website creator and digital chama management expert" 
                 className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-primary/20 shadow-md"
               />
               <p className="text-xs sm:text-sm text-muted-foreground">
