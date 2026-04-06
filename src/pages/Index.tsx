@@ -69,13 +69,13 @@ const Index = () => {
             {/* Content */}
             <div className="space-y-6 sm:space-y-8 text-center">
               <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight">
-                Build Your Financial Future{" "}
+                The All-in-One Digital Hub for{" "}
                 <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  Together
+                  Chamas and Mchango Campaigns
                 </span>
               </h1>
               <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto px-4">
-                Join thousands building wealth through community chamas, crowdfunding campaigns, and organizations
+                Join thousands building wealth through secure online Chama groups and Mchango campaigns in Kenya
               </p>
               
               {/* CTA Buttons */}
