@@ -117,8 +117,26 @@ export const PaymentStatusManager = ({
 
       if (contributionsError) throw contributionsError;
 
+      // Fetch overpayment wallet applications for the current month
+      const { data: walletData } = await supabase
+        .from("chama_overpayment_wallet")
+        .select("id, member_id, amount, applied_at, status")
+        .eq("chama_id", chamaId)
+        .eq("status", "applied")
+        .gte("applied_at", startDate.toISOString());
+
+      // Convert applied wallet entries into synthetic contribution records
+      const walletContributions: Contribution[] = (walletData || []).map((w: any) => ({
+        id: w.id,
+        member_id: w.member_id,
+        amount: w.amount,
+        contribution_date: w.applied_at,
+        status: "completed",
+        payment_reference: "WALLET-CREDIT",
+      }));
+
       setMembers(membersData || []);
-      setContributions(contributionsData || []);
+      setContributions([...(contributionsData || []), ...walletContributions]);
     } catch (error) {
       console.error("Error fetching payment data:", error);
     } finally {
