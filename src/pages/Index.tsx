@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/collapsible";
 // heroImage is available for future use
 import heroImage from "@/assets/hero-image.jpg";
-import profilePhoto from "@/assets/profile-photo.jpg";
+
 
 const Index = () => {
   const [isFaqOpen, setIsFaqOpen] = useState(false);
@@ -457,16 +457,6 @@ const Index = () => {
             <p className="text-muted-foreground text-sm sm:text-base">
               &copy; 2025 Pamojanova. Building financial futures together.
             </p>
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <img 
-                src={profilePhoto} 
-                alt="Declark Chacha - Pamojanova website creator and digital chama management expert" 
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-primary/20 shadow-md"
-              />
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Website created by <span className="font-semibold text-foreground">Declark Chacha</span>
-              </p>
-            </div>
           </div>
         </div>
       </footer>

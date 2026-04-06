@@ -50,8 +50,19 @@ const signupSchema = z.object({
   full_name: z.string().min(2, "Full name is required").max(100),
   id_number: z.string().min(5, "Valid ID number is required").max(50),
   phone: z.string()
-    .regex(/^\+254\d{9}$/, "Phone must be in format +254XXXXXXXXX")
-    .refine(isSafaricomNumber, "Only Safaricom numbers are accepted for M-Pesa payouts"),
+    .min(10, "Phone number is required")
+    .transform((val) => {
+      const cleaned = val.replace(/\s/g, '');
+      if (cleaned.startsWith('07') || cleaned.startsWith('01')) {
+        return '+254' + cleaned.slice(1);
+      }
+      if (cleaned.startsWith('7') || cleaned.startsWith('1')) {
+        return '+254' + cleaned;
+      }
+      return cleaned;
+    })
+    .refine((val) => /^\+254\d{9}$/.test(val), "Phone must be a valid Kenyan number (e.g., 0712345678 or +254712345678)")
+    .refine((val) => isSafaricomNumber(val), "Only Safaricom numbers are accepted for M-Pesa payouts"),
   email: z.string().email("Invalid email address").max(255),
   password: z
     .string()
