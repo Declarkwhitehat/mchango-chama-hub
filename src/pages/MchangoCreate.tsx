@@ -17,7 +17,7 @@ const MchangoCreate = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<(File | null)[]>([null]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>(["", "", ""]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([""]);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
