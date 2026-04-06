@@ -43,6 +43,14 @@ interface Contribution {
   payment_reference: string;
 }
 
+interface CyclePayment {
+  member_id: string;
+  is_paid: boolean;
+  amount_paid: number;
+  paid_at: string | null;
+  cycle_id: string;
+}
+
 interface PaymentStatusManagerProps {
   chamaId: string;
   chamaName: string;
@@ -60,6 +68,8 @@ export const PaymentStatusManager = ({
 }: PaymentStatusManagerProps) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [cyclePayments, setCyclePayments] = useState<CyclePayment[]>([]);
+  const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodType>("today");
   const [pdfPeriod, setPdfPeriod] = useState<PeriodType>("today");
@@ -117,6 +127,35 @@ export const PaymentStatusManager = ({
 
       if (contributionsError) throw contributionsError;
 
+      // Fetch the most recent cycles to find active/current cycle
+      const { data: cyclesData } = await supabase
+        .from("contribution_cycles")
+        .select("id, cycle_number, start_date, end_date, is_complete")
+        .eq("chama_id", chamaId)
+        .order("cycle_number", { ascending: false })
+        .limit(3);
+
+      // Find the current active cycle or most recently completed one
+      const currentCycle = cyclesData?.find(c => !c.is_complete) || cyclesData?.[0];
+      const recentCycleIds = (cyclesData || []).map(c => c.id);
+      setActiveCycleId(currentCycle?.id || null);
+
+      // Fetch member_cycle_payments for recent cycles (authoritative payment source)
+      let cyclePaymentsData: CyclePayment[] = [];
+      if (recentCycleIds.length > 0) {
+        const { data: mcpData } = await supabase
+          .from("member_cycle_payments")
+          .select("member_id, is_paid, amount_paid, paid_at, cycle_id")
+          .in("cycle_id", recentCycleIds);
+        cyclePaymentsData = (mcpData || []).map((m: any) => ({
+          member_id: m.member_id,
+          is_paid: m.is_paid,
+          amount_paid: m.amount_paid || 0,
+          paid_at: m.paid_at,
+          cycle_id: m.cycle_id,
+        }));
+      }
+
       // Fetch overpayment wallet applications for the current month
       const { data: walletData } = await supabase
         .from("chama_overpayment_wallet")
@@ -137,6 +176,7 @@ export const PaymentStatusManager = ({
 
       setMembers(membersData || []);
       setContributions([...(contributionsData || []), ...walletContributions]);
+      setCyclePayments(cyclePaymentsData);
     } catch (error) {
       console.error("Error fetching payment data:", error);
     } finally {
@@ -177,11 +217,60 @@ export const PaymentStatusManager = ({
   };
 
   const getMemberPaymentStatus = (memberId: string, p: PeriodType) => {
+    // For "today" view, use member_cycle_payments as the authoritative source
+    // This correctly handles wallet credits, carry-forward, and settlement allocations
+    if (p === "today" && activeCycleId) {
+      const mcp = cyclePayments.find(
+        (cp) => cp.member_id === memberId && cp.cycle_id === activeCycleId
+      );
+      if (mcp) {
+        // Build synthetic contribution for display
+        const syntheticContributions: Contribution[] = mcp.is_paid
+          ? [{
+              id: `mcp-${mcp.cycle_id}-${memberId}`,
+              member_id: memberId,
+              amount: mcp.amount_paid,
+              contribution_date: mcp.paid_at || new Date().toISOString(),
+              status: "completed",
+              payment_reference: "CYCLE-PAYMENT",
+            }]
+          : [];
+        return {
+          paid: mcp.is_paid,
+          amount: mcp.amount_paid,
+          contributions: syntheticContributions,
+        };
+      }
+    }
+
+    // Fallback: use contributions + wallet data for week/month views
     const periodContributions = getContributionsForPeriod(p);
     const memberContributions = periodContributions.filter(
       (c) => c.member_id === memberId
     );
     const totalPaid = memberContributions.reduce((sum, c) => sum + c.amount, 0);
+
+    // Also check if member_cycle_payments marks them as paid for any cycle in range
+    if (p !== "today") {
+      const memberCyclePayment = cyclePayments.find(
+        (cp) => cp.member_id === memberId && cp.is_paid
+      );
+      if (memberCyclePayment && totalPaid < contributionAmount) {
+        return {
+          paid: true,
+          amount: Math.max(totalPaid, memberCyclePayment.amount_paid),
+          contributions: memberContributions.length > 0 ? memberContributions : [{
+            id: `mcp-fallback-${memberId}`,
+            member_id: memberId,
+            amount: memberCyclePayment.amount_paid,
+            contribution_date: memberCyclePayment.paid_at || new Date().toISOString(),
+            status: "completed",
+            payment_reference: "CYCLE-PAYMENT",
+          }],
+        };
+      }
+    }
+
     return {
       paid: totalPaid >= contributionAmount,
       amount: totalPaid,
