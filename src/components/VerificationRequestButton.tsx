@@ -46,14 +46,32 @@ export const VerificationRequestButton = ({
   const [reason, setReason] = useState("");
   const [existingRequest, setExistingRequest] = useState<VerificationRequest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [verificationFee, setVerificationFee] = useState(200);
 
   useEffect(() => {
     if (user && isOwner) {
       fetchExistingRequest();
+      fetchVerificationFee();
     } else {
       setLoading(false);
     }
   }, [user, entityId, entityType, isOwner]);
+
+  const fetchVerificationFee = async () => {
+    try {
+      const { data } = await supabase
+        .from('platform_settings')
+        .select('setting_value')
+        .eq('setting_key', 'verification_fee')
+        .maybeSingle();
+      if (data && typeof data.setting_value === 'object' && data.setting_value !== null) {
+        const val = data.setting_value as { amount?: number };
+        if (val.amount) setVerificationFee(val.amount);
+      }
+    } catch (e) {
+      console.error('Error fetching verification fee:', e);
+    }
+  };
 
   const fetchExistingRequest = async () => {
     try {
@@ -82,7 +100,6 @@ export const VerificationRequestButton = ({
     }
   };
 
-  const VERIFICATION_FEE = 200;
   const requiresFee = entityType !== 'chama';
 
   const handleSubmit = async () => {
@@ -114,10 +131,10 @@ export const VerificationRequestButton = ({
           balance = data?.available_balance ?? 0;
         }
 
-        if (balance < VERIFICATION_FEE) {
+        if (balance < verificationFee) {
           toast({
             title: "Insufficient Balance",
-            description: `You need at least KSh ${VERIFICATION_FEE} in your ${entityType === 'mchango' ? 'campaign' : entityType} balance to request verification.`,
+            description: `You need at least KSh ${verificationFee} in your ${entityType === 'mchango' ? 'campaign' : entityType} balance to request verification.`,
             variant: "destructive",
           });
           setIsSubmitting(false);
@@ -151,17 +168,17 @@ export const VerificationRequestButton = ({
       // Deduct fee AFTER successful insert
       if (requiresFee) {
         if (entityType === 'mchango') {
-          await supabase.from('mchango').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+          await supabase.from('mchango').update({ available_balance: balance - verificationFee }).eq('id', entityId);
         } else if (entityType === 'organization') {
-          await supabase.from('organizations').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+          await supabase.from('organizations').update({ available_balance: balance - verificationFee }).eq('id', entityId);
         } else if (entityType === 'welfare') {
-          await supabase.from('welfares').update({ available_balance: balance - VERIFICATION_FEE }).eq('id', entityId);
+          await supabase.from('welfares').update({ available_balance: balance - verificationFee }).eq('id', entityId);
         }
 
         // Record fee as company revenue
         await supabase.from('company_earnings').insert({
-          amount: VERIFICATION_FEE,
-          source: 'VERIFICATION_FEE',
+          amount: verificationFee,
+          source: 'verificationFee',
           description: `Verification fee for ${entityType}: ${entityName}`,
           group_id: entityId,
         });
@@ -170,7 +187,7 @@ export const VerificationRequestButton = ({
       toast({
         title: "Request Submitted",
         description: requiresFee
-          ? `KSh ${VERIFICATION_FEE} has been deducted. Your verification request has been submitted for admin review.`
+          ? `KSh ${verificationFee} has been deducted. Your verification request has been submitted for admin review.`
           : "Your verification request has been submitted for admin review",
       });
 
@@ -222,7 +239,7 @@ export const VerificationRequestButton = ({
                 Submit a new request with additional information.
                 {requiresFee && (
                   <span className="block mt-2 font-medium text-foreground">
-                    A verification fee of KSh {VERIFICATION_FEE} will be deducted from your balance.
+                    A verification fee of KSh {verificationFee} will be deducted from your balance.
                   </span>
                 )}
               </DialogDescription>
@@ -279,7 +296,7 @@ export const VerificationRequestButton = ({
             A verified badge shows users that your {entityType === 'mchango' ? 'campaign' : entityType} is authentic and trustworthy.
             {requiresFee && (
               <span className="block mt-2 font-medium text-foreground">
-                A verification fee of KSh {VERIFICATION_FEE} will be deducted from your {entityType === 'mchango' ? 'campaign' : entityType} balance.
+                A verification fee of KSh {verificationFee} will be deducted from your {entityType === 'mchango' ? 'campaign' : entityType} balance.
               </span>
             )}
           </DialogDescription>

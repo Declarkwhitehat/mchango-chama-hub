@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Save, Percent, Shield } from "lucide-react";
+import { Loader2, Lock, Save, Percent, Shield, BadgeCheck } from "lucide-react";
 
 const SUPER_ADMIN_CODE = "D3E9C0L1A3R9K";
 
@@ -25,6 +25,7 @@ const AdminCommissionConfig = () => {
     { key: "commission_rate_organization", label: "Organizations", description: "Organization donation commission", rate: 5 },
     { key: "commission_rate_welfare", label: "Welfare", description: "Welfare contribution commission", rate: 5 },
   ]);
+  const [verificationFee, setVerificationFee] = useState(200);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -37,10 +38,11 @@ const AdminCommissionConfig = () => {
 
   const fetchRates = async () => {
     try {
+      const allKeys = [...rates.map(r => r.key), "verification_fee"];
       const { data, error } = await supabase
         .from("platform_settings")
         .select("setting_key, setting_value")
-        .in("setting_key", rates.map(r => r.key));
+        .in("setting_key", allKeys);
 
       if (error) throw error;
 
@@ -53,10 +55,16 @@ const AdminCommissionConfig = () => {
           }
           return r;
         }));
+
+        const feeSetting = data.find((d: any) => d.setting_key === "verification_fee");
+        if (feeSetting && typeof feeSetting.setting_value === 'object' && feeSetting.setting_value !== null) {
+          const val = feeSetting.setting_value as { amount?: number };
+          setVerificationFee(val.amount || 200);
+        }
       }
     } catch (err: any) {
       console.error(err);
-      toast({ title: "Error", description: "Failed to load commission rates", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to load settings", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -66,6 +74,12 @@ const AdminCommissionConfig = () => {
     const num = parseFloat(value);
     if (isNaN(num) || num < 0 || num > 50) return;
     setRates(prev => prev.map(r => r.key === key ? { ...r, rate: num } : r));
+  };
+
+  const handleFeeChange = (value: string) => {
+    const num = parseInt(value);
+    if (isNaN(num) || num < 0 || num > 10000) return;
+    setVerificationFee(num);
   };
 
   const handleSave = () => {
@@ -98,18 +112,32 @@ const AdminCommissionConfig = () => {
         if (error) throw error;
       }
 
+      // Update verification fee
+      const { error: feeError } = await supabase
+        .from("platform_settings")
+        .update({
+          setting_value: { amount: verificationFee },
+          updated_by: user?.id || null,
+        })
+        .eq("setting_key", "verification_fee");
+
+      if (feeError) throw feeError;
+
       // Log audit
       await supabase.from("audit_logs").insert({
         table_name: "platform_settings",
-        action: "commission_rates_updated",
+        action: "platform_settings_updated",
         user_id: user?.id,
-        new_values: Object.fromEntries(rates.map(r => [r.key, r.rate / 100])),
+        new_values: {
+          ...Object.fromEntries(rates.map(r => [r.key, r.rate / 100])),
+          verification_fee: verificationFee,
+        },
       });
 
-      toast({ title: "Saved", description: "Commission rates updated successfully" });
+      toast({ title: "Saved", description: "Platform settings updated successfully" });
     } catch (err: any) {
       console.error(err);
-      toast({ title: "Error", description: "Failed to update rates", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update settings", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -130,22 +158,24 @@ const AdminCommissionConfig = () => {
       <div className="container px-4 py-6 max-w-3xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Percent className="h-7 w-7" /> Commission Configuration
+            <Percent className="h-7 w-7" /> Platform Settings
           </h1>
           <p className="text-muted-foreground mt-1">
-            Manage platform-wide commission rates. Changes require Super Admin authorization.
+            Manage commission rates and fees. Changes require Super Admin authorization.
           </p>
         </div>
 
         <div className="flex items-center gap-2 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/10 text-sm text-amber-800 dark:text-amber-300">
           <Lock className="h-4 w-4 flex-shrink-0" />
-          <p>Changing commission rates affects all future transactions across the platform. This action is logged.</p>
+          <p>Changes affect all future transactions across the platform. Every change is logged.</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Commission Rates</CardTitle>
-            <CardDescription>Set the percentage deducted from each payment type</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Percent className="h-4 w-4" /> Commission Rates
+            </CardTitle>
+            <CardDescription>Percentage deducted from each payment type</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {rates.map((rate) => (
@@ -168,16 +198,44 @@ const AdminCommissionConfig = () => {
                 </div>
               </div>
             ))}
-
-            <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save Changes
-            </Button>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <BadgeCheck className="h-4 w-4" /> Verification Fee
+            </CardTitle>
+            <CardDescription>Amount charged when a Mchango, Welfare, or Organization requests verification (Chama is free)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <Label className="font-semibold">Verification Fee (KSh)</Label>
+                <p className="text-xs text-muted-foreground">Deducted from entity balance on request. Refunded if rejected.</p>
+              </div>
+              <div className="flex items-center gap-2 w-36">
+                <span className="text-sm font-medium text-muted-foreground">KSh</span>
+                <Input
+                  type="number"
+                  min="0"
+                  max="10000"
+                  step="50"
+                  value={verificationFee}
+                  onChange={(e) => handleFeeChange(e.target.value)}
+                  className="text-right font-mono"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save All Changes
+        </Button>
       </div>
 
-      {/* Super Admin Confirmation Dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
           <DialogHeader>
@@ -186,7 +244,7 @@ const AdminCommissionConfig = () => {
               Super Admin Authorization Required
             </DialogTitle>
             <DialogDescription>
-              Enter the Super Admin code to confirm commission rate changes.
+              Enter the Super Admin code to confirm changes.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-4">
