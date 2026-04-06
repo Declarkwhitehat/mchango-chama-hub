@@ -353,28 +353,28 @@ const Index = () => {
             <Accordion type="single" collapsible className="w-full space-y-2">
               <AccordionItem value="item-1" className="border rounded-lg px-4 py-1 bg-card">
                 <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  What is Mchango?
+                  What is the best platform for Mchango campaigns?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  Mchango is our crowdfunding feature that allows you to create fundraising campaigns for any cause - medical bills, education, weddings, or community projects.
+                  Pamojanova is the leading digital platform in Kenya for secure, transparent, and mobile-money integrated Mchango campaigns. Create your campaign, share it with supporters, and receive contributions directly via M-Pesa.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-2" className="border rounded-lg px-4 py-1 bg-card">
                 <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  What are Chamas?
+                  Can organizations manage welfare groups digitally?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  Chamas are rotating savings and credit associations (ROSCAs) where members contribute a fixed amount regularly. Each cycle, one member receives the total pot.
+                  Yes, our platform provides specialized tools for organizations to track contributions and ensure accountability. Welfare groups, NGOs, churches, and schools can all manage their funds transparently.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-3" className="border rounded-lg px-4 py-1 bg-card">
                 <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  What are Organizations?
+                  What is the best online Chama platform in Kenya?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  Organizations are verified entities (NGOs, churches, schools, etc.) that can receive donations through our platform. They provide transparency and accountability for their supporters.
+                  Pamojanova offers the most trusted digital chama management system with automated rotating savings, M-Pesa integration, and transparent contribution tracking for groups across Kenya.
                 </AccordionContent>
               </AccordionItem>
 
@@ -407,19 +407,10 @@ const Index = () => {
 
               <AccordionItem value="item-7" className="border rounded-lg px-4 py-1 bg-card">
                 <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  What are the fees?
+                  Is my money safe on Pamojanova?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  We charge a small commission on transactions to maintain the platform. Rates are displayed before you complete any transaction.
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-8" className="border rounded-lg px-4 py-1 bg-card">
-                <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline py-3">
-                  Is my money safe?
-                </AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground pb-3">
-                  Yes! We use bank-grade security, encrypted connections, and secure payment gateways. All transactions are tracked and auditable.
+                  Yes! We use bank-grade security, encrypted connections, and secure payment gateways. All transactions are tracked and auditable for complete transparency.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
