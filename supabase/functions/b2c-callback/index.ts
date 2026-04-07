@@ -250,8 +250,34 @@ serve(async (req) => {
       });
     }
 
-    const groupName = withdrawal.chama?.name || withdrawal.mchango?.title || withdrawal.welfares?.name || 'your group';
-    const recipientPhone = withdrawal.profiles?.phone;
+    // Determine source entity type and name
+    let sourceType = 'Group';
+    let sourceName = 'your group';
+    if (withdrawal.chama_id) {
+      sourceType = 'Chama';
+      // Fetch chama name
+      const { data: chamaData } = await supabaseAdmin.from('chama').select('name').eq('id', withdrawal.chama_id).maybeSingle();
+      sourceName = chamaData?.name || 'your Chama';
+    } else if (withdrawal.mchango_id) {
+      sourceType = 'Mchango';
+      const { data: mchangoData } = await supabaseAdmin.from('mchango').select('title').eq('id', withdrawal.mchango_id).maybeSingle();
+      sourceName = mchangoData?.title || 'your Mchango';
+    } else if (withdrawal.organization_id) {
+      sourceType = 'Organization';
+      const { data: orgData } = await supabaseAdmin.from('organizations').select('name').eq('id', withdrawal.organization_id).maybeSingle();
+      sourceName = orgData?.name || 'your Organization';
+    } else if (withdrawal.welfare_id) {
+      sourceType = 'Welfare';
+      const { data: welfareData } = await supabaseAdmin.from('welfares').select('name').eq('id', withdrawal.welfare_id).maybeSingle();
+      sourceName = welfareData?.name || 'your Welfare';
+    }
+
+    // Get recipient phone from profile
+    let recipientPhone = '';
+    if (withdrawal.requested_by) {
+      const { data: profileData } = await supabaseAdmin.from('profiles').select('phone').eq('id', withdrawal.requested_by).maybeSingle();
+      recipientPhone = profileData?.phone || '';
+    }
 
     if (resultCode === 0) {
       // === PAYMENT SUCCESSFUL ===
