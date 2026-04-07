@@ -865,19 +865,47 @@ Deno.serve(async (req) => {
 
           console.log(`Processing ${payoutType} payout for ${chama.name}: ${paidCount}/${totalMembers} paid, net: KES ${payoutAmount}`);
 
-          const { data: paymentMethod } = await supabase
+          // Try to find M-Pesa default payment method first
+          let { data: paymentMethod } = await supabase
             .from('payment_methods')
             .select('*')
             .eq('user_id', actualBeneficiary.user_id)
             .eq('is_default', true)
+            .eq('method_type', 'mpesa')
             .maybeSingle();
 
+          // Fallback: any M-Pesa method for this user
+          if (!paymentMethod) {
+            const { data: anyMpesa } = await supabase
+              .from('payment_methods')
+              .select('*')
+              .eq('user_id', actualBeneficiary.user_id)
+              .eq('method_type', 'mpesa')
+              .limit(1)
+              .maybeSingle();
+            paymentMethod = anyMpesa;
+          }
+
+          // Final fallback: use profile phone (guaranteed Safaricom per platform policy)
+          const profilePhone = actualBeneficiary.profiles?.phone;
+          const hasMpesaMethod = !!paymentMethod;
+          if (!paymentMethod && profilePhone) {
+            console.log(`ℹ️ No M-Pesa payment method for ${actualBeneficiary.member_code}, falling back to profile phone ${profilePhone}`);
+            paymentMethod = {
+              id: null,
+              method_type: 'mpesa',
+              phone_number: profilePhone,
+              is_default: true,
+              is_verified: true
+            } as any;
+          }
+
           if (!paymentMethod && payoutAmount > 0) {
-            console.error(`No payment method for beneficiary ${actualBeneficiary.member_code}`);
+            console.error(`No payment method or profile phone for beneficiary ${actualBeneficiary.member_code}`);
             errors++;
           } else {
             if (payoutAmount > 0) {
-              const canAutoApprove = paymentMethod?.method_type === 'mpesa' && 
+              const canAutoApprove = (hasMpesaMethod || !!profilePhone) && 
                                      !actualBeneficiary.requires_admin_verification &&
                                      (actualBeneficiary.missed_payments_count || 0) === 0;
               
