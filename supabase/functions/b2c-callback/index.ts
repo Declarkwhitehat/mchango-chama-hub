@@ -338,9 +338,13 @@ serve(async (req) => {
         });
       }
 
-      // Send success SMS
+      // Send detailed payout confirmation SMS
       if (recipientPhone) {
-        const successMessage = `🎉 Your ${groupName} payout of KES ${transactionAmount.toFixed(2)} has been sent to your M-Pesa. Transaction: ${transactionId}. Thank you!`;
+        const now = new Date();
+        const eatTime = new Date(now.getTime() + 3 * 60 * 60 * 1000); // UTC+3
+        const dateStr = eatTime.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = eatTime.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const successMessage = `✅ Pamojanova Payout Confirmed!\nAmount: KES ${transactionAmount.toFixed(2)}\nRef: ${transactionId}\nFrom: ${sourceType} - ${sourceName}\nDate: ${dateStr} ${timeStr}\n\nSisi tuko pamoja, je wewe?`;
         await sendSMS(recipientPhone, successMessage);
       }
 
