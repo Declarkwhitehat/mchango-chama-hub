@@ -7,33 +7,48 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
 };
 
-const celcomApiKey = Deno.env.get('CELCOM_API_KEY');
-const celcomPartnerId = Deno.env.get('CELCOM_PARTNER_ID');
-const celcomShortcode = Deno.env.get('CELCOM_SHORTCODE');
-
 async function sendSMS(phone: string, message: string) {
-  if (!celcomApiKey || !celcomPartnerId || !celcomShortcode) {
-    console.error('SMS credentials not configured');
+  const onfonApiKey = Deno.env.get('ONFON_API_KEY');
+  const onfonClientId = Deno.env.get('ONFON_CLIENT_ID');
+  const onfonAccessKey = Deno.env.get('ONFON_ACCESS_KEY');
+  const onfonSenderId = Deno.env.get('ONFON_SENDER_ID') || 'OnfonInfo';
+
+  if (!onfonApiKey || !onfonClientId || !onfonAccessKey) {
+    console.error('Onfon SMS credentials not configured');
     return { success: false, error: 'SMS not configured' };
   }
 
   try {
-    const response = await fetch('https://api.celcomafrica.com/v1/sms/send', {
+    // Normalize phone: remove '+' prefix for Onfon
+    let normalizedPhone = phone.replace(/^\+/, '');
+    if (normalizedPhone.startsWith('0')) {
+      normalizedPhone = '254' + normalizedPhone.substring(1);
+    } else if (!normalizedPhone.startsWith('254')) {
+      normalizedPhone = '254' + normalizedPhone;
+    }
+
+    const response = await fetch('https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${celcomApiKey}`
+        'Accesskey': onfonAccessKey,
       },
       body: JSON.stringify({
-        partnerID: celcomPartnerId,
-        shortCode: celcomShortcode,
-        mobile: phone.startsWith('254') ? phone : `254${phone.replace(/^0+/, '')}`,
-        message: message
-      })
+        ApiKey: onfonApiKey,
+        ClientId: onfonClientId,
+        SenderId: onfonSenderId,
+        MessageParameters: [
+          {
+            Number: normalizedPhone,
+            Text: message,
+          },
+        ],
+      }),
     });
 
     const data = await response.json();
-    return { success: response.ok, messageId: data.messageId };
+    console.log('SMS response:', JSON.stringify(data));
+    return { success: response.ok, data };
   } catch (error: any) {
     console.error('SMS error:', error);
     return { success: false, error: error.message };
