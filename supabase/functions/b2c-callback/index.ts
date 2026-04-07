@@ -371,7 +371,7 @@ serve(async (req) => {
           .eq('id', withdrawal.id);
 
         if (recipientPhone) {
-          await sendSMS(recipientPhone, `❌ Your ${groupName} payout of KES ${withdrawal.net_amount?.toFixed(2)} failed after multiple attempts. Error: ${resultDesc}. Please contact support.`);
+          await sendSMS(recipientPhone, `❌ Your ${sourceType} "${sourceName}" payout of KES ${withdrawal.net_amount?.toFixed(2)} failed after multiple attempts. Error: ${resultDesc}. Please contact support.`);
         }
       } else {
         await supabaseAdmin
