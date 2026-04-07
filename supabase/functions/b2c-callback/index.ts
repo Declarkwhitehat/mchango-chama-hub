@@ -7,33 +7,48 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
 };
 
-const celcomApiKey = Deno.env.get('CELCOM_API_KEY');
-const celcomPartnerId = Deno.env.get('CELCOM_PARTNER_ID');
-const celcomShortcode = Deno.env.get('CELCOM_SHORTCODE');
-
 async function sendSMS(phone: string, message: string) {
-  if (!celcomApiKey || !celcomPartnerId || !celcomShortcode) {
-    console.error('SMS credentials not configured');
+  const onfonApiKey = Deno.env.get('ONFON_API_KEY');
+  const onfonClientId = Deno.env.get('ONFON_CLIENT_ID');
+  const onfonAccessKey = Deno.env.get('ONFON_ACCESS_KEY');
+  const onfonSenderId = Deno.env.get('ONFON_SENDER_ID') || 'OnfonInfo';
+
+  if (!onfonApiKey || !onfonClientId || !onfonAccessKey) {
+    console.error('Onfon SMS credentials not configured');
     return { success: false, error: 'SMS not configured' };
   }
 
   try {
-    const response = await fetch('https://api.celcomafrica.com/v1/sms/send', {
+    // Normalize phone: remove '+' prefix for Onfon
+    let normalizedPhone = phone.replace(/^\+/, '');
+    if (normalizedPhone.startsWith('0')) {
+      normalizedPhone = '254' + normalizedPhone.substring(1);
+    } else if (!normalizedPhone.startsWith('254')) {
+      normalizedPhone = '254' + normalizedPhone;
+    }
+
+    const response = await fetch('https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${celcomApiKey}`
+        'Accesskey': onfonAccessKey,
       },
       body: JSON.stringify({
-        partnerID: celcomPartnerId,
-        shortCode: celcomShortcode,
-        mobile: phone.startsWith('254') ? phone : `254${phone.replace(/^0+/, '')}`,
-        message: message
-      })
+        ApiKey: onfonApiKey,
+        ClientId: onfonClientId,
+        SenderId: onfonSenderId,
+        MessageParameters: [
+          {
+            Number: normalizedPhone,
+            Text: message,
+          },
+        ],
+      }),
     });
 
     const data = await response.json();
-    return { success: response.ok, messageId: data.messageId };
+    console.log('SMS response:', JSON.stringify(data));
+    return { success: response.ok, data };
   } catch (error: any) {
     console.error('SMS error:', error);
     return { success: false, error: error.message };
@@ -235,8 +250,34 @@ serve(async (req) => {
       });
     }
 
-    const groupName = withdrawal.chama?.name || withdrawal.mchango?.title || withdrawal.welfares?.name || 'your group';
-    const recipientPhone = withdrawal.profiles?.phone;
+    // Determine source entity type and name
+    let sourceType = 'Group';
+    let sourceName = 'your group';
+    if (withdrawal.chama_id) {
+      sourceType = 'Chama';
+      // Fetch chama name
+      const { data: chamaData } = await supabaseAdmin.from('chama').select('name').eq('id', withdrawal.chama_id).maybeSingle();
+      sourceName = chamaData?.name || 'your Chama';
+    } else if (withdrawal.mchango_id) {
+      sourceType = 'Mchango';
+      const { data: mchangoData } = await supabaseAdmin.from('mchango').select('title').eq('id', withdrawal.mchango_id).maybeSingle();
+      sourceName = mchangoData?.title || 'your Mchango';
+    } else if (withdrawal.organization_id) {
+      sourceType = 'Organization';
+      const { data: orgData } = await supabaseAdmin.from('organizations').select('name').eq('id', withdrawal.organization_id).maybeSingle();
+      sourceName = orgData?.name || 'your Organization';
+    } else if (withdrawal.welfare_id) {
+      sourceType = 'Welfare';
+      const { data: welfareData } = await supabaseAdmin.from('welfares').select('name').eq('id', withdrawal.welfare_id).maybeSingle();
+      sourceName = welfareData?.name || 'your Welfare';
+    }
+
+    // Get recipient phone from profile
+    let recipientPhone = '';
+    if (withdrawal.requested_by) {
+      const { data: profileData } = await supabaseAdmin.from('profiles').select('phone').eq('id', withdrawal.requested_by).maybeSingle();
+      recipientPhone = profileData?.phone || '';
+    }
 
     if (resultCode === 0) {
       // === PAYMENT SUCCESSFUL ===
@@ -297,9 +338,13 @@ serve(async (req) => {
         });
       }
 
-      // Send success SMS
+      // Send detailed payout confirmation SMS
       if (recipientPhone) {
-        const successMessage = `🎉 Your ${groupName} payout of KES ${transactionAmount.toFixed(2)} has been sent to your M-Pesa. Transaction: ${transactionId}. Thank you!`;
+        const now = new Date();
+        const eatTime = new Date(now.getTime() + 3 * 60 * 60 * 1000); // UTC+3
+        const dateStr = eatTime.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = eatTime.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const successMessage = `✅ Pamojanova Payout Confirmed!\nAmount: KES ${transactionAmount.toFixed(2)}\nRef: ${transactionId}\nFrom: ${sourceType} - ${sourceName}\nDate: ${dateStr} ${timeStr}\n\nSisi tuko pamoja, je wewe?`;
         await sendSMS(recipientPhone, successMessage);
       }
 
@@ -326,7 +371,7 @@ serve(async (req) => {
           .eq('id', withdrawal.id);
 
         if (recipientPhone) {
-          await sendSMS(recipientPhone, `❌ Your ${groupName} payout of KES ${withdrawal.net_amount?.toFixed(2)} failed after multiple attempts. Error: ${resultDesc}. Please contact support.`);
+          await sendSMS(recipientPhone, `❌ Your ${sourceType} "${sourceName}" payout of KES ${withdrawal.net_amount?.toFixed(2)} failed after multiple attempts. Error: ${resultDesc}. Please contact support.`);
         }
       } else {
         await supabaseAdmin
@@ -343,7 +388,7 @@ serve(async (req) => {
           .eq('id', withdrawal.id);
 
         if (recipientPhone) {
-          await sendSMS(recipientPhone, `⚠️ Your ${groupName} payout could not be processed. We will retry automatically. If not received within 1 hour, contact support.`);
+          await sendSMS(recipientPhone, `⚠️ Your ${sourceType} "${sourceName}" payout could not be processed. We will retry automatically. If not received within 1 hour, contact support.`);
         }
       }
     }
