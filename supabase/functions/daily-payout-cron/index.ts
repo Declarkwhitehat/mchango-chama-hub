@@ -288,10 +288,31 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     console.log('[CRON] Daily payout started at:', new Date().toISOString());
 
-    const { data: chamas, error: chamasError } = await supabase
+    // Support early payout mode: process a single chama that has 100% payment
+    let requestBody: any = {};
+    try {
+      requestBody = await req.json();
+    } catch {
+      // No body — normal cron mode
+    }
+
+    const isEarlyPayout = requestBody?.earlyPayout === true;
+    const singleChamaId = requestBody?.chamaId;
+    const batchOffset = requestBody?.batchOffset || 0;
+    const BATCH_SIZE = 50; // Process max 50 chamas per invocation to avoid timeout
+
+    let chamaQuery = supabase
       .from('chama')
       .select('id, name, contribution_amount, commission_rate, contribution_frequency, current_cycle_round, created_at, every_n_days_count, monthly_contribution_day, monthly_contribution_day_2')
       .eq('status', 'active');
+
+    if (singleChamaId) {
+      chamaQuery = chamaQuery.eq('id', singleChamaId);
+    } else {
+      chamaQuery = chamaQuery.range(batchOffset, batchOffset + BATCH_SIZE - 1);
+    }
+
+    const { data: chamas, error: chamasError } = await chamaQuery;
 
     if (chamasError) {
       console.error('Error fetching chamas:', chamasError);
