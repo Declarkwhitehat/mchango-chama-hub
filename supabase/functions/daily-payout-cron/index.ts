@@ -1541,21 +1541,44 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[CRON] Daily payout completed. Processed: ${payoutsProcessed}, Skipped: ${skipsProcessed}, Errors: ${errors}`);
+    console.log(`[CRON] Daily payout batch completed. Offset: ${batchOffset}, Processed: ${payoutsProcessed}, Skipped: ${skipsProcessed}, Errors: ${errors}`);
+
+    // Auto-chain next batch if we processed a full batch (more chamas may exist)
+    let nextBatchTriggered = false;
+    if (!singleChamaId && !isEarlyPayout && chamas && chamas.length >= BATCH_SIZE) {
+      const nextOffset = batchOffset + BATCH_SIZE;
+      console.log(`[CRON] Triggering next batch at offset ${nextOffset}...`);
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/daily-payout-cron`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ batchOffset: nextOffset })
+        });
+        nextBatchTriggered = true;
+      } catch (chainError) {
+        console.error('[CRON] Failed to chain next batch:', chainError);
+      }
+    }
 
     return new Response(JSON.stringify({
       success: true,
       payoutsProcessed,
       skipsProcessed,
       errors,
-      processedChamas: chamas?.length || 0
+      processedChamas: chamas?.length || 0,
+      batchOffset,
+      nextBatchTriggered,
+      isEarlyPayout
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in daily-payout-cron:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as any).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
