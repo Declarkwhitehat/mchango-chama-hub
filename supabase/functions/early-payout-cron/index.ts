@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
       success: true,
       earlyPayoutsTriggered,
       skipped,
-      totalChamas: chamas?.length || 0,
+      totalChamas: chamas.length,
       results
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
