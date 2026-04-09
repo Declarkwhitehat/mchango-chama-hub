@@ -59,76 +59,63 @@ export default function Activity() {
 
       const memberIds = memberData?.map(m => m.id) || [];
 
-      // Fetch chama contributions through member IDs
-      let chamaData: any[] = [];
-      const chamaNameMap = new Map<string, string>();
-      
-      if (memberIds.length > 0) {
-        const { data, error: chamaError } = await supabase
-          .from("contributions")
-          .select("id, amount, status, created_at, chama_id, mpesa_receipt_number, member_id, chama:chama_id(name)")
-          .in("member_id", memberIds)
+      // Fetch ALL transaction types in parallel using Promise.allSettled
+      const [chamaResult, mchangoResult, orgResult, withdrawalResult] = await Promise.allSettled([
+        // Chama contributions
+        memberIds.length > 0
+          ? supabase
+              .from("contributions")
+              .select("id, amount, status, created_at, chama_id, mpesa_receipt_number, member_id, chama:chama_id(name)")
+              .in("member_id", memberIds)
+              .order("created_at", { ascending: false })
+              .limit(50)
+          : Promise.resolve({ data: [], error: null }),
+        // Mchango donations
+        supabase
+          .from("mchango_donations")
+          .select("id, amount, created_at, mchango_id, payment_status, payment_reference, mchango:mchango_id(title)")
+          .eq("user_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(50);
-          
-        if (chamaError) throw chamaError;
-        chamaData = data || [];
-        
-        // Build chama name map from joined data
-        chamaData.forEach((c: any) => {
-          if (c.chama) chamaNameMap.set(c.chama_id, c.chama.name);
-        });
-      }
+          .limit(50),
+        // Organization donations
+        supabase
+          .from("organization_donations")
+          .select("id, amount, created_at, organization_id, payment_status, mpesa_receipt_number, organization:organization_id(name)")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(50),
+        // Withdrawals
+        supabase
+          .from("withdrawals")
+          .select("id, amount, status, created_at, payment_reference")
+          .eq("requested_by", user.id)
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
 
-      // Fetch mchango donations with joined title
-      const { data: mchangoData, error: mchangoError } = await supabase
-        .from("mchango_donations")
-        .select("id, amount, created_at, mchango_id, payment_status, payment_reference, mchango:mchango_id(title)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      // Process results safely
+      const chamaData = chamaResult.status === 'fulfilled' && !chamaResult.value.error ? (chamaResult.value.data || []) : [];
+      const mchangoData = mchangoResult.status === 'fulfilled' && !mchangoResult.value.error ? (mchangoResult.value.data || []) : [];
+      const orgData = orgResult.status === 'fulfilled' && !orgResult.value.error ? (orgResult.value.data || []) : [];
+      const withdrawalData = withdrawalResult.status === 'fulfilled' && !withdrawalResult.value.error ? (withdrawalResult.value.data || []) : [];
 
-      if (mchangoError) throw mchangoError;
+      // Build name maps from joined data
+      const chamaNameMap = new Map<string, string>();
+      chamaData.forEach((c: any) => { if (c.chama) chamaNameMap.set(c.chama_id, c.chama.name); });
 
-      // Build mchango name map from joined data
       const mchangoNameMap = new Map<string, string>();
-      (mchangoData || []).forEach((m: any) => {
-        if (m.mchango) mchangoNameMap.set(m.mchango_id, m.mchango.title);
-      });
+      mchangoData.forEach((m: any) => { if (m.mchango) mchangoNameMap.set(m.mchango_id, m.mchango.title); });
 
-      // Fetch organization donations with joined name
-      const { data: orgData, error: orgError } = await supabase
-        .from("organization_donations")
-        .select("id, amount, created_at, organization_id, payment_status, mpesa_receipt_number, organization:organization_id(name)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (orgError) throw orgError;
-
-      // Build organization name map from joined data
       const orgNameMap = new Map<string, string>();
-      (orgData || []).forEach((o: any) => {
-        if (o.organization) orgNameMap.set(o.organization_id, o.organization.name);
-      });
-
-      // Fetch withdrawals
-      const { data: withdrawalData, error: withdrawalError } = await supabase
-        .from("withdrawals")
-        .select("id, amount, status, created_at, payment_reference")
-        .eq("requested_by", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (withdrawalError) throw withdrawalError;
+      orgData.forEach((o: any) => { if (o.organization) orgNameMap.set(o.organization_id, o.organization.name); });
 
       setChamaNames(chamaNameMap);
       setMchangoNames(mchangoNameMap);
       setOrganizationNames(orgNameMap);
-      setChamaTransactions(chamaData || []);
-      setMchangoTransactions(mchangoData || []);
-      setOrganizationTransactions(orgData || []);
-      setWithdrawals(withdrawalData || []);
+      setChamaTransactions(chamaData);
+      setMchangoTransactions(mchangoData);
+      setOrganizationTransactions(orgData);
+      setWithdrawals(withdrawalData);
 
       // Combine all transactions
       const allTransactions: Transaction[] = [
