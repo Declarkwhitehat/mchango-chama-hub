@@ -91,59 +91,67 @@ export const verifyOTP = async (
   }
 };
 
-// SMS Templates
+// SMS Templates — Pamojanova branded, professional, concise
+const STOP_LINE = '\nSTOP 4569*5#';
+
 export const SMS_TEMPLATES = {
   accountCreated: (name: string) =>
-    `Welcome ${name}! Your account has been created successfully. Start exploring our platform now.`,
-  
+    `Pamojanova: Welcome, ${name}! Your account has been created successfully. Log in to explore Chamas, Mchangos, and more.${STOP_LINE}`,
+
   chamaCreated: (chamaName: string) =>
-    `Your Chama "${chamaName}" has been created successfully! Share the link with members to join.`,
-  
+    `Pamojanova: Your Chama "${chamaName}" has been created. Share the invite link with members to get started.${STOP_LINE}`,
+
   mchangoCreated: (mchangoTitle: string) =>
-    `Your campaign "${mchangoTitle}" is now live! Share it to start receiving donations.`,
-  
+    `Pamojanova: Your campaign "${mchangoTitle}" is now live. Share it to start receiving donations.${STOP_LINE}`,
+
   passwordReset: (code: string) =>
-    `Your password reset code is: ${code}. Valid for 10 minutes.`,
-  
+    `Pamojanova: Your password reset code is ${code}. It expires in 10 minutes. Do not share this code with anyone.${STOP_LINE}`,
+
   paymentReceived: (amount: number, reference: string) =>
-    `Payment of KES ${amount} received successfully. Ref: ${reference}`,
-  
+    `Pamojanova: Payment of KES ${amount.toFixed(2)} received successfully. Ref: ${reference}. Thank you!${STOP_LINE}`,
+
   dailyPaymentReminder: (name: string, amount: number, memberCode: string) =>
-    `Hi ${name}, reminder: Your contribution of KES ${amount} is due today. Pay via M-Pesa or online. Member ID: ${memberCode}`,
-  
+    `Pamojanova: Hi ${name}, your contribution of KES ${amount.toFixed(2)} is due today. Pay via M-Pesa or online. Member ID: ${memberCode}.${STOP_LINE}`,
+
   fullPayoutNotice: (amount: number, chamaName: string, requiresVerification: boolean) =>
-    `Your chama "${chamaName}" payout of KES ${amount.toFixed(2)} has been processed. Full payout - all members contributed! ${requiresVerification ? 'Pending admin approval.' : "You'll receive it shortly."}`,
-  
+    `Pamojanova: Payout of KES ${amount.toFixed(2)} from "${chamaName}" has been processed. All members contributed. ${requiresVerification ? 'Pending admin approval.' : 'Funds will arrive shortly.'}${STOP_LINE}`,
+
   partialPayoutNotice: (amount: number, chamaName: string, paidCount: number, totalCount: number, requiresVerification: boolean) =>
-    `Your chama "${chamaName}" payout of KES ${amount.toFixed(2)} has been processed. Partial payout (${paidCount}/${totalCount} members paid). ${requiresVerification ? 'Pending admin approval.' : "You'll receive it shortly."}`,
-  
+    `Pamojanova: Payout of KES ${amount.toFixed(2)} from "${chamaName}" processed (${paidCount}/${totalCount} members paid). ${requiresVerification ? 'Pending admin approval.' : 'Funds will arrive shortly.'}${STOP_LINE}`,
+
   latePaymentCredit: (amount: number, nextCycleDate: string) =>
-    `Your payment of KES ${amount} was received after 8 PM. It has been credited to your next cycle contribution on ${nextCycleDate}.`,
-  
+    `Pamojanova: Your payment of KES ${amount.toFixed(2)} was received after the daily cut-off. It has been credited to your next cycle on ${nextCycleDate}.${STOP_LINE}`,
+
   managerMissedPaymentAlert: (memberName: string, memberCode: string, chamaName: string, missedCount: number) =>
-    `Alert: Member ${memberName} (${memberCode}) has missed ${missedCount} contributions in your Chama "${chamaName}". Please follow up.`,
-  
+    `Pamojanova: Alert — ${memberName} (${memberCode}) has missed ${missedCount} contribution(s) in "${chamaName}". Please follow up.${STOP_LINE}`,
+
   withdrawalApproved: (amount: number) =>
-    `Your withdrawal request of KES ${amount} has been approved and will be processed shortly.`,
-  
+    `Pamojanova: Your withdrawal of KES ${amount.toFixed(2)} has been approved and will be processed shortly.${STOP_LINE}`,
+
   chamaStarted: (chamaName: string, amount: number, frequency: string, memberNumber: number, payoutDate: string, startDate: string) =>
-    `Your Chama "${chamaName}" has officially started! You will contribute KES ${amount.toLocaleString()} ${frequency}, starting ${startDate}. You are member #${memberNumber}, and your payout date will be ${payoutDate}.`,
-  
+    `Pamojanova: "${chamaName}" has officially started on ${startDate}. Contribute KES ${amount.toLocaleString()} ${frequency}. You are member #${memberNumber}. Your payout date: ${payoutDate}.${STOP_LINE}`,
+
   paymentReminder: (chamaName: string, amount: number, dueDate: string, memberCode: string) =>
-    `⏰ Reminder: Your contribution of KSh ${amount.toLocaleString()} for "${chamaName}" is due on ${dueDate}. Member ID: ${memberCode}. Pay on time to avoid missing your payout turn!`,
-  
+    `Pamojanova: Reminder — Your contribution of KES ${amount.toLocaleString()} for "${chamaName}" is due on ${dueDate}. Member ID: ${memberCode}. Pay on time to secure your payout.${STOP_LINE}`,
+
   cycleComplete: (chamaName: string, managerName: string, managerPhone: string, memberCode: string) =>
-    `🎉 Great news! Your chama "${chamaName}" has completed its full cycle. All members have received their payouts! Would you like to rejoin for another cycle? Reply to your manager ${managerName} at ${managerPhone} or log in to the app. Member ID: ${memberCode}`,
-  
+    `Pamojanova: "${chamaName}" has completed its full cycle. All payouts have been made. To rejoin, contact ${managerName} at ${managerPhone} or log in to the app. Member ID: ${memberCode}.${STOP_LINE}`,
+
   rejoinRequestSubmitted: (memberName: string, chamaName: string) =>
-    `New rejoin request for "${chamaName}" from ${memberName}. Log in to the app to approve or reject this request.`,
-  
+    `Pamojanova: ${memberName} has submitted a rejoin request for "${chamaName}". Log in to approve or reject it.${STOP_LINE}`,
+
   rejoinApproved: (chamaName: string) =>
-    `✅ Your rejoin request for "${chamaName}" has been approved! You'll be notified when the new cycle starts with your new payout position.`,
-  
+    `Pamojanova: Your rejoin request for "${chamaName}" has been approved. You will be notified when the new cycle begins.${STOP_LINE}`,
+
   rejoinRejected: (chamaName: string, reason?: string) =>
-    `❌ Your rejoin request for "${chamaName}" was not approved. ${reason || 'Please contact the manager for more information.'}`,
-  
+    `Pamojanova: Your rejoin request for "${chamaName}" was not approved. ${reason || 'Contact the manager for details.'}${STOP_LINE}`,
+
   newCycleStarted: (chamaName: string, memberNumber: number, payoutDate: string) =>
-    `🔄 New cycle started for "${chamaName}"! You're member #${memberNumber}. Your payout date: ${payoutDate}. Contributions start now. Good luck! 🎯`,
+    `Pamojanova: A new cycle has started for "${chamaName}". You are member #${memberNumber}. Your payout date: ${payoutDate}. Contributions begin now.${STOP_LINE}`,
+
+  payoutConfirmed: (amount: number, reference: string, entityType: string, entityName: string, timestamp: string) =>
+    `Pamojanova: Payout of KES ${amount.toFixed(2)} confirmed. Ref: ${reference}. Source: ${entityType} "${entityName}". Sent on ${timestamp}. Sisi tuko pamoja, je wewe?${STOP_LINE}`,
+
+  chamaDeleted: (chamaName: string, rejoinCount: number, totalMembers: number) =>
+    `Pamojanova: "${chamaName}" did not meet the 40% rejoin requirement (${rejoinCount}/${totalMembers}). The Chama has been closed. You may join or create a new one.${STOP_LINE}`,
 };
