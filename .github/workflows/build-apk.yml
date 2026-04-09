@@ -2,6 +2,9 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -30,10 +33,12 @@ jobs:
 
       - name: Build Web App
         run: npm run build
-        continue-on-error: true
 
-      - name: Install Capacitor Android
-        run: npx cap add android || true
+      - name: Remove existing Android folder
+        run: rm -rf android
+
+      - name: Add Android Platform
+        run: npx cap add android
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -51,3 +56,4 @@ jobs:
         with:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          
