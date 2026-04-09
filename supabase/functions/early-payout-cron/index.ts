@@ -19,19 +19,33 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     console.log('[EARLY-PAYOUT] Started at:', new Date().toISOString());
 
-    // Get all active chamas
-    const { data: chamas, error: chamasError } = await supabase
-      .from('chama')
-      .select('id, name, contribution_amount, commission_rate')
-      .eq('status', 'active');
+    // Get all active chamas in batches to avoid timeout
+    const BATCH_SIZE = 100;
+    let allChamas: any[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    if (chamasError) {
-      console.error('Error fetching chamas:', chamasError);
-      return new Response(JSON.stringify({ error: chamasError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    while (hasMore) {
+      const { data: batch, error: batchError } = await supabase
+        .from('chama')
+        .select('id, name, contribution_amount, commission_rate')
+        .eq('status', 'active')
+        .range(offset, offset + BATCH_SIZE - 1);
+
+      if (batchError) {
+        console.error('Error fetching chamas:', batchError);
+        return new Response(JSON.stringify({ error: batchError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      allChamas = allChamas.concat(batch || []);
+      hasMore = (batch?.length || 0) >= BATCH_SIZE;
+      offset += BATCH_SIZE;
     }
+
+    const chamas = allChamas;
 
     let earlyPayoutsTriggered = 0;
     let skipped = 0;

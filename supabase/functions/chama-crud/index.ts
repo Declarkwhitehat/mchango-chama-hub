@@ -47,7 +47,18 @@ serve(async (req) => {
       const { data, error } = await supabaseClient
         .from('chama')
         .select(`
-          *,
+          id,
+          name,
+          slug,
+          description,
+          contribution_amount,
+          contribution_frequency,
+          max_members,
+          status,
+          created_at,
+          is_verified,
+          group_code,
+          is_public,
           profiles:created_by (
             full_name,
             email
@@ -60,7 +71,8 @@ serve(async (req) => {
           )
         `)
         .eq('status', 'active')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 
