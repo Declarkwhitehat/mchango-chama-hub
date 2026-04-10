@@ -1194,7 +1194,7 @@ serve(async (req) => {
                       gross_amount: grossAmount,
                       commission_amount: commissionAmount,
                       net_amount: netPayoutAmount,
-                      commission_rate: commissionRate,
+                      commission_rate: 0,
                       reference_id: newWithdrawal.id,
                       description: `Immediate full payout — Cycle #${currentCycle.cycle_number} to ${beneficiaryMember.member_code}. All ${totalMembers} members paid.`
                     });

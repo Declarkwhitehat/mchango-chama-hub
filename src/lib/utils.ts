@@ -31,14 +31,17 @@ export function formatDateTime(date: string | Date): string {
 
 /**
  * Detects if the app is running as an installed PWA
- * Returns true only when running in standalone PWA mode
+ * Returns true when running in standalone PWA mode or inside a Capacitor native app
  */
 export function isPWAMode(): boolean {
+  // Check if running inside a Capacitor native app (APK wrapper)
+  const isCapacitor = !!(window as any).Capacitor;
+
   // Check if running in standalone mode (installed PWA)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
   
   // Check for iOS Safari standalone mode
   const isIOSStandalone = (window.navigator as any).standalone === true;
   
-  return isStandalone || isIOSStandalone;
+  return isCapacitor || isStandalone || isIOSStandalone;
 }
