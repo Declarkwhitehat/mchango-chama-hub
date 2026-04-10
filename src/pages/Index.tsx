@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Users, TrendingUp, Heart, Shield, Building2, ChevronDown, User, Home, ShieldCheck } from "lucide-react";
+import { Users, TrendingUp, Heart, Shield, Building2, ChevronDown, User, Home, ShieldCheck, Smartphone } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -331,28 +331,29 @@ const Index = () => {
         <section className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
           <div className="bg-gradient-to-br from-accent/5 to-primary/5 rounded-xl p-6 sm:p-8 max-w-4xl mx-auto">
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-              <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 bg-primary/10 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 sm:w-7 sm:h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
+              <img
+                src="/pwa-192x192.png"
+                alt="Pamoja App"
+                className="w-14 h-14 rounded-xl flex-shrink-0"
+              />
               <div className="flex-1 text-center sm:text-left">
                 <h3 className="text-lg sm:text-xl font-bold text-foreground mb-1">
-                  Install Pamoja App
+                  Download Pamoja App
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Get offline access, faster loading, and instant notifications
+                  Get fingerprint login, offline access, faster loading &amp; instant notifications
                 </p>
               </div>
               <Button 
                 variant="default"
                 size="lg"
-                className="whitespace-nowrap"
+                className="whitespace-nowrap gap-1.5"
                 onClick={() => {
-                  window.dispatchEvent(new Event('triggerPWAInstall'));
+                  window.open("https://github.com/Iamkingsleyyy/pamojanova/releases/latest/download/app-debug.apk", "_blank");
                 }}
               >
-                Install App
+                <Smartphone className="h-4 w-4" />
+                Download APK
               </Button>
             </div>
           </div>
