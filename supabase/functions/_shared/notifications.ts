@@ -5,7 +5,7 @@ interface CreateNotificationParams {
   title: string;
   message: string;
   type?: 'info' | 'success' | 'warning' | 'error';
-  category: 'verification' | 'withdrawal' | 'payment' | 'reminder' | 'chama' | 'campaign' | 'organization';
+  category: 'verification' | 'withdrawal' | 'payment' | 'reminder' | 'chama' | 'campaign' | 'organization' | 'welfare';
   relatedEntityId?: string;
   relatedEntityType?: string;
 }

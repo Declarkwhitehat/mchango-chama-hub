@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const { data, error } = await supabase
       .from("generated_documents")
       .delete()
-      .lt("created_at", threeMonthsAgo.toISOString())
+      .lt("created_at", cutoffDate.toISOString())
       .select("id");
 
     if (error) throw error;

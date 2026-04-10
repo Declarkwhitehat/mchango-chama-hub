@@ -688,7 +688,7 @@ serve(async (req) => {
 
         // 0: requester profile
         tasks.push(w.requested_by
-          ? supabaseAdmin.from('profiles').select('full_name, email, phone').eq('id', w.requested_by).single().then(r => r.data)
+          ? Promise.resolve(supabaseAdmin.from('profiles').select('full_name, email, phone').eq('id', w.requested_by).single().then(r => r.data))
           : Promise.resolve(null));
 
         // 1: reviewer profile
