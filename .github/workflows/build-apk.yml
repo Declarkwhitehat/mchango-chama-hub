@@ -51,8 +51,22 @@ jobs:
           cd android
           ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Create or update latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Pamoja App (Latest)
+          body: |
+            Latest build of Pamoja App.
+            Download the APK below and install on your Android device.
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
