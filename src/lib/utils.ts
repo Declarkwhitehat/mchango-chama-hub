@@ -37,11 +37,15 @@ export function isPWAMode(): boolean {
   // Check if running inside a Capacitor native app (APK wrapper)
   const isCapacitor = !!(window as any).Capacitor;
 
+  // Detect Android WebView (Capacitor with remote URL doesn't inject window.Capacitor)
+  // Android WebView UA contains "wv" flag inside the Android parenthetical
+  const isAndroidWebView = /Android.*; wv\)/.test(navigator.userAgent);
+
   // Check if running in standalone mode (installed PWA)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
   
   // Check for iOS Safari standalone mode
   const isIOSStandalone = (window.navigator as any).standalone === true;
   
-  return isCapacitor || isStandalone || isIOSStandalone;
+  return isCapacitor || isAndroidWebView || isStandalone || isIOSStandalone;
 }
