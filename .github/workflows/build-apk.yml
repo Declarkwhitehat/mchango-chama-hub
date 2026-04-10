@@ -9,6 +9,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # This section gives GitHub permission to create releases and upload files
+    permissions:
+      contents: write
+      packages: write
+      actions: write
 
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -34,6 +40,9 @@ jobs:
       - name: Build Web App
         run: npm run build
 
+      - name: Upload to Capgo
+        run: npx @capgo/cli@latest bundle upload --token ${{ secrets.CAPGO_TOKEN }} --channel production
+
       - name: Remove existing Android folder
         run: rm -rf android
 
@@ -51,22 +60,8 @@ jobs:
           cd android
           ./gradlew assembleDebug
 
-      - name: Upload APK as artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Create or update latest release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: Pamoja App (Latest)
-          body: |
-            Latest build of Pamoja App.
-            Download the APK below and install on your Android device.
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-          prerelease: false
-          make_latest: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
