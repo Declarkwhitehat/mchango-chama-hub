@@ -10,6 +10,8 @@ import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { ChatSupport } from "./components/ChatSupport";
 import { Loader2 } from "lucide-react";
+import { usePushNotifications } from "./hooks/usePushNotifications";
+import React from "react";
 
 
 // Lazy load all pages for better initial load performance
@@ -93,6 +95,13 @@ const PageLoader = () => (
   </div>
 );
 
+const PushNotificationInit = () => {
+  // Initialize push notifications for native app users
+  const { initialize } = usePushNotifications();
+  React.useEffect(() => { initialize(); }, [initialize]);
+  return null;
+};
+
 const AppContent = () => {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -102,6 +111,7 @@ const AppContent = () => {
       <Toaster />
       <Sonner />
       <PWAInstallPrompt />
+      <PushNotificationInit />
       {!isAdminRoute && <ChatSupport />}
       <Suspense fallback={<PageLoader />}>
         <Routes>
