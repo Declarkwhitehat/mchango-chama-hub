@@ -349,7 +349,7 @@ const Index = () => {
                 size="lg"
                 className="whitespace-nowrap gap-1.5"
                 onClick={() => {
-                  window.open("https://github.com/Iamkingsleyyy/pamojanova/releases/latest/download/app-debug.apk", "_blank");
+                  window.open("https://github.com/Declarkwhitehat/mchango-chama-hub/releases/latest/download/app-debug.apk", "_blank");
                 }}
               >
                 <Smartphone className="h-4 w-4" />

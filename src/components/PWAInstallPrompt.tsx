@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { X, Smartphone } from "lucide-react";
 import { isPWAMode } from "@/lib/utils";
 
-const APK_DOWNLOAD_URL = "https://github.com/Iamkingsleyyy/pamojanova/releases/latest/download/app-debug.apk";
+const APK_DOWNLOAD_URL = "https://github.com/Declarkwhitehat/mchango-chama-hub/releases/latest/download/app-debug.apk";
 
 export default function PWAInstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
