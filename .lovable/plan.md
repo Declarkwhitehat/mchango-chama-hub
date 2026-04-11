@@ -1,28 +1,114 @@
 
 
-## Plan: Fix GJ5X3Q8S Payout and Clean Up Payment Methods
+# Plan: Native Push Notifications + Biometric Authentication for Pamoja APK
 
-### Root Cause
-Sabastian's default payment method is **Airtel Money** (+254783768798), not M-Pesa. The auto-payout logic requires `method_type === 'mpesa'` to auto-approve. Since his default is Airtel, the withdrawal was created as `pending` (requiring admin approval) instead of `approved`, and no B2C was triggered.
+## Important Architecture Note
 
-He also has 3 payment method records — 2 duplicates with a non-Safaricom number and 1 Airtel Money entry set as default. None use his actual Safaricom profile number (+254794944611).
+Your APK loads the web app from a remote URL (`pamojanova.online`). This means:
+- **Capacitor native plugins CAN work** — the bridge is injected into the WebView regardless
+- **Biometric auth**: We'll use `@capawesome/capacitor-biometrics` which provides native fingerprint/Face ID
+- **Push notifications**: Requires Firebase setup first — I'll guide you through that, then implement the code
 
-### Steps
+---
 
-#### 1. Clean up payment methods (database migration)
-- Delete the 3 incorrect/duplicate payment method records for this user
-- Create a single correct M-Pesa payment method using his profile Safaricom number (+254794944611) and set it as default + verified
+## Step 1: Firebase Setup (You need to do this)
 
-#### 2. Trigger the pending payout
-- Update withdrawal `b3b09c85` status from `pending` to `approved` so the B2C payout can be triggered
-- Trigger the B2C payout to send KES 190 to his Safaricom number +254794944611
+Before I can implement push notifications, you need to create a Firebase project:
 
-#### 3. Prevent recurrence (code fix)
-- In `daily-payout-cron`, when no M-Pesa default payment method is found, fall back to the user's **profile phone number** (which is guaranteed Safaricom per the platform policy) instead of blocking the auto-payout entirely
-- This ensures payouts aren't silently stuck as "pending" when payment methods are misconfigured
+1. Go to [Firebase Console](https://console.firebase.google.com)
+2. Create a new project (or use an existing one)
+3. Add an Android app with package name: `online.pamojanova.pamoja`
+4. Download the `google-services.json` file
+5. Upload it to this project (I'll place it correctly)
 
-### Technical Details
-- **Migration SQL**: DELETE from `payment_methods` WHERE `user_id = '7d43b338-...'`; INSERT correct M-Pesa record
-- **Edge function edit**: `daily-payout-cron/index.ts` lines ~868-882 — add fallback to `profiles.phone` when no M-Pesa default payment method exists
-- **Manual B2C trigger**: Call the `b2c-payout` edge function with withdrawal_id, phone +254794944611, amount 190
+Once you have the file, share it with me and I'll proceed with the push notification implementation.
+
+---
+
+## Step 2: Install Native Plugins (npm packages)
+
+- `@capacitor/push-notifications` — for Firebase Cloud Messaging
+- `@capawesome/capacitor-biometrics` — for fingerprint/Face ID authentication
+
+---
+
+## Step 3: Biometric Authentication (can do immediately)
+
+### New file: `src/hooks/useNativeBiometrics.ts`
+- Check if running in native app context (Capacitor bridge available)
+- Use `@capawesome/capacitor-biometrics` to check availability, authenticate
+- Enable `fallbackEnabled: true` for PIN/pattern/password fallback
+- Handle success, failure, and cancellation with proper error messages
+- Fallback to existing WebAuthn flow when not in native context
+
+### Update: `src/hooks/useWebAuthn.ts`
+- Integrate native biometric check — prefer native biometrics when available in APK
+- Fall back to WebAuthn for PWA users
+
+### Update: Auth-related components
+- Wire native biometric authentication into login and sensitive action flows
+
+---
+
+## Step 4: Push Notifications Implementation
+
+### New file: `src/hooks/usePushNotifications.ts`
+- Request notification permission (handles Android 13+ `POST_NOTIFICATIONS`)
+- Register device with FCM
+- Listen for all events: `registration`, `registrationError`, `pushNotificationReceived`, `pushNotificationActionPerformed`
+- Store device token in database for server-side sending
+
+### New migration: `device_tokens` table
+- `id`, `user_id`, `token`, `platform`, `created_at`, `updated_at`
+- RLS policies so users can only manage their own tokens
+
+### Update: `src/App.tsx` or auth flow
+- Initialize push notification registration after user logs in
+
+---
+
+## Step 5: Update GitHub Actions Workflow
+
+### Update: `.github/workflows/build-apk.yml`
+- Add step to copy `google-services.json` from a GitHub secret (Base64-encoded) into `android/app/` after `cap add android`
+- Ensure `npx cap sync android` runs after plugin installation
+- All existing steps preserved — no breakage
+
+```text
+Workflow order:
+  checkout → node setup → java setup → npm install → build
+  → rm -rf android → cap add android
+  → decode google-services.json secret → copy to android/app/
+  → cap sync android → chmod gradlew → assembleDebug
+  → upload artifact → create release
+```
+
+---
+
+## Step 6: AndroidManifest.xml Permissions
+
+Since the workflow rebuilds `android/` from scratch, permissions are added via a post-sync script or a Capacitor plugin config that auto-injects them. The plugins handle this automatically during `cap sync`:
+- `android.permission.POST_NOTIFICATIONS` — added by `@capacitor/push-notifications`
+- `android.permission.USE_BIOMETRIC` + `USE_FINGERPRINT` — added by `@capawesome/capacitor-biometrics`
+
+---
+
+## Execution Order
+
+1. **Immediately**: Install plugins, implement biometric auth, update workflow
+2. **After you provide google-services.json**: Complete push notification integration and device token storage
+
+---
+
+## Summary of Files Changed/Created
+
+| Action | File |
+|--------|------|
+| Create | `src/hooks/useNativeBiometrics.ts` |
+| Create | `src/hooks/usePushNotifications.ts` |
+| Update | `src/hooks/useWebAuthn.ts` |
+| Update | `src/App.tsx` |
+| Update | `.github/workflows/build-apk.yml` |
+| Update | `package.json` (new deps) |
+| Migration | `device_tokens` table |
 
