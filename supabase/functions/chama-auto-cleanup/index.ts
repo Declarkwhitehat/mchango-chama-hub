@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     for (const chama of completedChamas) {
       console.log(`Checking chama "${chama.name}" (${chama.id}) for cleanup...`);
 
-      // Get total members from last cycle history
+      // Get total members from last cycle history, fallback to counting chama_members
       const { data: cycleHistory } = await supabase
         .from('chama_cycle_history')
         .select('total_members')
@@ -46,10 +46,23 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      const totalMembers = cycleHistory?.total_members || 0;
+      let totalMembers = cycleHistory?.total_members || 0;
+
+      // Fallback: count all members (active + removed) if no cycle history exists
       if (totalMembers === 0) {
-        console.log(`No cycle history for chama "${chama.name}", skipping`);
-        continue;
+        const { count: memberCount } = await supabase
+          .from('chama_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('chama_id', chama.id)
+          .eq('approval_status', 'approved');
+
+        totalMembers = memberCount || 0;
+        console.log(`No cycle history for chama "${chama.name}", using member count: ${totalMembers}`);
+      }
+
+      if (totalMembers === 0) {
+        console.log(`Chama "${chama.name}" has no members at all, marking for deletion`);
+        totalMembers = 1; // Force deletion for empty chamas
       }
 
       // Count rejoin requests (pending + approved)
