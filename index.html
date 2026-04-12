@@ -9,15 +9,9 @@
     <meta name="keywords" content="mchango campaign, online chama, organizations in Kenya, welfare groups Kenya, digital chama, mchango fundraising, rotating savings Kenya" />
     <link rel="canonical" href="https://mchango-chama-hub.lovable.app/" />
     
-    <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Pamojanova" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
 
     <meta property="og:title" content="Pamojanova: Best Online Chama, Mchango & Organizations Platform in Kenya" />
     <meta property="og:description" content="Join thousands building wealth through secure online Chama groups and Mchango campaigns in Kenya." />
@@ -64,33 +58,22 @@
     }
     </script>
 
-    <!-- Force clear stale PWA caches on version update -->
+    <!-- Clean up any leftover service workers from previous PWA -->
     <script>
       (function() {
-        var cacheVersion = 'v5-20260309-branding-fix';
-        var storedVersion = localStorage.getItem('cache-version');
-        
-        if (storedVersion !== cacheVersion) {
-          if ('caches' in window) {
-            caches.keys().then(function(names) {
-              names.forEach(function(name) { caches.delete(name); });
-            });
-          }
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(regs) {
-              regs.forEach(function(reg) { reg.unregister(); });
-            }).then(function() {
-              localStorage.setItem('cache-version', cacheVersion);
-              if (storedVersion) window.location.reload();
-            });
-          } else {
-            localStorage.setItem('cache-version', cacheVersion);
-            if (storedVersion) window.location.reload();
-          }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(reg) { reg.unregister(); });
+          });
+        }
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) { caches.delete(name); });
+          });
         }
       })();
     </script>
-    
+
     <!-- Critical: Prevent theme flash by applying theme BEFORE any paint -->
     <script>
       (function() {

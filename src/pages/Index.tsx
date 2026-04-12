@@ -3,7 +3,7 @@ import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Users, TrendingUp, Heart, Shield, Building2, ChevronDown, User, Home, ShieldCheck, Smartphone } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -25,20 +25,7 @@ import heroImage from "@/assets/hero-image.jpg";
 
 const Index = () => {
   const [isFaqOpen, setIsFaqOpen] = useState(false);
-  const [isPWAInstalled, setIsPWAInstalled] = useState(false);
-
-  useEffect(() => {
-    // Check if running as installed PWA
-    const isStandalone = window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
-    setIsPWAInstalled(isStandalone);
-
-    // Listen for display mode changes
-    const mediaQuery = window.matchMedia("(display-mode: standalone)");
-    const handleChange = () => setIsPWAInstalled(mediaQuery.matches);
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
+  const isNativeApp = !!(window as any).Capacitor;
 
   const { user } = useAuth();
   const location = useLocation();
@@ -326,13 +313,13 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Download App Section - Compact - Only show if not installed */}
-      {!isPWAInstalled && (
+      {/* Download App Section - Only show on web, hide inside native app */}
+      {!isNativeApp && (
         <section className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
           <div className="bg-gradient-to-br from-accent/5 to-primary/5 rounded-xl p-6 sm:p-8 max-w-4xl mx-auto">
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
               <img
-                src="/pwa-192x192.png"
+                src="/app-icon-192.png"
                 alt="Pamoja App"
                 className="w-14 h-14 rounded-xl flex-shrink-0"
               />

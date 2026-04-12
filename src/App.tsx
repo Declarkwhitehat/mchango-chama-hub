@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
-import PWAInstallPrompt from "./components/PWAInstallPrompt";
+
 import { ChatSupport } from "./components/ChatSupport";
 import { Loader2 } from "lucide-react";
 import { usePushNotifications } from "./hooks/usePushNotifications";
@@ -110,7 +110,7 @@ const AppContent = () => {
     <>
       <Toaster />
       <Sonner />
-      <PWAInstallPrompt />
+      
       <PushNotificationInit />
       {!isAdminRoute && <ChatSupport />}
       <Suspense fallback={<PageLoader />}>
