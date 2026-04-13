@@ -1,45 +1,43 @@
 
 
-# Plan: Remove PWA, Keep Native App Only
+# Plan: Complete SEO for Google Search Console — pamojanova.online
 
-## What Changes
+## Issues Found
 
-1. **Remove PWA plugin and service worker**
-   - Remove `vite-plugin-pwa` from `vite.config.ts` (remove the entire `VitePWA(...)` block)
-   - Delete `src/registerSW.ts` and remove its import from `src/main.tsx`
-   - Remove the manifest link and PWA meta tags from `index.html` (keep standard favicon/meta)
-   - Remove the cache-busting script from `index.html` (no more service workers to clear)
+1. **Canonical URL** → points to `mchango-chama-hub.lovable.app` instead of `pamojanova.online`
+2. **Open Graph URL** → same wrong domain
+3. **OG/Twitter images** → generic Lovable placeholder, not your own branding
+4. **No sitemap.xml** → Google Search Console requires this for indexing
+5. **robots.txt missing Sitemap directive** → crawlers can't discover sitemap
+6. **No Organization schema** (JSON-LD) → missing structured data for rich results
+7. **No WebApplication schema** → helps Google understand the app
+8. **Missing og:site_name, og:locale** → incomplete Open Graph
+9. **No favicon `<link>`** in head
 
-2. **Delete PWAInstallPrompt component**
-   - Delete `src/components/PWAInstallPrompt.tsx`
-   - Remove its import and usage from `src/App.tsx`
+## Changes
 
-3. **Rename PWA icons to app icons**
-   - Rename `public/pwa-192x192.png` → `public/app-icon-192.png`
-   - Rename `public/pwa-512x512.png` → `public/app-icon-512.png`
-   - Update all references (Index.tsx download section uses `/pwa-192x192.png`)
+### 1. Update `index.html`
+- Change canonical to `https://pamojanova.online/`
+- Fix all OG/Twitter URLs to `pamojanova.online`
+- Use `/app-icon-512.png` as OG/Twitter image (your own icon)
+- Add `og:site_name`, `og:locale`
+- Add Organization + WebApplication JSON-LD schemas
+- Add favicon link tag
 
-4. **Fix the Download App section on Index.tsx**
-   - Remove the `isPWAInstalled` state and standalone detection logic (lines 28-41) — no longer needed
-   - Always show the download section (remove the `!isPWAInstalled` conditional)
-   - Update icon src to `/app-icon-192.png`
-   - Hide the download section when already inside the native app (detect via Capacitor bridge: `window.Capacitor`)
+### 2. Create `public/sitemap.xml`
+- List all public routes: `/`, `/about`, `/terms`, `/privacy`, `/mchango`, `/chama`, `/welfare`, `/auth`
+- Use `pamojanova.online` as base URL
+- Set appropriate `changefreq` and `priority`
 
-5. **Clean up dependencies**
-   - Remove `vite-plugin-pwa` and `workbox-*` packages from `package.json`
+### 3. Update `public/robots.txt`
+- Add `Sitemap: https://pamojanova.online/sitemap.xml`
+- Keep existing allow rules
 
-## Files Affected
+### Files Changed
 
 | Action | File |
 |--------|------|
-| Edit | `vite.config.ts` — remove VitePWA plugin |
-| Edit | `src/main.tsx` — remove registerSW import |
-| Delete | `src/registerSW.ts` |
-| Delete | `src/components/PWAInstallPrompt.tsx` |
-| Edit | `src/App.tsx` — remove PWAInstallPrompt import/usage |
-| Edit | `src/pages/Index.tsx` — simplify download section, use app icon |
-| Edit | `index.html` — remove PWA manifest link, PWA meta tags, cache script |
-| Rename | `public/pwa-192x192.png` → `public/app-icon-192.png` |
-| Rename | `public/pwa-512x512.png` → `public/app-icon-512.png` |
-| Edit | `package.json` — remove vite-plugin-pwa |
+| Edit | `index.html` — fix URLs, add schemas, add favicon |
+| Create | `public/sitemap.xml` |
+| Edit | `public/robots.txt` — add sitemap directive |
 
