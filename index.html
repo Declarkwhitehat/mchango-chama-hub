@@ -7,24 +7,60 @@
     <meta name="description" content="Join thousands building wealth through secure online Chama groups and Mchango campaigns in Kenya. Trusted platform for welfare groups and organizations." />
     <meta name="author" content="Pamojanova" />
     <meta name="keywords" content="mchango campaign, online chama, organizations in Kenya, welfare groups Kenya, digital chama, mchango fundraising, rotating savings Kenya" />
-    <link rel="canonical" href="https://mchango-chama-hub.lovable.app/" />
-    
+    <link rel="canonical" href="https://pamojanova.online/" />
+    <link rel="icon" href="/app-icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/app-icon-192.png" />
+
     <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
+    <!-- Open Graph -->
     <meta property="og:title" content="Pamojanova: Best Online Chama, Mchango & Organizations Platform in Kenya" />
     <meta property="og:description" content="Join thousands building wealth through secure online Chama groups and Mchango campaigns in Kenya." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://mchango-chama-hub.lovable.app/" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:url" content="https://pamojanova.online/" />
+    <meta property="og:image" content="https://pamojanova.online/app-icon-512.png" />
+    <meta property="og:site_name" content="Pamojanova" />
+    <meta property="og:locale" content="en_KE" />
 
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Pamojanova: Online Chama & Mchango Platform Kenya" />
     <meta name="twitter:description" content="Join thousands building wealth through secure online Chama groups and Mchango campaigns in Kenya." />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:image" content="https://pamojanova.online/app-icon-512.png" />
 
-    <!-- FAQ Schema JSON-LD -->
+    <!-- Organization Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Pamojanova",
+      "url": "https://pamojanova.online/",
+      "logo": "https://pamojanova.online/app-icon-512.png",
+      "description": "Kenya's trusted digital platform for Chama groups, Mchango campaigns, welfare groups and organizations.",
+      "sameAs": []
+    }
+    </script>
+
+    <!-- WebApplication Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Pamojanova",
+      "url": "https://pamojanova.online/",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Android",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "KES"
+      },
+      "description": "Manage Chama rotating savings, Mchango fundraising campaigns, welfare groups and organizations digitally with M-Pesa integration."
+    }
+    </script>
+
+    <!-- FAQ Schema -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -58,7 +94,7 @@
     }
     </script>
 
-    <!-- Clean up any leftover service workers from previous PWA -->
+    <!-- Clean up any leftover service workers -->
     <script>
       (function() {
         if ('serviceWorker' in navigator) {
@@ -74,39 +110,20 @@
       })();
     </script>
 
-    <!-- Critical: Prevent theme flash by applying theme BEFORE any paint -->
+    <!-- Prevent theme flash -->
     <script>
       (function() {
         var d = document.documentElement;
         var theme = null;
-        
-        try {
-          theme = localStorage.getItem('theme');
-        } catch (e) {}
-        
+        try { theme = localStorage.getItem('theme'); } catch (e) {}
         var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        
-        // Determine if dark mode should be applied
-        // Default to dark if no preference is saved
-        var isDark = theme === 'dark' || 
-                     theme === null || 
-                     (theme === 'system' && systemDark);
-        
-        // Apply theme class synchronously before first paint
-        if (isDark) {
-          d.classList.add('dark');
-          d.style.colorScheme = 'dark';
-        } else {
-          d.classList.remove('dark');
-          d.style.colorScheme = 'light';
-        }
-        
-        // Block transitions during initial load
+        var isDark = theme === 'dark' || theme === null || (theme === 'system' && systemDark);
+        if (isDark) { d.classList.add('dark'); d.style.colorScheme = 'dark'; }
+        else { d.classList.remove('dark'); d.style.colorScheme = 'light'; }
         d.classList.add('no-transitions');
       })();
     </script>
     
-    <!-- Critical CSS to prevent flash - inline dark theme background -->
     <style>
       html { background-color: #0d1a14; }
       html.dark { background-color: #0d1a14; }
