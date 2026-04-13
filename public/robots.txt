@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://pamojanova.online/sitemap.xml
+Sitemap: https://ahhcbwbvueimezmtftte.supabase.co/functions/v1/sitemap
