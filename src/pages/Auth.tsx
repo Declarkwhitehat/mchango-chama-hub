@@ -358,8 +358,20 @@ const Auth = () => {
         if (adminRole) {
           navigate("/admin");
         } else {
+          // Store session for native biometric re-auth
+          if (isNative) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData.session) {
+              localStorage.setItem('biometricSession', JSON.stringify({
+                access_token: sessionData.session.access_token,
+                refresh_token: sessionData.session.refresh_token,
+              }));
+            }
+          }
+          
           // Offer biometric setup for next time
-          if (isWebAuthnSupported()) {
+          const nativeBioAvailable = isNative && await isNativeBiometricAvailable();
+          if (nativeBioAvailable || isWebAuthnSupported()) {
             setBiometricIdentifier(data.emailOrPhone);
             setShowBiometricSetup(true);
           } else {
@@ -381,28 +393,67 @@ const Auth = () => {
       return;
     }
 
+    // Native app: use native biometric then auto-login with stored session
+    if (isNative) {
+      const result = await nativeAuthenticate('Verify your identity to sign in');
+      if (result.success) {
+        const storedToken = localStorage.getItem('biometricSession');
+        if (storedToken) {
+          try {
+            const parsed = JSON.parse(storedToken);
+            const { error } = await supabase.auth.setSession(parsed);
+            if (!error) {
+              toast.success('Welcome back!');
+              navigate(returnTo || '/home', { replace: true });
+              return;
+            }
+          } catch { /* fall through */ }
+        }
+        toast.error('Stored session expired. Please log in with your password.');
+      }
+      return;
+    }
+
+    // Browser: WebAuthn
     const result = await authenticate(emailOrPhone);
     if (result.success) {
-      // Store identifier for next auto-login
       localStorage.setItem('lastLoginIdentifier', emailOrPhone);
-      
-      if (returnTo) {
-        navigate(returnTo, { replace: true });
-      } else {
-        navigate('/home');
-      }
+      navigate(returnTo || '/home', { replace: true });
     }
   };
 
   const handleEnableBiometric = async () => {
     setIsLoading(true);
     try {
+      // Native app: just enable the flag (native biometric doesn't need server registration)
+      if (isNative) {
+        const result = await nativeAuthenticate('Verify your identity to enable fingerprint login');
+        if (result.success) {
+          localStorage.setItem('nativeBiometricEnabled', 'true');
+          // Store session tokens for future auto-login
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData.session) {
+            localStorage.setItem('biometricSession', JSON.stringify({
+              access_token: sessionData.session.access_token,
+              refresh_token: sessionData.session.refresh_token,
+            }));
+          }
+          toast.success('Fingerprint login enabled!');
+          setShowBiometricSetup(false);
+          navigate(returnTo || (signupStep === 'phone' ? '/kyc-upload' : '/home'), { replace: true });
+        } else {
+          toast.error(result.error || 'Failed to verify fingerprint');
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // Browser: WebAuthn registration
       const result = await registerCredential();
       if (result.success) {
         toast.success('Biometric login enabled successfully!');
         setShowBiometricSetup(false);
         
-        // Redirect based on returnTo, signup step, or default
         if (returnTo) {
           navigate(returnTo, { replace: true });
         } else {
