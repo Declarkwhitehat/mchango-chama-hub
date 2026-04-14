@@ -1,3 +1,4 @@
+```yaml
 name: Build Android APK
 
 on:
@@ -26,7 +27,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: Build web app
         run: npm run build
@@ -60,3 +61,4 @@ jobs:
             Download the APK below and install it on your Android phone.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
