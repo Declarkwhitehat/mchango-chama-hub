@@ -574,10 +574,10 @@ const Auth = () => {
       toast.success("Account created successfully!");
       
       // Check if device supports biometric and prompt immediately
-      if (isWebAuthnSupported()) {
+      const nativeBioAvailable = isNative && await isNativeBiometricAvailable();
+      if (nativeBioAvailable || isWebAuthnSupported()) {
         setShowBiometricSetup(true);
       } else {
-        // Redirect based on returnTo or default
         if (returnTo) {
           navigate(returnTo, { replace: true });
         } else {
