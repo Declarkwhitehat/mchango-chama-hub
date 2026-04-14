@@ -20,7 +20,6 @@ import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const loginSchema = z.object({
   emailOrPhone: z.string()
