@@ -18,7 +18,7 @@ const loadBiometricModule = async () => {
 };
 
 const isNativeApp = (): boolean => {
-  return !!(window as any).Capacitor || /Android.*; wv\)/.test(navigator.userAgent);
+  return !!(window as any).Capacitor || /; wv\)/.test(navigator.userAgent) || /wv\)/.test(navigator.userAgent);
 };
 
 export const useNativeBiometrics = () => {
