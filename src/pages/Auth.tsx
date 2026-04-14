@@ -18,6 +18,8 @@ import { PhoneVerification } from "@/components/PhoneVerification";
 import { TwoFactorVerification } from "@/components/TwoFactorVerification";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
+import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const loginSchema = z.object({
@@ -89,6 +91,7 @@ const Auth = () => {
   const returnTo = location.state?.returnTo;
   const { signIn, signUp, user } = useAuth();
   const { isSupported: isWebAuthnSupported, registerCredential, authenticate, checkHasCredentials, isLoading: isWebAuthnLoading } = useWebAuthn();
+  const { isNativeApp: isNative, isAvailable: isNativeBiometricAvailable, authenticate: nativeAuthenticate, getBiometryType } = useNativeBiometrics();
   const [isLoading, setIsLoading] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
