@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { Instagram, Facebook, Twitter } from "lucide-react";
 
+const BUILD_VERSION = new Date().toISOString().slice(0, 10).replace(/-/g, '') + '.1';
+
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
@@ -84,7 +86,7 @@ const Footer = () => {
         </div>
 
         <div className="mt-6 pt-6 border-t text-center text-sm text-muted-foreground">
-          <p>&copy; {currentYear} Chama Platform. All rights reserved. | Version 1.0</p>
+          <p>&copy; {currentYear} Chama Platform. All rights reserved. | Build {BUILD_VERSION}</p>
         </div>
       </div>
     </footer>
