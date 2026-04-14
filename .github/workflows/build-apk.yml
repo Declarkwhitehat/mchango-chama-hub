@@ -76,9 +76,7 @@ jobs:
           ./gradlew assembleDebug
 
       - name: Deploy Live Update
-        run: |
-          npm install @capacitor/live-updates
-          npx cap live-updates deploy
+        run: npx cap live-updates deploy
         env:
           CAPACITOR_LIVE_UPDATES_APP_ID: ${{ secrets.CAPACITOR_LIVE_UPDATES_APP_ID }}
           CAPACITOR_LIVE_UPDATES_CHANNEL: ${{ secrets.CAPACITOR_LIVE_UPDATES_CHANNEL }}
@@ -102,3 +100,4 @@ jobs:
           make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
