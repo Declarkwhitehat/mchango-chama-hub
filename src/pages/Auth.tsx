@@ -159,57 +159,69 @@ const Auth = () => {
 
     const attemptAutoLogin = async () => {
       try {
-        // Mark as attempted immediately and stop showing loading
         hasAttemptedAutoLogin.current = true;
         setIsInitialCheck(false);
         
-        // Don't auto-trigger if user cancelled biometric in this session
-        if (biometricCancelled) {
+        if (biometricCancelled) return;
+
+        // Native app: use native biometrics (fingerprint/face)
+        if (isNative) {
+          const available = await isNativeBiometricAvailable();
+          const nativeBioEnabled = localStorage.getItem('nativeBiometricEnabled') === 'true';
+          const storedToken = localStorage.getItem('biometricSession');
+          
+          if (available && nativeBioEnabled && storedToken) {
+            const biometryType = await getBiometryType();
+            const result = await nativeAuthenticate(`Verify your ${biometryType} to sign in`);
+            
+            if (result.success) {
+              try {
+                const parsed = JSON.parse(storedToken);
+                const { error } = await supabase.auth.setSession(parsed);
+                if (!error) {
+                  toast.success('Welcome back!');
+                  navigate(returnTo || '/', { replace: true });
+                  return;
+                }
+              } catch {
+                // Token expired or invalid — fall through to password login
+                localStorage.removeItem('biometricSession');
+              }
+            } else {
+              setBiometricCancelled(true);
+              toast.error('Fingerprint cancelled. Please use your password.');
+            }
+          }
           return;
         }
         
-        // Don't auto-trigger if device doesn't support WebAuthn
-        if (!isWebAuthnSupported()) {
-          return;
-        }
+        // Browser: use WebAuthn
+        if (!isWebAuthnSupported()) return;
 
-        // Check for stored identifier from previous successful login
         const storedIdentifier = localStorage.getItem('lastLoginIdentifier');
-        if (!storedIdentifier) {
-          return;
-        }
+        if (!storedIdentifier) return;
 
-        // Check if this user has registered credentials
         const hasCredentials = await checkHasCredentials(storedIdentifier);
-        if (!hasCredentials) {
-          console.log('No biometric credentials found for auto-login');
-          return;
-        }
+        if (!hasCredentials) return;
 
-        // Trigger fingerprint prompt - native dialog appears here
         const result = await authenticate(storedIdentifier);
         
         if (result.success) {
           toast.success('Welcome back!');
-          if (returnTo) {
-            navigate(returnTo, { replace: true });
-          } else {
-            navigate('/');
-          }
+          navigate(returnTo || '/', { replace: true });
         } else {
-          // If biometric failed, show clear message to use password
           setBiometricCancelled(true);
           toast.error('Fingerprint authentication failed. Please use your password.');
         }
       } catch (error) {
         console.error('Auto-login error:', error);
-        setBiometricCancelled(true); // Don't auto-prompt again this session
+        setBiometricCancelled(true);
         toast.error('Fingerprint authentication cancelled. Please use your password.');
       }
     };
 
     attemptAutoLogin();
-  }, [isWebAuthnSupported, checkHasCredentials, authenticate, biometricCancelled, navigate]);
+  }, [isWebAuthnSupported, checkHasCredentials, authenticate, biometricCancelled, navigate, isNative]);
 
   // Format countdown display
   const formatCountdown = (seconds: number): string => {
