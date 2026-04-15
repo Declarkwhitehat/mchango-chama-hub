@@ -503,7 +503,7 @@ const OrganizationCreate = () => {
                   type="submit"
                   variant="default"
                   className="w-full"
-                  disabled={isLoading || kycStatus !== "approved"}
+                  disabled={isLoading || isProcessing || kycStatus !== "approved"}
                 >
                   {isLoading ? "Registering..." : "Register Organization"}
                 </Button>
