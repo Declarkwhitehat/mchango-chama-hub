@@ -214,7 +214,9 @@ const OrganizationCreate = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [youtubeUrl, logoFile, coverFile, navigate]);
+
+  const { execute: handleSubmit, isProcessing } = useDebounceAction(handleSubmitInner);
 
   if (kycStatus === null) {
     return (
