@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useDebounceAction } from "@/hooks/useDebounceAction";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
   const [phone, setPhone] = useState(profile?.phone || "");
   const [isAnonymous, setIsAnonymous] = useState(false);
 
-  const handleDonate = async (e: React.FormEvent) => {
+  const handleDonateInner = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validation
@@ -195,7 +196,9 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
     } finally {
       setLoading(false);
     }
-  };
+  }, [amount, displayName, phone, isAnonymous, mchangoId, mchangoTitle, user, toast, onSuccess]);
+
+  const { execute: handleDonate, isProcessing } = useDebounceAction(handleDonateInner);
 
   return (
     <Card>
@@ -306,7 +309,7 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
             </Label>
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || isProcessing}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

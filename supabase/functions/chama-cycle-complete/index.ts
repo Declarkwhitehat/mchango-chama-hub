@@ -19,10 +19,10 @@ Deno.serve(async (req) => {
     const { data: chama, error: chamaError } = await supabase
       .from('chama')
       .select(`
-        *,
+        id, name, group_code, last_cycle_completed_at,
         chama_members!inner(
-          *,
-          profiles!inner(*)
+          id, member_code, is_manager, user_id,
+          profiles!inner(full_name, phone)
         )
       `)
       .eq('id', chamaId)

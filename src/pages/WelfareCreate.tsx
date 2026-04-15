@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useDebounceAction } from "@/hooks/useDebounceAction";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,7 @@ const WelfareCreate = () => {
   const [whatsappLink, setWhatsappLink] = useState("");
   const [minPeriod, setMinPeriod] = useState(3);
 
-  const handleCreate = async () => {
+  const handleCreateInner = useCallback(async () => {
     if (!name.trim() || name.trim().length < 3) {
       toast.error("Name must be at least 3 characters");
       return;
@@ -50,7 +51,9 @@ const WelfareCreate = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [name, description, isPublic, whatsappLink, minPeriod, navigate]);
+
+  const { execute: handleCreate, isProcessing } = useDebounceAction(handleCreateInner);
 
   return (
     <Layout>
@@ -138,7 +141,7 @@ const WelfareCreate = () => {
 
             <Button
               onClick={handleCreate}
-              disabled={loading || !name.trim()}
+              disabled={loading || isProcessing || !name.trim()}
               className="w-full"
             >
               {loading ? (

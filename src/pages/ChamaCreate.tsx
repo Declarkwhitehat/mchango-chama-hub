@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useDebounceAction } from "@/hooks/useDebounceAction";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,7 @@ const ChamaCreate = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmitInner = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
@@ -172,7 +173,9 @@ const ChamaCreate = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [frequency, monthlyDay, monthlyDay2, navigate, toast]);
+
+  const { execute: handleSubmit, isProcessing } = useDebounceAction(handleSubmitInner);
 
   if (kycStatus === null) {
     return (
@@ -435,7 +438,7 @@ const ChamaCreate = () => {
                   type="submit"
                   variant="default"
                   className="w-full"
-                  disabled={isLoading || kycStatus !== "approved"}
+                  disabled={isLoading || isProcessing || kycStatus !== "approved"}
                 >
                   {isLoading ? "Creating..." : "Create Chama Group"}
                 </Button>
