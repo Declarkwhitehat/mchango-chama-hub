@@ -9,6 +9,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
 
 import { ChatSupport } from "./components/ChatSupport";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Loader2 } from "lucide-react";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import React from "react";
@@ -193,7 +194,9 @@ const App = () => {
         <TooltipProvider>
           
           <BrowserRouter>
-            <AppContent />
+            <ErrorBoundary>
+              <AppContent />
+            </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
