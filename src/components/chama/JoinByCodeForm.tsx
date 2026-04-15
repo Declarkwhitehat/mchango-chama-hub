@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useDebounceAction } from "@/hooks/useDebounceAction";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -115,7 +116,7 @@ export function JoinByCodeForm({ onJoinSuccess }: JoinByCodeFormProps) {
     }
   };
 
-  const submitJoinRequest = async () => {
+  const submitJoinRequestInner = useCallback(async () => {
     if (!chamaPreview || !user) return;
 
     setIsJoining(true);
@@ -182,7 +183,9 @@ export function JoinByCodeForm({ onJoinSuccess }: JoinByCodeFormProps) {
     } finally {
       setIsJoining(false);
     }
-  };
+  }, [chamaPreview, user, code, navigate, onJoinSuccess]);
+
+  const { execute: submitJoinRequest, isProcessing: isJoinProcessing } = useDebounceAction(submitJoinRequestInner);
 
   const getFrequencyLabel = (frequency: string) => {
     switch (frequency) {
@@ -291,7 +294,7 @@ export function JoinByCodeForm({ onJoinSuccess }: JoinByCodeFormProps) {
               </Button>
               <Button
                 onClick={submitJoinRequest}
-                disabled={isJoining}
+                disabled={isJoining || isJoinProcessing}
                 className="flex-1 h-11"
               >
                 {isJoining ? (

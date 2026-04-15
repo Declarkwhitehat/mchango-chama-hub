@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useDebounceAction } from "@/hooks/useDebounceAction";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -182,12 +183,12 @@ export const WithdrawalButton = ({
     }
   };
 
-  const handleWithdraw = async (e: React.FormEvent) => {
+  const handleWithdraw = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Always require PIN first
     setShowPinConfirm(true);
-  };
+  }, []);
+
+  const { execute: handleWithdrawDebounced, isProcessing: isWithdrawProcessing } = useDebounceAction(handleWithdraw);
 
   const handlePinVerified = async () => {
     setShowPinConfirm(false);
