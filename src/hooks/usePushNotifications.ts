@@ -64,10 +64,10 @@ export const usePushNotifications = () => {
     }
 
     try {
-      const permStatus = await withTimeout(PushNotifications.checkPermissions(), 5000);
+      const permStatus: any = await withTimeout(PushNotifications.checkPermissions(), 5000);
 
       if (permStatus.receive === 'prompt') {
-        const reqResult = await withTimeout(PushNotifications.requestPermissions(), 10000);
+        const reqResult: any = await withTimeout(PushNotifications.requestPermissions(), 10000);
         if (reqResult.receive !== 'granted') {
           console.log('[Push] Permission denied');
           return;
