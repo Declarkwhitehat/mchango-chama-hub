@@ -184,11 +184,10 @@ const Auth = () => {
 
         // Native app: use native biometrics (fingerprint/face)
         if (isNative) {
-          const available = await isNativeBiometricAvailable();
           const nativeBioEnabled = localStorage.getItem('nativeBiometricEnabled') === 'true';
           const storedToken = localStorage.getItem('biometricSession');
           
-          if (available && nativeBioEnabled && storedToken) {
+          if (biometricReady && nativeBioEnabled && storedToken) {
             const biometryType = await getBiometryType();
             const result = await nativeAuthenticate(`Verify your ${biometryType} to sign in`);
             
