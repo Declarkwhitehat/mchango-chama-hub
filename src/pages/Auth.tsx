@@ -92,6 +92,24 @@ const Auth = () => {
   const { isSupported: isWebAuthnSupported, registerCredential, authenticate, checkHasCredentials, isLoading: isWebAuthnLoading } = useWebAuthn();
   const { isNativeApp: isNative, isAvailable: isNativeBiometricAvailable, authenticate: nativeAuthenticate, getBiometryType } = useNativeBiometrics();
   const [isLoading, setIsLoading] = useState(false);
+  const [biometricReady, setBiometricReady] = useState(false);
+
+  // Resolve biometric availability once on mount (async, non-blocking)
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const available = await isNativeBiometricAvailable();
+        if (!cancelled) setBiometricReady(available);
+      } catch {
+        if (!cancelled) setBiometricReady(false);
+      }
+    };
+    if (isNative) {
+      check();
+    }
+    return () => { cancelled = true; };
+  }, [isNative, isNativeBiometricAvailable]);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);

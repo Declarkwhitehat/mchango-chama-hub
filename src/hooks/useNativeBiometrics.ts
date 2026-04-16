@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
 
 // Dynamic imports to avoid build errors when not in native context
 let BiometricAuth: any = null;
@@ -18,7 +17,7 @@ const loadBiometricModule = async () => {
 };
 
 const isNativeApp = (): boolean => {
-  return !!(window as any).Capacitor || /; wv\)/.test(navigator.userAgent) || /wv\)/.test(navigator.userAgent);
+  return !!(window as any).Capacitor?.isNativePlatform?.();
 };
 
 export const useNativeBiometrics = () => {
@@ -29,7 +28,6 @@ export const useNativeBiometrics = () => {
     const loaded = await loadBiometricModule();
     if (!loaded || !BiometricAuth) return false;
     try {
-      await BiometricAuth.checkBiometry();
       const result = await BiometricAuth.checkBiometry();
       return result.isAvailable;
     } catch {
@@ -43,7 +41,6 @@ export const useNativeBiometrics = () => {
     if (!loaded || !BiometricAuth) return 'none';
     try {
       const result = await BiometricAuth.checkBiometry();
-      // biometryType: 1=touchId, 2=faceId, 3=fingerprintAuthentication, 4=faceAuthentication, 5=irisAuthentication
       const types: Record<number, string> = {
         1: 'fingerprint', 2: 'face', 3: 'fingerprint', 4: 'face', 5: 'iris'
       };
@@ -68,10 +65,10 @@ export const useNativeBiometrics = () => {
       await BiometricAuth.authenticate({
         reason: reason || 'Confirm your identity to continue',
         cancelTitle: 'Cancel',
-        allowDeviceCredential: true, // fallback to PIN/pattern/password
+        allowDeviceCredential: true,
         androidConfirmationRequired: false,
         ...(AndroidBiometryStrength && {
-          androidBiometryStrength: AndroidBiometryStrength.weak, // accept fingerprint + face
+          androidBiometryStrength: AndroidBiometryStrength.weak,
         }),
       });
 

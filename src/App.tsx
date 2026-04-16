@@ -96,10 +96,10 @@ const PageLoader = () => (
   </div>
 );
 
+// Push notifications self-initialize via useEffect inside the hook.
+// This component just mounts the hook — it never blocks rendering.
 const PushNotificationInit = () => {
-  // Initialize push notifications for native app users
-  const { initialize } = usePushNotifications();
-  React.useEffect(() => { initialize(); }, [initialize]);
+  usePushNotifications();
   return null;
 };
 

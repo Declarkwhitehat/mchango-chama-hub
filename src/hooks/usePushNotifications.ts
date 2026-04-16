@@ -17,7 +17,18 @@ const loadPushModule = async () => {
 };
 
 const isNativeApp = (): boolean => {
-  return !!(window as any).Capacitor || /Android.*; wv\)/.test(navigator.userAgent);
+  return !!(window as any).Capacitor?.isNativePlatform?.();
+};
+
+/** Wraps a promise with a timeout – rejects if not resolved in `ms` */
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Timeout')), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
 };
 
 export const usePushNotifications = () => {
@@ -27,7 +38,6 @@ export const usePushNotifications = () => {
   const saveToken = useCallback(async (token: string) => {
     if (!user) return;
     try {
-      // Upsert: if token already exists for this user, update it
       const { error } = await supabase
         .from('device_tokens')
         .upsert(
@@ -54,11 +64,10 @@ export const usePushNotifications = () => {
     }
 
     try {
-      // Check current permission status
-      const permStatus = await PushNotifications.checkPermissions();
+      const permStatus = await withTimeout(PushNotifications.checkPermissions(), 5000);
 
       if (permStatus.receive === 'prompt') {
-        const reqResult = await PushNotifications.requestPermissions();
+        const reqResult = await withTimeout(PushNotifications.requestPermissions(), 10000);
         if (reqResult.receive !== 'granted') {
           console.log('[Push] Permission denied');
           return;
@@ -68,21 +77,17 @@ export const usePushNotifications = () => {
         return;
       }
 
-      // Register for push notifications
-      await PushNotifications.register();
+      await withTimeout(PushNotifications.register(), 10000);
 
-      // Listen for registration success
       PushNotifications.addListener('registration', (token: { value: string }) => {
         console.log('[Push] Registered with token:', token.value.substring(0, 20) + '...');
         saveToken(token.value);
       });
 
-      // Listen for registration errors
       PushNotifications.addListener('registrationError', (error: any) => {
         console.error('[Push] Registration error:', error);
       });
 
-      // Listen for incoming notifications (app in foreground)
       PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
         console.log('[Push] Notification received:', notification);
         toast.info(notification.title || 'New notification', {
@@ -90,27 +95,28 @@ export const usePushNotifications = () => {
         });
       });
 
-      // Listen for notification taps (app was in background)
       PushNotifications.addListener('pushNotificationActionPerformed', (action: any) => {
         console.log('[Push] Notification action performed:', action);
-        // Could navigate to specific page based on action.notification.data
       });
 
       registeredRef.current = true;
       console.log('[Push] Push notifications initialized');
     } catch (error) {
-      console.error('[Push] Initialization error:', error);
+      console.warn('[Push] Initialization failed (non-blocking):', error);
     }
   }, [user, saveToken]);
 
-  // Auto-initialize when user logs in
+  // Auto-initialize with a 5-second delay so the UI loads first
   useEffect(() => {
-    if (user && session && isNativeApp()) {
-      initialize();
-    }
+    if (!user || !session || !isNativeApp()) return;
 
-    // Cleanup on unmount
+    const timer = setTimeout(() => {
+      // Fire-and-forget — never blocks rendering
+      initialize().catch((e) => console.warn('[Push] Deferred init error:', e));
+    }, 5000);
+
     return () => {
+      clearTimeout(timer);
       if (PushNotifications && registeredRef.current) {
         PushNotifications.removeAllListeners();
         registeredRef.current = false;
