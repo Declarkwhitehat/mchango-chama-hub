@@ -20,7 +20,6 @@ const isNativeApp = (): boolean => {
   return !!(window as any).Capacitor?.isNativePlatform?.();
 };
 
-/** Wraps a promise with a timeout – rejects if not resolved in `ms` */
 const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Timeout')), ms);
@@ -30,6 +29,8 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
     );
   });
 };
+
+const yieldToUI = (ms = 300) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export const usePushNotifications = () => {
   const { user, session } = useAuth();
@@ -67,7 +68,10 @@ export const usePushNotifications = () => {
       const permStatus: any = await withTimeout(PushNotifications.checkPermissions(), 5000);
 
       if (permStatus.receive === 'prompt') {
-        const reqResult: any = await withTimeout(PushNotifications.requestPermissions(), 10000);
+        // Yield to UI thread before showing the native permission dialog
+        await yieldToUI(300);
+
+        const reqResult: any = await withTimeout(PushNotifications.requestPermissions(), 15000);
         if (reqResult.receive !== 'granted') {
           console.log('[Push] Permission denied');
           return;
@@ -77,7 +81,10 @@ export const usePushNotifications = () => {
         return;
       }
 
-      await withTimeout(PushNotifications.register(), 10000);
+      // Yield again before register() so the UI thread stays responsive
+      await yieldToUI(500);
+
+      await withTimeout(PushNotifications.register(), 15000);
 
       PushNotifications.addListener('registration', (token: { value: string }) => {
         console.log('[Push] Registered with token:', token.value.substring(0, 20) + '...');
@@ -106,7 +113,25 @@ export const usePushNotifications = () => {
     }
   }, [user, saveToken]);
 
-  // Auto-initialize with a 5-second delay so the UI loads first
+  // Delay initialization by 8 seconds so login/biometric flows fully complete first
+  useEffect(() => {
+    if (!user || !session || !isNativeApp()) return;
+
+    const timer = setTimeout(() => {
+      initialize().catch((e) => console.warn('[Push] Deferred init error:', e));
+    }, 8000);
+
+    return () => {
+      clearTimeout(timer);
+      if (PushNotifications && registeredRef.current) {
+        PushNotifications.removeAllListeners();
+        registeredRef.current = false;
+      }
+    };
+  }, [user, session, initialize]);
+
+  return { initialize };
+};  // Auto-initialize with a 5-second delay so the UI loads first
   useEffect(() => {
     if (!user || !session || !isNativeApp()) return;
 
