@@ -1,112 +1,74 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Eye, EyeOff, Check, X, Fingerprint, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
-import { Link } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { PhoneVerification } from "@/components/PhoneVerification";
-import { TwoFactorVerification } from "@/components/TwoFactorVerification";
-import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
-import { useWebAuthn } from "@/hooks/useWebAuthn";
-import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
-const loginSchema = z.object({
-  emailOrPhone: z.string()
-    .min(1, "Email or phone number is required")
-    .refine(
-      (val) => {
-        // Check if it's a valid email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (emailRegex.test(val)) return true;
-        
-        // Check if it's a valid phone (international format or Kenyan format)
-        const phoneRegex = /^(\+?\d{10,15}|0\d{9}|[17]\d{8,9})$/;
-        return phoneRegex.test(val.replace(/\s/g, ''));
-      },
-      { message: "Must be a valid email or phone number (e.g., +254712345678 or 0712345678 or email@example.com)" }
-    ),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
-
-// Safaricom prefixes
-const SAFARICOM_PREFIXES = ['70', '71', '72', '74', '75', '76', '79', '110', '111'];
-
-const isSafaricomNumber = (phone: string): boolean => {
-  const numberPart = phone.replace('+254', '');
-  return SAFARICOM_PREFIXES.some(prefix => numberPart.startsWith(prefix));
-};
-
-const signupSchema = z.object({
-  full_name: z.string().min(2, "Full name is required").max(100),
-  id_number: z.string().min(5, "Valid ID number is required").max(50),
-  phone: z.string()
-    .min(10, "Phone number is required")
-    .transform((val) => {
-      const cleaned = val.replace(/\s/g, '');
-      if (cleaned.startsWith('07') || cleaned.startsWith('01')) {
-        return '+254' + cleaned.slice(1);
-      }
-      if (cleaned.startsWith('7') || cleaned.startsWith('1')) {
-        return '+254' + cleaned;
-      }
-      return cleaned;
-    })
-    .refine((val) => /^\+254\d{9}$/.test(val), "Phone must be a valid Kenyan number (e.g., 0712345678 or +254712345678)")
-    .refine((val) => isSafaricomNumber(val), "Only Safaricom numbers are accepted for M-Pesa payouts"),
-  email: z.string().email("Invalid email address").max(255),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number")
-    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
-  confirmPassword: z.string(),
-  acceptTerms: z.boolean().refine(val => val === true, {
-    message: "You must accept the Terms and Conditions"
-  }),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
-type SignupFormData = z.infer<typeof signupSchema>;
-
-const Auth = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const returnTo = location.state?.returnTo;
-  const { signIn, signUp, user } = useAuth();
-  const { isSupported: isWebAuthnSupported, registerCredential, authenticate, checkHasCredentials, isLoading: isWebAuthnLoading } = useWebAuthn();
-  const { isNativeApp: isNative, isAvailable: isNativeBiometricAvailable, authenticate: nativeAuthenticate, getBiometryType } = useNativeBiometrics();
-  const [isLoading, setIsLoading] = useState(false);
-  const [biometricReady, setBiometricReady] = useState(false);
-
-  // Resolve biometric availability once on mount (async, non-blocking)
+// Auto-trigger biometric authentication on page load
   useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
+    // Guard: Only run once per component mount
+    if (hasAttemptedAutoLogin.current) {
+      return;
+    }
+
+    const attemptAutoLogin = async () => {
       try {
-        const available = await isNativeBiometricAvailable();
-        if (!cancelled) setBiometricReady(available);
-      } catch {
-        if (!cancelled) setBiometricReady(false);
+        hasAttemptedAutoLogin.current = true;
+        setIsInitialCheck(false);
+        
+        if (biometricCancelled) return;
+
+        // Native app: use native biometrics (fingerprint/face)
+        if (isNative) {
+          const nativeBioEnabled = localStorage.getItem('nativeBiometricEnabled') === 'true';
+          const storedToken = localStorage.getItem('biometricSession');
+          
+          if (biometricReady && nativeBioEnabled && storedToken) {
+            const biometryType = await getBiometryType();
+            const result = await nativeAuthenticate(`Verify your ${biometryType} to sign in`);
+            
+            if (result.success) {
+              try {
+                const parsed = JSON.parse(storedToken);
+                const { error } = await supabase.auth.setSession(parsed);
+                if (!error) {
+                  toast.success('Welcome back!');
+                  navigate(returnTo || '/', { replace: true });
+                  return;
+                }
+              } catch {
+                // Token expired or invalid — fall through to password login
+                localStorage.removeItem('biometricSession');
+              }
+            } else {
+              setBiometricCancelled(true);
+              toast.error('Fingerprint cancelled. Please use your password.');
+            }
+          }
+          return;
+        }
+        
+        // Browser: use WebAuthn
+        if (!isWebAuthnSupported()) return;
+
+        const storedIdentifier = localStorage.getItem('lastLoginIdentifier');
+        if (!storedIdentifier) return;
+
+        const hasCredentials = await checkHasCredentials(storedIdentifier);
+        if (!hasCredentials) return;
+
+        const result = await authenticate(storedIdentifier);
+        
+        if (result.success) {
+          toast.success('Welcome back!');
+          navigate(returnTo || '/', { replace: true });
+        } else {
+          setBiometricCancelled(true);
+          toast.error('Fingerprint authentication failed. Please use your password.');
+        }
+      } catch (error) {
+        console.error('Auto-login error:', error);
+        setBiometricCancelled(true);
+        toast.error('Fingerprint authentication cancelled. Please use your password.');
       }
     };
-    if (isNative) {
-      check();
+
+    attemptAutoLogin();
+  }, [isWebAuthnSupported, checkHasCredentials, authenticate, biometricCancelled, biometricReady, navigate, isNative]);      check();
     }
     return () => { cancelled = true; };
   }, [isNative, isNativeBiometricAvailable]);
