@@ -238,7 +238,7 @@ const Auth = () => {
     };
 
     attemptAutoLogin();
-  }, [isWebAuthnSupported, checkHasCredentials, authenticate, biometricCancelled, navigate, isNative]);
+  }, [isWebAuthnSupported, checkHasCredentials, authenticate, biometricCancelled, biometricReady, navigate, isNative]);
 
   // Format countdown display
   const formatCountdown = (seconds: number): string => {
