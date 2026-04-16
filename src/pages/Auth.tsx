@@ -20,15 +20,17 @@ import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import React from "react";
 
 const loginSchema = z.object({
   emailOrPhone: z.string()
     .min(1, "Email or phone number is required")
     .refine(
       (val) => {
+        // Check if it's a valid email
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (emailRegex.test(val)) return true;
+        
+        // Check if it's a valid phone (international format or Kenyan format)
         const phoneRegex = /^(\+?\d{10,15}|0\d{9}|[17]\d{8,9})$/;
         return phoneRegex.test(val.replace(/\s/g, ''));
       },
@@ -37,6 +39,7 @@ const loginSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
+// Safaricom prefixes
 const SAFARICOM_PREFIXES = ['70', '71', '72', '74', '75', '76', '79', '110', '111'];
 
 const isSafaricomNumber = (phone: string): boolean => {
@@ -107,7 +110,6 @@ const Auth = () => {
     }
     return () => { cancelled = true; };
   }, [isNative, isNativeBiometricAvailable]);
-
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -149,47 +151,46 @@ const Auth = () => {
   // Countdown timer for rate limit
   useEffect(() => {
     if (!rateLimitResetTime) return;
-
+    
     const interval = setInterval(() => {
       const now = new Date();
       const diff = Math.max(0, Math.floor((rateLimitResetTime.getTime() - now.getTime()) / 1000));
-
+      
       setRemainingSeconds(diff);
-
+      
       if (diff === 0) {
         setRateLimitResetTime(null);
         localStorage.removeItem('rateLimitResetTime');
         toast.success('You can now try logging in again');
       }
     }, 1000);
-
+    
     return () => clearInterval(interval);
   }, [rateLimitResetTime]);
 
   // Auto-trigger biometric authentication on page load
   useEffect(() => {
     // Guard: Only run once per component mount
-    if (hasAttemptedAutoLogin.current) return;
-
-    // Wait for native biometric availability check to complete before proceeding
-    if (isNative && !biometricReady) return;
+    if (hasAttemptedAutoLogin.current) {
+      return;
+    }
 
     const attemptAutoLogin = async () => {
       try {
         hasAttemptedAutoLogin.current = true;
         setIsInitialCheck(false);
-
+        
         if (biometricCancelled) return;
 
         // Native app: use native biometrics (fingerprint/face)
         if (isNative) {
           const nativeBioEnabled = localStorage.getItem('nativeBiometricEnabled') === 'true';
           const storedToken = localStorage.getItem('biometricSession');
-
+          
           if (biometricReady && nativeBioEnabled && storedToken) {
             const biometryType = await getBiometryType();
             const result = await nativeAuthenticate(`Verify your ${biometryType} to sign in`);
-
+            
             if (result.success) {
               try {
                 const parsed = JSON.parse(storedToken);
@@ -210,7 +211,7 @@ const Auth = () => {
           }
           return;
         }
-
+        
         // Browser: use WebAuthn
         if (!isWebAuthnSupported()) return;
 
@@ -221,7 +222,7 @@ const Auth = () => {
         if (!hasCredentials) return;
 
         const result = await authenticate(storedIdentifier);
-
+        
         if (result.success) {
           toast.success('Welcome back!');
           navigate(returnTo || '/', { replace: true });
@@ -237,11 +238,7 @@ const Auth = () => {
     };
 
     attemptAutoLogin();
-  }, [
-    isWebAuthnSupported, checkHasCredentials, authenticate,
-    biometricCancelled, biometricReady, navigate, isNative,
-    getBiometryType, nativeAuthenticate, returnTo,
-  ]);
+  }, [isWebAuthnSupported, checkHasCredentials, authenticate, biometricCancelled, biometricReady, navigate, isNative]);
 
   // Format countdown display
   const formatCountdown = (seconds: number): string => {
@@ -282,8 +279,12 @@ const Auth = () => {
   });
 
   // Redirect if already logged in
+  // Move redirect to effect to avoid running navigation during render
+  // and to prevent redirect loops
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [didRedirect, setDidRedirect] = useState(false);
   if (user && !didRedirect && !show2FA) {
+    // defer redirect until after paint
     setTimeout(async () => {
       if (didRedirect) return;
       try {
@@ -305,7 +306,7 @@ const Auth = () => {
 
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
-
+    
     try {
       const result = await signIn(data.emailOrPhone, data.password);
       const { error } = result;
@@ -318,8 +319,9 @@ const Auth = () => {
         setIsLoading(false);
         return;
       }
-
+      
       if (error) {
+        // Check for rate limit error and extract reset time
         if (error.message.includes("Too many") || error.message.includes("rate limit")) {
           if ((error as any).rateLimitInfo?.resetTime) {
             const resetTime = new Date((error as any).rateLimitInfo.resetTime);
@@ -327,13 +329,15 @@ const Auth = () => {
             localStorage.setItem('rateLimitResetTime', resetTime.toISOString());
           }
           setRemainingAttempts(null);
+          // Don't show toast - countdown timer banner is sufficient
           return;
         }
-
+        
+        // Extract remaining attempts for non-rate-limit errors
         if ((error as any).remainingAttempts !== undefined) {
           setRemainingAttempts((error as any).remainingAttempts);
         }
-
+        
         if (error.message.includes("Invalid login credentials") || error.message.includes("No account found") || error.message.includes("Invalid")) {
           toast.error("Invalid credentials. Please check your email/phone and password.");
         } else if (error.message.includes("Email not confirmed")) {
@@ -343,16 +347,22 @@ const Auth = () => {
         }
         return;
       }
-
+      
+      // Store identifier for next auto-login
       localStorage.setItem('lastLoginIdentifier', data.emailOrPhone);
+      
+      // Clear any remaining attempts indicator
       setRemainingAttempts(null);
+      
       toast.success("Welcome back!");
-
+      
+      // Check if there's a return URL
       if (returnTo) {
         navigate(returnTo, { replace: true });
         return;
       }
-
+      
+      // Check if user is admin and redirect appropriately
       const { data: userData } = await supabase.auth.getUser();
       if (userData.user) {
         const { data: adminRole } = await supabase
@@ -365,6 +375,7 @@ const Auth = () => {
         if (adminRole) {
           navigate("/admin");
         } else {
+          // Store session for native biometric re-auth
           if (isNative) {
             const { data: sessionData } = await supabase.auth.getSession();
             if (sessionData.session) {
@@ -374,7 +385,8 @@ const Auth = () => {
               }));
             }
           }
-
+          
+          // Offer biometric setup for next time
           const nativeBioAvailable = isNative && await isNativeBiometricAvailable();
           if (nativeBioAvailable || isWebAuthnSupported()) {
             setBiometricIdentifier(data.emailOrPhone);
@@ -398,6 +410,7 @@ const Auth = () => {
       return;
     }
 
+    // Native app: use native biometric then auto-login with stored session
     if (isNative) {
       const result = await nativeAuthenticate('Verify your identity to sign in');
       if (result.success) {
@@ -418,6 +431,7 @@ const Auth = () => {
       return;
     }
 
+    // Browser: WebAuthn
     const result = await authenticate(emailOrPhone);
     if (result.success) {
       localStorage.setItem('lastLoginIdentifier', emailOrPhone);
@@ -428,10 +442,12 @@ const Auth = () => {
   const handleEnableBiometric = async () => {
     setIsLoading(true);
     try {
+      // Native app: just enable the flag (native biometric doesn't need server registration)
       if (isNative) {
         const result = await nativeAuthenticate('Verify your identity to enable fingerprint login');
         if (result.success) {
           localStorage.setItem('nativeBiometricEnabled', 'true');
+          // Store session tokens for future auto-login
           const { data: sessionData } = await supabase.auth.getSession();
           if (sessionData.session) {
             localStorage.setItem('biometricSession', JSON.stringify({
@@ -449,11 +465,12 @@ const Auth = () => {
         return;
       }
 
+      // Browser: WebAuthn registration
       const result = await registerCredential();
       if (result.success) {
         toast.success('Biometric login enabled successfully!');
         setShowBiometricSetup(false);
-
+        
         if (returnTo) {
           navigate(returnTo, { replace: true });
         } else {
@@ -469,6 +486,8 @@ const Auth = () => {
 
   const handleSkipBiometric = () => {
     setShowBiometricSetup(false);
+    
+    // Redirect based on returnTo, signup step, or default
     if (returnTo) {
       navigate(returnTo, { replace: true });
     } else {
@@ -477,14 +496,16 @@ const Auth = () => {
   };
 
   const handleSignup = async (data: SignupFormData) => {
+    // First step: collect details and verify phone
     if (!phoneVerified) {
       setSignupStep('phone');
       return;
     }
 
     setIsLoading(true);
-
+    
     try {
+      // Check uniqueness using security definer RPC (bypasses RLS for unauthenticated users)
       const { data: uniqueCheck, error: uniqueError } = await supabase
         .rpc('check_signup_uniqueness', {
           p_phone: data.phone,
@@ -511,46 +532,622 @@ const Auth = () => {
         }
       }
 
-      const { error } = await signUp(
-        data.email,
-        data.password,
-        data.full_name,
-        data.phone,
-        data.id_number
-      );
-
-      if (error) {
-        if (error.message.includes("already registered") || error.message.includes("already exists")) {
-          toast.error("An account with this email already exists. Please log in instead.");
+      const { error: signUpError } = await signUp(data.email, data.password, {
+        full_name: data.full_name,
+        id_number: data.id_number,
+        phone: data.phone,
+      });
+      
+      if (signUpError) {
+        // Handle duplicate phone number
+        if (signUpError.message.includes("phone number is already registered") || 
+            signUpError.message.includes("profiles_phone_unique")) {
+          toast.error("This phone number is already registered. Please use a different number or log in.");
+        }
+        // Handle duplicate ID number
+        else if (signUpError.message.includes("ID number is already registered") || 
+                 signUpError.message.includes("profiles_id_number_key")) {
+          toast.error("This ID number is already registered. Please contact support if this is an error.");
+        }
+        // Handle duplicate email
+        else if (signUpError.message.includes("already registered") || signUpError.message.includes("User already")) {
+          toast.error("This email is already registered. Please log in or use a different email.");
+        } else if (signUpError.message.includes("Password")) {
+          toast.error("Password is too weak. Please use a stronger password.");
+        } else if (signUpError.message.includes("rate limit")) {
+          toast.error("Too many requests. Please wait a moment and try again.");
         } else {
-          toast.error(error.message);
+          toast.error(signUpError.message);
         }
         return;
       }
 
-      toast.success("Account created! Please check your email to verify your account.");
+      // Record T&C acceptance
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('user_consents').insert({
+            user_id: user.id,
+            terms_version: 'v1.0',
+            privacy_version: 'v1.0',
+            ip_address: null,
+          });
+        }
+      } catch (consentError) {
+        console.error('Failed to record consent:', consentError);
+      }
 
+      // Send welcome SMS
+      try {
+        await sendTransactionalSMS(
+          data.phone,
+          SMS_TEMPLATES.accountCreated(data.full_name),
+          'registration'
+        );
+      } catch (smsError) {
+        console.error('Failed to send welcome SMS:', smsError);
+      }
+      
+      toast.success("Account created successfully!");
+      
+      // Check if device supports biometric and prompt immediately
       const nativeBioAvailable = isNative && await isNativeBiometricAvailable();
       if (nativeBioAvailable || isWebAuthnSupported()) {
-        setBiometricIdentifier(data.email);
         setShowBiometricSetup(true);
       } else {
-        navigate('/kyc-upload');
+        if (returnTo) {
+          navigate(returnTo, { replace: true });
+        } else {
+          navigate('/kyc-upload');
+        }
       }
     } catch (error: any) {
-      toast.error("An unexpected error occurred during signup");
+      toast.error("An unexpected error occurred");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (show2FA) {
+  const handle2FAVerified = async () => {
+    // 2FA verified - now set the session
+    if (pending2FASession) {
+      await supabase.auth.setSession(pending2FASession);
+    }
+    
+    // Capture IP after 2FA login
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.access_token) {
+        fetch(`${supabaseUrl}/functions/v1/capture-login-ip`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ is_signup: false }),
+        }).catch(err => console.error('Failed to capture IP after 2FA:', err));
+      }
+    } catch (err) {
+      console.error('Failed to capture IP after 2FA:', err);
+    }
+
+    // Store identifier for next auto-login
+    const emailOrPhone = loginForm.getValues('emailOrPhone');
+    if (emailOrPhone) {
+      localStorage.setItem('lastLoginIdentifier', emailOrPhone);
+    }
+
+    toast.success("Welcome back!");
+    setShow2FA(false);
+    setPending2FAUserId("");
+    setPending2FASession(null);
+
+    // Check if user is admin
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData.user) {
+      const { data: adminRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userData.user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      navigate(adminRole ? "/admin" : "/home", { replace: true });
+    } else {
+      navigate("/home", { replace: true });
+    }
+  };
+
+  const handle2FACancel = () => {
+    setShow2FA(false);
+    setPending2FAUserId("");
+    setPending2FASession(null);
+  };
+
+  // Show 2FA verification screen
+  if (show2FA && pending2FAUserId) {
     return (
-      <TwoFactorVerification
-        userId={pending2FAUserId}
-        pendingSession={pending2FASession}
-        onSuccess={() => {
-          setShow2FA(false);
-          navigate(returnTo || '/home', { replace: true });
-        }}
-        onCancel={()
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col items-center justify-center px-4">
+        <TwoFactorVerification
+          userId={pending2FAUserId}
+          onVerified={handle2FAVerified}
+          onCancel={handle2FACancel}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col">
+      <div className="container px-4 py-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/")}
+          className="mb-4"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)]">
+          <div className="w-full max-w-md space-y-6">
+            <div className="text-center space-y-2">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center shadow-lg">
+                  <span className="text-primary-foreground font-bold text-2xl">C</span>
+                </div>
+              </div>
+              <h1 className="text-3xl font-bold text-foreground">Welcome</h1>
+              <p className="text-muted-foreground">Join the community of savers and fundraisers</p>
+            </div>
+
+            <Tabs defaultValue={new URLSearchParams(location.search).get('tab') === 'signup' ? 'signup' : 'login'} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="login">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Login</CardTitle>
+                    <CardDescription>Enter your credentials to access your account</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isInitialCheck ? (
+                      <div className="flex items-center justify-center min-h-[400px]">
+                        <div className="text-muted-foreground text-sm">Checking authentication...</div>
+                      </div>
+                    ) : (
+                      <Form {...loginForm}>
+                        <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+                          {rateLimitResetTime && remainingSeconds > 0 && (
+                            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                              <div className="flex items-start gap-3">
+                                <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-semibold text-destructive mb-1">Too Many Login Attempts</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    Please wait <span className="font-medium text-foreground">{formatCountdown(remainingSeconds)}</span> before trying again
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {!rateLimitResetTime && remainingAttempts !== null && remainingAttempts < 5 && (
+                            <div className={`${
+                              remainingAttempts === 0 
+                                ? 'bg-destructive/10 border-destructive/30' 
+                                : remainingAttempts <= 2 
+                                  ? 'bg-secondary/10 border-secondary/30' 
+                                  : 'bg-muted/50 border-border/50'
+                            } border rounded-lg p-3`}>
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className={`h-4 w-4 flex-shrink-0 ${
+                                  remainingAttempts === 0 
+                                    ? 'text-destructive' 
+                                    : remainingAttempts <= 2 
+                                      ? 'text-secondary' 
+                                      : 'text-muted-foreground'
+                                }`} />
+                                <p className="text-sm">
+                                  <span className="font-medium">
+                                    {remainingAttempts === 0 
+                                      ? 'Last attempt remaining' 
+                                      : `${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining`}
+                                  </span>
+                                  {remainingAttempts <= 2 && (
+                                    <span className="text-muted-foreground ml-1">
+                                      before temporary lockout
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <FormField
+                            control={loginForm.control}
+                            name="emailOrPhone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email or Phone Number</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="Enter email or phone number"
+                                    {...field}
+                                    autoComplete="username"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={loginForm.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Password</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Input 
+                                      type={showLoginPassword ? "text" : "password"} 
+                                      {...field} 
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                                    >
+                                      {showLoginPassword ? (
+                                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                      ) : (
+                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <Button
+                            type="submit"
+                            variant="hero"
+                            className="w-full"
+                            disabled={isLoading || (rateLimitResetTime !== null && remainingSeconds > 0)}
+                          >
+                            {isLoading ? "Logging in..." : "Login"}
+                          </Button>
+                          
+                          {isWebAuthnSupported() && !biometricCancelled && (
+                            <>
+                              <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                  <span className="w-full border-t border-border" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                  <span className="bg-card px-2 text-muted-foreground">Or</span>
+                                </div>
+                              </div>
+                              
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full"
+                                disabled={isWebAuthnLoading || (rateLimitResetTime !== null && remainingSeconds > 0)}
+                                onClick={handleBiometricLogin}
+                              >
+                                <Fingerprint className="mr-2 h-4 w-4" />
+                                {isWebAuthnLoading ? "Authenticating..." : "Use Fingerprint/Face ID"}
+                              </Button>
+                            </>
+                          )}
+                          
+                          <div className="text-center">
+                            <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                              Forgot password?
+                            </Link>
+                          </div>
+                        </form>
+                      </Form>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="signup">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Create Account</CardTitle>
+                    <CardDescription>
+                      {signupStep === 'details' 
+                        ? 'Get started with your financial journey'
+                        : 'Verify your phone number'
+                      }
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...signupForm}>
+                      <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
+                        {signupStep === 'details' && (
+                          <>
+                        <FormField
+                          control={signupForm.control}
+                          name="full_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Full Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="John Doe" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="id_number"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>ID Number</FormLabel>
+                              <FormControl>
+                                <Input placeholder="12345678" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Phone Number</FormLabel>
+                              <FormControl>
+                                <Input placeholder="+254712345678" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="email"
+                                  placeholder="name@example.com"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input 
+                                    type={showSignupPassword ? "text" : "password"} 
+                                    {...field}
+                                    onChange={(e) => {
+                                      field.onChange(e);
+                                      calculatePasswordStrength(e.target.value);
+                                    }}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                    onClick={() => setShowSignupPassword(!showSignupPassword)}
+                                  >
+                                    {showSignupPassword ? (
+                                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                      <Eye className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                  </Button>
+                                </div>
+                              </FormControl>
+                              {field.value && (
+                                <div className="space-y-2 mt-2">
+                                  <div className="flex gap-1">
+                                    {[1, 2, 3, 4, 5].map((level) => (
+                                      <div
+                                        key={level}
+                                        className={`h-1 flex-1 rounded-full transition-colors ${
+                                          level <= passwordStrength.score
+                                            ? passwordStrength.score <= 2
+                                              ? "bg-red-500"
+                                              : passwordStrength.score <= 3
+                                              ? "bg-yellow-500"
+                                              : "bg-green-500"
+                                            : "bg-muted"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <div className="text-xs space-y-1">
+                                    {[
+                                      { check: passwordStrength.hasMinLength, label: "At least 8 characters" },
+                                      { check: passwordStrength.hasUpperCase, label: "One uppercase letter" },
+                                      { check: passwordStrength.hasLowerCase, label: "One lowercase letter" },
+                                      { check: passwordStrength.hasNumber, label: "One number" },
+                                      { check: passwordStrength.hasSpecialChar, label: "One special character" },
+                                    ].map((requirement, index) => (
+                                      <div key={index} className="flex items-center gap-1 text-muted-foreground">
+                                        {requirement.check ? (
+                                          <Check className="h-3 w-3 text-green-500" />
+                                        ) : (
+                                          <X className="h-3 w-3 text-red-500" />
+                                        )}
+                                        <span className={requirement.check ? "text-green-500" : ""}>
+                                          {requirement.label}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirm Password</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input 
+                                    type={showConfirmPassword ? "text" : "password"} 
+                                    {...field} 
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                  >
+                                    {showConfirmPassword ? (
+                                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                      <Eye className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                  </Button>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="acceptTerms"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel className="text-sm font-normal">
+                                  I agree to the{" "}
+                                  <Link to="/terms" target="_blank" className="text-primary hover:underline">
+                                    Terms and Conditions
+                                  </Link>
+                                  {" "}and{" "}
+                                  <Link to="/privacy" target="_blank" className="text-primary hover:underline">
+                                    Privacy Policy
+                                  </Link>
+                                </FormLabel>
+                                <FormMessage />
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="submit"
+                          variant="hero"
+                          className="w-full"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? "Creating account..." : phoneVerified ? "Complete Registration" : "Continue to Verification"}
+                        </Button>
+                          </>
+                        )}
+
+                        {signupStep === 'phone' && (
+                          <div className="space-y-4">
+                            <PhoneVerification
+                              phone={signupForm.watch('phone')}
+                              onPhoneChange={(phone) => signupForm.setValue('phone', phone)}
+                              onVerified={() => {
+                                setPhoneVerified(true);
+                                toast.success("Phone verified! Creating your account...");
+                                // Auto-submit the signup form after OTP verification
+                                setTimeout(() => {
+                                  signupForm.handleSubmit(handleSignup)();
+                                }, 500);
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => setSignupStep('details')}
+                            >
+                              Back to Details
+                            </Button>
+                          </div>
+                        )}
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+      </div>
+
+      {/* Biometric Setup Dialog */}
+      <Dialog open={showBiometricSetup} onOpenChange={setShowBiometricSetup}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Fingerprint className="h-5 w-5 text-primary" />
+              Enable Biometric Login?
+            </DialogTitle>
+            <DialogDescription>
+              Use your fingerprint or face recognition for faster and more secure login next time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Your biometric data stays secure on your device and is never shared. You can always use your password if needed.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSkipBiometric}
+              disabled={isWebAuthnLoading}
+            >
+              Maybe Later
+            </Button>
+            <Button
+              onClick={handleEnableBiometric}
+              disabled={isWebAuthnLoading}
+            >
+              {isWebAuthnLoading ? "Setting up..." : "Enable Biometric Login"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default Auth;
