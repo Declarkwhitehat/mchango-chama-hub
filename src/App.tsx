@@ -98,21 +98,22 @@ const PageLoader = () => (
 
 // Push notifications self-initialize via useEffect inside the hook.
 // This component just mounts the hook — it never blocks rendering.
-const PushNotificationInit = () => {
-  usePushNotifications();
+const PushNotificationInit = ({ enabled }: { enabled: boolean }) => {
+  usePushNotifications({ enabled });
   return null;
 };
 
 const AppContent = () => {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
+  const isAuthFlowRoute = ['/auth', '/forgot-password', '/reset-password'].includes(location.pathname);
   
   return (
     <>
       <Toaster />
       <Sonner />
       
-      <PushNotificationInit />
+      <PushNotificationInit enabled={!isAuthFlowRoute} />
       {!isAdminRoute && <ChatSupport />}
       <Suspense fallback={<PageLoader />}>
         <Routes>
