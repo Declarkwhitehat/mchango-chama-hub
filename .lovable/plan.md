@@ -1,58 +1,61 @@
 
 
-# Plan: Fix Push Notification Freezing & Harden Biometric Login
+# Plan: Fix Push Init Delay + Biometric Race Condition + Fingerprint Button Visibility
 
-## Problem 1: Push Notifications Blocking App Startup
-The `PushNotificationInit` component calls `initialize()` synchronously in a `useEffect`. On Android, `PushNotifications.requestPermissions()` and `PushNotifications.register()` can block the main thread or hang if Firebase isn't configured, freezing the entire app.
+## What I Found (correcting the bug report)
 
-**Fix**: Defer push initialization with a 5-second `setTimeout` after mount, wrap the entire flow in a try/catch with a timeout guard (10s max), and ensure any failure is silently logged — never blocking rendering.
+**Bug 1 claim is outdated.** `src/hooks/usePushNotifications.ts` does NOT have duplicate `useEffect` or duplicate `return` statements anymore — the previous fix already cleaned it up. It currently has exactly ONE `useEffect` (line 110) and ONE `return { initialize }` (line 127). The only adjustment needed is changing the delay from **5 seconds → 8 seconds** as you requested.
 
-## Problem 2: Biometric Login Issues
-The biometric hook and Auth page integration already exist and look correct. The likely cause of "fingerprint not working" is:
-1. The auto-login `useEffect` in Auth.tsx runs before `isNativeBiometricAvailable` resolves, causing a race condition
-2. The `isNativeApp()` regex `/; wv\)/` may not match all Android WebView user agents
-3. The fingerprint button visibility depends on state that isn't set until after an async check completes
+**Bug 2 is real and confirmed.** `src/pages/Auth.tsx` line 390 inside `handleLogin`:
+```ts
+const nativeBioAvailable = isNative && await isNativeBiometricAvailable();
+```
+This async call fires immediately after a successful login, at the same moment push notification init is being triggered by the new session. That's the crash. The resolved `biometricReady` state (line 95) already holds this value and must be used instead.
 
-**Fix**: Fix the `isNativeApp()` detection, add a proper async state for biometric availability, and ensure the fingerprint button renders reliably.
+**Bonus bug found.** The fingerprint button (line 829) is gated by `isWebAuthnSupported()` only:
+```tsx
+{isWebAuthnSupported() && !biometricCancelled && ( ... Fingerprint button ... )}
+```
+On the native Android APK, `isWebAuthnSupported()` returns false, so the button **never appears** even when native biometrics are available and `biometricReady` is true. Must include `biometricReady` in the condition.
 
 ## Changes
 
-### 1. Fix `isNativeApp()` detection (both hooks)
-Replace fragile regex with `!!(window as any).Capacitor?.isNativePlatform?.()` which is the official Capacitor check.
+### 1. `src/hooks/usePushNotifications.ts` — bump delay 5s → 8s
+One-line change inside the existing `useEffect` (line 116): change `5000` to `8000`. Update the comment on line 109 to say "8-second delay". No structural changes — file is already clean.
 
-**Files**: `src/hooks/usePushNotifications.ts`, `src/hooks/useNativeBiometrics.ts`
+### 2. `src/pages/Auth.tsx` — use resolved `biometricReady` state in `handleLogin`
+Replace line 390:
+```ts
+const nativeBioAvailable = isNative && await isNativeBiometricAvailable();
+```
+with:
+```ts
+const nativeBioAvailable = isNative && biometricReady;
+```
+This eliminates the race with notification init. `biometricReady` is already resolved on mount via the existing `useEffect` (lines 98–112).
 
-### 2. Make push notifications fully non-blocking
-- Add 5-second delay before initialization starts
-- Add 10-second timeout on the entire init flow
-- Wrap in try/catch that never throws
-- Remove the `useEffect` dependency on `initialize` (use ref-based guard only)
-
-**File**: `src/hooks/usePushNotifications.ts`, `src/App.tsx`
-
-### 3. Fix biometric availability check in Auth.tsx
-- Add `biometricAvailable` state initialized via `useEffect` with proper async resolution
-- Show fingerprint button based on resolved state, not inline async calls
-- Fix the auto-login effect to not race with availability check
-
-**File**: `src/pages/Auth.tsx`
-
-### 4. Fix duplicate `checkBiometry` call
-The `isAvailable` function calls `BiometricAuth.checkBiometry()` twice. Remove the duplicate.
-
-**File**: `src/hooks/useNativeBiometrics.ts`
+### 3. `src/pages/Auth.tsx` — fix fingerprint button visibility on native APK
+Change line 829 from:
+```tsx
+{isWebAuthnSupported() && !biometricCancelled && (
+```
+to:
+```tsx
+{(isWebAuthnSupported() || biometricReady) && !biometricCancelled && (
+```
+Now the button renders on native Android when biometrics are available, AND in browsers where WebAuthn is supported. Existing `handleBiometricLogin` already branches on `isNative` so it handles both paths correctly.
 
 ## Files Summary
 
-| Action | File |
-|--------|------|
-| Edit | `src/hooks/usePushNotifications.ts` — deferred non-blocking init |
-| Edit | `src/hooks/useNativeBiometrics.ts` — fix detection + duplicate call |
-| Edit | `src/App.tsx` — remove initialize dependency |
-| Edit | `src/pages/Auth.tsx` — reliable biometric state + button visibility |
+| Action | File | Change |
+|--------|------|--------|
+| Edit | `src/hooks/usePushNotifications.ts` | 5000 → 8000 ms delay |
+| Edit | `src/pages/Auth.tsx` line 390 | drop `await isNativeBiometricAvailable()`, use `biometricReady` |
+| Edit | `src/pages/Auth.tsx` line 829 | add `\|\| biometricReady` to button visibility condition |
 
-## Technical Notes
-- Dependencies are already at latest stable versions (Capacitor 8.x, biometric-auth 10.x) — no upgrades needed
-- `@aparajita/capacitor-biometric-auth` is the correct plugin for Capacitor 8
-- No database or migration changes required
+## Result After Fix
+- App never crashes after login when notification permission is granted (no async biometric call competing with push init)
+- Fingerprint button appears reliably on native Android when `biometricReady === true`
+- Push init waits a full 8 seconds after login before touching native APIs
+- Zero duplicate code in `usePushNotifications.ts` (already true, preserved)
 
