@@ -387,7 +387,7 @@ const Auth = () => {
           }
           
           // Offer biometric setup for next time
-          const nativeBioAvailable = isNative && await isNativeBiometricAvailable();
+          const nativeBioAvailable = isNative && biometricReady;
           if (nativeBioAvailable || isWebAuthnSupported()) {
             setBiometricIdentifier(data.emailOrPhone);
             setShowBiometricSetup(true);
@@ -826,7 +826,7 @@ const Auth = () => {
                             {isLoading ? "Logging in..." : "Login"}
                           </Button>
                           
-                          {isWebAuthnSupported() && !biometricCancelled && (
+                          {(isWebAuthnSupported() || biometricReady) && !biometricCancelled && (
                             <>
                               <div className="relative">
                                 <div className="absolute inset-0 flex items-center">
