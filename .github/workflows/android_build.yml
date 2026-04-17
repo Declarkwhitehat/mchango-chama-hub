@@ -16,14 +16,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22  # <-- FIXED: Updated to version 22
+          node-version: 22  # <-- Ensuring Node.js 22 is used
           cache: 'npm'
 
       - name: Install dependencies
         run: npm install
 
       - name: Build web assets
-        run: npm run build
+        run: npm run build  # <-- Generates the 'dist' folder
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
