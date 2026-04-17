@@ -1,0 +1,1 @@
+import{t as r,d as f}from"./en-US-ruyFB_RA.js";function u(s){const t=r(s);return t.setDate(1),t.setHours(0,0,0,0),t}function d(s,t){const a=f(),n=t?.weekStartsOn??t?.locale?.options?.weekStartsOn??a.weekStartsOn??a.locale?.options?.weekStartsOn??0,e=r(s),o=e.getDay(),c=(o<n?-7:0)+6-(o-n);return e.setDate(e.getDate()+c),e.setHours(23,59,59,999),e}export{d as e,u as s};

@@ -1,0 +1,1 @@
+const r=n=>{if(!n)return null;const t=n.replace(/\D/g,"");return t.startsWith("254")&&t.length===12?t:t.startsWith("0")&&t.length===10?"254"+t.substring(1):t.length===9&&/^[17]/.test(t)?"254"+t:null},e=n=>r(n)!==null;export{e as i,r as n};

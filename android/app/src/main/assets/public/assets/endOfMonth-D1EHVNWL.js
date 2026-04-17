@@ -1,0 +1,1 @@
+import{t as n}from"./en-US-ruyFB_RA.js";function s(e){const t=n(e);return t.setHours(23,59,59,999),t}function a(e){const t=n(e),o=t.getMonth();return t.setFullYear(t.getFullYear(),o+1,0),t.setHours(23,59,59,999),t}export{a,s as e};

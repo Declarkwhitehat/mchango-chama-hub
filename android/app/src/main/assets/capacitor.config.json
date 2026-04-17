@@ -1,0 +1,25 @@
+{
+	"appId": "online.pamojanova.pamoja",
+	"appName": "Pamoja",
+	"webDir": "dist",
+	"plugins": {
+		"Camera": {
+			"androidScaleType": "CENTER_CROP",
+			"saveToGallery": false
+		},
+		"Geolocation": {},
+		"Filesystem": {
+			"iosBackgroundColor": "#FFFFFF"
+		},
+		"PushNotifications": {
+			"presentationOptions": [
+				"badge",
+				"sound",
+				"alert"
+			]
+		}
+	},
+	"android": {
+		"allowMixedContent": true
+	}
+}

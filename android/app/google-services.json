@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "785156708008",
+    "project_id": "pamoja-app-1202e",
+    "storage_bucket": "pamoja-app-1202e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:785156708008:android:bc16f0306ac4f3766ed49d",
+        "android_client_info": {
+          "package_name": "online.pamojanova.pamoja"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCx7I3yUqnphebZoHUsqRLI0-mzcMAKV30"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:785156708008:android:23d41b67897ae0b76ed49d",
+        "android_client_info": {
+          "package_name": "pamoja.pamojanova.online"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCx7I3yUqnphebZoHUsqRLI0-mzcMAKV30"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

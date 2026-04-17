@@ -1,0 +1,1 @@
+import{r as s}from"./index-BiMr1Aut.js";function f(r,u=2e3){const[e,c]=s.useState(!1),t=s.useRef(!1);return{execute:s.useCallback(async(...n)=>{if(!(e||t.current)){c(!0);try{await r(...n)}finally{c(!1),t.current=!0,setTimeout(()=>{t.current=!1},u)}}},[r,u,e]),isProcessing:e}}export{f as u};
