@@ -106,14 +106,14 @@ export const usePushNotifications = () => {
     }
   }, [user, saveToken]);
 
-  // Auto-initialize with a 5-second delay so the UI loads first
+  // Auto-initialize with an 8-second delay so the UI loads first
   useEffect(() => {
     if (!user || !session || !isNativeApp()) return;
 
     const timer = setTimeout(() => {
       // Fire-and-forget — never blocks rendering
       initialize().catch((e) => console.warn('[Push] Deferred init error:', e));
-    }, 5000);
+    }, 8000);
 
     return () => {
       clearTimeout(timer);
