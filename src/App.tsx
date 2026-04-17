@@ -13,6 +13,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Loader2 } from "lucide-react";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import React from "react";
+import { warmUpNativePlugins } from "./lib/nativePermissions";
 
 
 // Lazy load all pages for better initial load performance
@@ -100,6 +101,11 @@ const PageLoader = () => (
 // This component just mounts the hook — it never blocks rendering.
 const PushNotificationInit = ({ enabled }: { enabled: boolean }) => {
   usePushNotifications({ enabled });
+  React.useEffect(() => {
+    if (!enabled) return;
+    // Fire-and-forget warm-up; safely no-ops on web.
+    warmUpNativePlugins();
+  }, [enabled]);
   return null;
 };
 
