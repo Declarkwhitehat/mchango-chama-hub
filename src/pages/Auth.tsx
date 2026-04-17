@@ -93,6 +93,8 @@ const Auth = () => {
   const { isNativeApp: isNative, isAvailable: isNativeBiometricAvailable, authenticate: nativeAuthenticate, getBiometryType } = useNativeBiometrics();
   const [isLoading, setIsLoading] = useState(false);
   const [biometricReady, setBiometricReady] = useState(false);
+  const [biometricChecked, setBiometricChecked] = useState(false);
+  const [nativeBiometricConfigured, setNativeBiometricConfigured] = useState(false);
 
   // Resolve biometric availability once on mount (async, non-blocking)
   useEffect(() => {
@@ -100,16 +102,39 @@ const Auth = () => {
     const check = async () => {
       try {
         const available = await isNativeBiometricAvailable();
-        if (!cancelled) setBiometricReady(available);
+        if (!cancelled) {
+          setBiometricReady(available);
+          setBiometricChecked(true);
+        }
       } catch {
-        if (!cancelled) setBiometricReady(false);
+        if (!cancelled) {
+          setBiometricReady(false);
+          setBiometricChecked(true);
+        }
       }
     };
     if (isNative) {
+      setBiometricChecked(false);
       check();
+    } else {
+      setBiometricReady(false);
+      setBiometricChecked(true);
     }
     return () => { cancelled = true; };
   }, [isNative, isNativeBiometricAvailable]);
+
+  useEffect(() => {
+    if (!isNative) {
+      setNativeBiometricConfigured(false);
+      return;
+    }
+
+    const hasEnabledFlag = localStorage.getItem('nativeBiometricEnabled') === 'true';
+    const hasStoredSession = !!localStorage.getItem('biometricSession');
+    setNativeBiometricConfigured(biometricReady && hasEnabledFlag && hasStoredSession);
+  }, [biometricReady, isNative]);
+
+  const nativeBiometricLoginEnabled = isNative && nativeBiometricConfigured;
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -175,10 +200,13 @@ const Auth = () => {
       return;
     }
 
+    if (isNative && !biometricChecked) {
+      return;
+    }
+
     const attemptAutoLogin = async () => {
       try {
         hasAttemptedAutoLogin.current = true;
-        setIsInitialCheck(false);
         
         if (biometricCancelled) return;
 
@@ -203,6 +231,8 @@ const Auth = () => {
               } catch {
                 // Token expired or invalid — fall through to password login
                 localStorage.removeItem('biometricSession');
+                localStorage.removeItem('nativeBiometricEnabled');
+                setNativeBiometricConfigured(false);
               }
             } else {
               setBiometricCancelled(true);
@@ -234,11 +264,13 @@ const Auth = () => {
         console.error('Auto-login error:', error);
         setBiometricCancelled(true);
         toast.error('Fingerprint authentication cancelled. Please use your password.');
+      } finally {
+        setIsInitialCheck(false);
       }
     };
 
-    attemptAutoLogin();
-  }, [isWebAuthnSupported, checkHasCredentials, authenticate, biometricCancelled, biometricReady, navigate, isNative]);
+    void attemptAutoLogin();
+  }, [authenticate, biometricCancelled, biometricChecked, biometricReady, checkHasCredentials, getBiometryType, isNative, isWebAuthnSupported, nativeAuthenticate, navigate, returnTo]);
 
   // Format countdown display
   const formatCountdown = (seconds: number): string => {
@@ -387,8 +419,8 @@ const Auth = () => {
           }
           
           // Offer biometric setup for next time
-          const nativeBioAvailable = isNative && biometricReady;
-          if (nativeBioAvailable || isWebAuthnSupported()) {
+          const shouldOfferNativeBiometricSetup = isNative && biometricReady && !nativeBiometricConfigured;
+          if (shouldOfferNativeBiometricSetup || isWebAuthnSupported()) {
             setBiometricIdentifier(data.emailOrPhone);
             setShowBiometricSetup(true);
           } else {
@@ -412,6 +444,11 @@ const Auth = () => {
 
     // Native app: use native biometric then auto-login with stored session
     if (isNative) {
+      if (!nativeBiometricLoginEnabled) {
+        toast.error('Fingerprint login is not set up on this device yet. Please log in with your password first.');
+        return;
+      }
+
       const result = await nativeAuthenticate('Verify your identity to sign in');
       if (result.success) {
         const storedToken = localStorage.getItem('biometricSession');
@@ -424,7 +461,11 @@ const Auth = () => {
               navigate(returnTo || '/home', { replace: true });
               return;
             }
-          } catch { /* fall through */ }
+          } catch {
+            localStorage.removeItem('biometricSession');
+            localStorage.removeItem('nativeBiometricEnabled');
+            setNativeBiometricConfigured(false);
+          }
         }
         toast.error('Stored session expired. Please log in with your password.');
       }
@@ -455,6 +496,7 @@ const Auth = () => {
               refresh_token: sessionData.session.refresh_token,
             }));
           }
+          setNativeBiometricConfigured(true);
           toast.success('Fingerprint login enabled!');
           setShowBiometricSetup(false);
           navigate(returnTo || (signupStep === 'phone' ? '/kyc-upload' : '/home'), { replace: true });
@@ -591,8 +633,8 @@ const Auth = () => {
       toast.success("Account created successfully!");
       
       // Check if device supports biometric and prompt immediately
-      const nativeBioAvailable = isNative && await isNativeBiometricAvailable();
-      if (nativeBioAvailable || isWebAuthnSupported()) {
+      const shouldOfferNativeBiometricSetup = isNative && biometricReady && !nativeBiometricConfigured;
+      if (shouldOfferNativeBiometricSetup || isWebAuthnSupported()) {
         setShowBiometricSetup(true);
       } else {
         if (returnTo) {
@@ -826,7 +868,7 @@ const Auth = () => {
                             {isLoading ? "Logging in..." : "Login"}
                           </Button>
                           
-                          {(isWebAuthnSupported() || biometricReady) && !biometricCancelled && (
+                          {(isWebAuthnSupported() || nativeBiometricLoginEnabled) && !biometricCancelled && (
                             <>
                               <div className="relative">
                                 <div className="absolute inset-0 flex items-center">

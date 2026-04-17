@@ -5,8 +5,18 @@ import { toast } from 'sonner';
 
 let PushNotifications: any = null;
 
+const INIT_DELAY_MS = 8000;
+const PERMISSION_TIMEOUT_MS = 5000;
+const REQUEST_TIMEOUT_MS = 10000;
+const REGISTER_TIMEOUT_MS = 10000;
+
+type PushListenerHandle = {
+  remove?: () => Promise<void> | void;
+};
+
 const loadPushModule = async () => {
   if (PushNotifications) return true;
+
   try {
     const mod = await import('@capacitor/push-notifications');
     PushNotifications = mod.PushNotifications;
@@ -20,23 +30,48 @@ const isNativeApp = (): boolean => {
   return !!(window as any).Capacitor?.isNativePlatform?.();
 };
 
-/** Wraps a promise with a timeout – rejects if not resolved in `ms` */
 const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Timeout')), ms);
+    const timer = window.setTimeout(() => reject(new Error('Timeout')), ms);
     promise.then(
-      (v) => { clearTimeout(timer); resolve(v); },
-      (e) => { clearTimeout(timer); reject(e); },
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
     );
   });
 };
 
-export const usePushNotifications = () => {
+const scheduleInBackground = (task: () => void) => {
+  const requestIdleCallback = (window as any).requestIdleCallback;
+
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(task, { timeout: 2000 });
+    return;
+  }
+
+  window.setTimeout(task, 0);
+};
+
+const removeListenerHandles = async (handles: PushListenerHandle[]) => {
+  await Promise.allSettled(
+    handles.map((handle) => Promise.resolve(handle?.remove?.()))
+  );
+};
+
+export const usePushNotifications = (options?: { enabled?: boolean }) => {
+  const { enabled = true } = options ?? {};
   const { user, session } = useAuth();
   const registeredRef = useRef(false);
+  const listenerHandlesRef = useRef<PushListenerHandle[]>([]);
 
   const saveToken = useCallback(async (token: string) => {
     if (!user) return;
+
     try {
       const { error } = await supabase
         .from('device_tokens')
@@ -44,85 +79,118 @@ export const usePushNotifications = () => {
           { user_id: user.id, token, platform: 'android' },
           { onConflict: 'user_id,token' }
         );
+
       if (error) {
         console.error('Failed to save device token:', error);
-      } else {
-        console.log('[Push] Token saved successfully');
-      }
-    } catch (err) {
-      console.error('Error saving device token:', err);
-    }
-  }, [user]);
-
-  const initialize = useCallback(async () => {
-    if (!isNativeApp() || registeredRef.current || !user) return;
-
-    const loaded = await loadPushModule();
-    if (!loaded || !PushNotifications) {
-      console.log('[Push] Push notifications module not available');
-      return;
-    }
-
-    try {
-      const permStatus: any = await withTimeout(PushNotifications.checkPermissions(), 5000);
-
-      if (permStatus.receive === 'prompt') {
-        const reqResult: any = await withTimeout(PushNotifications.requestPermissions(), 10000);
-        if (reqResult.receive !== 'granted') {
-          console.log('[Push] Permission denied');
-          return;
-        }
-      } else if (permStatus.receive !== 'granted') {
-        console.log('[Push] Permission not granted:', permStatus.receive);
         return;
       }
 
-      await withTimeout(PushNotifications.register(), 10000);
-
-      PushNotifications.addListener('registration', (token: { value: string }) => {
-        console.log('[Push] Registered with token:', token.value.substring(0, 20) + '...');
-        saveToken(token.value);
-      });
-
-      PushNotifications.addListener('registrationError', (error: any) => {
-        console.error('[Push] Registration error:', error);
-      });
-
-      PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
-        console.log('[Push] Notification received:', notification);
-        toast.info(notification.title || 'New notification', {
-          description: notification.body,
-        });
-      });
-
-      PushNotifications.addListener('pushNotificationActionPerformed', (action: any) => {
-        console.log('[Push] Notification action performed:', action);
-      });
-
-      registeredRef.current = true;
-      console.log('[Push] Push notifications initialized');
+      console.log('[Push] Token saved successfully');
     } catch (error) {
-      console.warn('[Push] Initialization failed (non-blocking):', error);
+      console.error('Error saving device token:', error);
     }
-  }, [user, saveToken]);
+  }, [user]);
 
-  // Auto-initialize with an 8-second delay so the UI loads first
+  const attachListeners = useCallback(async () => {
+    if (!PushNotifications || listenerHandlesRef.current.length > 0) return;
+
+    const listenerResults = await Promise.allSettled([
+      Promise.resolve(
+        PushNotifications.addListener('registration', (token: { value: string }) => {
+          console.log('[Push] Registered with token:', `${token.value.substring(0, 20)}...`);
+          void saveToken(token.value);
+        })
+      ),
+      Promise.resolve(
+        PushNotifications.addListener('registrationError', (error: any) => {
+          console.error('[Push] Registration error:', error);
+        })
+      ),
+      Promise.resolve(
+        PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
+          console.log('[Push] Notification received:', notification);
+          toast.info(notification.title || 'New notification', {
+            description: notification.body,
+          });
+        })
+      ),
+      Promise.resolve(
+        PushNotifications.addListener('pushNotificationActionPerformed', (action: any) => {
+          console.log('[Push] Notification action performed:', action);
+        })
+      ),
+    ]);
+
+    listenerHandlesRef.current = listenerResults
+      .filter(
+        (result): result is PromiseFulfilledResult<PushListenerHandle> =>
+          result.status === 'fulfilled' && !!result.value
+      )
+      .map((result) => result.value);
+  }, [saveToken]);
+
+  const initialize = useCallback(async () => {
+    try {
+      if (!enabled || !isNativeApp() || registeredRef.current || !user || !session) return;
+
+      const loaded = await loadPushModule();
+      if (!loaded || !PushNotifications) {
+        console.log('[Push] Push notifications module not available');
+        return;
+      }
+
+      await attachListeners();
+
+      const permissionStatus: any = await withTimeout(
+        PushNotifications.checkPermissions(),
+        PERMISSION_TIMEOUT_MS,
+      );
+
+      let receivePermission = permissionStatus?.receive;
+
+      if (receivePermission === 'prompt') {
+        const requestResult: any = await withTimeout(
+          PushNotifications.requestPermissions(),
+          REQUEST_TIMEOUT_MS,
+        );
+        receivePermission = requestResult?.receive;
+      }
+
+      if (receivePermission !== 'granted') {
+        console.log('[Push] Permission not granted:', receivePermission);
+        return;
+      }
+
+      await withTimeout(PushNotifications.register(), REGISTER_TIMEOUT_MS);
+      registeredRef.current = true;
+      console.log('[Push] Push notifications initialized in background');
+    } catch (error) {
+      console.warn('[Push] Initialization skipped (non-blocking):', error);
+    }
+  }, [attachListeners, enabled, session, user]);
+
   useEffect(() => {
-    if (!user || !session || !isNativeApp()) return;
+    if (!enabled || !user || !session || !isNativeApp()) return;
 
-    const timer = setTimeout(() => {
-      // Fire-and-forget — never blocks rendering
-      initialize().catch((e) => console.warn('[Push] Deferred init error:', e));
-    }, 8000);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+
+      scheduleInBackground(() => {
+        if (cancelled) return;
+        void initialize();
+      });
+    }, INIT_DELAY_MS);
 
     return () => {
-      clearTimeout(timer);
-      if (PushNotifications && registeredRef.current) {
-        PushNotifications.removeAllListeners();
-        registeredRef.current = false;
-      }
+      cancelled = true;
+      window.clearTimeout(timer);
+      const currentHandles = listenerHandlesRef.current;
+      listenerHandlesRef.current = [];
+      registeredRef.current = false;
+      void removeListenerHandles(currentHandles);
     };
-  }, [user, session, initialize]);
+  }, [enabled, initialize, session, user]);
 
   return { initialize };
 };
