@@ -891,6 +891,14 @@ const Auth = () => {
                               </Button>
                             </>
                           )}
+
+                          {/* Native: device supports biometrics but app not yet enrolled */}
+                          {isNative && biometricReady && !nativeBiometricConfigured && (
+                            <p className="text-center text-xs text-muted-foreground">
+                              <Fingerprint className="inline h-3.5 w-3.5 mr-1 align-text-bottom" />
+                              Sign in with your password — you can enable Fingerprint login right after.
+                            </p>
+                          )}
                           
                           <div className="text-center">
                             <Link to="/forgot-password" className="text-sm text-primary hover:underline">

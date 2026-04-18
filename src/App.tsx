@@ -10,6 +10,7 @@ import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
 
 import { ChatSupport } from "./components/ChatSupport";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { NativeDeepLinkHandler } from "./components/NativeDeepLinkHandler";
 import { Loader2 } from "lucide-react";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import React from "react";
@@ -119,6 +120,7 @@ const AppContent = () => {
       <Toaster />
       <Sonner />
       
+      <NativeDeepLinkHandler />
       <PushNotificationInit enabled={!isAuthFlowRoute} />
       {!isAdminRoute && <ChatSupport />}
       <Suspense fallback={<PageLoader />}>

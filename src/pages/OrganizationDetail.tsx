@@ -20,6 +20,7 @@ import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { useAuth } from "@/contexts/AuthContext";
 import { GroupDocuments } from "@/components/GroupDocuments";
+import { publicUrls } from "@/lib/publicUrl";
 
 interface Organization {
   id: string;
@@ -102,7 +103,7 @@ const OrganizationDetail = () => {
     fetchOrganization();
   };
 
-  const shareUrl = `${import.meta.env.VITE_APP_URL || window.location.origin}/organizations/${organization?.slug}`;
+  const shareUrl = organization?.slug ? publicUrls.organization(organization.slug) : '';
 
   if (loading) {
     return (

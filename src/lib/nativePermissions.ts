@@ -84,6 +84,59 @@ export const ensureStorageAvailable = async (): Promise<PermissionResult> => {
 };
 
 /**
+ * Calendar permission. The official Capacitor org does not ship a calendar
+ * plugin, so we attempt to resolve a community plugin lazily. If it isn't
+ * installed we return `unsupported` — callers should then fall back to a
+ * confirmation/email/SMS reminder rather than crashing.
+ */
+export const ensureCalendarPermission = async (): Promise<PermissionResult> => {
+  if (!isNativeApp()) return fail('unsupported');
+
+  try {
+    // Try a few known community plugins. Each lookup is wrapped so a missing
+    // module never throws into the caller.
+    const candidates: Array<() => Promise<any>> = [
+      () => import('@ebarooni/capacitor-calendar' as any).catch(() => null),
+      () => import('capacitor-plugin-calendar' as any).catch(() => null),
+    ];
+
+    for (const load of candidates) {
+      const mod = await load();
+      const plugin = mod?.Calendar ?? mod?.CapacitorCalendar ?? mod?.default;
+      if (!plugin) continue;
+
+      const checker = plugin.checkPermissions ?? plugin.checkPermission;
+      const requester = plugin.requestPermissions ?? plugin.requestPermission;
+      if (typeof requester !== 'function') continue;
+
+      try {
+        const status = typeof checker === 'function' ? await checker() : null;
+        const alreadyGranted =
+          status?.calendar === 'granted' ||
+          status?.readCalendar === 'granted' ||
+          status?.granted === true;
+        if (alreadyGranted) return { granted: true };
+
+        const result = await requester();
+        const granted =
+          result?.calendar === 'granted' ||
+          result?.readCalendar === 'granted' ||
+          result?.granted === true;
+        return granted ? { granted: true } : fail('denied');
+      } catch (error: any) {
+        console.warn('[Permissions] Calendar plugin call failed:', error);
+        return fail('error', error?.message);
+      }
+    }
+
+    return fail('unsupported', 'No Capacitor calendar plugin installed');
+  } catch (error: any) {
+    console.warn('[Permissions] Calendar request failed:', error);
+    return fail('error', error?.message);
+  }
+};
+
+/**
  * Best-effort warm-up: prepares plugins in the background after login so the
  * first user-triggered action (camera, map, etc.) is instant.
  * Never throws, never blocks the UI thread for more than a microtask.

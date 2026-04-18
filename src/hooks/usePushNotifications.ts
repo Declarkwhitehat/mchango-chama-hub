@@ -1,7 +1,19 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+
+/**
+ * Push notifications hook (native-only, never crashes the app).
+ *
+ * Architecture:
+ *  - Permission check, permission request, and registration are SEPARATE.
+ *  - Auto-register silently ONLY when permission is already granted.
+ *  - Explicit `requestPermission()` for user-triggered enablement.
+ *  - All native calls are deferred to idle time AFTER auth is stable.
+ *  - Listeners are attached once and cleaned up safely.
+ *  - Every failure path is swallowed and logged; the UI never crashes.
+ */
 
 let PushNotifications: any = null;
 
@@ -10,13 +22,11 @@ const PERMISSION_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 10000;
 const REGISTER_TIMEOUT_MS = 10000;
 
-type PushListenerHandle = {
-  remove?: () => Promise<void> | void;
-};
+type PushListenerHandle = { remove?: () => Promise<void> | void };
+type PermissionState = 'unknown' | 'prompt' | 'granted' | 'denied' | 'unsupported';
 
-const loadPushModule = async () => {
+const loadPushModule = async (): Promise<boolean> => {
   if (PushNotifications) return true;
-
   try {
     const mod = await import('@capacitor/push-notifications');
     PushNotifications = mod.PushNotifications;
@@ -26,12 +36,11 @@ const loadPushModule = async () => {
   }
 };
 
-const isNativeApp = (): boolean => {
-  return !!(window as any).Capacitor?.isNativePlatform?.();
-};
+const isNativeApp = (): boolean =>
+  !!(window as any).Capacitor?.isNativePlatform?.();
 
-const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
-  return new Promise((resolve, reject) => {
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+  new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => reject(new Error('Timeout')), ms);
     promise.then(
       (value) => {
@@ -44,22 +53,19 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
       },
     );
   });
-};
 
 const scheduleInBackground = (task: () => void) => {
-  const requestIdleCallback = (window as any).requestIdleCallback;
-
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(task, { timeout: 2000 });
-    return;
+  const ric = (window as any).requestIdleCallback;
+  if (typeof ric === 'function') {
+    ric(task, { timeout: 2000 });
+  } else {
+    window.setTimeout(task, 0);
   }
-
-  window.setTimeout(task, 0);
 };
 
 const removeListenerHandles = async (handles: PushListenerHandle[]) => {
   await Promise.allSettled(
-    handles.map((handle) => Promise.resolve(handle?.remove?.()))
+    handles.map((h) => Promise.resolve(h?.remove?.())),
   );
 };
 
@@ -68,129 +74,165 @@ export const usePushNotifications = (options?: { enabled?: boolean }) => {
   const { user, session } = useAuth();
   const registeredRef = useRef(false);
   const listenerHandlesRef = useRef<PushListenerHandle[]>([]);
+  const [permissionState, setPermissionState] = useState<PermissionState>('unknown');
 
   const saveToken = useCallback(async (token: string) => {
     if (!user) return;
-
     try {
       const { error } = await supabase
         .from('device_tokens')
         .upsert(
           { user_id: user.id, token, platform: 'android' },
-          { onConflict: 'user_id,token' }
+          { onConflict: 'user_id,token' },
         );
-
-      if (error) {
-        console.error('Failed to save device token:', error);
-        return;
-      }
-
-      console.log('[Push] Token saved successfully');
+      if (error) console.error('[Push] Failed to save device token:', error);
     } catch (error) {
-      console.error('Error saving device token:', error);
+      console.error('[Push] Error saving device token:', error);
     }
   }, [user]);
 
   const attachListeners = useCallback(async () => {
     if (!PushNotifications || listenerHandlesRef.current.length > 0) return;
 
-    const listenerResults = await Promise.allSettled([
+    const results = await Promise.allSettled([
       Promise.resolve(
         PushNotifications.addListener('registration', (token: { value: string }) => {
-          console.log('[Push] Registered with token:', `${token.value.substring(0, 20)}...`);
+          console.log('[Push] Registered:', `${token.value.substring(0, 20)}...`);
           void saveToken(token.value);
-        })
+        }),
       ),
       Promise.resolve(
         PushNotifications.addListener('registrationError', (error: any) => {
-          console.error('[Push] Registration error:', error);
-        })
+          console.warn('[Push] Registration error (non-fatal):', error);
+        }),
       ),
       Promise.resolve(
         PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
-          console.log('[Push] Notification received:', notification);
           toast.info(notification.title || 'New notification', {
             description: notification.body,
           });
-        })
+        }),
       ),
       Promise.resolve(
         PushNotifications.addListener('pushNotificationActionPerformed', (action: any) => {
-          console.log('[Push] Notification action performed:', action);
-        })
+          console.log('[Push] Action performed:', action);
+        }),
       ),
     ]);
 
-    listenerHandlesRef.current = listenerResults
-      .filter(
-        (result): result is PromiseFulfilledResult<PushListenerHandle> =>
-          result.status === 'fulfilled' && !!result.value
-      )
-      .map((result) => result.value);
+    listenerHandlesRef.current = results
+      .filter((r): r is PromiseFulfilledResult<PushListenerHandle> => r.status === 'fulfilled' && !!r.value)
+      .map((r) => r.value);
   }, [saveToken]);
 
-  const initialize = useCallback(async () => {
+  /** Pure check — never prompts. Safe to call anywhere. */
+  const checkPermission = useCallback(async (): Promise<PermissionState> => {
+    if (!isNativeApp()) {
+      setPermissionState('unsupported');
+      return 'unsupported';
+    }
     try {
-      if (!enabled || !isNativeApp() || registeredRef.current || !user || !session) return;
-
       const loaded = await loadPushModule();
-      if (!loaded || !PushNotifications) {
-        console.log('[Push] Push notifications module not available');
-        return;
+      if (!loaded) {
+        setPermissionState('unsupported');
+        return 'unsupported';
       }
-
-      await attachListeners();
-
-      const permissionStatus: any = await withTimeout(
+      const status: any = await withTimeout(
         PushNotifications.checkPermissions(),
         PERMISSION_TIMEOUT_MS,
       );
+      const next = (status?.receive as PermissionState) ?? 'unknown';
+      setPermissionState(next);
+      return next;
+    } catch (error) {
+      console.warn('[Push] checkPermission failed (non-fatal):', error);
+      setPermissionState('unknown');
+      return 'unknown';
+    }
+  }, []);
 
-      let receivePermission = permissionStatus?.receive;
-
-      if (receivePermission === 'prompt') {
-        const requestResult: any = await withTimeout(
-          PushNotifications.requestPermissions(),
-          REQUEST_TIMEOUT_MS,
-        );
-        receivePermission = requestResult?.receive;
-      }
-
-      if (receivePermission !== 'granted') {
-        console.log('[Push] Permission not granted:', receivePermission);
-        return;
-      }
-
+  /** Background registration — assumes permission is already granted. */
+  const registerSilently = useCallback(async (): Promise<boolean> => {
+    if (!isNativeApp() || registeredRef.current) return registeredRef.current;
+    try {
+      const loaded = await loadPushModule();
+      if (!loaded) return false;
+      await attachListeners();
       await withTimeout(PushNotifications.register(), REGISTER_TIMEOUT_MS);
       registeredRef.current = true;
-      console.log('[Push] Push notifications initialized in background');
+      console.log('[Push] Registered silently');
+      return true;
     } catch (error) {
-      console.warn('[Push] Initialization skipped (non-blocking):', error);
+      console.warn('[Push] Silent registration failed (non-fatal):', error);
+      return false;
     }
-  }, [attachListeners, enabled, session, user]);
+  }, [attachListeners]);
 
+  /** User-triggered: prompts the OS, then registers. */
+  const requestPermission = useCallback(async (): Promise<PermissionState> => {
+    if (!isNativeApp()) return 'unsupported';
+    try {
+      const loaded = await loadPushModule();
+      if (!loaded) return 'unsupported';
+      await attachListeners();
+
+      const result: any = await withTimeout(
+        PushNotifications.requestPermissions(),
+        REQUEST_TIMEOUT_MS,
+      );
+      const next = (result?.receive as PermissionState) ?? 'denied';
+      setPermissionState(next);
+
+      if (next === 'granted') {
+        // Register in background — never block the caller.
+        scheduleInBackground(() => {
+          void registerSilently();
+        });
+      }
+      return next;
+    } catch (error) {
+      console.warn('[Push] requestPermission failed (non-fatal):', error);
+      return 'denied';
+    }
+  }, [attachListeners, registerSilently]);
+
+  // Auto-init: check permission on mount, register silently if already granted.
   useEffect(() => {
     if (!enabled || !user || !session || !isNativeApp()) return;
 
     let cancelled = false;
     const timer = window.setTimeout(() => {
       if (cancelled) return;
-
-      scheduleInBackground(() => {
+      scheduleInBackground(async () => {
         if (cancelled) return;
-        void initialize();
+        try {
+          const state = await checkPermission();
+          if (cancelled) return;
+          if (state === 'granted') {
+            await registerSilently();
+          }
+          // 'prompt' or 'denied' → do NOTHING here. UI must call requestPermission().
+        } catch (error) {
+          console.warn('[Push] auto-init skipped (non-fatal):', error);
+        }
       });
     }, INIT_DELAY_MS);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
-      const currentHandles = listenerHandlesRef.current;
+      const handles = listenerHandlesRef.current;
       listenerHandlesRef.current = [];
       registeredRef.current = false;
-      void removeListenerHandles(currentHandles);
+      void removeListenerHandles(handles);
     };
-  }, [enabled, initialize, session, user]);
+  }, [enabled, user, session, checkPermission, registerSilently]);
 
-  return { initialize };
+  return {
+    permissionState,
+    checkPermission,
+    requestPermission,
+    registerSilently,
+    isNativeApp: isNativeApp(),
+  };
 };

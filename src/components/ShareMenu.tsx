@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Share2, MessageCircle, Facebook, Mail, MessageSquare, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import { toPublicUrl } from "@/lib/publicUrl";
 
 interface ShareMenuProps {
   url: string;
@@ -18,6 +19,9 @@ interface ShareMenuProps {
   label?: string;
   className?: string;
 }
+
+const isNativeApp = (): boolean =>
+  !!(window as any).Capacitor?.isNativePlatform?.();
 
 export const ShareMenu = ({
   url,
@@ -30,9 +34,13 @@ export const ShareMenu = ({
 }: ShareMenuProps) => {
   const [copied, setCopied] = useState(false);
 
-  const encodedUrl = encodeURIComponent(url);
+  // Always rewrite to a canonical public URL — fixes native shares opening
+  // to localhost / preview origins.
+  const publicUrl = toPublicUrl(url);
+
+  const encodedUrl = encodeURIComponent(publicUrl);
   const encodedText = encodeURIComponent(text || title);
-  const fullMessage = encodeURIComponent(`${text || title}\n${url}`);
+  const fullMessage = encodeURIComponent(`${text || title}\n${publicUrl}`);
 
   const shareOptions = [
     {
@@ -61,9 +69,30 @@ export const ShareMenu = ({
     },
   ];
 
+  const handleNativeShare = async (): Promise<boolean> => {
+    if (!isNativeApp()) return false;
+    try {
+      const { Share } = await import("@capacitor/share");
+      const can = await Share.canShare();
+      if (!can?.value) return false;
+      await Share.share({
+        title,
+        text: text || title,
+        url: publicUrl,
+        dialogTitle: title,
+      });
+      return true;
+    } catch (error: any) {
+      // User cancelled the native sheet — that's not an error.
+      if (error?.message?.toLowerCase?.().includes("cancel")) return true;
+      console.warn("[Share] Native share failed, falling back to menu:", error);
+      return false;
+    }
+  };
+
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(publicUrl);
       setCopied(true);
       toast.success("Link copied to clipboard!");
       setTimeout(() => setCopied(false), 2000);
@@ -71,6 +100,23 @@ export const ShareMenu = ({
       toast.error("Failed to copy link");
     }
   };
+
+  // On native: tap → fire OS share sheet directly. No dropdown.
+  if (isNativeApp()) {
+    return (
+      <Button
+        variant={variant}
+        size={size}
+        className={`gap-2 ${className}`}
+        onClick={() => {
+          void handleNativeShare();
+        }}
+      >
+        <Share2 className="h-4 w-4" />
+        {label}
+      </Button>
+    );
+  }
 
   return (
     <DropdownMenu>
