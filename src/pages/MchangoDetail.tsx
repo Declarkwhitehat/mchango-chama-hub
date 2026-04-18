@@ -23,6 +23,7 @@ import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { GroupDocuments } from "@/components/GroupDocuments";
+import { publicUrls } from "@/lib/publicUrl";
 
 interface Campaign {
   id: string;
@@ -134,9 +135,7 @@ const MchangoDetail = () => {
     return diffDays > 0 ? diffDays : 0;
   };
 
-  const shareUrl = campaign?.slug
-    ? (await import('@/lib/publicUrl'), require('@/lib/publicUrl').publicUrls.mchango(campaign.slug))
-    : '';
+  const shareUrl = campaign?.slug ? publicUrls.mchango(campaign.slug) : '';
 
   if (loading) {
     return (
