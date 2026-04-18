@@ -134,7 +134,9 @@ const MchangoDetail = () => {
     return diffDays > 0 ? diffDays : 0;
   };
 
-  const shareUrl = `${import.meta.env.VITE_APP_URL || window.location.origin}/mchango/${campaign?.slug}`;
+  const shareUrl = campaign?.slug
+    ? (await import('@/lib/publicUrl'), require('@/lib/publicUrl').publicUrls.mchango(campaign.slug))
+    : '';
 
   if (loading) {
     return (

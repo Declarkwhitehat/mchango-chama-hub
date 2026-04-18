@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Link2, Plus, Loader2, X, Users } from "lucide-react";
 import { ShareMenu } from "@/components/ShareMenu";
+import { publicUrls } from "@/lib/publicUrl";
 import { format } from "date-fns";
 
 interface InviteCode {
@@ -204,7 +205,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
                     </div>
                     <div className="flex gap-2">
                       <ShareMenu 
-                        url={`https://mchango-chama-hub.lovable.app/chama/join/${chamaSlug}?code=${inviteCode.code}`}
+                        url={publicUrls.chamaJoin(chamaSlug, inviteCode.code)}
                         title="Chama Invite"
                         text={`You're invited to join our Chama! Use code: ${inviteCode.code}`}
                         label="Share"
