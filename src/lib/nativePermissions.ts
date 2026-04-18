@@ -96,8 +96,8 @@ export const ensureCalendarPermission = async (): Promise<PermissionResult> => {
     // Try a few known community plugins. Each lookup is wrapped so a missing
     // module never throws into the caller.
     const candidates: Array<() => Promise<any>> = [
-      () => import('@ebarooni/capacitor-calendar' as any).catch(() => null),
-      () => import('capacitor-plugin-calendar' as any).catch(() => null),
+      () => (new Function('m', 'return import(m)'))('@ebarooni/capacitor-calendar').catch(() => null),
+      () => (new Function('m', 'return import(m)'))('capacitor-plugin-calendar').catch(() => null),
     ];
 
     for (const load of candidates) {
