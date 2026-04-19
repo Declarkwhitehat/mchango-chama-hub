@@ -2,8 +2,8 @@ import qrcode from "qrcode-generator";
 import { jsPDF } from "jspdf";
 
 const VERIFY_BASE_URL = "https://mchango-chama-hub.lovable.app/admin/documents";
-const SUPPORT_EMAIL = "support@pamojanova.com";
-const CUSTOMER_CARE = "+254 700 000 000";
+const SUPPORT_EMAIL = "info@pamojanova.com";
+const CUSTOMER_CARE = "+254 707 874 790";
 
 /**
  * Adds a branded footer with QR code, serial number, contacts to a jsPDF document.
