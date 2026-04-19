@@ -418,17 +418,8 @@ const Auth = () => {
             }
           }
           
-          // Offer biometric setup for next time
-          if (isNative && !nativeBiometricConfigured) {
-            // Always show biometric setup dialog on native
-            // regardless of availability check result
-            setBiometricIdentifier(data.emailOrPhone);
-            setShowBiometricSetup(true);
-          } else if (isWebAuthnSupported()) {
-            setBiometricIdentifier(data.emailOrPhone);
-            setShowBiometricSetup(true);
-          } else {
-            navigate("/home");
+          // Always navigate home — biometric setup available in settings
+          navigate("/home");
           }
         }
       }
