@@ -200,9 +200,13 @@ const Auth = () => {
       return;
     }
 
-    if (isNative && !biometricChecked) {
+    if (isNative) {
+      // Do NOT auto-trigger fingerprint on native app
+      // User taps the fingerprint button manually
+      hasAttemptedAutoLogin.current = true;
       return;
     }
+    if (!biometricChecked) return;
 
     const attemptAutoLogin = async () => {
       try {
