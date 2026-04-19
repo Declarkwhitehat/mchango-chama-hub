@@ -143,7 +143,7 @@ const Auth = () => {
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [biometricIdentifier, setBiometricIdentifier] = useState('');
   const [biometricCancelled, setBiometricCancelled] = useState(false);
-  const [isInitialCheck, setIsInitialCheck] = useState(true);
+  const [isInitialCheck, setIsInitialCheck] = useState(false);
   const hasAttemptedAutoLogin = useRef(false);
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
