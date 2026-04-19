@@ -430,43 +430,59 @@ const Auth = () => {
   };
 
   const handleBiometricLogin = async () => {
-    const emailOrPhone = loginForm.getValues('emailOrPhone');
-    if (!emailOrPhone) {
-      toast.error('Please enter your email or phone number first');
-      return;
-    }
-
-    // Native app: use native biometric then auto-login with stored session
+    // Native app fingerprint login
     if (isNative) {
       if (!nativeBiometricLoginEnabled) {
-        toast.error('Fingerprint login is not set up on this device yet. Please log in with your password first.');
+        toast.error('Fingerprint login is not set up. Please go to Profile → Security → Enable Fingerprint Login.');
         return;
       }
 
-      const result = await nativeAuthenticate('Verify your identity to sign in');
+      const result = await nativeAuthenticate('Scan your fingerprint to sign in');
       if (result.success) {
         const storedToken = localStorage.getItem('biometricSession');
         if (storedToken) {
           try {
             const parsed = JSON.parse(storedToken);
+            // Try to restore session
             const { error } = await supabase.auth.setSession(parsed);
             if (!error) {
               toast.success('Welcome back!');
               navigate(returnTo || '/home', { replace: true });
               return;
             }
+            // Session expired — try refresh token
+            const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession({
+              refresh_token: parsed.refresh_token,
+            });
+            if (!refreshError && refreshed.session) {
+              // Save new refreshed session
+              localStorage.setItem('biometricSession', JSON.stringify({
+                access_token: refreshed.session.access_token,
+                refresh_token: refreshed.session.refresh_token,
+              }));
+              toast.success('Welcome back!');
+              navigate(returnTo || '/home', { replace: true });
+              return;
+            }
           } catch {
-            localStorage.removeItem('biometricSession');
-            localStorage.removeItem('nativeBiometricEnabled');
-            setNativeBiometricConfigured(false);
+            // fall through
           }
         }
-        toast.error('Stored session expired. Please log in with your password.');
+        // Session could not be restored — clear and ask for password
+        localStorage.removeItem('biometricSession');
+        localStorage.removeItem('nativeBiometricEnabled');
+        setNativeBiometricConfigured(false);
+        toast.error('Your session has expired. Please log in with your password once to re-enable fingerprint.');
       }
       return;
     }
 
-    // Browser: WebAuthn
+    // Browser: WebAuthn — still needs email/phone
+    const emailOrPhone = loginForm.getValues('emailOrPhone');
+    if (!emailOrPhone) {
+      toast.error('Please enter your email or phone number first');
+      return;
+    }
     const result = await authenticate(emailOrPhone);
     if (result.success) {
       localStorage.setItem('lastLoginIdentifier', emailOrPhone);
