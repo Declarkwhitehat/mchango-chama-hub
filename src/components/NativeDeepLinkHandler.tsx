@@ -10,6 +10,52 @@ import { useNavigate } from "react-router-dom";
  *
  * Safely no-ops on web.
  */
+
+const KNOWN_PUBLIC_HOSTS = new Set([
+  "pamojanova.online",
+  "www.pamojanova.online",
+]);
+
+const CUSTOM_SCHEMES = new Set(["pamoja"]);
+
+/**
+ * Extract the in-app path from any incoming URL string.
+ * Returns null if the URL is not actionable (e.g. plain localhost root).
+ */
+const extractInAppPath = (rawUrl: string): string | null => {
+  if (!rawUrl) return null;
+
+  // Trim accidental whitespace/punctuation that often comes from share text.
+  const trimmed = rawUrl.trim().replace(/[)\].,;!?]+$/g, "");
+
+  try {
+    const url = new URL(trimmed);
+    const scheme = url.protocol.replace(":", "").toLowerCase();
+
+    // Only handle our public domain or our custom scheme. Ignore localhost,
+    // capacitor://, file://, etc. — those are just the app's own shell URLs.
+    const isKnownHttp =
+      (scheme === "https" || scheme === "http") &&
+      KNOWN_PUBLIC_HOSTS.has(url.host);
+    const isCustomScheme = CUSTOM_SCHEMES.has(scheme);
+
+    if (!isKnownHttp && !isCustomScheme) return null;
+
+    // For pamoja://mchango/slug the path lives in url.pathname; for custom
+    // schemes the host is sometimes the first segment, so reconstruct safely.
+    let path = `${url.pathname}${url.search}${url.hash}`;
+    if (isCustomScheme && (!url.pathname || url.pathname === "/")) {
+      path = `/${url.host}${url.search}${url.hash}`;
+    }
+
+    if (!path || path === "/") return null;
+    return path;
+  } catch (error) {
+    console.warn("[DeepLink] Could not parse URL:", rawUrl, error);
+    return null;
+  }
+};
+
 export const NativeDeepLinkHandler = () => {
   const navigate = useNavigate();
 
@@ -21,15 +67,10 @@ export const NativeDeepLinkHandler = () => {
     let cancelled = false;
 
     const routeFromUrl = (rawUrl: string) => {
-      try {
-        const url = new URL(rawUrl);
-        const path = `${url.pathname}${url.search}${url.hash}`;
-        if (path && path !== "/") {
-          navigate(path, { replace: false });
-        }
-      } catch (error) {
-        console.warn("[DeepLink] Could not parse URL:", rawUrl, error);
-      }
+      const path = extractInAppPath(rawUrl);
+      if (!path) return;
+      console.info("[DeepLink] Routing to", path);
+      navigate(path, { replace: true });
     };
 
     (async () => {
@@ -37,10 +78,13 @@ export const NativeDeepLinkHandler = () => {
         const { App } = await import("@capacitor/app");
         if (cancelled) return;
 
-        // Handle cold-start launch URL.
+        // Handle cold-start launch URL — defer one tick so React Router has
+        // mounted before we navigate.
         try {
           const launch = await App.getLaunchUrl();
-          if (launch?.url) routeFromUrl(launch.url);
+          if (launch?.url) {
+            setTimeout(() => routeFromUrl(launch.url), 0);
+          }
         } catch (error) {
           console.warn("[DeepLink] getLaunchUrl failed (non-fatal):", error);
         }
