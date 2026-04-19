@@ -413,17 +413,23 @@ const Auth = () => {
         } else {
           // Store session for native biometric re-auth
           if (isNative) {
-            const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData.session) {
+            const { data: refreshed } = await supabase.auth.refreshSession();
+            const session = refreshed?.session || (await supabase.auth.getSession()).data.session;
+            if (session) {
               localStorage.setItem('biometricSession', JSON.stringify({
-                access_token: sessionData.session.access_token,
-                refresh_token: sessionData.session.refresh_token,
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
               }));
             }
           }
           
-          // Always navigate home — biometric setup available in settings
-          navigate("/home");
+          // On first login — offer fingerprint setup
+          if (isNative && !nativeBiometricConfigured) {
+            setBiometricIdentifier(data.emailOrPhone);
+            setShowBiometricSetup(true);
+          } else {
+            navigate("/home");
+          }
           }
         }
     } catch (error: any) {
