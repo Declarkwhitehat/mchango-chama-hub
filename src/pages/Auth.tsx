@@ -422,7 +422,6 @@ const Auth = () => {
           navigate("/home");
           }
         }
-      }
     } catch (error: any) {
       toast.error("An unexpected error occurred");
     } finally {
