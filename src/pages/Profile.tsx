@@ -161,9 +161,13 @@ const Profile = () => {
             access_token: sessionData.session.access_token,
             refresh_token: sessionData.session.refresh_token,
           }));
+          setNativeBiometricEnabled(true);
+          toast.success('Fingerprint login enabled! Use your fingerprint next time you sign in.');
+        } else {
+          toast.error('Could not save session. Please log out and log in again first.');
+          setIsTogglingNativeBiometric(false);
+          return;
         }
-        setNativeBiometricEnabled(true);
-        toast.success('Fingerprint login enabled! You can now use your fingerprint to sign in.');
       } else {
         toast.error(result.error || 'Fingerprint verification failed. Please try again.');
       }
