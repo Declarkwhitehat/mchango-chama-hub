@@ -35,6 +35,12 @@ jobs:
       - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli
 
+      - name: Remove incomplete android folder
+        run: rm -rf android
+
+      - name: Add Android platform fresh
+        run: npx cap add android
+
       - name: Sync Capacitor
         run: npx cap sync android
 
