@@ -35,14 +35,11 @@ jobs:
       - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli
 
-      - name: Add Android platform
-        run: npx cap add android
+      - name: Sync Capacitor
+        run: npx cap sync android
 
       - name: Place google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
-
-      - name: Sync Capacitor
-        run: npx cap sync android
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
