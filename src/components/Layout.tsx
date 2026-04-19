@@ -62,7 +62,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 safe-top">
         <div className="container flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             {showBackButton ? (
