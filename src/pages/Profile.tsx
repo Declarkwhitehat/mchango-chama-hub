@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { User, Mail, Phone, MapPin, LogOut, Edit, AlertCircle, CheckCircle, Clock, Key, Eye, EyeOff, Wallet, Fingerprint, Trash2, Plus, Shield } from "lucide-react";
+import { User, Mail, Phone, LogOut, Edit, AlertCircle, CheckCircle, Clock, Key, Eye, EyeOff, Wallet, Fingerprint, Trash2, Plus, Shield } from "lucide-react";
 import { TwoFactorSetup } from "@/components/TwoFactorSetup";
 import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +19,7 @@ import { useState, useEffect } from "react";
 import { PaymentMethodsManager } from "@/components/PaymentMethodsManager";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useWebAuthnManagement } from "@/hooks/useWebAuthnManagement";
+import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import { format } from "date-fns";
 
 const Profile = () => {
@@ -32,14 +33,30 @@ const Profile = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-  
-  // Biometric management
+
+  // WebAuthn (browser) biometric management
   const { isSupported: isWebAuthnSupported, registerCredential } = useWebAuthn();
   const { isLoading: isLoadingCredentials, credentials, listCredentials, deleteCredential } = useWebAuthnManagement();
   const [credentialToDelete, setCredentialToDelete] = useState<string | null>(null);
   const [isAddingBiometric, setIsAddingBiometric] = useState(false);
+
+  // Native biometric management (Android app)
+  const { isNativeApp: isNative, isAvailable: isNativeBiometricAvailable, authenticate: nativeAuthenticate } = useNativeBiometrics();
+  const [nativeBiometricEnabled, setNativeBiometricEnabled] = useState(false);
+  const [isTogglingNativeBiometric, setIsTogglingNativeBiometric] = useState(false);
+  const [showDisableBiometricDialog, setShowDisableBiometricDialog] = useState(false);
+
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [show2FAForPassword, setShow2FAForPassword] = useState(false);
+
+  // Load native biometric state from localStorage
+  useEffect(() => {
+    if (isNative) {
+      const enabled = localStorage.getItem('nativeBiometricEnabled') === 'true';
+      const hasSession = !!localStorage.getItem('biometricSession');
+      setNativeBiometricEnabled(enabled && hasSession);
+    }
+  }, [isNative]);
 
   // Check 2FA status
   const check2FAStatus = async () => {
@@ -91,7 +108,6 @@ const Profile = () => {
       return;
     }
 
-    // If 2FA is enabled, require verification first
     if (is2FAEnabled) {
       setShow2FAForPassword(true);
       return;
@@ -122,13 +138,59 @@ const Profile = () => {
     }
   };
 
+  // Enable native fingerprint login
+  const handleEnableNativeBiometric = async () => {
+    setIsTogglingNativeBiometric(true);
+    try {
+      // Check if biometric is available on this device
+      const available = await isNativeBiometricAvailable();
+      if (!available) {
+        toast.error('Fingerprint is not available on this device. Please set up fingerprint in your phone Settings → Security → Fingerprint.');
+        setIsTogglingNativeBiometric(false);
+        return;
+      }
+
+      // Ask user to verify fingerprint first
+      const result = await nativeAuthenticate('Scan your fingerprint to enable fingerprint login');
+      if (result.success) {
+        // Store flag and current session
+        localStorage.setItem('nativeBiometricEnabled', 'true');
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) {
+          localStorage.setItem('biometricSession', JSON.stringify({
+            access_token: sessionData.session.access_token,
+            refresh_token: sessionData.session.refresh_token,
+          }));
+        }
+        setNativeBiometricEnabled(true);
+        toast.success('Fingerprint login enabled! You can now use your fingerprint to sign in.');
+      } else {
+        toast.error(result.error || 'Fingerprint verification failed. Please try again.');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to enable fingerprint login');
+    } finally {
+      setIsTogglingNativeBiometric(false);
+    }
+  };
+
+  // Disable native fingerprint login
+  const handleDisableNativeBiometric = () => {
+    localStorage.removeItem('nativeBiometricEnabled');
+    localStorage.removeItem('biometricSession');
+    setNativeBiometricEnabled(false);
+    setShowDisableBiometricDialog(false);
+    toast.success('Fingerprint login disabled.');
+  };
+
+  // WebAuthn (browser) biometric management
   const handleAddBiometric = async () => {
     setIsAddingBiometric(true);
     try {
       const result = await registerCredential();
       if (result.success) {
         toast.success('Biometric device added successfully!');
-        await listCredentials(); // Refresh the list
+        await listCredentials();
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to add biometric device');
@@ -139,7 +201,6 @@ const Profile = () => {
 
   const handleDeleteBiometric = async () => {
     if (!credentialToDelete) return;
-    
     const result = await deleteCredential(credentialToDelete);
     if (result.success) {
       setCredentialToDelete(null);
@@ -195,6 +256,7 @@ const Profile = () => {
   return (
     <Layout>
       <div className="container px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 max-w-2xl mx-auto space-y-4 sm:space-y-6">
+
         {/* Profile Header */}
         <Card>
           <CardContent className="pt-4 sm:pt-6 px-4 sm:px-6 pb-4 sm:pb-6">
@@ -229,10 +291,7 @@ const Profile = () => {
               </div>
             )}
             {!profile.kyc_submitted_at && (
-              <Button
-                onClick={() => navigate("/kyc-upload")}
-                className="w-full text-sm sm:text-base"
-              >
+              <Button onClick={() => navigate("/kyc-upload")} className="w-full text-sm sm:text-base">
                 Complete KYC Verification
               </Button>
             )}
@@ -262,7 +321,6 @@ const Profile = () => {
                 <span className="text-sm sm:text-base text-foreground break-words">{profile.full_name}</span>
               </div>
             </div>
-
             <div className="space-y-1.5 sm:space-y-2">
               <Label className="text-xs sm:text-sm text-muted-foreground">Email</Label>
               <div className="flex items-center gap-2">
@@ -270,7 +328,6 @@ const Profile = () => {
                 <span className="text-sm sm:text-base text-foreground break-all">{profile.email}</span>
               </div>
             </div>
-
             <div className="space-y-1.5 sm:space-y-2">
               <Label className="text-xs sm:text-sm text-muted-foreground">Phone</Label>
               <div className="flex items-center gap-2">
@@ -278,7 +335,6 @@ const Profile = () => {
                 <span className="text-sm sm:text-base text-foreground">{profile.phone}</span>
               </div>
             </div>
-
             <div className="space-y-1.5 sm:space-y-2">
               <Label className="text-xs sm:text-sm text-muted-foreground">ID Number</Label>
               <div className="flex items-center gap-2">
@@ -289,7 +345,7 @@ const Profile = () => {
           </CardContent>
         </Card>
 
-        {/* Payment Methods Dashboard */}
+        {/* Payment Methods */}
         <Card>
           <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
             <div>
@@ -303,7 +359,7 @@ const Profile = () => {
             </div>
           </CardHeader>
           <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
-            <PaymentMethodsManager 
+            <PaymentMethodsManager
               userName={profile.full_name}
               onUpdate={refreshProfile}
             />
@@ -317,6 +373,8 @@ const Profile = () => {
             <CardDescription className="text-xs sm:text-sm">Manage your account security</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 px-4 sm:px-6 pb-4 sm:pb-6">
+
+            {/* Change Password */}
             <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="w-full justify-start text-sm sm:text-base">
@@ -384,8 +442,8 @@ const Profile = () => {
                       </Button>
                     </div>
                   </div>
-                  <Button 
-                    onClick={handlePasswordUpdate} 
+                  <Button
+                    onClick={handlePasswordUpdate}
                     className="w-full text-sm sm:text-base"
                     disabled={isUpdatingPassword}
                   >
@@ -404,8 +462,58 @@ const Profile = () => {
               description="Enter your 2FA code to confirm password change"
             />
 
-            {isWebAuthnSupported() && (
-              <div className="space-y-4 pt-6 border-t border-border">
+            {/* Native Fingerprint Login (Android App Only) */}
+            {isNative && (
+              <div className="space-y-3 pt-4 border-t border-border">
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="h-5 w-5 text-primary" />
+                  <h3 className="text-base sm:text-lg font-semibold">Fingerprint Login</h3>
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Use your fingerprint to sign in faster and more securely. Your fingerprint data never leaves your device.
+                </p>
+
+                {nativeBiometricEnabled ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200">
+                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
+                      <p className="text-xs sm:text-sm text-green-700 font-medium">
+                        Fingerprint login is enabled
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full text-sm sm:text-base text-destructive border-destructive hover:bg-destructive/10"
+                      onClick={() => setShowDisableBiometricDialog(true)}
+                    >
+                      <Trash2 className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      Disable Fingerprint Login
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 sm:p-4 bg-muted/50 rounded-lg border border-border">
+                      <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Fingerprint login is not enabled
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleEnableNativeBiometric}
+                      disabled={isTogglingNativeBiometric}
+                      className="w-full text-sm sm:text-base"
+                    >
+                      <Fingerprint className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      {isTogglingNativeBiometric ? 'Setting up...' : 'Enable Fingerprint Login'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WebAuthn Biometric (Browser Only) */}
+            {!isNative && isWebAuthnSupported() && (
+              <div className="space-y-4 pt-4 border-t border-border">
                 <div className="flex items-center gap-2">
                   <Fingerprint className="h-5 w-5 text-primary" />
                   <h3 className="text-base sm:text-lg font-semibold">Biometric Login</h3>
@@ -464,7 +572,6 @@ const Profile = () => {
                         </Button>
                       </div>
                     ))}
-                    
                     <Button
                       onClick={handleAddBiometric}
                       disabled={isAddingBiometric}
@@ -481,6 +588,7 @@ const Profile = () => {
 
             {/* Two-Factor Authentication */}
             <TwoFactorSetup isEnabled={is2FAEnabled} onStatusChange={check2FAStatus} />
+
           </CardContent>
         </Card>
 
@@ -499,13 +607,13 @@ const Profile = () => {
         </Card>
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete WebAuthn Credential Confirmation */}
       <AlertDialog open={!!credentialToDelete} onOpenChange={() => setCredentialToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Biometric Device?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this biometric device? You'll need to use your password or another registered device to log in.
+              Are you sure you want to remove this biometric device? You'll need to use your password to log in.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -519,6 +627,28 @@ const Profile = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Disable Native Fingerprint Confirmation */}
+      <AlertDialog open={showDisableBiometricDialog} onOpenChange={setShowDisableBiometricDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Fingerprint Login?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will need to use your password to log in after disabling fingerprint login. You can re-enable it anytime from this settings page.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDisableNativeBiometric}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disable Fingerprint
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </Layout>
   );
 };
