@@ -419,18 +419,11 @@ const Auth = () => {
           }
           
           // Offer biometric setup for next time
-          if (isNative) {
-            try {
-              const bioAvailable = await isNativeBiometricAvailable();
-              if (bioAvailable && !nativeBiometricConfigured) {
-                setBiometricIdentifier(data.emailOrPhone);
-                setShowBiometricSetup(true);
-              } else {
-                navigate("/home");
-              }
-            } catch {
-              navigate("/home");
-            }
+          if (isNative && !nativeBiometricConfigured) {
+            // Always show biometric setup dialog on native
+            // regardless of availability check result
+            setBiometricIdentifier(data.emailOrPhone);
+            setShowBiometricSetup(true);
           } else if (isWebAuthnSupported()) {
             setBiometricIdentifier(data.emailOrPhone);
             setShowBiometricSetup(true);
