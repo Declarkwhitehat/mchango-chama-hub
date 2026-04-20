@@ -244,7 +244,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   };
 
   const signOut = async (): Promise<{ error: any }> => {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
     return { error };
   };
 
