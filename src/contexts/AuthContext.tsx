@@ -90,6 +90,22 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
         setTimeout(() => {
           if (mounted) fetchProfile(newSession.user.id);
         }, 0);
+
+        // Keep stored biometric session fresh on every valid auth event
+        // so the saved refresh_token never goes stale (one-time-use rotation).
+        if (
+          (event === 'SIGNED_IN' ||
+            event === 'TOKEN_REFRESHED' ||
+            event === 'USER_UPDATED') &&
+          newSession.access_token &&
+          newSession.refresh_token &&
+          isNativeBiometricEnabled()
+        ) {
+          writeBiometricSession({
+            access_token: newSession.access_token,
+            refresh_token: newSession.refresh_token,
+          });
+        }
       } else {
         setProfile(null);
         if (event === 'TOKEN_REFRESHED' && !newSession) {
