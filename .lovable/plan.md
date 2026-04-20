@@ -1,126 +1,106 @@
 
-# Plan: Fix native Android crashes, fingerprint setup, and shared-link routing
+Goal: make native fingerprint login work reliably, prompt setup immediately after first successful password login, and allow later sign-in with fingerprint only on the auth screen.
 
-## Do I know what the issue is?
-Yes.
+What I found
+1. The main bug is stale session storage for native biometric login.
+   - In `src/pages/Auth.tsx`, `storeNativeBiometricSession()` saves the current `access_token` and `refresh_token` into `localStorage`.
+   - Later, auth token rotation keeps happening in the background, but the saved `biometricSession` is not kept in sync.
+   - Supabase refresh tokens are one-time use and rotate. The auth logs confirm this exact failure:
+     - `Invalid Refresh Token: Refresh Token Not Found`
+     - `session_not_found`
+   - So after logout / later login, fingerprint succeeds locally, but restoring the old saved session fails, which triggers the “Your session has expired…” message.
 
-## What I found
-1. **Notification crash root cause**
-   - The Android manifest is **missing key notification permissions** for modern Android (`POST_NOTIFICATIONS`, plus related notification permissions noted in the project guide).
-   - Push init still mounts globally on app routes and can hit native APIs too early after session restore.
-   - There is **no native deep app-state guard** (`App` plugin listeners) around push startup, so release builds can fail hard when permission/registration happens at the wrong time.
+2. There is duplicated native biometric session logic.
+   - `src/pages/Auth.tsx` stores biometric session one way.
+   - `src/pages/Profile.tsx` separately writes `biometricSession` directly.
+   - This makes it easy for the app to save outdated tokens again.
 
-2. **Fingerprint problem**
-   - The app currently mixes **device capability** with **app setup state**.
-   - `biometricReady` only means “device/plugin available”, while actual login depends on prior local flags/session storage.
-   - There is no professional “set up fingerprint” state flow for native users when the device supports biometrics but the app has not configured it yet.
+3. The “ask me to enable fingerprint right after first login” flow is present but fragile.
+   - It is triggered in `Auth.tsx` after password login and after 2FA login.
+   - But if storing the session fails, or auth state / redirect timing wins first, the setup flow can be skipped or become unreliable.
 
-3. **Shared links are broken in the native app**
-   - There is **no Android deep-link intent filter** for campaign/organization/public links.
-   - There is **no `App.addListener('appUrlOpen')` / `getLaunchUrl()` routing** in the app.
-   - Some share URLs use `window.location.origin` or a hardcoded preview/published URL, so native shares can open the wrong destination or nowhere.
+4. Fingerprint-only login is partially implemented already.
+   - The native auth screen can show a fingerprint button without email input.
+   - The missing piece is restoring a fresh valid session every time, not a stale one.
 
-4. **Permissions are incomplete**
-   - Camera/location/storage helpers exist and are lazy, which is good.
-   - **Calendar permission is declared in AndroidManifest but there is no calendar permission helper / runtime flow.**
-   - The manifest is also missing a few entries already documented in `ANDROID_PERMISSIONS_GUIDE.md`.
+Implementation plan
+1. Centralize native biometric credential/session management
+   - Move native biometric storage/restore logic into a shared helper or hook used by both `Auth.tsx` and `Profile.tsx`.
+   - Remove duplicated direct writes to `localStorage` from `Profile.tsx`.
+   - Keep one source of truth for:
+     - `nativeBiometricEnabled`
+     - stored session payload
+     - clearing invalid biometric state
 
-## Implementation plan
+2. Keep stored biometric session fresh automatically
+   - Update the saved native biometric session whenever auth state changes to a valid session, especially on:
+     - successful sign-in
+     - `TOKEN_REFRESHED`
+     - successful 2FA completion
+   - This prevents the stored refresh token from becoming stale.
+   - Also avoid saving only once during setup and then never updating it again.
 
-### 1. Harden Android native configuration
-- Update `android/app/src/main/AndroidManifest.xml` to include the missing Android 13+ notification permission and the rest of the required native entries from the permissions guide.
-- Add **deep-link intent filters** for:
-  - `https://pamojanova.online/...`
-  - `https://www.pamojanova.online/...`
-  - optional custom app scheme fallback
-- Add any missing notification metadata/channel defaults needed for stable release behavior.
+3. Harden biometric restore flow
+   - In `Auth.tsx`, make native fingerprint login restore use the latest stored refresh token first.
+   - If restore fails, clear invalid biometric storage cleanly and show a precise recovery message.
+   - Keep fingerprint login independent from manual email entry.
 
-### 2. Refactor push notifications professionally
-- Rewrite `src/hooks/usePushNotifications.ts` so it:
-  - never blocks rendering
-  - initializes only after auth is stable and the app is active
-  - separates **permission check**, **permission request**, and **token registration**
-  - auto-registers silently only when permission is already granted
-  - exposes an explicit `requestPermission()` flow for user-triggered enablement
-  - attaches listeners once and cleans them up safely
-  - logs failures without ever crashing the app
-- Mount push init only where appropriate, not as an uncontrolled startup side effect.
+4. Make first-login fingerprint enrollment consistent
+   - After successful password login or 2FA login on native:
+     - wait until session is confirmed
+     - save a fresh biometric session snapshot
+     - then open the fingerprint setup dialog before redirecting away
+   - This ensures the user is actually prompted the first time instead of needing to visit Profile manually.
 
-### 3. Fix fingerprint properly
-- Refactor `src/hooks/useNativeBiometrics.ts` and `src/pages/Auth.tsx` to separate:
-  - **supported**
-  - **enrolled on device**
-  - **enabled for this app**
-- Show:
-  - **“Use Fingerprint/Face ID”** only when native login is already configured
-  - **“Set up Fingerprint”** after password login when the device supports it but the app has not enabled it yet
-- Keep all biometric checks non-blocking and use the already-resolved state instead of re-triggering async checks during login.
-- Preserve password/PIN fallback at all times.
+5. Prevent redirect timing from interfering
+   - Refactor the redirect logic in `Auth.tsx` so the “already logged in” redirect does not race against:
+     - `showBiometricSetup`
+     - 2FA completion
+     - native biometric enrollment flow
+   - The current render-time `setTimeout(...)` redirect is fragile and should be moved to a safer effect-based flow.
 
-### 4. Finish native permission support
-- Keep camera/location/storage permission requests lazy and action-based.
-- Add a proper `ensureCalendarPermission()` helper in `src/lib/nativePermissions.ts`.
-- Ensure every native permission request returns a safe result object and never throws into the UI.
+6. Align logout behavior with biometric quick re-entry
+   - Keep local-only sign-out behavior in `AuthContext.tsx`.
+   - Verify no other logout paths revoke the session globally or wipe biometric storage unexpectedly.
+   - Keep fingerprint login available on the auth page after logout.
 
-### 5. Fix share links and landing behavior
-- Create a centralized **public URL builder** so campaign/org/invite links always use the real production domain instead of preview/native origin.
-- Update `ShareMenu` to use **Capacitor Share on native** and web fallback in browser.
-- Add app-level deep-link handling so opening a shared campaign link routes correctly to:
-  - `/mchango/:slug`
-  - `/organizations/:slug`
-  - `/chama/join/:slug?code=...`
-
-### 6. Add focused regression tests
-- Update/add tests for:
-  - push init not blocking app startup
-  - permission-granted push registration not crashing
-  - biometric availability/setup/login states
-  - native/public share URL generation
-  - deep-link route parsing
-
-## Files I expect to touch
-- `android/app/src/main/AndroidManifest.xml`
-- `src/App.tsx`
-- `src/hooks/usePushNotifications.ts`
-- `src/hooks/useNativeBiometrics.ts`
+Files to update
 - `src/pages/Auth.tsx`
-- `src/components/ShareMenu.tsx`
-- `src/lib/nativePermissions.ts`
-- likely a new small helper for canonical public URLs / deep-link routing
+  - fix native biometric restore
+  - trigger setup reliably after first password/2FA login
+  - refactor redirect race conditions
+- `src/pages/Profile.tsx`
+  - replace duplicate session-saving logic with shared native biometric helper
+- `src/hooks/useNativeBiometrics.ts` or a new shared hook/helper
+  - add unified native biometric session persistence/restore helpers
+- `src/contexts/AuthContext.tsx`
+  - sync stored biometric session on valid auth changes
+  - keep logout compatible with native biometric relogin
 
-## How I will test it
-1. **App startup**
-   - Launch signed-in native app
-   - Verify UI renders before push setup begins
-   - Verify allowing notification permission does not freeze/crash
+Expected result after fix
+1. User logs in with password the first time in the native app.
+2. App immediately asks whether to enable fingerprint login.
+3. If enabled, a fresh biometric-backed session is stored and kept updated.
+4. User logs out.
+5. On the auth screen, user taps fingerprint and signs in successfully without entering email first.
+6. No more “session expired” loop unless the session is truly invalid, in which case biometric is reset cleanly.
 
-2. **Push notifications**
-   - Test permission states: prompt, granted, denied
-   - Verify registration errors fail softly
-   - Verify app still works after allowing notifications
+What I’ll verify after implementation
+- First password login on native shows fingerprint setup prompt
+- Enabling fingerprint from the prompt works
+- Enabling fingerprint later from Profile also works
+- Logout keeps fingerprint login available
+- Fingerprint-only login works from `/auth` without email input
+- 2FA + fingerprint flow still works
+- Invalid biometric state clears gracefully instead of looping
 
-3. **Biometrics**
-   - Device with fingerprint enrolled: verify setup prompt appears after login
-   - Enable fingerprint in app, sign out, log back in with fingerprint
-   - Device without biometric enrollment: verify graceful fallback to password/PIN
-
-4. **Permissions**
-   - Trigger camera, location, storage, and calendar flows one by one
-   - Confirm no startup prompt spam and no crashes
-
-5. **Shared links**
-   - Share a campaign link from native app
-   - Open link from WhatsApp/browser
-   - Confirm it lands on the correct campaign inside the app or website
-
-## What I may need you to do after implementation
-Because these are **native Android changes**, after I make the fixes you will likely need to:
-1. pull the latest code
-2. run `npm install`
-3. run `npx cap sync android`
-4. rebuild and reinstall the Android app
-
-For a true release verification, it is best to test on a **real Android device** with:
-- notification permission prompt available
-- fingerprint already enrolled in device settings
+What you may need to do after I implement it
+- Pull the latest changes
+- Run `npx cap sync android`
+- Rebuild/reinstall the Android app
+- Test one clean cycle:
+  1. password login
+  2. enable fingerprint
+  3. logout
+  4. fingerprint-only login
 
