@@ -156,14 +156,8 @@ const Profile = () => {
       // Ask user to verify fingerprint first
       const result = await nativeAuthenticate('Scan your fingerprint to enable fingerprint login');
       if (result.success) {
-        // Store flag and current session
-        localStorage.setItem('nativeBiometricEnabled', 'true');
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session) {
-          localStorage.setItem('biometricSession', JSON.stringify({
-            access_token: sessionData.session.access_token,
-            refresh_token: sessionData.session.refresh_token,
-          }));
+        const stored = await saveCurrentSessionForBiometric(true);
+        if (stored) {
           setNativeBiometricEnabled(true);
           toast.success('Fingerprint login enabled! Use your fingerprint next time you sign in.');
         } else {
