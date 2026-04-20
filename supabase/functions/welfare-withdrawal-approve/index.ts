@@ -91,12 +91,12 @@ serve(async (req) => {
         // Notify requester
         if (withdrawal.requested_by) {
           await createNotification(supabaseAdmin, {
-            user_id: withdrawal.requested_by,
+            userId: withdrawal.requested_by,
             title: 'Withdrawal Cancelled',
             message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} was cancelled by admin during the cooling-off period.`,
             category: 'welfare',
-            related_entity_type: 'welfare',
-            related_entity_id: withdrawal.welfare_id,
+            relatedEntityType: 'welfare',
+            relatedEntityId: withdrawal.welfare_id,
           });
         }
 
@@ -193,12 +193,12 @@ serve(async (req) => {
 
         if (withdrawal) {
           await createNotification(supabaseAdmin, {
-            user_id: withdrawal.requested_by,
+            userId: withdrawal.requested_by,
             title: 'Withdrawal Rejected',
             message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} was rejected by the ${approval.approver_role}.`,
             category: 'welfare',
-            related_entity_type: 'welfare',
-            related_entity_id: approval.welfare_id,
+            relatedEntityType: 'welfare',
+            relatedEntityId: approval.welfare_id,
           });
         }
 
@@ -257,12 +257,12 @@ serve(async (req) => {
         // Notify requester about approval + cooling-off
         if (withdrawal) {
           await createNotification(supabaseAdmin, {
-            user_id: withdrawal.requested_by,
+            userId: withdrawal.requested_by,
             title: 'Withdrawal Approved — 24hr Hold',
             message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} has been approved. Payout will be processed after a 24-hour cooling-off period.`,
             category: 'welfare',
-            related_entity_type: 'welfare',
-            related_entity_id: approval.welfare_id,
+            relatedEntityType: 'welfare',
+            relatedEntityId: approval.welfare_id,
           });
         }
 
@@ -280,12 +280,12 @@ serve(async (req) => {
           for (const member of allMembers) {
             if (member.user_id !== withdrawal.requested_by) {
               await createNotification(supabaseAdmin, {
-                user_id: member.user_id,
+                userId: member.user_id,
                 title: 'Welfare Withdrawal Approved',
                 message: `A withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} to ${recipientName} has been approved. Payout in 24 hours unless cancelled.`,
                 category: 'welfare',
-                related_entity_type: 'welfare',
-                related_entity_id: approval.welfare_id,
+                relatedEntityType: 'welfare',
+                relatedEntityId: approval.welfare_id,
               });
             }
           }

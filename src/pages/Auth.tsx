@@ -135,6 +135,74 @@ const Auth = () => {
   }, [biometricReady, isNative]);
 
   const nativeBiometricLoginEnabled = isNative && nativeBiometricConfigured;
+  const clearNativeBiometricStorage = () => {
+    localStorage.removeItem('biometricSession');
+    localStorage.removeItem('nativeBiometricEnabled');
+    setNativeBiometricConfigured(false);
+  };
+
+  const storeNativeBiometricSession = async (enableLogin = false) => {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    const session = refreshed?.session || (await supabase.auth.getSession()).data.session;
+
+    if (!session?.refresh_token || !session.access_token) {
+      return false;
+    }
+
+    localStorage.setItem('biometricSession', JSON.stringify({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    }));
+
+    if (enableLogin) {
+      localStorage.setItem('nativeBiometricEnabled', 'true');
+      setNativeBiometricConfigured(true);
+    }
+
+    return true;
+  };
+
+  const restoreNativeBiometricSession = async () => {
+    const storedToken = localStorage.getItem('biometricSession');
+    if (!storedToken) return false;
+
+    try {
+      const parsed = JSON.parse(storedToken);
+
+      if (parsed?.refresh_token) {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession({
+          refresh_token: parsed.refresh_token,
+        });
+
+        if (!refreshError && refreshed.session) {
+          localStorage.setItem('biometricSession', JSON.stringify({
+            access_token: refreshed.session.access_token,
+            refresh_token: refreshed.session.refresh_token,
+          }));
+          return true;
+        }
+      }
+
+      if (parsed?.access_token && parsed?.refresh_token) {
+        const { error } = await supabase.auth.setSession(parsed);
+        if (!error) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token && session.refresh_token) {
+            localStorage.setItem('biometricSession', JSON.stringify({
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+            }));
+            return true;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Native biometric session restore failed:', error);
+    }
+
+    clearNativeBiometricStorage();
+    return false;
+  };
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -319,7 +387,7 @@ const Auth = () => {
   // and to prevent redirect loops
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const [didRedirect, setDidRedirect] = useState(false);
-  if (user && !didRedirect && !show2FA) {
+  if (user && !didRedirect && !show2FA && !showBiometricSetup && !isLoading) {
     // defer redirect until after paint
     setTimeout(async () => {
       if (didRedirect) return;
@@ -411,16 +479,8 @@ const Auth = () => {
         if (adminRole) {
           navigate("/admin");
         } else {
-          // Store session for native biometric re-auth
-          if (isNative) {
-            const { data: refreshed } = await supabase.auth.refreshSession();
-            const session = refreshed?.session || (await supabase.auth.getSession()).data.session;
-            if (session) {
-              localStorage.setItem('biometricSession', JSON.stringify({
-                access_token: session.access_token,
-                refresh_token: session.refresh_token,
-              }));
-            }
+          if (isNative && nativeBiometricConfigured) {
+            await storeNativeBiometricSession();
           }
           
           // On first login — offer fingerprint setup
@@ -449,39 +509,13 @@ const Auth = () => {
 
       const result = await nativeAuthenticate('Scan your fingerprint to sign in');
       if (result.success) {
-        const storedToken = localStorage.getItem('biometricSession');
-        if (storedToken) {
-          try {
-            const parsed = JSON.parse(storedToken);
-            // Try to restore session
-            const { error } = await supabase.auth.setSession(parsed);
-            if (!error) {
-              toast.success('Welcome back!');
-              navigate(returnTo || '/home', { replace: true });
-              return;
-            }
-            // Session expired — try refresh token
-            const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession({
-              refresh_token: parsed.refresh_token,
-            });
-            if (!refreshError && refreshed.session) {
-              // Save new refreshed session
-              localStorage.setItem('biometricSession', JSON.stringify({
-                access_token: refreshed.session.access_token,
-                refresh_token: refreshed.session.refresh_token,
-              }));
-              toast.success('Welcome back!');
-              navigate(returnTo || '/home', { replace: true });
-              return;
-            }
-          } catch {
-            // fall through
-          }
+        const restored = await restoreNativeBiometricSession();
+        if (restored) {
+          toast.success('Welcome back!');
+          navigate(returnTo || '/home', { replace: true });
+          return;
         }
-        // Session could not be restored — clear and ask for password
-        localStorage.removeItem('biometricSession');
-        localStorage.removeItem('nativeBiometricEnabled');
-        setNativeBiometricConfigured(false);
+
         toast.error('Your session has expired. Please log in with your password once to re-enable fingerprint.');
       }
       return;
@@ -507,16 +541,12 @@ const Auth = () => {
       if (isNative) {
         const result = await nativeAuthenticate('Verify your identity to enable fingerprint login');
         if (result.success) {
-          localStorage.setItem('nativeBiometricEnabled', 'true');
-          // Store session tokens for future auto-login
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData.session) {
-            localStorage.setItem('biometricSession', JSON.stringify({
-              access_token: sessionData.session.access_token,
-              refresh_token: sessionData.session.refresh_token,
-            }));
+          const stored = await storeNativeBiometricSession(true);
+          if (!stored) {
+            toast.error('Could not save your login session for fingerprint sign-in. Please log in again.');
+            setIsLoading(false);
+            return;
           }
-          setNativeBiometricConfigured(true);
           toast.success('Fingerprint login enabled!');
           setShowBiometricSetup(false);
           navigate(returnTo || (signupStep === 'phone' ? '/kyc-upload' : '/home'), { replace: true });
@@ -716,7 +746,25 @@ const Auth = () => {
         .eq('role', 'admin')
         .maybeSingle();
 
-      navigate(adminRole ? "/admin" : "/home", { replace: true });
+      if (adminRole) {
+        navigate("/admin", { replace: true });
+        return;
+      }
+
+      if (isNative && !nativeBiometricConfigured) {
+        const stored = await storeNativeBiometricSession();
+        if (stored) {
+          setBiometricIdentifier(emailOrPhone);
+          setShowBiometricSetup(true);
+          return;
+        }
+      }
+
+      if (isNative && nativeBiometricConfigured) {
+        await storeNativeBiometricSession();
+      }
+
+      navigate("/home", { replace: true });
     } else {
       navigate("/home", { replace: true });
     }

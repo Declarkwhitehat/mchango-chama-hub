@@ -37,6 +37,7 @@ Deno.serve(async (req) => {
 
     // Get manager info
     const manager = chama.chama_members.find((m: any) => m.is_manager);
+    const managerProfile = Array.isArray(manager?.profiles) ? manager.profiles[0] : manager?.profiles;
     if (!manager) {
       throw new Error('No manager found for chama');
     }
@@ -45,26 +46,27 @@ Deno.serve(async (req) => {
 
     // Send SMS to all members
     const smsPromises = chama.chama_members.map(async (member: any) => {
-      const message = `🎉 Great news! Your chama "${chama.name}" has completed its full cycle. All members have received their payouts! Would you like to rejoin for another cycle? Reply to your manager ${manager.profiles.full_name} at ${manager.profiles.phone} or log in to the app. Member ID: ${member.member_code}`;
+      const memberProfile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+      const message = `🎉 Great news! Your chama "${chama.name}" has completed its full cycle. All members have received their payouts! Would you like to rejoin for another cycle? Reply to your manager ${managerProfile?.full_name || 'your manager'} at ${managerProfile?.phone || 'the app'} or log in to the app. Member ID: ${member.member_code}`;
 
       try {
         const { error: smsError } = await supabase.functions.invoke('send-transactional-sms', {
           body: {
-            phone: member.profiles.phone,
+            phone: memberProfile?.phone,
             message,
             eventType: 'cycle_complete'
           }
         });
 
         if (smsError) {
-          console.error(`Failed to send SMS to ${member.profiles.phone}:`, smsError);
-          return { success: false, phone: member.profiles.phone, error: smsError };
+          console.error(`Failed to send SMS to ${memberProfile?.phone}:`, smsError);
+          return { success: false, phone: memberProfile?.phone, error: smsError };
         }
 
-        return { success: true, phone: member.profiles.phone };
+        return { success: true, phone: memberProfile?.phone };
       } catch (error) {
-        console.error(`Exception sending SMS to ${member.profiles.phone}:`, error);
-        return { success: false, phone: member.profiles.phone, error };
+        console.error(`Exception sending SMS to ${memberProfile?.phone}:`, error);
+        return { success: false, phone: memberProfile?.phone, error };
       }
     });
 
