@@ -746,7 +746,25 @@ const Auth = () => {
         .eq('role', 'admin')
         .maybeSingle();
 
-      navigate(adminRole ? "/admin" : "/home", { replace: true });
+      if (adminRole) {
+        navigate("/admin", { replace: true });
+        return;
+      }
+
+      if (isNative && !nativeBiometricConfigured) {
+        const stored = await storeNativeBiometricSession();
+        if (stored) {
+          setBiometricIdentifier(emailOrPhone);
+          setShowBiometricSetup(true);
+          return;
+        }
+      }
+
+      if (isNative && nativeBiometricConfigured) {
+        await storeNativeBiometricSession();
+      }
+
+      navigate("/home", { replace: true });
     } else {
       navigate("/home", { replace: true });
     }
