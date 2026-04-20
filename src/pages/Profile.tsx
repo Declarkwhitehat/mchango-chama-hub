@@ -20,6 +20,11 @@ import { PaymentMethodsManager } from "@/components/PaymentMethodsManager";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useWebAuthnManagement } from "@/hooks/useWebAuthnManagement";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
+import {
+  isNativeBiometricEnabled as readNativeBiometricEnabled,
+  saveCurrentSessionForBiometric,
+  clearBiometricSession,
+} from "@/lib/nativeBiometricSession";
 import { format } from "date-fns";
 
 const Profile = () => {
@@ -49,12 +54,10 @@ const Profile = () => {
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [show2FAForPassword, setShow2FAForPassword] = useState(false);
 
-  // Load native biometric state from localStorage
+  // Load native biometric state from shared helper
   useEffect(() => {
     if (isNative) {
-      const enabled = localStorage.getItem('nativeBiometricEnabled') === 'true';
-      const hasSession = !!localStorage.getItem('biometricSession');
-      setNativeBiometricEnabled(enabled && hasSession);
+      setNativeBiometricEnabled(readNativeBiometricEnabled());
     }
   }, [isNative]);
 
@@ -153,14 +156,8 @@ const Profile = () => {
       // Ask user to verify fingerprint first
       const result = await nativeAuthenticate('Scan your fingerprint to enable fingerprint login');
       if (result.success) {
-        // Store flag and current session
-        localStorage.setItem('nativeBiometricEnabled', 'true');
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session) {
-          localStorage.setItem('biometricSession', JSON.stringify({
-            access_token: sessionData.session.access_token,
-            refresh_token: sessionData.session.refresh_token,
-          }));
+        const stored = await saveCurrentSessionForBiometric(true);
+        if (stored) {
           setNativeBiometricEnabled(true);
           toast.success('Fingerprint login enabled! Use your fingerprint next time you sign in.');
         } else {
@@ -180,8 +177,7 @@ const Profile = () => {
 
   // Disable native fingerprint login
   const handleDisableNativeBiometric = () => {
-    localStorage.removeItem('nativeBiometricEnabled');
-    localStorage.removeItem('biometricSession');
+    clearBiometricSession();
     setNativeBiometricEnabled(false);
     setShowDisableBiometricDialog(false);
     toast.success('Fingerprint login disabled.');

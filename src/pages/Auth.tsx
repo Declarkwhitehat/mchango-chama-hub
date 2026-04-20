@@ -20,6 +20,12 @@ import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  isNativeBiometricEnabled as readNativeBiometricEnabled,
+  saveCurrentSessionForBiometric,
+  restoreSessionFromBiometric,
+  clearBiometricSession,
+} from "@/lib/nativeBiometricSession";
 
 const loginSchema = z.object({
   emailOrPhone: z.string()
@@ -129,79 +135,26 @@ const Auth = () => {
       return;
     }
 
-    const hasEnabledFlag = localStorage.getItem('nativeBiometricEnabled') === 'true';
-    const hasStoredSession = !!localStorage.getItem('biometricSession');
-    setNativeBiometricConfigured(biometricReady && hasEnabledFlag && hasStoredSession);
+    setNativeBiometricConfigured(biometricReady && readNativeBiometricEnabled());
   }, [biometricReady, isNative]);
 
   const nativeBiometricLoginEnabled = isNative && nativeBiometricConfigured;
+
   const clearNativeBiometricStorage = () => {
-    localStorage.removeItem('biometricSession');
-    localStorage.removeItem('nativeBiometricEnabled');
+    clearBiometricSession();
     setNativeBiometricConfigured(false);
   };
 
   const storeNativeBiometricSession = async (enableLogin = false) => {
-    const { data: refreshed } = await supabase.auth.refreshSession();
-    const session = refreshed?.session || (await supabase.auth.getSession()).data.session;
-
-    if (!session?.refresh_token || !session.access_token) {
-      return false;
-    }
-
-    localStorage.setItem('biometricSession', JSON.stringify({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    }));
-
-    if (enableLogin) {
-      localStorage.setItem('nativeBiometricEnabled', 'true');
-      setNativeBiometricConfigured(true);
-    }
-
-    return true;
+    const ok = await saveCurrentSessionForBiometric(enableLogin);
+    if (ok && enableLogin) setNativeBiometricConfigured(true);
+    return ok;
   };
 
   const restoreNativeBiometricSession = async () => {
-    const storedToken = localStorage.getItem('biometricSession');
-    if (!storedToken) return false;
-
-    try {
-      const parsed = JSON.parse(storedToken);
-
-      if (parsed?.refresh_token) {
-        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession({
-          refresh_token: parsed.refresh_token,
-        });
-
-        if (!refreshError && refreshed.session) {
-          localStorage.setItem('biometricSession', JSON.stringify({
-            access_token: refreshed.session.access_token,
-            refresh_token: refreshed.session.refresh_token,
-          }));
-          return true;
-        }
-      }
-
-      if (parsed?.access_token && parsed?.refresh_token) {
-        const { error } = await supabase.auth.setSession(parsed);
-        if (!error) {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token && session.refresh_token) {
-            localStorage.setItem('biometricSession', JSON.stringify({
-              access_token: session.access_token,
-              refresh_token: session.refresh_token,
-            }));
-            return true;
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Native biometric session restore failed:', error);
-    }
-
-    clearNativeBiometricStorage();
-    return false;
+    const ok = await restoreSessionFromBiometric();
+    if (!ok) setNativeBiometricConfigured(false);
+    return ok;
   };
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -284,28 +237,18 @@ const Auth = () => {
 
         // Native app: use native biometrics (fingerprint/face)
         if (isNative) {
-          const nativeBioEnabled = localStorage.getItem('nativeBiometricEnabled') === 'true';
-          const storedToken = localStorage.getItem('biometricSession');
-          
-          if (biometricReady && nativeBioEnabled && storedToken) {
+          if (biometricReady && readNativeBiometricEnabled()) {
             const biometryType = await getBiometryType();
             const result = await nativeAuthenticate(`Verify your ${biometryType} to sign in`);
-            
+
             if (result.success) {
-              try {
-                const parsed = JSON.parse(storedToken);
-                const { error } = await supabase.auth.setSession(parsed);
-                if (!error) {
-                  toast.success('Welcome back!');
-                  navigate(returnTo || '/', { replace: true });
-                  return;
-                }
-              } catch {
-                // Token expired or invalid — fall through to password login
-                localStorage.removeItem('biometricSession');
-                localStorage.removeItem('nativeBiometricEnabled');
-                setNativeBiometricConfigured(false);
+              const restored = await restoreNativeBiometricSession();
+              if (restored) {
+                toast.success('Welcome back!');
+                navigate(returnTo || '/home', { replace: true });
+                return;
               }
+              toast.error('Your fingerprint session expired. Please log in with your password to re-enable.');
             } else {
               setBiometricCancelled(true);
               toast.error('Fingerprint cancelled. Please use your password.');
@@ -382,15 +325,16 @@ const Auth = () => {
     resolver: zodResolver(signupSchema),
   });
 
-  // Redirect if already logged in
-  // Move redirect to effect to avoid running navigation during render
-  // and to prevent redirect loops
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  // Redirect if already logged in — done inside an effect to avoid racing
+  // against fingerprint-setup, 2FA, and biometric enrollment dialogs.
   const [didRedirect, setDidRedirect] = useState(false);
-  if (user && !didRedirect && !show2FA && !showBiometricSetup && !isLoading) {
-    // defer redirect until after paint
-    setTimeout(async () => {
-      if (didRedirect) return;
+  useEffect(() => {
+    if (!user) return;
+    if (didRedirect) return;
+    if (show2FA || showBiometricSetup || isLoading) return;
+
+    let cancelled = false;
+    (async () => {
       try {
         const { data } = await supabase
           .from('user_roles')
@@ -398,15 +342,17 @@ const Auth = () => {
           .eq('user_id', user.id)
           .eq('role', 'admin')
           .maybeSingle();
+        if (cancelled) return;
         setDidRedirect(true);
-        navigate(data ? "/admin" : "/home", { replace: true });
+        navigate(data ? "/admin" : (returnTo || "/home"), { replace: true });
       } catch {
+        if (cancelled) return;
         setDidRedirect(true);
-        navigate("/home", { replace: true });
+        navigate(returnTo || "/home", { replace: true });
       }
-    }, 0);
-    return null;
-  }
+    })();
+    return () => { cancelled = true; };
+  }, [user, didRedirect, show2FA, showBiometricSetup, isLoading, navigate, returnTo]);
 
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
@@ -477,21 +423,21 @@ const Auth = () => {
           .maybeSingle();
 
         if (adminRole) {
-          navigate("/admin");
+          navigate("/admin", { replace: true });
         } else {
-          if (isNative && nativeBiometricConfigured) {
-            await storeNativeBiometricSession();
-          }
-          
-          // On first login — offer fingerprint setup
-          if (isNative && !nativeBiometricConfigured) {
+          // Offer fingerprint setup on first native login if device supports it
+          if (isNative && biometricReady && !nativeBiometricConfigured) {
             setBiometricIdentifier(data.emailOrPhone);
             setShowBiometricSetup(true);
           } else {
-            navigate("/home");
-          }
+            // Refresh stored biometric tokens silently if already enabled
+            if (isNative && nativeBiometricConfigured) {
+              await saveCurrentSessionForBiometric();
+            }
+            navigate("/home", { replace: true });
           }
         }
+      }
     } catch (error: any) {
       toast.error("An unexpected error occurred");
     } finally {
