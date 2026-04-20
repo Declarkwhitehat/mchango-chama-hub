@@ -325,15 +325,16 @@ const Auth = () => {
     resolver: zodResolver(signupSchema),
   });
 
-  // Redirect if already logged in
-  // Move redirect to effect to avoid running navigation during render
-  // and to prevent redirect loops
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  // Redirect if already logged in — done inside an effect to avoid racing
+  // against fingerprint-setup, 2FA, and biometric enrollment dialogs.
   const [didRedirect, setDidRedirect] = useState(false);
-  if (user && !didRedirect && !show2FA && !showBiometricSetup && !isLoading) {
-    // defer redirect until after paint
-    setTimeout(async () => {
-      if (didRedirect) return;
+  useEffect(() => {
+    if (!user) return;
+    if (didRedirect) return;
+    if (show2FA || showBiometricSetup || isLoading) return;
+
+    let cancelled = false;
+    (async () => {
       try {
         const { data } = await supabase
           .from('user_roles')
@@ -341,13 +342,17 @@ const Auth = () => {
           .eq('user_id', user.id)
           .eq('role', 'admin')
           .maybeSingle();
+        if (cancelled) return;
         setDidRedirect(true);
-        navigate(data ? "/admin" : "/home", { replace: true });
+        navigate(data ? "/admin" : (returnTo || "/home"), { replace: true });
       } catch {
+        if (cancelled) return;
         setDidRedirect(true);
-        navigate("/home", { replace: true });
+        navigate(returnTo || "/home", { replace: true });
       }
-    }, 0);
+    })();
+    return () => { cancelled = true; };
+  }, [user, didRedirect, show2FA, showBiometricSetup, isLoading, navigate, returnTo]);
     return null;
   }
 
