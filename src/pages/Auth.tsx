@@ -237,28 +237,18 @@ const Auth = () => {
 
         // Native app: use native biometrics (fingerprint/face)
         if (isNative) {
-          const nativeBioEnabled = localStorage.getItem('nativeBiometricEnabled') === 'true';
-          const storedToken = localStorage.getItem('biometricSession');
-          
-          if (biometricReady && nativeBioEnabled && storedToken) {
+          if (biometricReady && readNativeBiometricEnabled()) {
             const biometryType = await getBiometryType();
             const result = await nativeAuthenticate(`Verify your ${biometryType} to sign in`);
-            
+
             if (result.success) {
-              try {
-                const parsed = JSON.parse(storedToken);
-                const { error } = await supabase.auth.setSession(parsed);
-                if (!error) {
-                  toast.success('Welcome back!');
-                  navigate(returnTo || '/', { replace: true });
-                  return;
-                }
-              } catch {
-                // Token expired or invalid — fall through to password login
-                localStorage.removeItem('biometricSession');
-                localStorage.removeItem('nativeBiometricEnabled');
-                setNativeBiometricConfigured(false);
+              const restored = await restoreNativeBiometricSession();
+              if (restored) {
+                toast.success('Welcome back!');
+                navigate(returnTo || '/home', { replace: true });
+                return;
               }
+              toast.error('Your fingerprint session expired. Please log in with your password to re-enable.');
             } else {
               setBiometricCancelled(true);
               toast.error('Fingerprint cancelled. Please use your password.');
