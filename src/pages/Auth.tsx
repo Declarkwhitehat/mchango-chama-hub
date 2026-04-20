@@ -423,19 +423,18 @@ const Auth = () => {
           .maybeSingle();
 
         if (adminRole) {
-          navigate("/admin");
+          navigate("/admin", { replace: true });
         } else {
-          if (isNative && nativeBiometricConfigured) {
-            await storeNativeBiometricSession();
-          }
-          
-          // On first login — offer fingerprint setup
-          if (isNative && !nativeBiometricConfigured) {
+          // Offer fingerprint setup on first native login if device supports it
+          if (isNative && biometricReady && !nativeBiometricConfigured) {
             setBiometricIdentifier(data.emailOrPhone);
             setShowBiometricSetup(true);
           } else {
-            navigate("/home");
-          }
+            // Refresh stored biometric tokens silently if already enabled
+            if (isNative && nativeBiometricConfigured) {
+              await saveCurrentSessionForBiometric();
+            }
+            navigate("/home", { replace: true });
           }
         }
     } catch (error: any) {
