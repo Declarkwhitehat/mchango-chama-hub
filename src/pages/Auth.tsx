@@ -135,79 +135,26 @@ const Auth = () => {
       return;
     }
 
-    const hasEnabledFlag = localStorage.getItem('nativeBiometricEnabled') === 'true';
-    const hasStoredSession = !!localStorage.getItem('biometricSession');
-    setNativeBiometricConfigured(biometricReady && hasEnabledFlag && hasStoredSession);
+    setNativeBiometricConfigured(biometricReady && readNativeBiometricEnabled());
   }, [biometricReady, isNative]);
 
   const nativeBiometricLoginEnabled = isNative && nativeBiometricConfigured;
+
   const clearNativeBiometricStorage = () => {
-    localStorage.removeItem('biometricSession');
-    localStorage.removeItem('nativeBiometricEnabled');
+    clearBiometricSession();
     setNativeBiometricConfigured(false);
   };
 
   const storeNativeBiometricSession = async (enableLogin = false) => {
-    const { data: refreshed } = await supabase.auth.refreshSession();
-    const session = refreshed?.session || (await supabase.auth.getSession()).data.session;
-
-    if (!session?.refresh_token || !session.access_token) {
-      return false;
-    }
-
-    localStorage.setItem('biometricSession', JSON.stringify({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    }));
-
-    if (enableLogin) {
-      localStorage.setItem('nativeBiometricEnabled', 'true');
-      setNativeBiometricConfigured(true);
-    }
-
-    return true;
+    const ok = await saveCurrentSessionForBiometric(enableLogin);
+    if (ok && enableLogin) setNativeBiometricConfigured(true);
+    return ok;
   };
 
   const restoreNativeBiometricSession = async () => {
-    const storedToken = localStorage.getItem('biometricSession');
-    if (!storedToken) return false;
-
-    try {
-      const parsed = JSON.parse(storedToken);
-
-      if (parsed?.refresh_token) {
-        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession({
-          refresh_token: parsed.refresh_token,
-        });
-
-        if (!refreshError && refreshed.session) {
-          localStorage.setItem('biometricSession', JSON.stringify({
-            access_token: refreshed.session.access_token,
-            refresh_token: refreshed.session.refresh_token,
-          }));
-          return true;
-        }
-      }
-
-      if (parsed?.access_token && parsed?.refresh_token) {
-        const { error } = await supabase.auth.setSession(parsed);
-        if (!error) {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token && session.refresh_token) {
-            localStorage.setItem('biometricSession', JSON.stringify({
-              access_token: session.access_token,
-              refresh_token: session.refresh_token,
-            }));
-            return true;
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Native biometric session restore failed:', error);
-    }
-
-    clearNativeBiometricStorage();
-    return false;
+    const ok = await restoreSessionFromBiometric();
+    if (!ok) setNativeBiometricConfigured(false);
+    return ok;
   };
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
