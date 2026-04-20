@@ -54,12 +54,10 @@ const Profile = () => {
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [show2FAForPassword, setShow2FAForPassword] = useState(false);
 
-  // Load native biometric state from localStorage
+  // Load native biometric state from shared helper
   useEffect(() => {
     if (isNative) {
-      const enabled = localStorage.getItem('nativeBiometricEnabled') === 'true';
-      const hasSession = !!localStorage.getItem('biometricSession');
-      setNativeBiometricEnabled(enabled && hasSession);
+      setNativeBiometricEnabled(readNativeBiometricEnabled());
     }
   }, [isNative]);
 
