@@ -353,8 +353,6 @@ const Auth = () => {
     })();
     return () => { cancelled = true; };
   }, [user, didRedirect, show2FA, showBiometricSetup, isLoading, navigate, returnTo]);
-    return null;
-  }
 
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
