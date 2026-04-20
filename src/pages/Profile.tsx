@@ -177,8 +177,7 @@ const Profile = () => {
 
   // Disable native fingerprint login
   const handleDisableNativeBiometric = () => {
-    localStorage.removeItem('nativeBiometricEnabled');
-    localStorage.removeItem('biometricSession');
+    clearBiometricSession();
     setNativeBiometricEnabled(false);
     setShowDisableBiometricDialog(false);
     toast.success('Fingerprint login disabled.');
