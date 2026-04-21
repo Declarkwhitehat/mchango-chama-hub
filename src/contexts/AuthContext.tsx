@@ -4,9 +4,12 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
-  isNativeBiometricEnabled,
-  writeBiometricSession,
-} from '@/lib/nativeBiometricSession';
+  isBiometricEnabledSync,
+  setStoredSession,
+  setAppLocked,
+  hardLogoutStorage,
+} from '@/lib/secureStorage';
+import { isNativeApp } from '@/lib/biometricHandler';
 
 interface Profile {
   id: string;
