@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { FileText, Download, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { format, parseISO } from "date-fns";
+import { notifyDownloadComplete } from "@/lib/nativeDownloadNotification";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 
 interface Props {
@@ -210,6 +211,7 @@ export const WelfareContributionReport = ({ welfareId, welfareName }: Props) => 
       const pdfBlob = doc.output('blob');
       const filename = `${welfareName.replace(/\s+/g, '-')}-contributions-${startDate}-to-${endDate}.pdf`;
       doc.save(filename);
+      notifyDownloadComplete(filename);
 
       // Upload to storage in background
       uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});

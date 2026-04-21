@@ -4,6 +4,7 @@ import { FileDown, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 import { addPDFBrandingFooter } from "@/utils/pdfBranding";
+import { notifyDownloadComplete } from "@/lib/nativeDownloadNotification";
 
 interface AllocationLine {
   type: string;
@@ -223,6 +224,7 @@ export function TransactionReceiptDownload({
       const pdfBlob = doc.output('blob');
       const filename = `receipt-${receiptData.memberCode}-${receiptData.transactionId.substring(0, 8)}.pdf`;
       doc.save(filename);
+      notifyDownloadComplete(filename);
 
       // Upload to storage in background
       uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});
