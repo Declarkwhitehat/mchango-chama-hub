@@ -30,7 +30,7 @@ import {
   hardLogoutStorage,
 } from "@/lib/secureStorage";
 import { isNativeApp, authenticateBiometric, getBiometricType as getBioType } from "@/lib/biometricHandler";
-import { supabase as supabaseClient } from "@/integrations/supabase/client";
+
 
 const loginSchema = z.object({
   emailOrPhone: z.string()
