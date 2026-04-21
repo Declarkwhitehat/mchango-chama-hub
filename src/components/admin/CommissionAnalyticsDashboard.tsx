@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { notifyDownloadComplete } from "@/lib/nativeDownloadNotification";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -329,7 +330,9 @@ export const CommissionAnalyticsDashboard = () => {
     doc.setTextColor(128);
     doc.text("This is a system-generated commission statement. Confidential.", pageWidth / 2, 290, { align: "center" });
 
-    doc.save(`commission-statement-${dateFrom}-to-${dateTo}.pdf`);
+    const commFilename = `commission-statement-${dateFrom}-to-${dateTo}.pdf`;
+    doc.save(commFilename);
+    notifyDownloadComplete(commFilename);
     toast({ title: "Downloaded", description: "Commission statement PDF saved" });
   };
 
