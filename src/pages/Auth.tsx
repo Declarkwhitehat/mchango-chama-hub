@@ -170,13 +170,21 @@ const Auth = () => {
     }
   };
 
-  const restoreNativeBiometricSession = async () => {
+  
+    } catch {}
+    // Failed
+    await hardLogoutStorage();
+    setNativeBiometricConfigured(false);
+    return false;
+  };
+  const [showLoginPassword, setShowLoginPassword] = useconst restoreNativeBiometricSession = async () => {
     const stored = await getStoredSession();
     if (!stored) {
       setNativeBiometricConfigured(false);
       return false;
     }
-    // Try refresh first
+
+    // Try refresh token first (works even if access token expired)
     try {
       const { data, error } = await supabase.auth.refreshSession({
         refresh_token: stored.refresh_token,
@@ -190,7 +198,8 @@ const Auth = () => {
         return true;
       }
     } catch {}
-    // Try setSession
+
+    // Try setSession with existing tokens
     try {
       const { error } = await supabase.auth.setSession({
         access_token: stored.access_token,
@@ -208,12 +217,43 @@ const Auth = () => {
         }
       }
     } catch {}
-    // Failed
-    await hardLogoutStorage();
+
+    // Last resort — try refreshing with just the refresh token directly
+    try {
+      const response = await fetch(
+        `${(supabase as any).supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': (supabase as any).supabaseKey,
+          },
+          body: JSON.stringify({ refresh_token: stored.refresh_token }),
+        }
+      );
+      const result = await response.json();
+      if (result.access_token && result.refresh_token) {
+        await supabase.auth.setSession({
+          access_token: result.access_token,
+          refresh_token: result.refresh_token,
+        });
+        await setStoredSession({
+          access_token: result.access_token,
+          refresh_token: result.refresh_token,
+        });
+        await setAppLocked(false);
+        return true;
+      }
+    } catch {}
+
+    // All attempts failed — token truly expired
+    // Clear only the session but keep biometric enabled
+    // so user just needs to login once to re-enable
+    await clearStoredSession();
+    await setAppLocked(false);
     setNativeBiometricConfigured(false);
     return false;
-  };
-  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  };State(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
