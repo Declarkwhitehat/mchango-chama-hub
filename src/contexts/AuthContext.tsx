@@ -273,6 +273,18 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     return { error };
   };
 
+  /** Soft logout: lock the app but keep stored session for biometric unlock. */
+  const lockApp = async (): Promise<void> => {
+    await setAppLocked(true);
+    await supabase.auth.signOut({ scope: 'local' });
+  };
+
+  /** Hard logout: wipe everything, biometric no longer works. */
+  const hardLogout = async (): Promise<void> => {
+    await hardLogoutStorage();
+    await supabase.auth.signOut({ scope: 'local' });
+  };
+
   const value: AuthContextType = {
     user,
     session,
@@ -281,6 +293,8 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     signIn,
     signUp,
     signOut,
+    lockApp,
+    hardLogout,
     refreshProfile,
   };
 
