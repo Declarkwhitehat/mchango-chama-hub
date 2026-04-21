@@ -21,11 +21,16 @@ import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  isNativeBiometricEnabled as readNativeBiometricEnabled,
-  saveCurrentSessionForBiometric,
-  restoreSessionFromBiometric,
-  clearBiometricSession,
-} from "@/lib/nativeBiometricSession";
+  isBiometricEnabledSync,
+  isAppLockedSync,
+  getStoredSession,
+  setStoredSession,
+  setAppLocked,
+  setBiometricEnabled,
+  hardLogoutStorage,
+} from "@/lib/secureStorage";
+import { isNativeApp, authenticateBiometric, getBiometricType as getBioType } from "@/lib/biometricHandler";
+
 
 const loginSchema = z.object({
   emailOrPhone: z.string()
@@ -135,28 +140,78 @@ const Auth = () => {
       return;
     }
 
-    setNativeBiometricConfigured(biometricReady && readNativeBiometricEnabled());
+    setNativeBiometricConfigured(biometricReady && isBiometricEnabledSync());
   }, [biometricReady, isNative]);
 
-  // Show fingerprint button immediately on native if previously enabled in localStorage
-  // Don't wait for async biometric availability check
-  const nativeBiometricLoginEnabled = isNative && readNativeBiometricEnabled();
+  // Show fingerprint button immediately if token exists + biometric enabled + app locked
+  const nativeBiometricLoginEnabled = isNative && isBiometricEnabledSync() && isAppLockedSync();
 
-  const clearNativeBiometricStorage = () => {
-    clearBiometricSession();
+  const clearNativeBiometricStorage = async () => {
+    await hardLogoutStorage();
     setNativeBiometricConfigured(false);
   };
 
   const storeNativeBiometricSession = async (enableLogin = false) => {
-    const ok = await saveCurrentSessionForBiometric(enableLogin);
-    if (ok && enableLogin) setNativeBiometricConfigured(true);
-    return ok;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+      if (!session?.access_token || !session.refresh_token) return false;
+      await setStoredSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+      if (enableLogin) {
+        await setBiometricEnabled(true);
+        setNativeBiometricConfigured(true);
+      }
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const restoreNativeBiometricSession = async () => {
-    const ok = await restoreSessionFromBiometric();
-    if (!ok) setNativeBiometricConfigured(false);
-    return ok;
+    const stored = await getStoredSession();
+    if (!stored) {
+      setNativeBiometricConfigured(false);
+      return false;
+    }
+    // Try refresh first
+    try {
+      const { data, error } = await supabase.auth.refreshSession({
+        refresh_token: stored.refresh_token,
+      });
+      if (!error && data.session?.access_token && data.session.refresh_token) {
+        await setStoredSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        await setAppLocked(false);
+        return true;
+      }
+    } catch {}
+    // Try setSession
+    try {
+      const { error } = await supabase.auth.setSession({
+        access_token: stored.access_token,
+        refresh_token: stored.refresh_token,
+      });
+      if (!error) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.access_token && data.session.refresh_token) {
+          await setStoredSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+          await setAppLocked(false);
+          return true;
+        }
+      }
+    } catch {}
+    // Failed
+    await hardLogoutStorage();
+    setNativeBiometricConfigured(false);
+    return false;
   };
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -239,7 +294,7 @@ const Auth = () => {
 
         // Native app: use native biometrics (fingerprint/face)
         if (isNative) {
-          if (biometricReady && readNativeBiometricEnabled()) {
+          if (biometricReady && isBiometricEnabledSync()) {
             const biometryType = await getBiometryType();
             const result = await nativeAuthenticate(`Verify your ${biometryType} to sign in`);
 
@@ -434,7 +489,7 @@ const Auth = () => {
           } else {
             // Refresh stored biometric tokens silently if already enabled
             if (isNative && nativeBiometricConfigured) {
-              await saveCurrentSessionForBiometric();
+              await storeNativeBiometricSession();
             }
             navigate("/home", { replace: true });
           }

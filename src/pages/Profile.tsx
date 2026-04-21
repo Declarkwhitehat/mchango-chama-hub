@@ -21,10 +21,11 @@ import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useWebAuthnManagement } from "@/hooks/useWebAuthnManagement";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import {
-  isNativeBiometricEnabled as readNativeBiometricEnabled,
-  saveCurrentSessionForBiometric,
-  clearBiometricSession,
-} from "@/lib/nativeBiometricSession";
+  isBiometricEnabledSync,
+  setStoredSession,
+  setBiometricEnabled as setBiometricEnabledStorage,
+  hardLogoutStorage,
+} from "@/lib/secureStorage";
 import { format } from "date-fns";
 
 const Profile = () => {
@@ -57,7 +58,7 @@ const Profile = () => {
   // Load native biometric state from shared helper
   useEffect(() => {
     if (isNative) {
-      setNativeBiometricEnabled(readNativeBiometricEnabled());
+      setNativeBiometricEnabled(isBiometricEnabledSync());
     }
   }, [isNative]);
 
@@ -156,8 +157,11 @@ const Profile = () => {
       // Ask user to verify fingerprint first
       const result = await nativeAuthenticate('Scan your fingerprint to enable fingerprint login');
       if (result.success) {
-        const stored = await saveCurrentSessionForBiometric(true);
-        if (stored) {
+        const { data } = await supabase.auth.getSession();
+        const session = data.session;
+        if (session?.access_token && session.refresh_token) {
+          await setStoredSession({ access_token: session.access_token, refresh_token: session.refresh_token });
+          await setBiometricEnabledStorage(true);
           setNativeBiometricEnabled(true);
           toast.success('Fingerprint login enabled! Use your fingerprint next time you sign in.');
         } else {
@@ -176,8 +180,8 @@ const Profile = () => {
   };
 
   // Disable native fingerprint login
-  const handleDisableNativeBiometric = () => {
-    clearBiometricSession();
+  const handleDisableNativeBiometric = async () => {
+    await hardLogoutStorage();
     setNativeBiometricEnabled(false);
     setShowDisableBiometricDialog(false);
     toast.success('Fingerprint login disabled.');

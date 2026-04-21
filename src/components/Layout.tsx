@@ -3,7 +3,7 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity, ShieldCheck, LogOut, LayoutDashboard } from "lucide-react";
+import { Home, User, Menu, ArrowLeft, Shield, Users, Heart, Info, Building2, Activity, ShieldCheck, LogOut, LayoutDashboard, Lock } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 import { toast } from "sonner";
 import {
@@ -27,7 +27,7 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/home";
   const [isAdmin, setIsAdmin] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user, signOut, lockApp, hardLogout } = useAuth();
 
   useEffect(() => {
     checkAdminStatus();
@@ -176,15 +176,27 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                 <div className="border-t border-border my-3" />
                 <Button 
                   variant="outline" 
+                  className="w-full justify-start"
+                  onClick={async () => {
+                    await lockApp();
+                    navigate("/auth");
+                    toast.success("App locked. Use fingerprint to unlock.");
+                  }}
+                >
+                  <Lock className="mr-2 h-4 w-4" />
+                  Lock App
+                </Button>
+                <Button 
+                  variant="outline" 
                   className="w-full justify-start text-destructive hover:text-destructive"
                   onClick={async () => {
-                    await signOut();
+                    await hardLogout();
                     navigate("/auth");
-                    toast.success("Signed out successfully");
+                    toast.success("Signed out completely");
                   }}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  Logout
+                  Logout Completely
                 </Button>
               </nav>
             </SheetContent>

@@ -4,9 +4,12 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
-  isNativeBiometricEnabled,
-  writeBiometricSession,
-} from '@/lib/nativeBiometricSession';
+  isBiometricEnabledSync,
+  setStoredSession,
+  setAppLocked,
+  hardLogoutStorage,
+} from '@/lib/secureStorage';
+import { isNativeApp } from '@/lib/biometricHandler';
 
 interface Profile {
   id: string;
@@ -29,6 +32,8 @@ interface AuthContextType {
   signIn: (emailOrPhone: string, password: string) => Promise<{ error: any; requires2FA?: boolean; userId?: string; pendingSession?: any }>;
   signUp: (email: string, password: string, userData: any) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
+  lockApp: () => Promise<void>;
+  hardLogout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -91,17 +96,17 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
           if (mounted) fetchProfile(newSession.user.id);
         }, 0);
 
-        // Keep stored biometric session fresh on every valid auth event
-        // so the saved refresh_token never goes stale (one-time-use rotation).
+        // Keep stored session fresh on every valid auth event
         if (
           (event === 'SIGNED_IN' ||
             event === 'TOKEN_REFRESHED' ||
             event === 'USER_UPDATED') &&
           newSession.access_token &&
           newSession.refresh_token &&
-          isNativeBiometricEnabled()
+          isNativeApp() &&
+          isBiometricEnabledSync()
         ) {
-          writeBiometricSession({
+          setStoredSession({
             access_token: newSession.access_token,
             refresh_token: newSession.refresh_token,
           });
@@ -268,6 +273,18 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     return { error };
   };
 
+  /** Soft logout: lock the app but keep stored session for biometric unlock. */
+  const lockApp = async (): Promise<void> => {
+    await setAppLocked(true);
+    await supabase.auth.signOut({ scope: 'local' });
+  };
+
+  /** Hard logout: wipe everything, biometric no longer works. */
+  const hardLogout = async (): Promise<void> => {
+    await hardLogoutStorage();
+    await supabase.auth.signOut({ scope: 'local' });
+  };
+
   const value: AuthContextType = {
     user,
     session,
@@ -276,6 +293,8 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     signIn,
     signUp,
     signOut,
+    lockApp,
+    hardLogout,
     refreshProfile,
   };
 
