@@ -26,7 +26,6 @@ import {
   setBiometricEnabled as setBiometricEnabledStorage,
   hardLogoutStorage,
 } from "@/lib/secureStorage";
-import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
 const Profile = () => {
