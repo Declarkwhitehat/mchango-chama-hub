@@ -294,7 +294,7 @@ const Auth = () => {
 
         // Native app: use native biometrics (fingerprint/face)
         if (isNative) {
-          if (biometricReady && readNativeBiometricEnabled()) {
+          if (biometricReady && isBiometricEnabledSync()) {
             const biometryType = await getBiometryType();
             const result = await nativeAuthenticate(`Verify your ${biometryType} to sign in`);
 
@@ -489,7 +489,7 @@ const Auth = () => {
           } else {
             // Refresh stored biometric tokens silently if already enabled
             if (isNative && nativeBiometricConfigured) {
-              await saveCurrentSessionForBiometric();
+              await storeNativeBiometricSession();
             }
             navigate("/home", { replace: true });
           }
