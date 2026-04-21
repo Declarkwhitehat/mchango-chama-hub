@@ -21,10 +21,12 @@ import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useWebAuthnManagement } from "@/hooks/useWebAuthnManagement";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import {
-  isNativeBiometricEnabled as readNativeBiometricEnabled,
-  saveCurrentSessionForBiometric,
-  clearBiometricSession,
-} from "@/lib/nativeBiometricSession";
+  isBiometricEnabledSync,
+  setStoredSession,
+  setBiometricEnabled as setBiometricEnabledStorage,
+  hardLogoutStorage,
+} from "@/lib/secureStorage";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
 const Profile = () => {
