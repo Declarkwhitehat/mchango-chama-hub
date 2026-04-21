@@ -12,7 +12,7 @@
     "start": "vite preview --port $PORT --host 0.0.0.0"
   },
   "dependencies": {
-    "@aparajita/capacitor-biometric-auth": "^10.0.0",
+    "@aparajita/capacitor-biometric-auth": "^9.0.0",
     "@capacitor/android": "^8.0.2",
     "@capacitor/app": "^8.1.0",
     "@capacitor/camera": "^8.1.0",
