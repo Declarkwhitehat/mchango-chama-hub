@@ -138,7 +138,9 @@ const Auth = () => {
     setNativeBiometricConfigured(biometricReady && readNativeBiometricEnabled());
   }, [biometricReady, isNative]);
 
-  const nativeBiometricLoginEnabled = isNative && nativeBiometricConfigured;
+  // Show fingerprint button immediately on native if previously enabled in localStorage
+  // Don't wait for async biometric availability check
+  const nativeBiometricLoginEnabled = isNative && readNativeBiometricEnabled();
 
   const clearNativeBiometricStorage = () => {
     clearBiometricSession();
@@ -882,7 +884,7 @@ const Auth = () => {
                             {isLoading ? "Logging in..." : "Login"}
                           </Button>
                           
-                          {(isWebAuthnSupported() || nativeBiometricLoginEnabled) && !biometricCancelled && (
+                          {(isWebAuthnSupported() || nativeBiometricLoginEnabled) && (
                             <>
                               <div className="relative">
                                 <div className="absolute inset-0 flex items-center">
