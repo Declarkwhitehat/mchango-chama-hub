@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -196,9 +197,11 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
       <Breadcrumbs />
 
       {/* Main Content */}
-      <main className="flex-1 pb-[calc(var(--bottom-nav-offset)+24px)]">
-        {children}
-      </main>
+      <PullToRefresh>
+        <main className="flex-1 pb-[calc(var(--bottom-nav-offset)+24px)]">
+          {children}
+        </main>
+      </PullToRefresh>
 
       {/* Floating Action Menu */}
       <FloatingActionMenu />
