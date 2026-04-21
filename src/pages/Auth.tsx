@@ -21,11 +21,16 @@ import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  isNativeBiometricEnabled as readNativeBiometricEnabled,
-  saveCurrentSessionForBiometric,
-  restoreSessionFromBiometric,
-  clearBiometricSession,
-} from "@/lib/nativeBiometricSession";
+  isBiometricEnabledSync,
+  isAppLockedSync,
+  getStoredSession,
+  setStoredSession,
+  setAppLocked,
+  setBiometricEnabled,
+  hardLogoutStorage,
+} from "@/lib/secureStorage";
+import { isNativeApp, authenticateBiometric, getBiometricType as getBioType } from "@/lib/biometricHandler";
+import { supabase } from "@/integrations/supabase/client";
 
 const loginSchema = z.object({
   emailOrPhone: z.string()
