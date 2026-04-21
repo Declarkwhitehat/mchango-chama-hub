@@ -28,20 +28,16 @@ import {
   setAppLocked,
   setBiometricEnabled,
   hardLogoutStorage,
+  clearStoredSession,
 } from "@/lib/secureStorage";
 import { isNativeApp, authenticateBiometric, getBiometricType as getBioType } from "@/lib/biometricHandler";
-
-
 const loginSchema = z.object({
   emailOrPhone: z.string()
     .min(1, "Email or phone number is required")
     .refine(
       (val) => {
-        // Check if it's a valid email
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (emailRegex.test(val)) return true;
-        
-        // Check if it's a valid phone (international format or Kenyan format)
         const phoneRegex = /^(\+?\d{10,15}|0\d{9}|[17]\d{8,9})$/;
         return phoneRegex.test(val.replace(/\s/g, ''));
       },
@@ -50,7 +46,6 @@ const loginSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-// Safaricom prefixes
 const SAFARICOM_PREFIXES = ['70', '71', '72', '74', '75', '76', '79', '110', '111'];
 
 const isSafaricomNumber = (phone: string): boolean => {
@@ -94,7 +89,6 @@ const signupSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
-
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -107,7 +101,6 @@ const Auth = () => {
   const [biometricChecked, setBiometricChecked] = useState(false);
   const [nativeBiometricConfigured, setNativeBiometricConfigured] = useState(false);
 
-  // Resolve biometric availability once on mount (async, non-blocking)
   useEffect(() => {
     let cancelled = false;
     const check = async () => {
@@ -139,12 +132,10 @@ const Auth = () => {
       setNativeBiometricConfigured(false);
       return;
     }
-
     setNativeBiometricConfigured(biometricReady && isBiometricEnabledSync());
   }, [biometricReady, isNative]);
 
-  // Show fingerprint button immediately if token exists + biometric enabled + app locked
-  const nativeBiometricLoginEnabled = isNative && isBiometricEnabledSync() && isAppLockedSync();
+  const nativeBiometricLoginEnabled = isNative && isBiometricEnabledSync();
 
   const clearNativeBiometricStorage = async () => {
     await hardLogoutStorage();
@@ -170,21 +161,13 @@ const Auth = () => {
     }
   };
 
-  
-    } catch {}
-    // Failed
-    await hardLogoutStorage();
-    setNativeBiometricConfigured(false);
-    return false;
-  };
-  const [showLoginPassword, setShowLoginPassword] = useconst restoreNativeBiometricSession = async () => {
+  const restoreNativeBiometricSession = async () => {
     const stored = await getStoredSession();
     if (!stored) {
       setNativeBiometricConfigured(false);
       return false;
     }
 
-    // Try refresh token first (works even if access token expired)
     try {
       const { data, error } = await supabase.auth.refreshSession({
         refresh_token: stored.refresh_token,
@@ -199,7 +182,6 @@ const Auth = () => {
       }
     } catch {}
 
-    // Try setSession with existing tokens
     try {
       const { error } = await supabase.auth.setSession({
         access_token: stored.access_token,
@@ -218,15 +200,16 @@ const Auth = () => {
       }
     } catch {}
 
-    // Last resort — try refreshing with just the refresh token directly
     try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const response = await fetch(
-        `${(supabase as any).supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
+        `${supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'apikey': (supabase as any).supabaseKey,
+            'apikey': supabaseKey,
           },
           body: JSON.stringify({ refresh_token: stored.refresh_token }),
         }
@@ -246,14 +229,13 @@ const Auth = () => {
       }
     } catch {}
 
-    // All attempts failed — token truly expired
-    // Clear only the session but keep biometric enabled
-    // so user just needs to login once to re-enable
     await clearStoredSession();
     await setAppLocked(false);
     setNativeBiometricConfigured(false);
     return false;
-  };State(false);
+  };
+
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
@@ -278,7 +260,6 @@ const Auth = () => {
   const [pending2FAUserId, setPending2FAUserId] = useState<string>("");
   const [pending2FASession, setPending2FASession] = useState<any>(null);
 
-  // Check localStorage for rate limit on mount
   useEffect(() => {
     const stored = localStorage.getItem('rateLimitResetTime');
     if (stored) {
@@ -291,36 +272,24 @@ const Auth = () => {
     }
   }, []);
 
-  // Countdown timer for rate limit
   useEffect(() => {
     if (!rateLimitResetTime) return;
-    
     const interval = setInterval(() => {
       const now = new Date();
       const diff = Math.max(0, Math.floor((rateLimitResetTime.getTime() - now.getTime()) / 1000));
-      
       setRemainingSeconds(diff);
-      
       if (diff === 0) {
         setRateLimitResetTime(null);
         localStorage.removeItem('rateLimitResetTime');
         toast.success('You can now try logging in again');
       }
     }, 1000);
-    
     return () => clearInterval(interval);
   }, [rateLimitResetTime]);
 
-  // Auto-trigger biometric authentication on page load
   useEffect(() => {
-    // Guard: Only run once per component mount
-    if (hasAttemptedAutoLogin.current) {
-      return;
-    }
-
+    if (hasAttemptedAutoLogin.current) return;
     if (isNative) {
-      // Do NOT auto-trigger fingerprint on native app
-      // User taps the fingerprint button manually
       hasAttemptedAutoLogin.current = true;
       return;
     }
@@ -329,42 +298,13 @@ const Auth = () => {
     const attemptAutoLogin = async () => {
       try {
         hasAttemptedAutoLogin.current = true;
-        
         if (biometricCancelled) return;
-
-        // Native app: use native biometrics (fingerprint/face)
-        if (isNative) {
-          if (biometricReady && isBiometricEnabledSync()) {
-            const biometryType = await getBiometryType();
-            const result = await nativeAuthenticate(`Verify your ${biometryType} to sign in`);
-
-            if (result.success) {
-              const restored = await restoreNativeBiometricSession();
-              if (restored) {
-                toast.success('Welcome back!');
-                navigate(returnTo || '/home', { replace: true });
-                return;
-              }
-              toast.error('Your fingerprint session expired. Please log in with your password to re-enable.');
-            } else {
-              setBiometricCancelled(true);
-              toast.error('Fingerprint cancelled. Please use your password.');
-            }
-          }
-          return;
-        }
-        
-        // Browser: use WebAuthn
         if (!isWebAuthnSupported()) return;
-
         const storedIdentifier = localStorage.getItem('lastLoginIdentifier');
         if (!storedIdentifier) return;
-
         const hasCredentials = await checkHasCredentials(storedIdentifier);
         if (!hasCredentials) return;
-
         const result = await authenticate(storedIdentifier);
-        
         if (result.success) {
           toast.success('Welcome back!');
           navigate(returnTo || '/', { replace: true });
@@ -375,70 +315,42 @@ const Auth = () => {
       } catch (error) {
         console.error('Auto-login error:', error);
         setBiometricCancelled(true);
-        toast.error('Fingerprint authentication cancelled. Please use your password.');
       } finally {
         setIsInitialCheck(false);
       }
     };
-
     void attemptAutoLogin();
-  }, [authenticate, biometricCancelled, biometricChecked, biometricReady, checkHasCredentials, getBiometryType, isNative, isWebAuthnSupported, nativeAuthenticate, navigate, returnTo]);
+  }, [authenticate, biometricCancelled, biometricChecked, checkHasCredentials, isNative, isWebAuthnSupported, navigate, returnTo]);
 
-  // Format countdown display
   const formatCountdown = (seconds: number): string => {
-    if (seconds < 60) {
-      return `${seconds} second${seconds !== 1 ? 's' : ''}`;
-    }
+    if (seconds < 60) return `${seconds} second${seconds !== 1 ? 's' : ''}`;
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes} minute${minutes !== 1 ? 's' : ''} ${secs} second${secs !== 1 ? 's' : ''}`;
   };
 
-  // Calculate password strength
   const calculatePasswordStrength = (password: string) => {
     const hasUpperCase = /[A-Z]/.test(password);
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumber = /[0-9]/.test(password);
     const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
     const hasMinLength = password.length >= 8;
-
     const score = [hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar, hasMinLength].filter(Boolean).length;
-
-    setPasswordStrength({
-      score,
-      hasUpperCase,
-      hasLowerCase,
-      hasNumber,
-      hasSpecialChar,
-      hasMinLength,
-    });
+    setPasswordStrength({ score, hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar, hasMinLength });
   };
 
-  const loginForm = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  });
+  const loginForm = useForm<LoginFormData>({ resolver: zodResolver(loginSchema) });
+  const signupForm = useForm<SignupFormData>({ resolver: zodResolver(signupSchema) });
 
-  const signupForm = useForm<SignupFormData>({
-    resolver: zodResolver(signupSchema),
-  });
-
-  // Redirect if already logged in — done inside an effect to avoid racing
-  // against fingerprint-setup, 2FA, and biometric enrollment dialogs.
   const [didRedirect, setDidRedirect] = useState(false);
   useEffect(() => {
     if (!user) return;
     if (didRedirect) return;
     if (show2FA || showBiometricSetup || isLoading) return;
-
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .maybeSingle();
+        const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
         if (cancelled) return;
         setDidRedirect(true);
         navigate(data ? "/admin" : (returnTo || "/home"), { replace: true });
@@ -450,15 +362,13 @@ const Auth = () => {
     })();
     return () => { cancelled = true; };
   }, [user, didRedirect, show2FA, showBiometricSetup, isLoading, navigate, returnTo]);
-
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
-    
+
     try {
       const result = await signIn(data.emailOrPhone, data.password);
       const { error } = result;
 
-      // Check if 2FA is required
       if (result.requires2FA && result.userId) {
         setPending2FAUserId(result.userId);
         setPending2FASession(result.pendingSession);
@@ -466,9 +376,8 @@ const Auth = () => {
         setIsLoading(false);
         return;
       }
-      
+
       if (error) {
-        // Check for rate limit error and extract reset time
         if (error.message.includes("Too many") || error.message.includes("rate limit")) {
           if ((error as any).rateLimitInfo?.resetTime) {
             const resetTime = new Date((error as any).rateLimitInfo.resetTime);
@@ -476,15 +385,13 @@ const Auth = () => {
             localStorage.setItem('rateLimitResetTime', resetTime.toISOString());
           }
           setRemainingAttempts(null);
-          // Don't show toast - countdown timer banner is sufficient
           return;
         }
-        
-        // Extract remaining attempts for non-rate-limit errors
+
         if ((error as any).remainingAttempts !== undefined) {
           setRemainingAttempts((error as any).remainingAttempts);
         }
-        
+
         if (error.message.includes("Invalid login credentials") || error.message.includes("No account found") || error.message.includes("Invalid")) {
           toast.error("Invalid credentials. Please check your email/phone and password.");
         } else if (error.message.includes("Email not confirmed")) {
@@ -494,22 +401,16 @@ const Auth = () => {
         }
         return;
       }
-      
-      // Store identifier for next auto-login
+
       localStorage.setItem('lastLoginIdentifier', data.emailOrPhone);
-      
-      // Clear any remaining attempts indicator
       setRemainingAttempts(null);
-      
       toast.success("Welcome back!");
-      
-      // Check if there's a return URL
+
       if (returnTo) {
         navigate(returnTo, { replace: true });
         return;
       }
-      
-      // Check if user is admin and redirect appropriately
+
       const { data: userData } = await supabase.auth.getUser();
       if (userData.user) {
         const { data: adminRole } = await supabase
@@ -522,12 +423,10 @@ const Auth = () => {
         if (adminRole) {
           navigate("/admin", { replace: true });
         } else {
-          // Offer fingerprint setup on first native login if device supports it
           if (isNative && biometricReady && !nativeBiometricConfigured) {
             setBiometricIdentifier(data.emailOrPhone);
             setShowBiometricSetup(true);
           } else {
-            // Refresh stored biometric tokens silently if already enabled
             if (isNative && nativeBiometricConfigured) {
               await storeNativeBiometricSession();
             }
@@ -543,10 +442,9 @@ const Auth = () => {
   };
 
   const handleBiometricLogin = async () => {
-    // Native app fingerprint login
     if (isNative) {
       if (!nativeBiometricLoginEnabled) {
-        toast.error('Fingerprint login is not set up. Please go to Profile → Security → Enable Fingerprint Login.');
+        toast.error('Fingerprint login is not set up. Please log in with your password first.');
         return;
       }
 
@@ -558,13 +456,11 @@ const Auth = () => {
           navigate(returnTo || '/home', { replace: true });
           return;
         }
-
         toast.error('Your session has expired. Please log in with your password once to re-enable fingerprint.');
       }
       return;
     }
 
-    // Browser: WebAuthn — still needs email/phone
     const emailOrPhone = loginForm.getValues('emailOrPhone');
     if (!emailOrPhone) {
       toast.error('Please enter your email or phone number first');
@@ -580,7 +476,6 @@ const Auth = () => {
   const handleEnableBiometric = async () => {
     setIsLoading(true);
     try {
-      // Native app: just enable the flag (native biometric doesn't need server registration)
       if (isNative) {
         const result = await nativeAuthenticate('Verify your identity to enable fingerprint login');
         if (result.success) {
@@ -600,12 +495,11 @@ const Auth = () => {
         return;
       }
 
-      // Browser: WebAuthn registration
       const result = await registerCredential();
       if (result.success) {
         toast.success('Biometric login enabled successfully!');
         setShowBiometricSetup(false);
-        
+
         if (returnTo) {
           navigate(returnTo, { replace: true });
         } else {
@@ -621,8 +515,6 @@ const Auth = () => {
 
   const handleSkipBiometric = () => {
     setShowBiometricSetup(false);
-    
-    // Redirect based on returnTo, signup step, or default
     if (returnTo) {
       navigate(returnTo, { replace: true });
     } else {
@@ -631,17 +523,15 @@ const Auth = () => {
   };
 
   const handleSignup = async (data: SignupFormData) => {
-    // First step: collect details and verify phone
     if (!phoneVerified) {
       setSignupStep('phone');
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
-      // Check uniqueness using security definer RPC (bypasses RLS for unauthenticated users)
-      const { data: uniqueCheck, error: uniqueError } = await supabase
+      const { data: uniqueCheck } = await supabase
         .rpc('check_signup_uniqueness', {
           p_phone: data.phone,
           p_id_number: data.id_number,
@@ -665,27 +555,22 @@ const Auth = () => {
           setIsLoading(false);
           return;
         }
-      }
+      } 
 
-      const { error: signUpError } = await signUp(data.email, data.password, {
+    const { error: signUpError } = await signUp(data.email, data.password, {
         full_name: data.full_name,
         id_number: data.id_number,
         phone: data.phone,
       });
-      
+
       if (signUpError) {
-        // Handle duplicate phone number
-        if (signUpError.message.includes("phone number is already registered") || 
+        if (signUpError.message.includes("phone number is already registered") ||
             signUpError.message.includes("profiles_phone_unique")) {
           toast.error("This phone number is already registered. Please use a different number or log in.");
-        }
-        // Handle duplicate ID number
-        else if (signUpError.message.includes("ID number is already registered") || 
+        } else if (signUpError.message.includes("ID number is already registered") ||
                  signUpError.message.includes("profiles_id_number_key")) {
           toast.error("This ID number is already registered. Please contact support if this is an error.");
-        }
-        // Handle duplicate email
-        else if (signUpError.message.includes("already registered") || signUpError.message.includes("User already")) {
+        } else if (signUpError.message.includes("already registered") || signUpError.message.includes("User already")) {
           toast.error("This email is already registered. Please log in or use a different email.");
         } else if (signUpError.message.includes("Password")) {
           toast.error("Password is too weak. Please use a stronger password.");
@@ -697,7 +582,6 @@ const Auth = () => {
         return;
       }
 
-      // Record T&C acceptance
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -712,7 +596,6 @@ const Auth = () => {
         console.error('Failed to record consent:', consentError);
       }
 
-      // Send welcome SMS
       try {
         await sendTransactionalSMS(
           data.phone,
@@ -722,10 +605,9 @@ const Auth = () => {
       } catch (smsError) {
         console.error('Failed to send welcome SMS:', smsError);
       }
-      
+
       toast.success("Account created successfully!");
-      
-      // Check if device supports biometric and prompt immediately
+
       const shouldOfferNativeBiometricSetup = isNative && biometricReady && !nativeBiometricConfigured;
       if (shouldOfferNativeBiometricSetup || isWebAuthnSupported()) {
         setShowBiometricSetup(true);
@@ -744,12 +626,10 @@ const Auth = () => {
   };
 
   const handle2FAVerified = async () => {
-    // 2FA verified - now set the session
     if (pending2FASession) {
       await supabase.auth.setSession(pending2FASession);
     }
-    
-    // Capture IP after 2FA login
+
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -768,7 +648,6 @@ const Auth = () => {
       console.error('Failed to capture IP after 2FA:', err);
     }
 
-    // Store identifier for next auto-login
     const emailOrPhone = loginForm.getValues('emailOrPhone');
     if (emailOrPhone) {
       localStorage.setItem('lastLoginIdentifier', emailOrPhone);
@@ -779,7 +658,6 @@ const Auth = () => {
     setPending2FAUserId("");
     setPending2FASession(null);
 
-    // Check if user is admin
     const { data: userData } = await supabase.auth.getUser();
     if (userData.user) {
       const { data: adminRole } = await supabase
@@ -819,7 +697,6 @@ const Auth = () => {
     setPending2FASession(null);
   };
 
-  // Show 2FA verification screen
   if (show2FA && pending2FAUserId) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col items-center justify-center px-4">
@@ -889,27 +766,27 @@ const Auth = () => {
                               </div>
                             </div>
                           )}
-                          
+
                           {!rateLimitResetTime && remainingAttempts !== null && remainingAttempts < 5 && (
                             <div className={`${
-                              remainingAttempts === 0 
-                                ? 'bg-destructive/10 border-destructive/30' 
-                                : remainingAttempts <= 2 
-                                  ? 'bg-secondary/10 border-secondary/30' 
+                              remainingAttempts === 0
+                                ? 'bg-destructive/10 border-destructive/30'
+                                : remainingAttempts <= 2
+                                  ? 'bg-secondary/10 border-secondary/30'
                                   : 'bg-muted/50 border-border/50'
                             } border rounded-lg p-3`}>
                               <div className="flex items-center gap-2">
                                 <AlertTriangle className={`h-4 w-4 flex-shrink-0 ${
-                                  remainingAttempts === 0 
-                                    ? 'text-destructive' 
-                                    : remainingAttempts <= 2 
-                                      ? 'text-secondary' 
+                                  remainingAttempts === 0
+                                    ? 'text-destructive'
+                                    : remainingAttempts <= 2
+                                      ? 'text-secondary'
                                       : 'text-muted-foreground'
                                 }`} />
                                 <p className="text-sm">
                                   <span className="font-medium">
-                                    {remainingAttempts === 0 
-                                      ? 'Last attempt remaining' 
+                                    {remainingAttempts === 0
+                                      ? 'Last attempt remaining'
                                       : `${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining`}
                                   </span>
                                   {remainingAttempts <= 2 && (
@@ -921,7 +798,7 @@ const Auth = () => {
                               </div>
                             </div>
                           )}
-                          
+
                           <FormField
                             control={loginForm.control}
                             name="emailOrPhone"
@@ -947,9 +824,9 @@ const Auth = () => {
                                 <FormLabel>Password</FormLabel>
                                 <FormControl>
                                   <div className="relative">
-                                    <Input 
-                                      type={showLoginPassword ? "text" : "password"} 
-                                      {...field} 
+                                    <Input
+                                      type={showLoginPassword ? "text" : "password"}
+                                      {...field}
                                     />
                                     <Button
                                       type="button"
@@ -978,7 +855,7 @@ const Auth = () => {
                           >
                             {isLoading ? "Logging in..." : "Login"}
                           </Button>
-                          
+
                           {(isWebAuthnSupported() || nativeBiometricLoginEnabled) && (
                             <>
                               <div className="relative">
@@ -989,6 +866,7 @@ const Auth = () => {
                                   <span className="bg-card px-2 text-muted-foreground">Or</span>
                                 </div>
                               </div>
+
                               
                               <Button
                                 type="button"
@@ -1003,14 +881,20 @@ const Auth = () => {
                             </>
                           )}
 
-                          {/* Native: device supports biometrics but app not yet enrolled */}
                           {isNative && biometricReady && !nativeBiometricConfigured && (
                             <p className="text-center text-xs text-muted-foreground">
                               <Fingerprint className="inline h-3.5 w-3.5 mr-1 align-text-bottom" />
                               Sign in with your password — you can enable Fingerprint login right after.
                             </p>
                           )}
-                          
+
+                          {isAppLockedSync() && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
+                              <span>🔒</span>
+                              <span>App locked. Use fingerprint to unlock.</span>
+                            </div>
+                          )}
+
                           <div className="text-center">
                             <Link to="/forgot-password" className="text-sm text-primary hover:underline">
                               Forgot password?
@@ -1028,7 +912,7 @@ const Auth = () => {
                   <CardHeader>
                     <CardTitle>Create Account</CardTitle>
                     <CardDescription>
-                      {signupStep === 'details' 
+                      {signupStep === 'details'
                         ? 'Get started with your financial journey'
                         : 'Verify your phone number'
                       }
@@ -1103,8 +987,8 @@ const Auth = () => {
                               <FormLabel>Password</FormLabel>
                               <FormControl>
                                 <div className="relative">
-                                  <Input 
-                                    type={showSignupPassword ? "text" : "password"} 
+                                  <Input
+                                    type={showSignupPassword ? "text" : "password"}
                                     {...field}
                                     onChange={(e) => {
                                       field.onChange(e);
@@ -1178,9 +1062,9 @@ const Auth = () => {
                               <FormLabel>Confirm Password</FormLabel>
                               <FormControl>
                                 <div className="relative">
-                                  <Input 
-                                    type={showConfirmPassword ? "text" : "password"} 
-                                    {...field} 
+                                  <Input
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    {...field}
                                   />
                                   <Button
                                     type="button"
@@ -1247,7 +1131,6 @@ const Auth = () => {
                               onVerified={() => {
                                 setPhoneVerified(true);
                                 toast.success("Phone verified! Creating your account...");
-                                // Auto-submit the signup form after OTP verification
                                 setTimeout(() => {
                                   signupForm.handleSubmit(handleSignup)();
                                 }, 500);
