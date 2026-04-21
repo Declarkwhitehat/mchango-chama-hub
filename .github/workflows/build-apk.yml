@@ -50,8 +50,23 @@ jobs:
       - name: Place google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
-      - name: Make Gradle executable
-        run: chmod +x android/gradlew
+      - name: Set app icon
+        run: |
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          cp public/app-icon-512.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
 
       - name: Build APK
         run: cd android && ./gradlew assembleDebug
