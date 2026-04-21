@@ -50,24 +50,26 @@ jobs:
       - name: Place google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
-      - name: Set app icon
+      - name: Install image resizing tool
+        run: npm install -g sharp-cli
+
+      - name: Set app icon all sizes
         run: |
           mkdir -p android/app/src/main/res/mipmap-mdpi
           mkdir -p android/app/src/main/res/mipmap-hdpi
           mkdir -p android/app/src/main/res/mipmap-xhdpi
           mkdir -p android/app/src/main/res/mipmap-xxhdpi
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          cp public/app-icon-512.png android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
-
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-mdpi/ic_launcher.png resize 48 48
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png resize 48 48
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png resize 72 72
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png resize 72 72
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xhdpi/ic_launcher.png resize 96 96
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png resize 96 96
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png resize 144 144
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png resize 144 144
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png resize 192 192
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png resize 192 192
       - name: Build APK
         run: cd android && ./gradlew assembleDebug
 
