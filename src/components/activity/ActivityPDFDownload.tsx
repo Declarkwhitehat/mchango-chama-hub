@@ -5,6 +5,7 @@ import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 import { addPDFBrandingFooter } from "@/utils/pdfBranding";
+import { notifyDownloadComplete } from "@/lib/nativeDownloadNotification";
 
 interface ActivityPDFDownloadProps {
   data: any[];
@@ -223,6 +224,7 @@ export const ActivityPDFDownload = ({
       const pdfBlob = doc.output('blob');
       const filename = `${type}-transactions-${format(new Date(), "yyyy-MM-dd")}.pdf`;
       doc.save(filename);
+      notifyDownloadComplete(filename);
 
       // Upload to storage in background
       uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});

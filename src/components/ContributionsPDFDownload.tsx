@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Download, Loader2, FileText } from "lucide-react";
+import { notifyDownloadComplete } from "@/lib/nativeDownloadNotification";
 import { jsPDF } from "jspdf";
 import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
@@ -235,6 +236,7 @@ export const ContributionsPDFDownload = ({
       const pdfBlob = doc.output('blob');
       const fileName = `${title.replace(/[^a-zA-Z0-9]/g, "_")}_${period}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
       doc.save(fileName);
+      notifyDownloadComplete(fileName);
 
       // Upload to storage in background
       uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});

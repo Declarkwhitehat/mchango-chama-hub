@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { notifyDownloadComplete } from "@/lib/nativeDownloadNotification";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -351,7 +352,9 @@ export function RevenueDashboard() {
       y += 5;
     });
 
-    doc.save(`revenue-statement-${format(from, "yyyy-MM-dd")}.pdf`);
+    const revFilename = `revenue-statement-${format(from, "yyyy-MM-dd")}.pdf`;
+    doc.save(revFilename);
+    notifyDownloadComplete(revFilename);
   };
 
   const fmtKES = (n: number) => `KES ${n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

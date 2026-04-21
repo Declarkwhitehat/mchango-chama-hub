@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { notifyDownloadComplete } from "@/lib/nativeDownloadNotification";
 import { jsPDF } from "jspdf";
 import { toast } from "sonner";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
@@ -471,6 +472,7 @@ export const PaymentStatusManager = ({
       const pdfBlob = doc.output('blob');
       const fileName = `${chamaName.replace(/[^a-zA-Z0-9]/g, "_")}_payments_${pdfPeriod}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
       doc.save(fileName);
+      notifyDownloadComplete(fileName);
 
       // Upload to storage in background
       uploadDocumentPDF(documentId, serialNumber, pdfBlob).catch(() => {});
