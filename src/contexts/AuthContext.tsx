@@ -32,6 +32,8 @@ interface AuthContextType {
   signIn: (emailOrPhone: string, password: string) => Promise<{ error: any; requires2FA?: boolean; userId?: string; pendingSession?: any }>;
   signUp: (email: string, password: string, userData: any) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
+  lockApp: () => Promise<void>;
+  hardLogout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
