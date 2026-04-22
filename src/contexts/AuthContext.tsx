@@ -1,15 +1,18 @@
 import * as React from 'react';
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   isBiometricEnabledSync,
+  isAppLockedSync,
+  getStoredSession,
   setStoredSession,
   setAppLocked,
   hardLogoutStorage,
+  debugStorageState,
 } from '@/lib/secureStorage';
-import { isNativeApp } from '@/lib/biometricHandler';
+import { isNativeApp, authenticateBiometric, getBiometricType } from '@/lib/biometricHandler';
 
 interface Profile {
   id: string;
@@ -56,6 +59,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const initRan = useRef(false);
 
   const fetchProfile = async (userId: string): Promise<void> => {
     try {
@@ -82,7 +86,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   useEffect(() => {
     let mounted = true;
 
-    // Listener for ONGOING auth changes - never await Supabase calls here
+    // ── 1. Auth state listener (set up FIRST) ──────────────────────
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
@@ -98,9 +102,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
 
         // Keep stored session fresh on every valid auth event
         if (
-          (event === 'SIGNED_IN' ||
-            event === 'TOKEN_REFRESHED' ||
-            event === 'USER_UPDATED') &&
+          (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') &&
           newSession.access_token &&
           newSession.refresh_token &&
           isNativeApp() &&
@@ -119,9 +121,40 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       }
     });
 
-    // INITIAL load - controls loading state
+    // ── 2. Initialization (runs INSIDE the provider lifecycle) ─────
     const initializeAuth = async () => {
       try {
+        // Debug log storage state on native
+        if (isNativeApp()) {
+          await debugStorageState();
+        }
+
+        // Check if we need biometric unlock (soft-locked state)
+        if (isNativeApp() && isBiometricEnabledSync() && isAppLockedSync()) {
+          const stored = await getStoredSession();
+          if (stored) {
+            // Attempt biometric authentication
+            const bioType = await getBiometricType();
+            const bioResult = await authenticateBiometric(
+              `Scan your ${bioType} to unlock PAMOJA NOVA`
+            );
+
+            if (bioResult.success) {
+              // Restore session from stored tokens
+              const restored = await restoreSessionFromStored(stored);
+              if (restored && mounted) {
+                await setAppLocked(false);
+                // Session is now set via setSession above (triggered by the listener)
+                return;
+              }
+            }
+            // Biometric failed or session expired — stay on login screen
+            if (mounted) setLoading(false);
+            return;
+          }
+        }
+
+        // Normal init: check existing Supabase session
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         if (!mounted) return;
         
@@ -136,14 +169,19 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       }
     };
 
-    initializeAuth();
+    if (!initRan.current) {
+      initRan.current = true;
+      initializeAuth();
+    } else {
+      setLoading(false);
+    }
 
-    // Refresh session when tab regains focus (debounced – skip if < 60s since last)
+    // ── 3. Visibility change handler (app resume) ──────────────────
     let lastVisibilityRefresh = 0;
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         const now = Date.now();
-        if (now - lastVisibilityRefresh < 60_000) return; // skip if < 60s
+        if (now - lastVisibilityRefresh < 60_000) return;
         lastVisibilityRefresh = now;
         supabase.auth.getSession().then(({ data: { session: refreshedSession } }) => {
           if (!mounted) return;
@@ -164,7 +202,6 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
-
 
   const captureLoginIP = async (isSignup: boolean) => {
     try {
@@ -191,7 +228,6 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       
-      // Call login edge function with direct fetch for full response control
       const response = await fetch(`${supabaseUrl}/functions/v1/login`, {
         method: 'POST',
         headers: {
@@ -206,7 +242,6 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
 
       const responseData = await response.json();
 
-      // Handle 429 rate limit error
       if (response.status === 429) {
         const error = new Error(responseData.error || 'Too many login attempts. Please try again later.');
         (error as any).rateLimitInfo = {
@@ -216,21 +251,18 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
         throw error;
       }
 
-      // Handle other error responses
       if (!response.ok) {
         const error = new Error(
           responseData.error?.includes('Invalid credentials')
             ? 'Invalid email/phone or password. Please check your credentials and try again.'
             : responseData.error || 'Login failed. Please try again.'
         );
-        // Include remaining attempts info for all errors
         if (responseData.remainingAttempts !== undefined) {
           (error as any).remainingAttempts = responseData.remainingAttempts;
         }
         throw error;
       }
 
-      // Check if 2FA is required
       if (responseData.requires2FA) {
         return { 
           error: null, 
@@ -240,10 +272,8 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
         };
       }
 
-      // Success - set session
       if (responseData.session) {
         await supabase.auth.setSession(responseData.session);
-        // Capture IP after successful login
         captureLoginIP(false);
       }
       
@@ -262,7 +292,6 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       },
     });
     if (!error) {
-      // Capture IP after successful signup
       captureLoginIP(true);
     }
     return { error };
@@ -275,6 +304,16 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
 
   /** Soft logout: lock the app but keep stored session for biometric unlock. */
   const lockApp = async (): Promise<void> => {
+    // Save current session to secure storage before signing out
+    if (isNativeApp() && isBiometricEnabledSync()) {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.access_token && data.session.refresh_token) {
+        await setStoredSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+      }
+    }
     await setAppLocked(true);
     await supabase.auth.signOut({ scope: 'local' });
   };
@@ -303,4 +342,53 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       {children}
     </AuthContext.Provider>
   );
+}
+
+/**
+ * Restore a Supabase session from stored tokens.
+ * Tries refreshSession first, falls back to setSession.
+ * On success, atomically updates stored tokens with fresh rotated ones.
+ */
+async function restoreSessionFromStored(
+  stored: { access_token: string; refresh_token: string }
+): Promise<boolean> {
+  // Strategy 1: refresh with stored refresh_token
+  try {
+    const { data, error } = await supabase.auth.refreshSession({
+      refresh_token: stored.refresh_token,
+    });
+    if (!error && data.session?.access_token && data.session.refresh_token) {
+      await setStoredSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+      return true;
+    }
+  } catch (err) {
+    console.warn('[AuthContext] refreshSession failed:', err);
+  }
+
+  // Strategy 2: setSession
+  try {
+    const { error } = await supabase.auth.setSession({
+      access_token: stored.access_token,
+      refresh_token: stored.refresh_token,
+    });
+    if (!error) {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.access_token && data.session.refresh_token) {
+        await setStoredSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        return true;
+      }
+    }
+  } catch (err) {
+    console.error('[AuthContext] setSession failed:', err);
+  }
+
+  // Both failed → tokens are stale
+  await hardLogoutStorage();
+  return false;
 }
