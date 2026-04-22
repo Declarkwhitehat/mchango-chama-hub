@@ -168,6 +168,7 @@ const Auth = () => {
       return false;
     }
 
+    // Strategy 1: refresh with stored refresh_token
     try {
       const { data, error } = await supabase.auth.refreshSession({
         refresh_token: stored.refresh_token,
@@ -182,6 +183,7 @@ const Auth = () => {
       }
     } catch {}
 
+    // Strategy 2: setSession fallback
     try {
       const { error } = await supabase.auth.setSession({
         access_token: stored.access_token,
@@ -200,35 +202,7 @@ const Auth = () => {
       }
     } catch {}
 
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const response = await fetch(
-        `${supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-          },
-          body: JSON.stringify({ refresh_token: stored.refresh_token }),
-        }
-      );
-      const result = await response.json();
-      if (result.access_token && result.refresh_token) {
-        await supabase.auth.setSession({
-          access_token: result.access_token,
-          refresh_token: result.refresh_token,
-        });
-        await setStoredSession({
-          access_token: result.access_token,
-          refresh_token: result.refresh_token,
-        });
-        await setAppLocked(false);
-        return true;
-      }
-    } catch {}
-
+    // Both failed → clear stale tokens
     await clearStoredSession();
     await setAppLocked(false);
     setNativeBiometricConfigured(false);
