@@ -136,7 +136,11 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
         }
 
         // Check if we need biometric unlock (soft-locked state)
-        if (isNativeApp() && isBiometricEnabledSync() && isAppLockedSync()) {
+        // Use ASYNC checks that read from Capacitor Preferences (survives Android memory wipe)
+        const biometricOn = isNativeApp() && await isBiometricEnabled();
+        const locked = isNativeApp() && await isAppLocked();
+        
+        if (isNativeApp() && biometricOn && locked) {
           const stored = await getStoredSession();
           if (stored) {
             // Attempt biometric authentication
