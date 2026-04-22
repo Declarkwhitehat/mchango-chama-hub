@@ -5,10 +5,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   isBiometricEnabledSync,
+  isBiometricEnabled,
   isAppLockedSync,
+  isAppLocked,
   getStoredSession,
   setStoredSession,
-  setAppLocked,
+  setAppLocked as setAppLockedStorage,
   hardLogoutStorage,
   debugStorageState,
 } from '@/lib/secureStorage';
@@ -100,17 +102,21 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
           if (mounted) fetchProfile(newSession.user.id);
         }, 0);
 
-        // Keep stored session fresh on every valid auth event
+        // Keep stored session fresh on every valid auth event (fire-and-forget async)
         if (
           (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') &&
           newSession.access_token &&
           newSession.refresh_token &&
-          isNativeApp() &&
-          isBiometricEnabledSync()
+          isNativeApp()
         ) {
-          setStoredSession({
-            access_token: newSession.access_token,
-            refresh_token: newSession.refresh_token,
+          // Use async isBiometricEnabled() instead of sync localStorage check
+          isBiometricEnabled().then((enabled) => {
+            if (enabled) {
+              setStoredSession({
+                access_token: newSession.access_token,
+                refresh_token: newSession.refresh_token,
+              });
+            }
           });
         }
       } else {
@@ -130,7 +136,11 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
         }
 
         // Check if we need biometric unlock (soft-locked state)
-        if (isNativeApp() && isBiometricEnabledSync() && isAppLockedSync()) {
+        // Use ASYNC checks that read from Capacitor Preferences (survives Android memory wipe)
+        const biometricOn = isNativeApp() && await isBiometricEnabled();
+        const locked = isNativeApp() && await isAppLocked();
+        
+        if (isNativeApp() && biometricOn && locked) {
           const stored = await getStoredSession();
           if (stored) {
             // Attempt biometric authentication
@@ -143,7 +153,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
               // Restore session from stored tokens
               const restored = await restoreSessionFromStored(stored);
               if (restored && mounted) {
-                await setAppLocked(false);
+                await setAppLockedStorage(false);
                 // Session is now set via setSession above (triggered by the listener)
                 return;
               }
@@ -314,7 +324,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
         });
       }
     }
-    await setAppLocked(true);
+    await setAppLockedStorage(true);
     await supabase.auth.signOut({ scope: 'local' });
   };
 
