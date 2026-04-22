@@ -100,17 +100,21 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
           if (mounted) fetchProfile(newSession.user.id);
         }, 0);
 
-        // Keep stored session fresh on every valid auth event
+        // Keep stored session fresh on every valid auth event (fire-and-forget async)
         if (
           (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') &&
           newSession.access_token &&
           newSession.refresh_token &&
-          isNativeApp() &&
-          isBiometricEnabledSync()
+          isNativeApp()
         ) {
-          setStoredSession({
-            access_token: newSession.access_token,
-            refresh_token: newSession.refresh_token,
+          // Use async isBiometricEnabled() instead of sync localStorage check
+          isBiometricEnabled().then((enabled) => {
+            if (enabled) {
+              setStoredSession({
+                access_token: newSession.access_token,
+                refresh_token: newSession.refresh_token,
+              });
+            }
           });
         }
       } else {
