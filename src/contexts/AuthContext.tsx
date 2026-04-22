@@ -109,7 +109,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
           newSession.refresh_token &&
           isNativeApp()
         ) {
-          // Use async isBiometricEnabled() instead of sync localStorage check
+          // Use async isBiometricEnabled() to read from Capacitor Preferences
           isBiometricEnabled().then((enabled) => {
             if (enabled) {
               setStoredSession({
@@ -154,7 +154,6 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
               const restored = await restoreSessionFromStored(stored);
               if (restored && mounted) {
                 await setAppLockedStorage(false);
-                // Session is now set via setSession above (triggered by the listener)
                 return;
               }
             }
@@ -314,8 +313,10 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
 
   /** Soft logout: lock the app but keep stored session for biometric unlock. */
   const lockApp = async (): Promise<void> => {
-    // Save current session to secure storage before signing out
-    if (isNativeApp() && isBiometricEnabledSync()) {
+    // Use ASYNC isBiometricEnabled() to read from Capacitor Preferences
+    // isBiometricEnabledSync() was removed here because localStorage gets wiped by Android
+    const biometricEnabled = isNativeApp() && await isBiometricEnabled();
+    if (biometricEnabled) {
       const { data } = await supabase.auth.getSession();
       if (data.session?.access_token && data.session.refresh_token) {
         await setStoredSession({
@@ -401,4 +402,5 @@ async function restoreSessionFromStored(
   // Both failed → tokens are stale
   await hardLogoutStorage();
   return false;
-}
+                }
+              
