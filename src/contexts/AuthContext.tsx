@@ -149,7 +149,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
               // Restore session from stored tokens
               const restored = await restoreSessionFromStored(stored);
               if (restored && mounted) {
-                await setAppLocked(false);
+                await setAppLockedStorage(false);
                 // Session is now set via setSession above (triggered by the listener)
                 return;
               }
@@ -320,7 +320,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
         });
       }
     }
-    await setAppLocked(true);
+    await setAppLockedStorage(true);
     await supabase.auth.signOut({ scope: 'local' });
   };
 
