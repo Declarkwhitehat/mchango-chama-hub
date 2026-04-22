@@ -1,106 +1,73 @@
 
-Goal: make native fingerprint login work reliably, prompt setup immediately after first successful password login, and allow later sign-in with fingerprint only on the auth screen.
 
-What I found
-1. The main bug is stale session storage for native biometric login.
-   - In `src/pages/Auth.tsx`, `storeNativeBiometricSession()` saves the current `access_token` and `refresh_token` into `localStorage`.
-   - Later, auth token rotation keeps happening in the background, but the saved `biometricSession` is not kept in sync.
-   - Supabase refresh tokens are one-time use and rotate. The auth logs confirm this exact failure:
-     - `Invalid Refresh Token: Refresh Token Not Found`
-     - `session_not_found`
-   - So after logout / later login, fingerprint succeeds locally, but restoring the old saved session fails, which triggers the “Your session has expired…” message.
+# Fix Biometric Session Persistence and Auth Configuration
 
-2. There is duplicated native biometric session logic.
-   - `src/pages/Auth.tsx` stores biometric session one way.
-   - `src/pages/Profile.tsx` separately writes `biometricSession` directly.
-   - This makes it easy for the app to save outdated tokens again.
+## Problem Summary
+There are two overlapping biometric session systems (`secureStorage.ts` and `nativeBiometricSession.ts`), the Supabase client uses `localStorage` which gets wiped by Android OS under memory pressure, the app initializer runs outside the AuthContext lifecycle causing race conditions, and the JWT expiry is at the default 1 hour (too short for a mobile app with biometric unlock).
 
-3. The “ask me to enable fingerprint right after first login” flow is present but fragile.
-   - It is triggered in `Auth.tsx` after password login and after 2FA login.
-   - But if storing the session fails, or auth state / redirect timing wins first, the setup flow can be skipped or become unreliable.
+## Plan
 
-4. Fingerprint-only login is partially implemented already.
-   - The native auth screen can show a fingerprint button without email input.
-   - The missing piece is restoring a fresh valid session every time, not a stale one.
+### 1. Configure JWT expiry and refresh token reuse
+- Use the `configure_auth` tool (or migration if needed) to set:
+  - JWT expiry: **604800 seconds** (7 days)
+  - Refresh token reuse interval: **10 seconds**
+- This prevents stale tokens between app launches since a 7-day JWT means biometric unlock works even if the app was closed for days.
 
-Implementation plan
-1. Centralize native biometric credential/session management
-   - Move native biometric storage/restore logic into a shared helper or hook used by both `Auth.tsx` and `Profile.tsx`.
-   - Remove duplicated direct writes to `localStorage` from `Profile.tsx`.
-   - Keep one source of truth for:
-     - `nativeBiometricEnabled`
-     - stored session payload
-     - clearing invalid biometric state
+### 2. Create a custom Capacitor Preferences storage adapter for the Supabase client
+- Create `src/lib/capacitorStorageAdapter.ts` — a class implementing the Supabase `SupportedStorage` interface (`getItem`, `setItem`, `removeItem`) that:
+  - On native: delegates to `@capacitor/preferences` (async, but the Supabase client handles async storage)
+  - On web: delegates to `localStorage`
+- This ensures the Supabase SDK's own session persists in Capacitor Preferences, surviving Android WebView memory reclamation.
 
-2. Keep stored biometric session fresh automatically
-   - Update the saved native biometric session whenever auth state changes to a valid session, especially on:
-     - successful sign-in
-     - `TOKEN_REFRESHED`
-     - successful 2FA completion
-   - This prevents the stored refresh token from becoming stale.
-   - Also avoid saving only once during setup and then never updating it again.
+### 3. Update Supabase client to use the new storage adapter
+- In `src/integrations/supabase/client.ts`, replace `storage: localStorage` with the new Capacitor storage adapter instance.
+- Note: This file is auto-generated, but the `auth.storage` override is critical for native. We will create the adapter externally and only reference it in the client config.
 
-3. Harden biometric restore flow
-   - In `Auth.tsx`, make native fingerprint login restore use the latest stored refresh token first.
-   - If restore fails, clear invalid biometric storage cleanly and show a precise recovery message.
-   - Keep fingerprint login independent from manual email entry.
+### 4. Consolidate biometric session management — remove `nativeBiometricSession.ts`
+- Delete `src/lib/nativeBiometricSession.ts` entirely.
+- All biometric session storage now goes through `src/lib/secureStorage.ts` (which already uses `@capacitor/preferences`).
+- Update any imports in `Auth.tsx`, `Profile.tsx`, or `AuthContext.tsx` that reference the old module.
 
-4. Make first-login fingerprint enrollment consistent
-   - After successful password login or 2FA login on native:
-     - wait until session is confirmed
-     - save a fresh biometric session snapshot
-     - then open the fingerprint setup dialog before redirecting away
-   - This ensures the user is actually prompted the first time instead of needing to visit Profile manually.
+### 5. Move app initializer logic inside AuthContext
+- Remove standalone `initializeAppAuth()` calls from `Auth.tsx` or `main.tsx`.
+- Inside `AuthContext.tsx`'s `initializeAuth` function:
+  1. Check if native + biometric enabled + app locked.
+  2. If so, attempt biometric authentication.
+  3. On success, call `supabase.auth.setSession()` with stored tokens.
+  4. On failure, stay in unauthenticated state (no redirect).
+- This eliminates the race condition where `appInitializer.ts` runs before the AuthContext listener is mounted.
 
-5. Prevent redirect timing from interfering
-   - Refactor the redirect logic in `Auth.tsx` so the “already logged in” redirect does not race against:
-     - `showBiometricSetup`
-     - 2FA completion
-     - native biometric enrollment flow
-   - The current render-time `setTimeout(...)` redirect is fragile and should be moved to a safer effect-based flow.
+### 6. Make token sync atomic in AuthContext
+- In the `onAuthStateChange` listener, when `SIGNED_IN` or `TOKEN_REFRESHED` fires with a valid session on native:
+  - Atomically write both `access_token` and `refresh_token` to `secureStorage` in a single `setStoredSession()` call.
+  - Only write if biometric is enabled (check via `isBiometricEnabledSync()`).
+  - This is already partially implemented but will be tightened to use only `secureStorage.ts`.
 
-6. Align logout behavior with biometric quick re-entry
-   - Keep local-only sign-out behavior in `AuthContext.tsx`.
-   - Verify no other logout paths revoke the session globally or wipe biometric storage unexpectedly.
-   - Keep fingerprint login available on the auth page after logout.
+### 7. Simplify Auth.tsx biometric restore
+- Remove the three-strategy restore logic (SDK refresh, setSession, raw fetch) from `Auth.tsx`.
+- Replace with a single call to the `restoreSession()` function from `appInitializer.ts` (or inline equivalent).
+- The Supabase client itself now persists in Capacitor Preferences, so restoring is more reliable.
 
-Files to update
-- `src/pages/Auth.tsx`
-  - fix native biometric restore
-  - trigger setup reliably after first password/2FA login
-  - refactor redirect race conditions
-- `src/pages/Profile.tsx`
-  - replace duplicate session-saving logic with shared native biometric helper
-- `src/hooks/useNativeBiometrics.ts` or a new shared hook/helper
-  - add unified native biometric session persistence/restore helpers
-- `src/contexts/AuthContext.tsx`
-  - sync stored biometric session on valid auth changes
-  - keep logout compatible with native biometric relogin
+### 8. Clean up Auth.tsx fingerprint button visibility
+- Keep the synchronous `isBiometricEnabledSync()` check for immediate button rendering.
+- Ensure `isAppLockedSync()` is also checked so the button only shows when the app is in locked state (soft logout).
 
-Expected result after fix
-1. User logs in with password the first time in the native app.
-2. App immediately asks whether to enable fingerprint login.
-3. If enabled, a fresh biometric-backed session is stored and kept updated.
-4. User logs out.
-5. On the auth screen, user taps fingerprint and signs in successfully without entering email first.
-6. No more “session expired” loop unless the session is truly invalid, in which case biometric is reset cleanly.
+## Files to create
+- `src/lib/capacitorStorageAdapter.ts` — Supabase-compatible async storage using Capacitor Preferences
 
-What I’ll verify after implementation
-- First password login on native shows fingerprint setup prompt
-- Enabling fingerprint from the prompt works
-- Enabling fingerprint later from Profile also works
-- Logout keeps fingerprint login available
-- Fingerprint-only login works from `/auth` without email input
-- 2FA + fingerprint flow still works
-- Invalid biometric state clears gracefully instead of looping
+## Files to edit
+- `src/integrations/supabase/client.ts` — swap `localStorage` for Capacitor adapter
+- `src/contexts/AuthContext.tsx` — integrate app init logic, atomic token sync
+- `src/pages/Auth.tsx` — simplify biometric restore, remove old imports
+- `src/pages/Profile.tsx` — remove duplicate session writes, use only `secureStorage.ts`
+- `src/lib/appInitializer.ts` — retain as utility but no longer called standalone
 
-What you may need to do after I implement it
-- Pull the latest changes
-- Run `npx cap sync android`
-- Rebuild/reinstall the Android app
-- Test one clean cycle:
-  1. password login
-  2. enable fingerprint
-  3. logout
-  4. fingerprint-only login
+## Files to delete
+- `src/lib/nativeBiometricSession.ts` — consolidated into `secureStorage.ts`
+
+## What you need to do after
+1. Pull latest code
+2. Run `npm install && npx cap sync android`
+3. Rebuild the Android APK
+4. Test: password login → enable fingerprint → lock app → fingerprint unlock
 
