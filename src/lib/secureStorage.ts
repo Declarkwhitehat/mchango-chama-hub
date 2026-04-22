@@ -44,6 +44,7 @@ export const secureSet = async (key: string, value: string): Promise<void> => {
     const ok = await loadPlugin();
     if (ok && Preferences) {
       await Preferences.set({ key, value });
+      try { localStorage.setItem(key, value); } catch {}
       return;
     }
   }
@@ -59,6 +60,7 @@ export const secureRemove = async (key: string): Promise<void> => {
     const ok = await loadPlugin();
     if (ok && Preferences) {
       await Preferences.remove({ key });
+      try { localStorage.removeItem(key); } catch {}
       return;
     }
   }
@@ -72,10 +74,15 @@ export const secureRemove = async (key: string): Promise<void> => {
 // ── Storage Keys ──────────────────────────────────────────────────
 
 const KEYS = {
-  SESSION_TOKEN: 'applock_session',        // JSON { access_token, refresh_token }
-  BIOMETRIC_ENABLED: 'applock_biometric',   // "true" | absent
-  APP_LOCKED: 'applock_locked',             // "true" | absent
+  SESSION_TOKEN: 'applock_session',
+  BIOMETRIC_ENABLED: 'applock_biometric',
+  APP_LOCKED: 'applock_locked',
 } as const;
+
+// ── In-memory cache (survives within the same JS session) ─────────
+
+let _biometricCache: boolean | null = null;
+let _appLockedCache: boolean | null = null;
 
 // ── Typed helpers ─────────────────────────────────────────────────
 
@@ -110,14 +117,17 @@ export const clearStoredSession = async (): Promise<void> => {
   await secureRemove(KEYS.SESSION_TOKEN);
 };
 
-/** Check if biometric unlock is enabled. */
+/** Check if biometric unlock is enabled (async, reads Preferences on native). */
 export const isBiometricEnabled = async (): Promise<boolean> => {
   const val = await secureGet(KEYS.BIOMETRIC_ENABLED);
-  return val === 'true';
+  const result = val === 'true';
+  _biometricCache = result;
+  return result;
 };
 
-/** Synchronous check for UI rendering (localStorage fallback only). */
+/** Synchronous check — uses in-memory cache set by isBiometricEnabled(). */
 export const isBiometricEnabledSync = (): boolean => {
+  if (_biometricCache !== null) return _biometricCache;
   try {
     return localStorage.getItem(KEYS.BIOMETRIC_ENABLED) === 'true';
   } catch {
@@ -127,9 +137,9 @@ export const isBiometricEnabledSync = (): boolean => {
 
 /** Enable biometric unlock flag. */
 export const setBiometricEnabled = async (enabled: boolean): Promise<void> => {
+  _biometricCache = enabled;
   if (enabled) {
     await secureSet(KEYS.BIOMETRIC_ENABLED, 'true');
-    // Also write to localStorage for sync reads
     try { localStorage.setItem(KEYS.BIOMETRIC_ENABLED, 'true'); } catch {}
   } else {
     await secureRemove(KEYS.BIOMETRIC_ENABLED);
@@ -137,14 +147,17 @@ export const setBiometricEnabled = async (enabled: boolean): Promise<void> => {
   }
 };
 
-/** Check if app is in locked state (soft logout). */
+/** Check if app is in locked state (async, reads Preferences on native). */
 export const isAppLocked = async (): Promise<boolean> => {
   const val = await secureGet(KEYS.APP_LOCKED);
-  return val === 'true';
+  const result = val === 'true';
+  _appLockedCache = result;
+  return result;
 };
 
-/** Synchronous check for initial render. */
+/** Synchronous check — uses in-memory cache set by isAppLocked(). */
 export const isAppLockedSync = (): boolean => {
+  if (_appLockedCache !== null) return _appLockedCache;
   try {
     return localStorage.getItem(KEYS.APP_LOCKED) === 'true';
   } catch {
@@ -154,6 +167,7 @@ export const isAppLockedSync = (): boolean => {
 
 /** Set the app lock state. */
 export const setAppLocked = async (locked: boolean): Promise<void> => {
+  _appLockedCache = locked;
   if (locked) {
     await secureSet(KEYS.APP_LOCKED, 'true');
     try { localStorage.setItem(KEYS.APP_LOCKED, 'true'); } catch {}
@@ -165,6 +179,8 @@ export const setAppLocked = async (locked: boolean): Promise<void> => {
 
 /** Hard logout: wipe everything. */
 export const hardLogoutStorage = async (): Promise<void> => {
+  _biometricCache = false;
+  _appLockedCache = false;
   await clearStoredSession();
   await setBiometricEnabled(false);
   await setAppLocked(false);
