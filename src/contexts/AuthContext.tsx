@@ -61,6 +61,29 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   const [loading, setLoading] = useState<boolean>(true);
   const initRan = useRef(false);
 
+  const clearLocalClientSession = async (): Promise<void> => {
+    const authClient = supabase.auth as unknown as {
+      _stopAutoRefresh?: () => Promise<void> | void;
+      _removeSession?: () => Promise<void>;
+    };
+
+    try {
+      await authClient._stopAutoRefresh?.();
+    } catch (error) {
+      console.warn('[AppLock] Failed to stop auto refresh before local clear:', error);
+    }
+
+    if (typeof authClient._removeSession === 'function') {
+      await authClient._removeSession();
+      return;
+    }
+
+    console.warn('[AppLock] Supabase local session clear helper not available, falling back to state reset only.');
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+  };
+
   const fetchProfile = async (userId: string): Promise<void> => {
     try {
       const { data, error } = await supabase
@@ -284,12 +307,12 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   };
 
   /**
-   * Soft lock: save tokens to Capacitor Preferences, mark app as locked,
-   * then clear the in-memory Supabase session WITHOUT calling signOut().
-   * 
-   * CRITICAL: We must NOT call supabase.auth.signOut() here because that
-   * invalidates the refresh token on the server, making biometric restore
-   * impossible. Instead we just clear the local session state.
+   * Soft lock: save tokens, mark app as locked, then clear only the local auth state.
+   *
+   * NOTE: In the installed auth-js version, signOut({ scope: 'local' }) still calls
+   * the backend logout endpoint, which revokes the refresh token and breaks biometric
+   * restore. We therefore clear the local client session through the internal local
+   * cleanup path instead of calling signOut().
    */
   const lockApp = async (): Promise<void> => {
     const biometricEnabled = isNativeApp() && await isBiometricEnabled();
@@ -322,9 +345,8 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     // Mark app as locked in Capacitor Preferences
     await setAppLockedStorage(true);
 
-    // Clear local session WITHOUT invalidating the refresh token on the server.
-    // scope: 'local' only removes the local session, keeping server-side tokens valid.
-    await supabase.auth.signOut({ scope: 'local' });
+    // Clear only the local client session so the refresh token remains valid for biometric restore.
+    await clearLocalClientSession();
   };
 
   /** Hard logout: wipe everything, biometric no longer works. */
