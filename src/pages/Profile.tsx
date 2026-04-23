@@ -21,7 +21,7 @@ import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useWebAuthnManagement } from "@/hooks/useWebAuthnManagement";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import {
-  isBiometricEnabledSync,
+  isBiometricEnabled,
   setStoredSession,
   setBiometricEnabled as setBiometricEnabledStorage,
   hardLogoutStorage,
@@ -57,9 +57,23 @@ const Profile = () => {
 
   // Load native biometric state from shared helper
   useEffect(() => {
-    if (isNative) {
-      setNativeBiometricEnabled(isBiometricEnabledSync());
-    }
+    let cancelled = false;
+
+    const loadNativeBiometricState = async () => {
+      if (!isNative) {
+        if (!cancelled) setNativeBiometricEnabled(false);
+        return;
+      }
+
+      const enabled = await isBiometricEnabled();
+      if (!cancelled) setNativeBiometricEnabled(enabled);
+    };
+
+    void loadNativeBiometricState();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isNative]);
 
   // Check 2FA status
