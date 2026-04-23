@@ -129,7 +129,9 @@ export const isBiometricEnabled = async (): Promise<boolean> => {
 export const isBiometricEnabledSync = (): boolean => {
   if (_biometricCache !== null) return _biometricCache;
   try {
-    return localStorage.getItem(KEYS.BIOMETRIC_ENABLED) === 'true';
+    const result = localStorage.getItem(KEYS.BIOMETRIC_ENABLED) === 'true';
+    _biometricCache = result;
+    return result;
   } catch {
     return false;
   }
@@ -159,7 +161,9 @@ export const isAppLocked = async (): Promise<boolean> => {
 export const isAppLockedSync = (): boolean => {
   if (_appLockedCache !== null) return _appLockedCache;
   try {
-    return localStorage.getItem(KEYS.APP_LOCKED) === 'true';
+    const result = localStorage.getItem(KEYS.APP_LOCKED) === 'true';
+    _appLockedCache = result;
+    return result;
   } catch {
     return false;
   }
