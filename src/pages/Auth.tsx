@@ -21,8 +21,8 @@ import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  isBiometricEnabledSync,
-  isAppLockedSync,
+  isBiometricEnabled,
+  isAppLocked,
   getStoredSession,
   setStoredSession,
   setAppLocked,
@@ -100,6 +100,8 @@ const Auth = () => {
   const [biometricReady, setBiometricReady] = useState(false);
   const [biometricChecked, setBiometricChecked] = useState(false);
   const [nativeBiometricConfigured, setNativeBiometricConfigured] = useState(false);
+  const [nativeBiometricLoginEnabled, setNativeBiometricLoginEnabled] = useState(false);
+  const [nativeAppLocked, setNativeAppLocked] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,18 +130,43 @@ const Auth = () => {
   }, [isNative, isNativeBiometricAvailable]);
 
   useEffect(() => {
-    if (!isNative) {
-      setNativeBiometricConfigured(false);
-      return;
-    }
-    setNativeBiometricConfigured(biometricReady && isBiometricEnabledSync());
-  }, [biometricReady, isNative]);
+    let cancelled = false;
 
-  const nativeBiometricLoginEnabled = isNative && isBiometricEnabledSync();
+    const loadNativeBiometricState = async () => {
+      if (!isNative) {
+        if (!cancelled) {
+          setNativeBiometricConfigured(false);
+          setNativeBiometricLoginEnabled(false);
+          setNativeAppLocked(false);
+        }
+        return;
+      }
+
+      const [enabled, locked] = await Promise.all([
+        isBiometricEnabled(),
+        isAppLocked(),
+      ]);
+
+      if (!cancelled) {
+        const configured = biometricReady && enabled;
+        setNativeBiometricConfigured(configured);
+        setNativeBiometricLoginEnabled(enabled);
+        setNativeAppLocked(locked);
+      }
+    };
+
+    void loadNativeBiometricState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [biometricReady, isNative]);
 
   const clearNativeBiometricStorage = async () => {
     await hardLogoutStorage();
     setNativeBiometricConfigured(false);
+    setNativeBiometricLoginEnabled(false);
+    setNativeAppLocked(false);
   };
 
   const storeNativeBiometricSession = async (enableLogin = false) => {
@@ -154,6 +181,7 @@ const Auth = () => {
       if (enableLogin) {
         await setBiometricEnabled(true);
         setNativeBiometricConfigured(true);
+        setNativeBiometricLoginEnabled(true);
       }
       return true;
     } catch {
@@ -165,6 +193,7 @@ const Auth = () => {
     const stored = await getStoredSession();
     if (!stored) {
       setNativeBiometricConfigured(false);
+      setNativeBiometricLoginEnabled(false);
       return false;
     }
 
@@ -179,6 +208,7 @@ const Auth = () => {
           refresh_token: data.session.refresh_token,
         });
         await setAppLocked(false);
+        setNativeAppLocked(false);
         return true;
       }
     } catch {}
@@ -197,6 +227,7 @@ const Auth = () => {
             refresh_token: data.session.refresh_token,
           });
           await setAppLocked(false);
+          setNativeAppLocked(false);
           return true;
         }
       }
@@ -206,6 +237,8 @@ const Auth = () => {
     await clearStoredSession();
     await setAppLocked(false);
     setNativeBiometricConfigured(false);
+    setNativeBiometricLoginEnabled(false);
+    setNativeAppLocked(false);
     return false;
   };
 
@@ -862,7 +895,7 @@ const Auth = () => {
                             </p>
                           )}
 
-                          {isAppLockedSync() && (
+                          {nativeAppLocked && (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
                               <span>🔒</span>
                               <span>App locked. Use fingerprint to unlock.</span>
