@@ -4,9 +4,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
-  isBiometricEnabledSync,
   isBiometricEnabled,
-  isAppLockedSync,
   isAppLocked,
   getStoredSession,
   setStoredSession,
@@ -402,5 +400,4 @@ async function restoreSessionFromStored(
   // Both failed → tokens are stale
   await hardLogoutStorage();
   return false;
-                }
-              
+}
