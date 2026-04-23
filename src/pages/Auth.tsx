@@ -89,6 +89,69 @@ const signupSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
+
+type NativeRestoreErrorInfo = {
+  code: string | null;
+  message: string;
+  name: string | null;
+  status: number | null;
+};
+
+type NativeRestoreDebugState = {
+  attemptedAt: string;
+  storedTokens: "tokens" | "null" | "error";
+  biometricEnabled: boolean | null;
+  appLocked: boolean | null;
+  refreshSessionError: NativeRestoreErrorInfo | null;
+  setSessionError: NativeRestoreErrorInfo | null;
+  supabaseErrorCode: string | null;
+  supabaseErrorMessage: string | null;
+};
+
+const normalizeRestoreError = (error: unknown): NativeRestoreErrorInfo => {
+  if (error && typeof error === "object") {
+    const candidate = error as {
+      code?: string;
+      message?: string;
+      name?: string;
+      status?: number | string;
+      error_description?: string;
+    };
+
+    const parsedStatus =
+      typeof candidate.status === "number"
+        ? candidate.status
+        : typeof candidate.status === "string" && !Number.isNaN(Number(candidate.status))
+          ? Number(candidate.status)
+          : null;
+
+    return {
+      code: candidate.code ?? null,
+      message: candidate.message ?? candidate.error_description ?? "Unknown error",
+      name: candidate.name ?? null,
+      status: parsedStatus,
+    };
+  }
+
+  return {
+    code: null,
+    message: typeof error === "string" ? error : "Unknown error",
+    name: null,
+    status: null,
+  };
+};
+
+const formatRestoreErrorInfo = (error: NativeRestoreErrorInfo | null): string => {
+  if (!error) return "—";
+
+  const parts = [error.message];
+  if (error.code) parts.push(`code: ${error.code}`);
+  if (error.status !== null) parts.push(`status: ${error.status}`);
+  if (error.name) parts.push(`name: ${error.name}`);
+
+  return parts.join(" | ");
+};
+
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -102,6 +165,8 @@ const Auth = () => {
   const [nativeBiometricConfigured, setNativeBiometricConfigured] = useState(false);
   const [nativeBiometricLoginEnabled, setNativeBiometricLoginEnabled] = useState(false);
   const [nativeAppLocked, setNativeAppLocked] = useState(false);
+  const [nativeRestoreDebug, setNativeRestoreDebug] = useState<NativeRestoreDebugState | null>(null);
+  const lastBiometricPreferenceToast = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
