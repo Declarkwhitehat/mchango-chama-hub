@@ -148,12 +148,6 @@ const Auth = () => {
         isAppLocked(),
       ]);
 
-      const debugKey = `${enabled}-${locked}-${biometricReady}`;
-      if (lastBiometricPreferenceToast.current !== debugKey) {
-        lastBiometricPreferenceToast.current = debugKey;
-        toast.info(`Biometric preferences debug: enabled=${enabled}, locked=${locked}`);
-      }
-
       if (!cancelled) {
         const configured = biometricReady && enabled;
         setNativeBiometricConfigured(configured);
@@ -196,108 +190,46 @@ const Auth = () => {
     }
   };
 
-  const restoreNativeBiometricSession = async () => {
-    const debugState: NativeRestoreDebugState = {
-      attemptedAt: new Date().toISOString(),
-      storedTokens: "null",
-      biometricEnabled: null,
-      appLocked: null,
-      refreshSessionError: null,
-      setSessionError: null,
-      supabaseErrorCode: null,
-      supabaseErrorMessage: null,
-    };
-
-    try {
-      debugState.biometricEnabled = await isBiometricEnabled();
-      toast.info(`Step 0: isBiometricEnabled() returned ${debugState.biometricEnabled}`);
-    } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.supabaseErrorCode = normalizedError.code;
-      debugState.supabaseErrorMessage = normalizedError.message;
-      toast.info(`Step 0: isBiometricEnabled() failed - ${normalizedError.message}`);
-    }
-
-    try {
-      debugState.appLocked = await isAppLocked();
-      toast.info(`Step 0b: isAppLocked() returned ${debugState.appLocked}`);
-    } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.supabaseErrorCode = debugState.supabaseErrorCode ?? normalizedError.code;
-      debugState.supabaseErrorMessage = debugState.supabaseErrorMessage ?? normalizedError.message;
-      toast.info(`Step 0b: isAppLocked() failed - ${normalizedError.message}`);
-    }
-
+  const restoreNativeBiometricSession = async (): Promise<boolean> => {
     let stored: Awaited<ReturnType<typeof getStoredSession>> = null;
-
     try {
       stored = await getStoredSession();
-      debugState.storedTokens = stored ? "tokens" : "null";
-      toast.info(stored ? 'Step 1: Found stored tokens' : 'Step 1: No stored tokens found');
     } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.storedTokens = "error";
-      debugState.supabaseErrorCode = normalizedError.code;
-      debugState.supabaseErrorMessage = normalizedError.message;
-      toast.info(`Step 1: Failed to read stored tokens - ${normalizedError.message}`);
+      console.warn('[Biometric] Failed to read stored tokens:', error);
     }
 
     if (!stored) {
       setNativeBiometricConfigured(false);
       setNativeBiometricLoginEnabled(false);
-      setNativeRestoreDebug(debugState);
       return false;
     }
 
+    // Strategy 1: refresh with stored refresh_token
     try {
       const { data, error } = await supabase.auth.refreshSession({
         refresh_token: stored.refresh_token,
       });
-
-      if (error) {
-        const normalizedError = normalizeRestoreError(error);
-        debugState.refreshSessionError = normalizedError;
-        debugState.supabaseErrorCode = normalizedError.code;
-        debugState.supabaseErrorMessage = normalizedError.message;
-        toast.info(`Step 2: refreshSession failed - ${formatRestoreErrorInfo(normalizedError)}`);
-      } else if (data.session?.access_token && data.session.refresh_token) {
+      if (!error && data.session?.access_token && data.session.refresh_token) {
         await setStoredSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
         await setAppLocked(false);
         setNativeAppLocked(false);
-        setNativeRestoreDebug(null);
-        toast.info('Step 2: refreshSession succeeded');
         return true;
-      } else {
-        const fallbackError = normalizeRestoreError('refreshSession returned no session');
-        debugState.refreshSessionError = fallbackError;
-        debugState.supabaseErrorCode = fallbackError.code;
-        debugState.supabaseErrorMessage = fallbackError.message;
-        toast.info(`Step 2: refreshSession failed - ${fallbackError.message}`);
       }
+      if (error) console.warn('[Biometric] refreshSession error:', error);
     } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.refreshSessionError = normalizedError;
-      debugState.supabaseErrorCode = normalizedError.code;
-      debugState.supabaseErrorMessage = normalizedError.message;
-      toast.info(`Step 2: refreshSession failed - ${formatRestoreErrorInfo(normalizedError)}`);
+      console.warn('[Biometric] refreshSession threw:', error);
     }
 
+    // Strategy 2: setSession with stored tokens
     try {
       const { error } = await supabase.auth.setSession({
         access_token: stored.access_token,
         refresh_token: stored.refresh_token,
       });
-
-      if (error) {
-        const normalizedError = normalizeRestoreError(error);
-        debugState.setSessionError = normalizedError;
-        debugState.supabaseErrorCode = normalizedError.code;
-        debugState.supabaseErrorMessage = normalizedError.message;
-        toast.info(`Step 3: setSession failed - ${formatRestoreErrorInfo(normalizedError)}`);
-      } else {
+      if (!error) {
         const { data } = await supabase.auth.getSession();
         if (data.session?.access_token && data.session.refresh_token) {
           await setStoredSession({
@@ -306,40 +238,24 @@ const Auth = () => {
           });
           await setAppLocked(false);
           setNativeAppLocked(false);
-          setNativeRestoreDebug(null);
-          toast.info('Step 3: setSession succeeded');
           return true;
         }
-
-        const fallbackError = normalizeRestoreError('setSession returned no session');
-        debugState.setSessionError = fallbackError;
-        debugState.supabaseErrorCode = fallbackError.code;
-        debugState.supabaseErrorMessage = fallbackError.message;
-        toast.info(`Step 3: setSession failed - ${fallbackError.message}`);
       }
+      if (error) console.warn('[Biometric] setSession error:', error);
     } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.setSessionError = normalizedError;
-      debugState.supabaseErrorCode = normalizedError.code;
-      debugState.supabaseErrorMessage = normalizedError.message;
-      toast.info(`Step 3: setSession failed - ${formatRestoreErrorInfo(normalizedError)}`);
+      console.warn('[Biometric] setSession threw:', error);
     }
 
+    // Both failed → tokens are stale; clear and require password
     try {
       await clearStoredSession();
       await setAppLocked(false);
-      toast.info('Step 4: Cleared stored tokens and reset app lock');
     } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.supabaseErrorCode = debugState.supabaseErrorCode ?? normalizedError.code;
-      debugState.supabaseErrorMessage = debugState.supabaseErrorMessage ?? normalizedError.message;
-      toast.info(`Step 4: Failed to clear stored tokens - ${formatRestoreErrorInfo(normalizedError)}`);
+      console.warn('[Biometric] Failed to clear stale tokens:', error);
     }
-
     setNativeBiometricConfigured(false);
     setNativeBiometricLoginEnabled(false);
     setNativeAppLocked(false);
-    setNativeRestoreDebug(debugState);
     return false;
   };
 
