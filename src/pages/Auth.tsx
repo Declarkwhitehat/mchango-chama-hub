@@ -919,23 +919,7 @@ const Auth = () => {
                             </div>
                           )}
 
-                          {nativeRestoreDebug && (
-                            <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-xs">
-                              <div className="space-y-1">
-                                <p className="font-semibold text-destructive">Biometric restore debug</p>
-                                <p className="text-muted-foreground break-all">Attempted: {nativeRestoreDebug.attemptedAt}</p>
-                              </div>
-                              <div className="grid gap-2 text-muted-foreground">
-                                <p><span className="font-medium text-foreground">Stored tokens:</span> {nativeRestoreDebug.storedTokens}</p>
-                                <p><span className="font-medium text-foreground">Biometric enabled:</span> {String(nativeRestoreDebug.biometricEnabled)}</p>
-                                <p><span className="font-medium text-foreground">App locked:</span> {String(nativeRestoreDebug.appLocked)}</p>
-                                <p className="break-words"><span className="font-medium text-foreground">refreshSession():</span> {formatRestoreErrorInfo(nativeRestoreDebug.refreshSessionError)}</p>
-                                <p className="break-words"><span className="font-medium text-foreground">setSession():</span> {formatRestoreErrorInfo(nativeRestoreDebug.setSessionError)}</p>
-                                <p className="break-words"><span className="font-medium text-foreground">Supabase error code:</span> {nativeRestoreDebug.supabaseErrorCode ?? '—'}</p>
-                                <p className="break-words"><span className="font-medium text-foreground">Supabase error message:</span> {nativeRestoreDebug.supabaseErrorMessage ?? '—'}</p>
-                              </div>
-                            </div>
-                          )}
+
 
                           <div className="text-center">
                             <Link to="/forgot-password" className="text-sm text-primary hover:underline">
