@@ -316,31 +316,21 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
    */
   const lockApp = async (): Promise<void> => {
     const biometricEnabled = isNativeApp() && await isBiometricEnabled();
-    let tokenSaveMessage = 'Biometric lock debug: biometric storage disabled, skipping token save.';
 
     if (biometricEnabled) {
       // Save current fresh tokens BEFORE clearing session
       const { data } = await supabase.auth.getSession();
       if (data.session?.access_token && data.session.refresh_token) {
-        const expiresAt = data.session.expires_at
-          ? new Date(data.session.expires_at * 1000).toISOString()
-          : 'unknown';
-
         try {
           await setStoredSession({
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token,
           });
-          tokenSaveMessage = `Biometric lock debug: tokens saved successfully. Expires at ${expiresAt}.`;
         } catch (error) {
-          tokenSaveMessage = `Biometric lock debug: failed to save tokens - ${error instanceof Error ? error.message : 'Unknown error'}. Expires at ${expiresAt}.`;
+          console.warn('[AppLock] Failed to save tokens before lock:', error);
         }
-      } else {
-        tokenSaveMessage = 'Biometric lock debug: no session tokens available to save before lock.';
       }
     }
-
-    toast.info(tokenSaveMessage);
 
     // Mark app as locked in Capacitor Preferences
     await setAppLockedStorage(true);

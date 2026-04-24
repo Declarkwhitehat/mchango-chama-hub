@@ -90,68 +90,6 @@ const signupSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
 
-type NativeRestoreErrorInfo = {
-  code: string | null;
-  message: string;
-  name: string | null;
-  status: number | null;
-};
-
-type NativeRestoreDebugState = {
-  attemptedAt: string;
-  storedTokens: "tokens" | "null" | "error";
-  biometricEnabled: boolean | null;
-  appLocked: boolean | null;
-  refreshSessionError: NativeRestoreErrorInfo | null;
-  setSessionError: NativeRestoreErrorInfo | null;
-  supabaseErrorCode: string | null;
-  supabaseErrorMessage: string | null;
-};
-
-const normalizeRestoreError = (error: unknown): NativeRestoreErrorInfo => {
-  if (error && typeof error === "object") {
-    const candidate = error as {
-      code?: string;
-      message?: string;
-      name?: string;
-      status?: number | string;
-      error_description?: string;
-    };
-
-    const parsedStatus =
-      typeof candidate.status === "number"
-        ? candidate.status
-        : typeof candidate.status === "string" && !Number.isNaN(Number(candidate.status))
-          ? Number(candidate.status)
-          : null;
-
-    return {
-      code: candidate.code ?? null,
-      message: candidate.message ?? candidate.error_description ?? "Unknown error",
-      name: candidate.name ?? null,
-      status: parsedStatus,
-    };
-  }
-
-  return {
-    code: null,
-    message: typeof error === "string" ? error : "Unknown error",
-    name: null,
-    status: null,
-  };
-};
-
-const formatRestoreErrorInfo = (error: NativeRestoreErrorInfo | null): string => {
-  if (!error) return "—";
-
-  const parts = [error.message];
-  if (error.code) parts.push(`code: ${error.code}`);
-  if (error.status !== null) parts.push(`status: ${error.status}`);
-  if (error.name) parts.push(`name: ${error.name}`);
-
-  return parts.join(" | ");
-};
-
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -165,8 +103,6 @@ const Auth = () => {
   const [nativeBiometricConfigured, setNativeBiometricConfigured] = useState(false);
   const [nativeBiometricLoginEnabled, setNativeBiometricLoginEnabled] = useState(false);
   const [nativeAppLocked, setNativeAppLocked] = useState(false);
-  const [nativeRestoreDebug, setNativeRestoreDebug] = useState<NativeRestoreDebugState | null>(null);
-  const lastBiometricPreferenceToast = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,12 +148,6 @@ const Auth = () => {
         isAppLocked(),
       ]);
 
-      const debugKey = `${enabled}-${locked}-${biometricReady}`;
-      if (lastBiometricPreferenceToast.current !== debugKey) {
-        lastBiometricPreferenceToast.current = debugKey;
-        toast.info(`Biometric preferences debug: enabled=${enabled}, locked=${locked}`);
-      }
-
       if (!cancelled) {
         const configured = biometricReady && enabled;
         setNativeBiometricConfigured(configured);
@@ -260,108 +190,46 @@ const Auth = () => {
     }
   };
 
-  const restoreNativeBiometricSession = async () => {
-    const debugState: NativeRestoreDebugState = {
-      attemptedAt: new Date().toISOString(),
-      storedTokens: "null",
-      biometricEnabled: null,
-      appLocked: null,
-      refreshSessionError: null,
-      setSessionError: null,
-      supabaseErrorCode: null,
-      supabaseErrorMessage: null,
-    };
-
-    try {
-      debugState.biometricEnabled = await isBiometricEnabled();
-      toast.info(`Step 0: isBiometricEnabled() returned ${debugState.biometricEnabled}`);
-    } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.supabaseErrorCode = normalizedError.code;
-      debugState.supabaseErrorMessage = normalizedError.message;
-      toast.info(`Step 0: isBiometricEnabled() failed - ${normalizedError.message}`);
-    }
-
-    try {
-      debugState.appLocked = await isAppLocked();
-      toast.info(`Step 0b: isAppLocked() returned ${debugState.appLocked}`);
-    } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.supabaseErrorCode = debugState.supabaseErrorCode ?? normalizedError.code;
-      debugState.supabaseErrorMessage = debugState.supabaseErrorMessage ?? normalizedError.message;
-      toast.info(`Step 0b: isAppLocked() failed - ${normalizedError.message}`);
-    }
-
+  const restoreNativeBiometricSession = async (): Promise<boolean> => {
     let stored: Awaited<ReturnType<typeof getStoredSession>> = null;
-
     try {
       stored = await getStoredSession();
-      debugState.storedTokens = stored ? "tokens" : "null";
-      toast.info(stored ? 'Step 1: Found stored tokens' : 'Step 1: No stored tokens found');
     } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.storedTokens = "error";
-      debugState.supabaseErrorCode = normalizedError.code;
-      debugState.supabaseErrorMessage = normalizedError.message;
-      toast.info(`Step 1: Failed to read stored tokens - ${normalizedError.message}`);
+      console.warn('[Biometric] Failed to read stored tokens:', error);
     }
 
     if (!stored) {
       setNativeBiometricConfigured(false);
       setNativeBiometricLoginEnabled(false);
-      setNativeRestoreDebug(debugState);
       return false;
     }
 
+    // Strategy 1: refresh with stored refresh_token
     try {
       const { data, error } = await supabase.auth.refreshSession({
         refresh_token: stored.refresh_token,
       });
-
-      if (error) {
-        const normalizedError = normalizeRestoreError(error);
-        debugState.refreshSessionError = normalizedError;
-        debugState.supabaseErrorCode = normalizedError.code;
-        debugState.supabaseErrorMessage = normalizedError.message;
-        toast.info(`Step 2: refreshSession failed - ${formatRestoreErrorInfo(normalizedError)}`);
-      } else if (data.session?.access_token && data.session.refresh_token) {
+      if (!error && data.session?.access_token && data.session.refresh_token) {
         await setStoredSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
         await setAppLocked(false);
         setNativeAppLocked(false);
-        setNativeRestoreDebug(null);
-        toast.info('Step 2: refreshSession succeeded');
         return true;
-      } else {
-        const fallbackError = normalizeRestoreError('refreshSession returned no session');
-        debugState.refreshSessionError = fallbackError;
-        debugState.supabaseErrorCode = fallbackError.code;
-        debugState.supabaseErrorMessage = fallbackError.message;
-        toast.info(`Step 2: refreshSession failed - ${fallbackError.message}`);
       }
+      if (error) console.warn('[Biometric] refreshSession error:', error);
     } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.refreshSessionError = normalizedError;
-      debugState.supabaseErrorCode = normalizedError.code;
-      debugState.supabaseErrorMessage = normalizedError.message;
-      toast.info(`Step 2: refreshSession failed - ${formatRestoreErrorInfo(normalizedError)}`);
+      console.warn('[Biometric] refreshSession threw:', error);
     }
 
+    // Strategy 2: setSession with stored tokens
     try {
       const { error } = await supabase.auth.setSession({
         access_token: stored.access_token,
         refresh_token: stored.refresh_token,
       });
-
-      if (error) {
-        const normalizedError = normalizeRestoreError(error);
-        debugState.setSessionError = normalizedError;
-        debugState.supabaseErrorCode = normalizedError.code;
-        debugState.supabaseErrorMessage = normalizedError.message;
-        toast.info(`Step 3: setSession failed - ${formatRestoreErrorInfo(normalizedError)}`);
-      } else {
+      if (!error) {
         const { data } = await supabase.auth.getSession();
         if (data.session?.access_token && data.session.refresh_token) {
           await setStoredSession({
@@ -370,40 +238,24 @@ const Auth = () => {
           });
           await setAppLocked(false);
           setNativeAppLocked(false);
-          setNativeRestoreDebug(null);
-          toast.info('Step 3: setSession succeeded');
           return true;
         }
-
-        const fallbackError = normalizeRestoreError('setSession returned no session');
-        debugState.setSessionError = fallbackError;
-        debugState.supabaseErrorCode = fallbackError.code;
-        debugState.supabaseErrorMessage = fallbackError.message;
-        toast.info(`Step 3: setSession failed - ${fallbackError.message}`);
       }
+      if (error) console.warn('[Biometric] setSession error:', error);
     } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.setSessionError = normalizedError;
-      debugState.supabaseErrorCode = normalizedError.code;
-      debugState.supabaseErrorMessage = normalizedError.message;
-      toast.info(`Step 3: setSession failed - ${formatRestoreErrorInfo(normalizedError)}`);
+      console.warn('[Biometric] setSession threw:', error);
     }
 
+    // Both failed → tokens are stale; clear and require password
     try {
       await clearStoredSession();
       await setAppLocked(false);
-      toast.info('Step 4: Cleared stored tokens and reset app lock');
     } catch (error) {
-      const normalizedError = normalizeRestoreError(error);
-      debugState.supabaseErrorCode = debugState.supabaseErrorCode ?? normalizedError.code;
-      debugState.supabaseErrorMessage = debugState.supabaseErrorMessage ?? normalizedError.message;
-      toast.info(`Step 4: Failed to clear stored tokens - ${formatRestoreErrorInfo(normalizedError)}`);
+      console.warn('[Biometric] Failed to clear stale tokens:', error);
     }
-
     setNativeBiometricConfigured(false);
     setNativeBiometricLoginEnabled(false);
     setNativeAppLocked(false);
-    setNativeRestoreDebug(debugState);
     return false;
   };
 
@@ -525,15 +377,15 @@ const Auth = () => {
         const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
         if (cancelled) return;
         setDidRedirect(true);
-        navigate(data ? "/admin" : (returnTo || "/home"), { replace: true });
+        navigate(data ? "/admin" : "/home", { replace: true });
       } catch {
         if (cancelled) return;
         setDidRedirect(true);
-        navigate(returnTo || "/home", { replace: true });
+        navigate("/home", { replace: true });
       }
     })();
     return () => { cancelled = true; };
-  }, [user, didRedirect, show2FA, showBiometricSetup, isLoading, navigate, returnTo]);
+  }, [user, didRedirect, show2FA, showBiometricSetup, isLoading, navigate]);
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
 
@@ -578,10 +430,7 @@ const Auth = () => {
       setRemainingAttempts(null);
       toast.success("Welcome back!");
 
-      if (returnTo) {
-        navigate(returnTo, { replace: true });
-        return;
-      }
+      // Always send users to /home after login (admins go to /admin below).
 
       const { data: userData } = await supabase.auth.getUser();
       if (userData.user) {
@@ -1067,23 +916,7 @@ const Auth = () => {
                             </div>
                           )}
 
-                          {nativeRestoreDebug && (
-                            <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-xs">
-                              <div className="space-y-1">
-                                <p className="font-semibold text-destructive">Biometric restore debug</p>
-                                <p className="text-muted-foreground break-all">Attempted: {nativeRestoreDebug.attemptedAt}</p>
-                              </div>
-                              <div className="grid gap-2 text-muted-foreground">
-                                <p><span className="font-medium text-foreground">Stored tokens:</span> {nativeRestoreDebug.storedTokens}</p>
-                                <p><span className="font-medium text-foreground">Biometric enabled:</span> {String(nativeRestoreDebug.biometricEnabled)}</p>
-                                <p><span className="font-medium text-foreground">App locked:</span> {String(nativeRestoreDebug.appLocked)}</p>
-                                <p className="break-words"><span className="font-medium text-foreground">refreshSession():</span> {formatRestoreErrorInfo(nativeRestoreDebug.refreshSessionError)}</p>
-                                <p className="break-words"><span className="font-medium text-foreground">setSession():</span> {formatRestoreErrorInfo(nativeRestoreDebug.setSessionError)}</p>
-                                <p className="break-words"><span className="font-medium text-foreground">Supabase error code:</span> {nativeRestoreDebug.supabaseErrorCode ?? '—'}</p>
-                                <p className="break-words"><span className="font-medium text-foreground">Supabase error message:</span> {nativeRestoreDebug.supabaseErrorMessage ?? '—'}</p>
-                              </div>
-                            </div>
-                          )}
+
 
                           <div className="text-center">
                             <Link to="/forgot-password" className="text-sm text-primary hover:underline">

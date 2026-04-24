@@ -46,6 +46,7 @@ const WelfareList = lazy(() => import("./pages/WelfareList"));
 const WelfareDetail = lazy(() => import("./pages/WelfareDetail"));
 const WelfareJoin = lazy(() => import("./pages/WelfareJoin"));
 const PinSetup = lazy(() => import("./pages/PinSetup"));
+const Security = lazy(() => import("./pages/Security"));
 
 // Admin pages - lazy loaded
 const AdminKYC = lazy(() => import("./pages/AdminKYC"));
@@ -147,6 +148,7 @@ const AppContent = () => {
           <Route path="/chama/join/:slug" element={<ChamaJoin />} />
           <Route path="/chama/:id" element={<ChamaDetail />} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/security" element={<ProtectedRoute><Security /></ProtectedRoute>} />
           <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
           
           {/* Welfare Routes */}

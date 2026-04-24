@@ -154,6 +154,12 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
                     Profile
                   </Button>
                 </Link>
+                <Link to="/security">
+                  <Button variant={isActiveRoute("/security") ? "secondary" : "ghost"} className="w-full justify-start">
+                    <Shield className="mr-2 h-4 w-4" />
+                    Security
+                  </Button>
+                </Link>
                 <Link to="/about">
                   <Button variant={isActiveRoute("/about") ? "secondary" : "ghost"} className="w-full justify-start">
                     <Info className="mr-2 h-4 w-4" />
