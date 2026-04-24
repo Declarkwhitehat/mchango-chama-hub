@@ -377,15 +377,15 @@ const Auth = () => {
         const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
         if (cancelled) return;
         setDidRedirect(true);
-        navigate(data ? "/admin" : (returnTo || "/home"), { replace: true });
+        navigate(data ? "/admin" : "/home", { replace: true });
       } catch {
         if (cancelled) return;
         setDidRedirect(true);
-        navigate(returnTo || "/home", { replace: true });
+        navigate("/home", { replace: true });
       }
     })();
     return () => { cancelled = true; };
-  }, [user, didRedirect, show2FA, showBiometricSetup, isLoading, navigate, returnTo]);
+  }, [user, didRedirect, show2FA, showBiometricSetup, isLoading, navigate]);
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
 
