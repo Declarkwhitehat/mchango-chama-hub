@@ -430,10 +430,7 @@ const Auth = () => {
       setRemainingAttempts(null);
       toast.success("Welcome back!");
 
-      if (returnTo) {
-        navigate(returnTo, { replace: true });
-        return;
-      }
+      // Always send users to /home after login (admins go to /admin below).
 
       const { data: userData } = await supabase.auth.getUser();
       if (userData.user) {
