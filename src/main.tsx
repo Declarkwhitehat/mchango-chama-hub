@@ -27,8 +27,8 @@ root.render(
   <StrictMode>
     <ThemeProvider 
       attribute="class" 
-      defaultTheme="dark" 
-      enableSystem={false}
+      defaultTheme="system" 
+      enableSystem={true}
       storageKey="theme"
       disableTransitionOnChange
     >
