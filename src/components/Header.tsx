@@ -153,9 +153,9 @@ export const Header = () => {
                       <Activity className="mr-2 h-4 w-4" />
                       Activity & Payments
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+                    <DropdownMenuItem onClick={() => navigate('/security')} className="cursor-pointer">
                       <Settings className="mr-2 h-4 w-4" />
-                      Settings
+                      Security
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
@@ -297,13 +297,13 @@ export const Header = () => {
                   <Button 
                     variant="ghost" 
                     onClick={() => {
-                      navigate('/profile');
+                      navigate('/security');
                       setMobileMenuOpen(false);
                     }}
                     className="w-full justify-start gap-2"
                   >
-                    <Settings className="h-4 w-4" />
-                    Settings
+                    <Shield className="h-4 w-4" />
+                    Security
                   </Button>
                   <Button 
                     variant="outline"
