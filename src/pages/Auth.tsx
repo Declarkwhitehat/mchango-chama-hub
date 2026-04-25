@@ -93,7 +93,9 @@ type SignupFormData = z.infer<typeof signupSchema>;
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const returnTo = location.state?.returnTo;
+  // Intentionally ignored: after login users must always land on /home (or /admin).
+  // Keeping this here only so existing references compile; do NOT use it for redirects.
+  const returnTo = undefined as string | undefined;
   const { signIn, signUp, user } = useAuth();
   const { isSupported: isWebAuthnSupported, registerCredential, authenticate, checkHasCredentials, isLoading: isWebAuthnLoading } = useWebAuthn();
   const { isNativeApp: isNative, isAvailable: isNativeBiometricAvailable, authenticate: nativeAuthenticate, getBiometryType } = useNativeBiometrics();
@@ -331,7 +333,7 @@ const Auth = () => {
         const result = await authenticate(storedIdentifier);
         if (result.success) {
           toast.success('Welcome back!');
-          navigate(returnTo || '/', { replace: true });
+          navigate('/home', { replace: true });
         } else {
           setBiometricCancelled(true);
           toast.error('Fingerprint authentication failed. Please use your password.');
