@@ -193,11 +193,19 @@ serve(async (req) => {
         );
       }
 
-      // Generate slug from title
-      let slug = body.slug || body.title
+      // Generate slug from title (trim, collapse, strip leading/trailing dashes)
+      let slug = (body.slug || body.title || '')
+        .toString()
         .toLowerCase()
+        .trim()
         .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-');
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      if (!slug) {
+        slug = `mchango-${Date.now()}`;
+      }
 
       // Check slug uniqueness, append timestamp if needed
       const { data: existingSlug } = await supabaseClient
