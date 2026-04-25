@@ -45,12 +45,15 @@ export const toPublicUrl = (urlOrPath: string): string => {
 /**
  * Convenience builders for the most common shareable entities.
  */
+const cleanSlug = (slug: string) =>
+  (slug || '').toString().trim().toLowerCase().replace(/^-+|-+$/g, '');
+
 export const publicUrls = {
-  mchango: (slug: string) => buildPublicUrl(`/mchango/${slug}`),
-  organization: (slug: string) => buildPublicUrl(`/organizations/${slug}`),
+  mchango: (slug: string) => buildPublicUrl(`/mchango/${cleanSlug(slug)}`),
+  organization: (slug: string) => buildPublicUrl(`/organizations/${cleanSlug(slug)}`),
   chamaJoin: (slug: string, code?: string) =>
-    buildPublicUrl(`/chama/join/${slug}${code ? `?code=${encodeURIComponent(code)}` : ''}`),
-  welfareJoin: (slug: string) => buildPublicUrl(`/welfare/join/${slug}`),
+    buildPublicUrl(`/chama/join/${cleanSlug(slug)}${code ? `?code=${encodeURIComponent(code)}` : ''}`),
+  welfareJoin: (slug: string) => buildPublicUrl(`/welfare/join/${cleanSlug(slug)}`),
   exploreMchango: () => buildPublicUrl('/explore/mchango'),
   organizationsList: () => buildPublicUrl('/organizations'),
   mchangoList: () => buildPublicUrl('/mchango'),
