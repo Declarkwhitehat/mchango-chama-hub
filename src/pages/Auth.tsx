@@ -333,7 +333,7 @@ const Auth = () => {
         const result = await authenticate(storedIdentifier);
         if (result.success) {
           toast.success('Welcome back!');
-          navigate(returnTo || '/', { replace: true });
+          navigate('/home', { replace: true });
         } else {
           setBiometricCancelled(true);
           toast.error('Fingerprint authentication failed. Please use your password.');
