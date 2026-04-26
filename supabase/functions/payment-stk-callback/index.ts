@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { COMMISSION_RATES } from "../_shared/commissionRates.ts";
+import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -197,6 +198,14 @@ serve(async (req) => {
           .eq('id', member?.user_id)
           .single();
 
+        // Get chama name for notifications
+        const { data: chamaForNotif } = await supabaseClient
+          .from('chama')
+          .select('name, created_by')
+          .eq('id', contribution.chama_id)
+          .maybeSingle();
+        const chamaName = chamaForNotif?.name || 'your Chama';
+
         // Check if someone else paid for this member
         const paidByDifferentMember = contribution.paid_by_member_id && 
           contribution.paid_by_member_id !== contribution.member_id;
@@ -216,7 +225,28 @@ serve(async (req) => {
               .eq('id', payerMember.user_id)
               .single();
 
-            // Notify the payer
+            // Notify the payer (push + in-app)
+            await createNotification(supabaseClient, {
+              userId: payerMember.user_id,
+              ...NotificationTemplates.paymentReceived(actualAmount, chamaName),
+              relatedEntityId: contribution.chama_id,
+              relatedEntityType: 'chama',
+            });
+
+            // Notify the beneficiary that someone paid for them (push + in-app)
+            if (member?.user_id) {
+              await createNotification(supabaseClient, {
+                userId: member.user_id,
+                title: '🤝 Payment Made on Your Behalf',
+                message: `${payerProfile?.full_name || 'A member'} paid KES ${actualAmount.toLocaleString()} for your contribution to "${chamaName}".`,
+                type: 'success',
+                category: 'chama',
+                relatedEntityId: contribution.chama_id,
+                relatedEntityType: 'chama',
+              });
+            }
+
+            // SMS to payer
             if (payerProfile?.phone) {
               try {
                 await supabaseClient.functions.invoke('send-transactional-sms', {
@@ -225,35 +255,41 @@ serve(async (req) => {
                     message: `Payment successful! KES ${actualAmount} credited to ${beneficiaryProfile?.full_name || 'member'}'s account. Receipt: ${mpesaReceiptNumber || 'N/A'}`
                   }
                 });
-                console.log('SMS notification sent to payer');
               } catch (smsError) {
                 console.error('Error sending SMS to payer:', smsError);
               }
             }
           }
 
-          // Notify the beneficiary that someone paid for them
+          // SMS to beneficiary
           if (beneficiaryProfile?.phone) {
             try {
-              const { data: payerProfile } = await supabaseClient
+              const { data: payerProfile2 } = await supabaseClient
                 .from('profiles')
                 .select('full_name')
                 .eq('id', payerMember?.user_id)
                 .single();
-              
               await supabaseClient.functions.invoke('send-transactional-sms', {
                 body: {
                   phone: beneficiaryProfile.phone,
-                  message: `Good news! ${payerProfile?.full_name || 'A member'} has paid KES ${actualAmount} for your chama contribution. Receipt: ${mpesaReceiptNumber || 'N/A'}`
+                  message: `Good news! ${payerProfile2?.full_name || 'A member'} has paid KES ${actualAmount} for your chama contribution. Receipt: ${mpesaReceiptNumber || 'N/A'}`
                 }
               });
-              console.log('SMS notification sent to beneficiary');
             } catch (smsError) {
               console.error('Error sending SMS to beneficiary:', smsError);
             }
           }
         } else {
-          // Self-payment - notify the member directly
+          // Self-payment — notify the member directly (push + in-app)
+          if (member?.user_id) {
+            await createNotification(supabaseClient, {
+              userId: member.user_id,
+              ...NotificationTemplates.paymentConfirmed(actualAmount, mpesaReceiptNumber || 'N/A'),
+              relatedEntityId: contribution.chama_id,
+              relatedEntityType: 'chama',
+            });
+          }
+
           if (beneficiaryProfile?.phone) {
             try {
               await supabaseClient.functions.invoke('send-transactional-sms', {
@@ -262,7 +298,6 @@ serve(async (req) => {
                   message: `Chama contribution confirmed! KES ${actualAmount} received. Receipt: ${mpesaReceiptNumber || 'N/A'}`
                 }
               });
-              console.log('SMS notification sent');
             } catch (smsError) {
               console.error('Error sending SMS:', smsError);
             }
@@ -389,6 +424,49 @@ serve(async (req) => {
         }
         
         console.log('Commission recorded:', commissionAmount);
+
+        // ── Push + in-app notifications ──
+        try {
+          const { data: mchangoMeta } = await supabaseClient
+            .from('mchango')
+            .select('title, created_by, managers')
+            .eq('id', donation.mchango_id)
+            .maybeSingle();
+          const campaignName = mchangoMeta?.title || 'your campaign';
+          const donorName = donation.display_name || 'A donor';
+
+          // Notify campaign creator + managers
+          const ownerIds: string[] = [];
+          if (mchangoMeta?.created_by) ownerIds.push(mchangoMeta.created_by);
+          if (Array.isArray(mchangoMeta?.managers)) ownerIds.push(...mchangoMeta!.managers);
+          await notifyManyUsers(supabaseClient, ownerIds, {
+            ...NotificationTemplates.donationReceived(grossAmount, campaignName, donorName),
+            relatedEntityId: donation.mchango_id,
+            relatedEntityType: 'mchango',
+          });
+
+          // Notify the donor (if they have an account, looked up by phone)
+          if (donation.phone) {
+            const { data: donorProfile } = await supabaseClient
+              .from('profiles')
+              .select('id')
+              .eq('phone', donation.phone)
+              .maybeSingle();
+            if (donorProfile?.id) {
+              await createNotification(supabaseClient, {
+                userId: donorProfile.id,
+                title: '💝 Donation Confirmed',
+                message: `Thank you! Your donation of KES ${grossAmount.toLocaleString()} to "${campaignName}" was received.`,
+                type: 'success',
+                category: 'campaign',
+                relatedEntityId: donation.mchango_id,
+                relatedEntityType: 'mchango',
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.error('Error sending mchango donation notifications:', notifErr);
+        }
       }
 
       return new Response(
@@ -504,6 +582,48 @@ serve(async (req) => {
 
         if (ledgerError) {
           console.error('Error recording in financial ledger:', ledgerError);
+        }
+
+        // ── Push + in-app notifications ──
+        try {
+          const { data: orgMeta } = await supabaseClient
+            .from('organizations')
+            .select('name, created_by')
+            .eq('id', orgDonation.organization_id)
+            .maybeSingle();
+          const orgName = orgMeta?.name || 'the organization';
+          const donorName = orgDonation.display_name || 'A donor';
+
+          if (orgMeta?.created_by) {
+            await createNotification(supabaseClient, {
+              userId: orgMeta.created_by,
+              ...NotificationTemplates.donationReceived(grossAmount, orgName, donorName),
+              category: 'organization',
+              relatedEntityId: orgDonation.organization_id,
+              relatedEntityType: 'organization',
+            });
+          }
+
+          if (orgDonation.phone) {
+            const { data: donorProfile } = await supabaseClient
+              .from('profiles')
+              .select('id')
+              .eq('phone', orgDonation.phone)
+              .maybeSingle();
+            if (donorProfile?.id) {
+              await createNotification(supabaseClient, {
+                userId: donorProfile.id,
+                title: '💝 Donation Confirmed',
+                message: `Thank you! Your donation of KES ${grossAmount.toLocaleString()} to "${orgName}" was received.`,
+                type: 'success',
+                category: 'organization',
+                relatedEntityId: orgDonation.organization_id,
+                relatedEntityType: 'organization',
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.error('Error sending org donation notifications:', notifErr);
         }
       }
 

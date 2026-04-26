@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -346,6 +347,56 @@ serve(async (req) => {
         const timeStr = eatTime.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true });
         const successMessage = `✅ Pamojanova Payout Confirmed!\nAmount: KES ${transactionAmount.toFixed(2)}\nRef: ${transactionId}\nFrom: ${sourceType} - ${sourceName}\nDate: ${dateStr} ${timeStr}\n\nSisi tuko pamoja, je wewe?`;
         await sendSMS(recipientPhone, successMessage);
+      }
+
+      // Push + in-app notification to the requester
+      try {
+        if (withdrawal.requested_by) {
+          await createNotification(supabaseAdmin, {
+            userId: withdrawal.requested_by,
+            ...NotificationTemplates.withdrawalCompleted(transactionAmount || withdrawal.net_amount || withdrawal.amount),
+            relatedEntityId: withdrawal.id,
+            relatedEntityType: 'withdrawal',
+          });
+        }
+
+        // Donor fan-out for campaign / organization withdrawals
+        if (withdrawal.mchango_id) {
+          const { data: donors } = await supabaseAdmin
+            .from('mchango_donations')
+            .select('phone')
+            .eq('mchango_id', withdrawal.mchango_id)
+            .eq('payment_status', 'completed');
+          const phones = Array.from(new Set((donors || []).map((d: any) => d.phone).filter(Boolean)));
+          if (phones.length) {
+            const { data: donorProfiles } = await supabaseAdmin
+              .from('profiles').select('id').in('phone', phones);
+            await notifyManyUsers(supabaseAdmin, (donorProfiles || []).map((p: any) => p.id), {
+              ...NotificationTemplates.campaignWithdrawal(sourceName, transactionAmount || withdrawal.net_amount || withdrawal.amount),
+              relatedEntityId: withdrawal.mchango_id,
+              relatedEntityType: 'mchango',
+            });
+          }
+        } else if (withdrawal.organization_id) {
+          const { data: donors } = await supabaseAdmin
+            .from('organization_donations')
+            .select('phone')
+            .eq('organization_id', withdrawal.organization_id)
+            .eq('payment_status', 'completed');
+          const phones = Array.from(new Set((donors || []).map((d: any) => d.phone).filter(Boolean)));
+          if (phones.length) {
+            const { data: donorProfiles } = await supabaseAdmin
+              .from('profiles').select('id').in('phone', phones);
+            await notifyManyUsers(supabaseAdmin, (donorProfiles || []).map((p: any) => p.id), {
+              ...NotificationTemplates.campaignWithdrawal(sourceName, transactionAmount || withdrawal.net_amount || withdrawal.amount),
+              category: 'organization',
+              relatedEntityId: withdrawal.organization_id,
+              relatedEntityType: 'organization',
+            });
+          }
+        }
+      } catch (notifErr) {
+        console.error('Error sending withdrawal notifications:', notifErr);
       }
 
     } else {

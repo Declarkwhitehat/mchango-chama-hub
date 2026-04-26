@@ -158,6 +158,23 @@ export const usePushNotifications = (options?: { enabled?: boolean }) => {
       const loaded = await loadPushModule();
       if (!loaded) return false;
       await attachListeners();
+
+      // Ensure the 'transactions' channel exists so high-priority banners + sound work on Android 8+
+      try {
+        await PushNotifications.createChannel?.({
+          id: 'transactions',
+          name: 'Transactions & Alerts',
+          description: 'Payments, withdrawals, donations, reminders and other important alerts',
+          importance: 5,
+          visibility: 1,
+          sound: 'default',
+          vibration: true,
+          lights: true,
+        });
+      } catch (chanErr) {
+        console.warn('[Push] createChannel failed (non-fatal):', chanErr);
+      }
+
       await withTimeout(PushNotifications.register(), REGISTER_TIMEOUT_MS);
       registeredRef.current = true;
       console.log('[Push] Registered silently');

@@ -1,73 +1,60 @@
+## Why push notifications are not arriving
 
+Investigation findings:
 
-# Fix Biometric Session Persistence and Auth Configuration
+1. **Device tokens are registered correctly** — the user has multiple FCM tokens stored in `device_tokens` (most recent today).
+2. **The `send-push-notification` edge function has never been called** — its logs are completely empty. The push pipeline is plumbed (DB trigger → edge function → FCM HTTP v1) but the trigger only fires when a row is inserted into `public.notifications`.
+3. **The payment-success code paths are not inserting notification rows.** The `notifications` table has no entries newer than April 5; recent payments and withdrawals never wrote to it. Specifically:
+   - `payment-stk-callback` (chama contributions) → only sends an SMS, no notification row.
+   - `payment-stk-callback` (mchango / organization donations) → no notification at all (neither donor nor campaign owner).
+   - `c2b-confirm-payment` (offline PayBill donations) → only sends SMS to the donor; campaign owner not notified.
+   - `b2c-callback` (withdrawal completion) → no notification when M‑Pesa actually pays out.
+   - Reminder cron jobs (`daily-reminder-cron`, `daily-payout-cron`) write reminders but those rows are old.
 
-## Problem Summary
-There are two overlapping biometric session systems (`secureStorage.ts` and `nativeBiometricSession.ts`), the Supabase client uses `localStorage` which gets wiped by Android OS under memory pressure, the app initializer runs outside the AuthContext lifecycle causing race conditions, and the JWT expiry is at the default 1 hour (too short for a mobile app with biometric unlock).
+So the fix is **not** in the FCM/Firebase plumbing — that part is correct. The fix is to insert a `notifications` row at every transaction event, which automatically fans out a push via the existing trigger.
 
 ## Plan
 
-### 1. Configure JWT expiry and refresh token reuse
-- Use the `configure_auth` tool (or migration if needed) to set:
-  - JWT expiry: **604800 seconds** (7 days)
-  - Refresh token reuse interval: **10 seconds**
-- This prevents stale tokens between app launches since a 7-day JWT means biometric unlock works even if the app was closed for days.
+### 1. Add notifications on every payment success (chama contributions)
 
-### 2. Create a custom Capacitor Preferences storage adapter for the Supabase client
-- Create `src/lib/capacitorStorageAdapter.ts` — a class implementing the Supabase `SupportedStorage` interface (`getItem`, `setItem`, `removeItem`) that:
-  - On native: delegates to `@capacitor/preferences` (async, but the Supabase client handles async storage)
-  - On web: delegates to `localStorage`
-- This ensures the Supabase SDK's own session persists in Capacitor Preferences, surviving Android WebView memory reclamation.
+In `supabase/functions/payment-stk-callback/index.ts`, when `status === 'completed'` for a chama contribution, also call `createNotification(...)` for:
+- The payer (always) — "Payment Confirmed ✅ KES X to {chama}. Receipt: {ref}".
+- The beneficiary, if someone else paid for them — "{Payer} paid KES X for your contribution".
 
-### 3. Update Supabase client to use the new storage adapter
-- In `src/integrations/supabase/client.ts`, replace `storage: localStorage` with the new Capacitor storage adapter instance.
-- Note: This file is auto-generated, but the `auth.storage` override is critical for native. We will create the adapter externally and only reference it in the client config.
+### 2. Add notifications for donations (mchango + organizations)
 
-### 4. Consolidate biometric session management — remove `nativeBiometricSession.ts`
-- Delete `src/lib/nativeBiometricSession.ts` entirely.
-- All biometric session storage now goes through `src/lib/secureStorage.ts` (which already uses `@capacitor/preferences`).
-- Update any imports in `Auth.tsx`, `Profile.tsx`, or `AuthContext.tsx` that reference the old module.
+In **both** `payment-stk-callback` and `c2b-confirm-payment`:
+- Notify the **donor** if they have a Pamoja account (lookup by phone in `profiles`) — "Donation received ✅ KES X to {campaign}".
+- Notify the **campaign creator / organization owner / additional managers** — "💝 New donation: {donor} gave KES X to {campaign}".
+- Notify the campaign creator on **paid contributions to chamas** they manage (manager visibility) — only when relevant.
 
-### 5. Move app initializer logic inside AuthContext
-- Remove standalone `initializeAppAuth()` calls from `Auth.tsx` or `main.tsx`.
-- Inside `AuthContext.tsx`'s `initializeAuth` function:
-  1. Check if native + biometric enabled + app locked.
-  2. If so, attempt biometric authentication.
-  3. On success, call `supabase.auth.setSession()` with stored tokens.
-  4. On failure, stay in unauthenticated state (no redirect).
-- This eliminates the race condition where `appInitializer.ts` runs before the AuthContext listener is mounted.
+### 3. Add notifications when a withdrawal actually pays out
 
-### 6. Make token sync atomic in AuthContext
-- In the `onAuthStateChange` listener, when `SIGNED_IN` or `TOKEN_REFRESHED` fires with a valid session on native:
-  - Atomically write both `access_token` and `refresh_token` to `secureStorage` in a single `setStoredSession()` call.
-  - Only write if biometric is enabled (check via `isBiometricEnabledSync()`).
-  - This is already partially implemented but will be tightened to use only `secureStorage.ts`.
+In `supabase/functions/b2c-callback/index.ts`, on M‑Pesa B2C `ResultCode === 0`:
+- Notify the requester — "Withdrawal Complete ✅ KES X sent to your M‑Pesa. Ref: {receipt}".
+- For mchango/organization withdrawals, also notify all donors that funds were withdrawn (best‑effort, deduplicated by `user_id`) using the existing `campaignWithdrawal` template.
 
-### 7. Simplify Auth.tsx biometric restore
-- Remove the three-strategy restore logic (SDK refresh, setSession, raw fetch) from `Auth.tsx`.
-- Replace with a single call to the `restoreSession()` function from `appInitializer.ts` (or inline equivalent).
-- The Supabase client itself now persists in Capacitor Preferences, so restoring is more reliable.
+### 4. Add reminder push for due payments
 
-### 8. Clean up Auth.tsx fingerprint button visibility
-- Keep the synchronous `isBiometricEnabledSync()` check for immediate button rendering.
-- Ensure `isAppLockedSync()` is also checked so the button only shows when the app is in locked state (soft logout).
+The `daily-reminder-cron` and `daily-payout-cron` already insert notification rows, so they will get push automatically once the trigger is in place — verify the trigger is active (`notifications_push_after_insert`) and re-deploy if needed.
 
-## Files to create
-- `src/lib/capacitorStorageAdapter.ts` — Supabase-compatible async storage using Capacitor Preferences
+### 5. Android notification channel
 
-## Files to edit
-- `src/integrations/supabase/client.ts` — swap `localStorage` for Capacitor adapter
-- `src/contexts/AuthContext.tsx` — integrate app init logic, atomic token sync
-- `src/pages/Auth.tsx` — simplify biometric restore, remove old imports
-- `src/pages/Profile.tsx` — remove duplicate session writes, use only `secureStorage.ts`
-- `src/lib/appInitializer.ts` — retain as utility but no longer called standalone
+Create the `transactions` notification channel referenced in `send-push-notification` (`channel_id: 'transactions'`) so high‑priority banners + sound work on Android 8+. Add a small native bootstrap call in `usePushNotifications.ts` using `PushNotifications.createChannel(...)` immediately after registration.
 
-## Files to delete
-- `src/lib/nativeBiometricSession.ts` — consolidated into `secureStorage.ts`
+### 6. Verification step
 
-## What you need to do after
-1. Pull latest code
-2. Run `npm install && npx cap sync android`
-3. Rebuild the Android APK
-4. Test: password login → enable fingerprint → lock app → fingerprint unlock
+After deploying, perform a small donation/contribution end‑to‑end and confirm:
+- A `notifications` row appears.
+- `send-push-notification` logs show a 200 from FCM.
+- The Android device shows a heads‑up banner.
 
+## Files to touch
+
+- `supabase/functions/payment-stk-callback/index.ts` — add `createNotification` calls for chama payer/beneficiary, mchango donor + creator + managers, organization donor + creator.
+- `supabase/functions/c2b-confirm-payment/index.ts` — add notifications for mchango and organization offline donations (donor + creator).
+- `supabase/functions/b2c-callback/index.ts` — add `withdrawalCompleted` notification + donor fan‑out for campaign withdrawals.
+- `supabase/functions/_shared/notifications.ts` — add a small `notifyManyUsers(...)` helper that dedupes user IDs to send the same notification to a list (for donor fan‑out).
+- `src/hooks/usePushNotifications.ts` — register a `transactions` Android notification channel on init so the channel referenced by `send-push-notification` exists.
+
+No DB schema changes are needed — the trigger and FCM service account are already in place.

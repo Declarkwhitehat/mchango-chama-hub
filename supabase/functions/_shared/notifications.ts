@@ -1,4 +1,7 @@
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+// Use a structural type so this helper works with any @supabase/supabase-js client version.
+type AnySupabaseClient = {
+  from: (table: string) => any;
+};
 
 interface CreateNotificationParams {
   userId: string;
@@ -58,7 +61,7 @@ async function sendPushNotification(
  * Every place that calls this will now automatically get both.
  */
 export async function createNotification(
-  adminClient: SupabaseClient,
+  adminClient: AnySupabaseClient,
   params: CreateNotificationParams
 ) {
   try {
@@ -85,6 +88,26 @@ export async function createNotification(
   } catch (err) {
     console.error('Failed to create notification:', err);
   }
+}
+
+/**
+ * Send the same notification to a list of users (deduped). Best-effort, never throws.
+ * Useful for fan-out notifications (e.g. notify all donors when a campaign withdraws).
+ */
+export async function notifyManyUsers(
+  adminClient: AnySupabaseClient,
+  userIds: (string | null | undefined)[],
+  notification: Omit<CreateNotificationParams, 'userId'>,
+) {
+  const unique = Array.from(
+    new Set(userIds.filter((id): id is string => !!id && typeof id === 'string')),
+  );
+  if (unique.length === 0) return;
+  await Promise.allSettled(
+    unique.map((userId) =>
+      createNotification(adminClient, { ...notification, userId }),
+    ),
+  );
 }
 
 // ─── Notification Templates ───────────────────────────────────────────────────
