@@ -349,6 +349,56 @@ serve(async (req) => {
         await sendSMS(recipientPhone, successMessage);
       }
 
+      // Push + in-app notification to the requester
+      try {
+        if (withdrawal.requested_by) {
+          await createNotification(supabaseAdmin, {
+            userId: withdrawal.requested_by,
+            ...NotificationTemplates.withdrawalCompleted(transactionAmount || withdrawal.net_amount || withdrawal.amount),
+            relatedEntityId: withdrawal.id,
+            relatedEntityType: 'withdrawal',
+          });
+        }
+
+        // Donor fan-out for campaign / organization withdrawals
+        if (withdrawal.mchango_id) {
+          const { data: donors } = await supabaseAdmin
+            .from('mchango_donations')
+            .select('phone')
+            .eq('mchango_id', withdrawal.mchango_id)
+            .eq('payment_status', 'completed');
+          const phones = Array.from(new Set((donors || []).map((d: any) => d.phone).filter(Boolean)));
+          if (phones.length) {
+            const { data: donorProfiles } = await supabaseAdmin
+              .from('profiles').select('id').in('phone', phones);
+            await notifyManyUsers(supabaseAdmin, (donorProfiles || []).map((p: any) => p.id), {
+              ...NotificationTemplates.campaignWithdrawal(sourceName, transactionAmount || withdrawal.net_amount || withdrawal.amount),
+              relatedEntityId: withdrawal.mchango_id,
+              relatedEntityType: 'mchango',
+            });
+          }
+        } else if (withdrawal.organization_id) {
+          const { data: donors } = await supabaseAdmin
+            .from('organization_donations')
+            .select('phone')
+            .eq('organization_id', withdrawal.organization_id)
+            .eq('payment_status', 'completed');
+          const phones = Array.from(new Set((donors || []).map((d: any) => d.phone).filter(Boolean)));
+          if (phones.length) {
+            const { data: donorProfiles } = await supabaseAdmin
+              .from('profiles').select('id').in('phone', phones);
+            await notifyManyUsers(supabaseAdmin, (donorProfiles || []).map((p: any) => p.id), {
+              ...NotificationTemplates.campaignWithdrawal(sourceName, transactionAmount || withdrawal.net_amount || withdrawal.amount),
+              category: 'organization',
+              relatedEntityId: withdrawal.organization_id,
+              relatedEntityType: 'organization',
+            });
+          }
+        }
+      } catch (notifErr) {
+        console.error('Error sending withdrawal notifications:', notifErr);
+      }
+
     } else {
       // === PAYMENT FAILED ===
       console.error('B2C payment failed:', { resultCode, resultDesc });
