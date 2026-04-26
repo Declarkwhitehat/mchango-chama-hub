@@ -87,6 +87,26 @@ export async function createNotification(
   }
 }
 
+/**
+ * Send the same notification to a list of users (deduped). Best-effort, never throws.
+ * Useful for fan-out notifications (e.g. notify all donors when a campaign withdraws).
+ */
+export async function notifyManyUsers(
+  adminClient: SupabaseClient,
+  userIds: (string | null | undefined)[],
+  notification: Omit<CreateNotificationParams, 'userId'>,
+) {
+  const unique = Array.from(
+    new Set(userIds.filter((id): id is string => !!id && typeof id === 'string')),
+  );
+  if (unique.length === 0) return;
+  await Promise.allSettled(
+    unique.map((userId) =>
+      createNotification(adminClient, { ...notification, userId }),
+    ),
+  );
+}
+
 // ─── Notification Templates ───────────────────────────────────────────────────
 
 export const NotificationTemplates = {
