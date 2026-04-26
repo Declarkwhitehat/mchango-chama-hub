@@ -424,6 +424,49 @@ serve(async (req) => {
         }
         
         console.log('Commission recorded:', commissionAmount);
+
+        // ── Push + in-app notifications ──
+        try {
+          const { data: mchangoMeta } = await supabaseClient
+            .from('mchango')
+            .select('title, created_by, managers')
+            .eq('id', donation.mchango_id)
+            .maybeSingle();
+          const campaignName = mchangoMeta?.title || 'your campaign';
+          const donorName = donation.display_name || 'A donor';
+
+          // Notify campaign creator + managers
+          const ownerIds: string[] = [];
+          if (mchangoMeta?.created_by) ownerIds.push(mchangoMeta.created_by);
+          if (Array.isArray(mchangoMeta?.managers)) ownerIds.push(...mchangoMeta!.managers);
+          await notifyManyUsers(supabaseClient, ownerIds, {
+            ...NotificationTemplates.donationReceived(grossAmount, campaignName, donorName),
+            relatedEntityId: donation.mchango_id,
+            relatedEntityType: 'mchango',
+          });
+
+          // Notify the donor (if they have an account, looked up by phone)
+          if (donation.phone) {
+            const { data: donorProfile } = await supabaseClient
+              .from('profiles')
+              .select('id')
+              .eq('phone', donation.phone)
+              .maybeSingle();
+            if (donorProfile?.id) {
+              await createNotification(supabaseClient, {
+                userId: donorProfile.id,
+                title: '💝 Donation Confirmed',
+                message: `Thank you! Your donation of KES ${grossAmount.toLocaleString()} to "${campaignName}" was received.`,
+                type: 'success',
+                category: 'campaign',
+                relatedEntityId: donation.mchango_id,
+                relatedEntityType: 'mchango',
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.error('Error sending mchango donation notifications:', notifErr);
+        }
       }
 
       return new Response(
