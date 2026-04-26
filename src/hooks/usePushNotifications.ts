@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 
 let PushNotifications: any = null;
 
-const INIT_DELAY_MS = 8000;
+const INIT_DELAY_MS = 2000;
 const PERMISSION_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 10000;
 const REGISTER_TIMEOUT_MS = 10000;
@@ -227,8 +227,16 @@ export const usePushNotifications = (options?: { enabled?: boolean }) => {
           if (cancelled) return;
           if (state === 'granted') {
             await registerSilently();
+          } else if (state === 'prompt') {
+            // First login on this device → actively prompt the user so they
+            // see the OS "Allow notifications" dialog right after sign-in.
+            const next = await requestPermission();
+            if (cancelled) return;
+            if (next === 'granted') {
+              await registerSilently();
+            }
           }
-          // 'prompt' or 'denied' → do NOTHING here. UI must call requestPermission().
+          // 'denied' → user already declined. UI must offer a re-enable button.
         } catch (error) {
           console.warn('[Push] auto-init skipped (non-fatal):', error);
         }
@@ -243,7 +251,7 @@ export const usePushNotifications = (options?: { enabled?: boolean }) => {
       registeredRef.current = false;
       void removeListenerHandles(handles);
     };
-  }, [enabled, user, session, checkPermission, registerSilently]);
+  }, [enabled, user, session, checkPermission, registerSilently, requestPermission]);
 
   return {
     permissionState,
