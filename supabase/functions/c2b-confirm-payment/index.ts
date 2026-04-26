@@ -525,13 +525,31 @@ serve(async (req) => {
         console.error('Error sending SMS:', smsError);
       }
 
-      return new Response(
-        JSON.stringify({ 
-          ResultCode: 0, 
-          ResultDesc: 'Donation accepted and recorded for Mchango',
-          type: 'mchango',
-          gross_amount: grossAmount,
-          commission_amount: commissionAmount,
+      // Push + in-app notifications (creator/managers + donor if registered)
+      try {
+        const { data: mMeta } = await supabase
+          .from('mchango').select('created_by, managers').eq('id', mchangoData.id).maybeSingle();
+        const ownerIds: string[] = [];
+        if (mMeta?.created_by) ownerIds.push(mMeta.created_by);
+        if (Array.isArray(mMeta?.managers)) ownerIds.push(...mMeta!.managers);
+        await notifyManyUsers(supabase, ownerIds, {
+          ...NotificationTemplates.donationReceived(grossAmount, mchangoData.title, displayName),
+          relatedEntityId: mchangoData.id, relatedEntityType: 'mchango',
+        });
+        if (phoneNumber) {
+          const { data: donorProfile } = await supabase
+            .from('profiles').select('id').eq('phone', phoneNumber).maybeSingle();
+          if (donorProfile?.id) {
+            await createNotification(supabase, {
+              userId: donorProfile.id,
+              title: '💝 Donation Confirmed',
+              message: `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${mchangoData.title}" was received. Receipt: ${mpesaReceiptNumber}`,
+              type: 'success', category: 'campaign',
+              relatedEntityId: mchangoData.id, relatedEntityType: 'mchango',
+            });
+          }
+        }
+      } catch (notifErr) { console.error('Error sending mchango notifications:', notifErr); }
           net_amount: netAmount
         }),
         { 
