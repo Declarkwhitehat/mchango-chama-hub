@@ -669,6 +669,33 @@ serve(async (req) => {
         console.error('Error sending SMS:', smsError);
       }
 
+      // Push + in-app notifications (org owner + donor if registered)
+      try {
+        const { data: orgMeta } = await supabase
+          .from('organizations').select('created_by').eq('id', orgData.id).maybeSingle();
+        if (orgMeta?.created_by) {
+          await createNotification(supabase, {
+            userId: orgMeta.created_by,
+            ...NotificationTemplates.donationReceived(grossAmount, orgData.name, displayName),
+            category: 'organization',
+            relatedEntityId: orgData.id, relatedEntityType: 'organization',
+          });
+        }
+        if (phoneNumber) {
+          const { data: donorProfile } = await supabase
+            .from('profiles').select('id').eq('phone', phoneNumber).maybeSingle();
+          if (donorProfile?.id) {
+            await createNotification(supabase, {
+              userId: donorProfile.id,
+              title: '💝 Donation Confirmed',
+              message: `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${orgData.name}" was received. Receipt: ${mpesaReceiptNumber}`,
+              type: 'success', category: 'organization',
+              relatedEntityId: orgData.id, relatedEntityType: 'organization',
+            });
+          }
+        }
+      } catch (notifErr) { console.error('Error sending org notifications:', notifErr); }
+
       return new Response(
         JSON.stringify({ 
           ResultCode: 0, 
