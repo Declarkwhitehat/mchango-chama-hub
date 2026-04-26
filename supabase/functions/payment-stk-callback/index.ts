@@ -583,6 +583,48 @@ serve(async (req) => {
         if (ledgerError) {
           console.error('Error recording in financial ledger:', ledgerError);
         }
+
+        // ── Push + in-app notifications ──
+        try {
+          const { data: orgMeta } = await supabaseClient
+            .from('organizations')
+            .select('name, created_by')
+            .eq('id', orgDonation.organization_id)
+            .maybeSingle();
+          const orgName = orgMeta?.name || 'the organization';
+          const donorName = orgDonation.display_name || 'A donor';
+
+          if (orgMeta?.created_by) {
+            await createNotification(supabaseClient, {
+              userId: orgMeta.created_by,
+              ...NotificationTemplates.donationReceived(grossAmount, orgName, donorName),
+              category: 'organization',
+              relatedEntityId: orgDonation.organization_id,
+              relatedEntityType: 'organization',
+            });
+          }
+
+          if (orgDonation.phone) {
+            const { data: donorProfile } = await supabaseClient
+              .from('profiles')
+              .select('id')
+              .eq('phone', orgDonation.phone)
+              .maybeSingle();
+            if (donorProfile?.id) {
+              await createNotification(supabaseClient, {
+                userId: donorProfile.id,
+                title: '💝 Donation Confirmed',
+                message: `Thank you! Your donation of KES ${grossAmount.toLocaleString()} to "${orgName}" was received.`,
+                type: 'success',
+                category: 'organization',
+                relatedEntityId: orgDonation.organization_id,
+                relatedEntityType: 'organization',
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.error('Error sending org donation notifications:', notifErr);
+        }
       }
 
       return new Response(
