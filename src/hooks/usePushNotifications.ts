@@ -251,7 +251,7 @@ export const usePushNotifications = (options?: { enabled?: boolean }) => {
       registeredRef.current = false;
       void removeListenerHandles(handles);
     };
-  }, [enabled, user, session, checkPermission, registerSilently]);
+  }, [enabled, user, session, checkPermission, registerSilently, requestPermission]);
 
   return {
     permissionState,
