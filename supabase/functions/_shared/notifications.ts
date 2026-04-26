@@ -61,7 +61,7 @@ async function sendPushNotification(
  * Every place that calls this will now automatically get both.
  */
 export async function createNotification(
-  adminClient: SupabaseClient,
+  adminClient: AnySupabaseClient,
   params: CreateNotificationParams
 ) {
   try {
@@ -95,7 +95,7 @@ export async function createNotification(
  * Useful for fan-out notifications (e.g. notify all donors when a campaign withdraws).
  */
 export async function notifyManyUsers(
-  adminClient: SupabaseClient,
+  adminClient: AnySupabaseClient,
   userIds: (string | null | undefined)[],
   notification: Omit<CreateNotificationParams, 'userId'>,
 ) {
