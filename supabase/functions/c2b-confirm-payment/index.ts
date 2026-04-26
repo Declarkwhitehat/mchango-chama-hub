@@ -550,9 +550,17 @@ serve(async (req) => {
           }
         }
       } catch (notifErr) { console.error('Error sending mchango notifications:', notifErr); }
+
+      return new Response(
+        JSON.stringify({
+          ResultCode: 0,
+          ResultDesc: 'Donation accepted and recorded for Mchango',
+          type: 'mchango',
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
           net_amount: netAmount
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
