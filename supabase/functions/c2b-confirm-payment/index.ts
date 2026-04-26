@@ -201,7 +201,7 @@ serve(async (req) => {
         console.error('Error delegating settlement:', settleError);
       }
 
-      // Send SMS notification
+      // Send SMS notification + push
       if (chamaData) {
         try {
           await supabase.functions.invoke('send-transactional-sms', {
@@ -212,6 +212,16 @@ serve(async (req) => {
           });
         } catch (smsError) {
           console.error('Error sending SMS:', smsError);
+        }
+
+        // Push + in-app notification to the contributing member
+        if (chamaMemberData?.user_id) {
+          await createNotification(supabase, {
+            userId: chamaMemberData.user_id,
+            ...NotificationTemplates.paymentConfirmed(grossAmount, mpesaReceiptNumber),
+            relatedEntityId: chamaMemberData.chama_id,
+            relatedEntityType: 'chama',
+          });
         }
       }
 
