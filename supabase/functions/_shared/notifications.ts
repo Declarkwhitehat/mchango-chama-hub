@@ -1,4 +1,7 @@
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+// Use a structural type so this helper works with any @supabase/supabase-js client version.
+type AnySupabaseClient = {
+  from: (table: string) => any;
+};
 
 interface CreateNotificationParams {
   userId: string;
