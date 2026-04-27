@@ -78,12 +78,20 @@ export const NativeDeepLinkHandler = () => {
         const { App } = await import("@capacitor/app");
         if (cancelled) return;
 
-        // Handle cold-start launch URL — defer one tick so React Router has
-        // mounted before we navigate.
+        // Handle cold-start launch URL — defer so React Router has fully
+        // mounted and AuthContext has settled before we navigate, otherwise
+        // the route change can be clobbered by an Index re-render.
         try {
           const launch = await App.getLaunchUrl();
           if (launch?.url) {
-            setTimeout(() => routeFromUrl(launch.url), 0);
+            console.info("[DeepLink] Cold-start launch URL:", launch.url);
+            // Try a few times in case the router/auth aren't ready yet.
+            const attempt = (tries: number) => {
+              if (cancelled) return;
+              routeFromUrl(launch.url);
+              if (tries > 0) setTimeout(() => attempt(tries - 1), 400);
+            };
+            setTimeout(() => attempt(3), 250);
           }
         } catch (error) {
           console.warn("[DeepLink] getLaunchUrl failed (non-fatal):", error);
@@ -91,6 +99,7 @@ export const NativeDeepLinkHandler = () => {
 
         // Handle warm-start URL opens.
         const handle = await App.addListener("appUrlOpen", (event: { url: string }) => {
+          console.info("[DeepLink] appUrlOpen:", event?.url);
           if (event?.url) routeFromUrl(event.url);
         });
 
