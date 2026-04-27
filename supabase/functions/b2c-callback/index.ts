@@ -394,6 +394,47 @@ serve(async (req) => {
               relatedEntityType: 'organization',
             });
           }
+        } else if (withdrawal.welfare_id) {
+          // Notify ALL active welfare members of withdrawal
+          const { data: members } = await supabaseAdmin
+            .from('welfare_members')
+            .select('user_id')
+            .eq('welfare_id', withdrawal.welfare_id)
+            .eq('status', 'active');
+          const memberIds = (members || [])
+            .map((m: any) => m.user_id)
+            .filter((id: string) => id && id !== withdrawal.requested_by);
+          if (memberIds.length > 0) {
+            await notifyManyUsers(supabaseAdmin, memberIds, {
+              title: 'Welfare Withdrawal Processed 💸',
+              message: `KES ${(transactionAmount || withdrawal.net_amount || withdrawal.amount).toLocaleString()} was withdrawn from "${sourceName}".`,
+              type: 'info',
+              category: 'welfare',
+              relatedEntityId: withdrawal.welfare_id,
+              relatedEntityType: 'welfare',
+            });
+          }
+        } else if (withdrawal.chama_id) {
+          // Notify ALL active chama members of withdrawal
+          const { data: members } = await supabaseAdmin
+            .from('chama_members')
+            .select('user_id')
+            .eq('chama_id', withdrawal.chama_id)
+            .eq('status', 'active')
+            .eq('approval_status', 'approved');
+          const memberIds = (members || [])
+            .map((m: any) => m.user_id)
+            .filter((id: string) => id && id !== withdrawal.requested_by);
+          if (memberIds.length > 0) {
+            await notifyManyUsers(supabaseAdmin, memberIds, {
+              title: 'Chama Payout Processed 💸',
+              message: `KES ${(transactionAmount || withdrawal.net_amount || withdrawal.amount).toLocaleString()} was paid out from "${sourceName}".`,
+              type: 'info',
+              category: 'chama',
+              relatedEntityId: withdrawal.chama_id,
+              relatedEntityType: 'chama',
+            });
+          }
         }
       } catch (notifErr) {
         console.error('Error sending withdrawal notifications:', notifErr);
