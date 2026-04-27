@@ -881,21 +881,20 @@ serve(async (req) => {
         });
       }
 
-      // Notify welfare executives (Chairman, Secretary, Treasurer) of new contribution
+      // Notify ALL active welfare members of new contribution
       try {
-        const { data: executives } = await supabase
+        const { data: allMembers } = await supabase
           .from('welfare_members')
-          .select('user_id, role')
+          .select('user_id')
           .eq('welfare_id', welfareData.id)
-          .eq('status', 'active')
-          .in('role', ['chairman', 'secretary', 'treasurer']);
+          .eq('status', 'active');
 
-        const execIds = (executives || [])
-          .map((e: any) => e.user_id)
+        const memberIds = (allMembers || [])
+          .map((m: any) => m.user_id)
           .filter((id: string) => id && id !== matchedMember?.user_id);
 
-        if (execIds.length > 0) {
-          await notifyManyUsers(supabase, execIds, {
+        if (memberIds.length > 0) {
+          await notifyManyUsers(supabase, memberIds, {
             title: 'New Welfare Contribution 🤝',
             message: `${firstName} contributed KES ${grossAmount.toLocaleString()} to "${welfareData.name}".`,
             type: 'success',
@@ -905,7 +904,7 @@ serve(async (req) => {
           });
         }
       } catch (notifyErr) {
-        console.warn('Failed to notify welfare executives:', notifyErr);
+        console.warn('Failed to notify welfare members:', notifyErr);
       }
 
       return new Response(
