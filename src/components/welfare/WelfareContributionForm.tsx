@@ -62,7 +62,10 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
         body: {
           phone_number: normalized,
           amount: numAmount,
-          account_reference: paybillAccountId || `WF-${welfareId.substring(0, 8)}`,
+          // Use the member's unique ID (e.g. G7BZM0001) so the STK prompt
+          // shows the correct account and C2B can match the contribution to
+          // this specific member, not just the welfare group.
+          account_reference: memberCode || paybillAccountId || `WF-${welfareId.substring(0, 8)}`,
           transaction_desc: "Welfare contrib",
           callback_metadata: {
             type: "welfare_contribution",
