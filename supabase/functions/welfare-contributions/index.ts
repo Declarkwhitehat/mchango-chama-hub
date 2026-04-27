@@ -164,20 +164,19 @@ serve(async (req) => {
           relatedEntityType: 'welfare',
         });
 
-        // Notify executives of new contribution
-        const { data: executives } = await supabaseAdmin
+        // Notify ALL active welfare members of new contribution
+        const { data: allMembers } = await supabaseAdmin
           .from('welfare_members')
-          .select('user_id, role')
+          .select('user_id')
           .eq('welfare_id', welfare_id)
-          .eq('status', 'active')
-          .in('role', ['chairman', 'secretary', 'treasurer']);
+          .eq('status', 'active');
 
-        const execIds = (executives || [])
-          .map((e: any) => e.user_id)
+        const memberIds = (allMembers || [])
+          .map((m: any) => m.user_id)
           .filter((id: string) => id && id !== userData.user.id);
 
-        if (execIds.length > 0) {
-          await notifyManyUsers(supabaseAdmin, execIds, {
+        if (memberIds.length > 0) {
+          await notifyManyUsers(supabaseAdmin, memberIds, {
             title: 'New Welfare Contribution 🤝',
             message: `A member contributed KES ${grossAmount.toLocaleString()} to "${wName}".`,
             type: 'success',
