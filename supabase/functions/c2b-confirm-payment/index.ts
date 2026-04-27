@@ -712,8 +712,8 @@ serve(async (req) => {
     }
 
     // Try welfare - first check if the account number is a welfare member_code (e.g., Q8KKUG7V → member ID)
-    let welfareData = null;
-    let matchedMember = null;
+    let welfareData: any = null;
+    let matchedMember: { id: string; user_id: string } | null = null;
 
     const { data: welfareMemberByCode } = await supabase
       .from('welfare_members')
@@ -869,6 +869,43 @@ serve(async (req) => {
         });
       } catch (smsError) {
         console.error('Error sending welfare SMS:', smsError);
+      }
+
+      // Push + in-app notification to the contributing member
+      if (matchedMember?.user_id) {
+        await createNotification(supabase, {
+          userId: matchedMember.user_id,
+          ...NotificationTemplates.paymentConfirmed(grossAmount, mpesaReceiptNumber),
+          relatedEntityId: welfareData.id,
+          relatedEntityType: 'welfare',
+        });
+      }
+
+      // Notify welfare executives (Chairman, Secretary, Treasurer) of new contribution
+      try {
+        const { data: executives } = await supabase
+          .from('welfare_members')
+          .select('user_id, role')
+          .eq('welfare_id', welfareData.id)
+          .eq('status', 'active')
+          .in('role', ['chairman', 'secretary', 'treasurer']);
+
+        const execIds = (executives || [])
+          .map((e: any) => e.user_id)
+          .filter((id: string) => id && id !== matchedMember?.user_id);
+
+        if (execIds.length > 0) {
+          await notifyManyUsers(supabase, execIds, {
+            title: 'New Welfare Contribution 🤝',
+            message: `${firstName} contributed KES ${grossAmount.toLocaleString()} to "${welfareData.name}".`,
+            type: 'success',
+            category: 'welfare',
+            relatedEntityId: welfareData.id,
+            relatedEntityType: 'welfare',
+          });
+        }
+      } catch (notifyErr) {
+        console.warn('Failed to notify welfare executives:', notifyErr);
       }
 
       return new Response(
