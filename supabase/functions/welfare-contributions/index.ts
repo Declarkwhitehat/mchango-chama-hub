@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
 import { COMMISSION_RATES } from "../_shared/commissionRates.ts";
+import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
