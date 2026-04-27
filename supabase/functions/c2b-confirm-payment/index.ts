@@ -712,8 +712,8 @@ serve(async (req) => {
     }
 
     // Try welfare - first check if the account number is a welfare member_code (e.g., Q8KKUG7V → member ID)
-    let welfareData = null;
-    let matchedMember = null;
+    let welfareData: any = null;
+    let matchedMember: { id: string; user_id: string } | null = null;
 
     const { data: welfareMemberByCode } = await supabase
       .from('welfare_members')
