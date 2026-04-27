@@ -148,6 +148,48 @@ serve(async (req) => {
         p_description: `Welfare contribution commission (${(commissionRate * 100).toFixed(0)}%)`
       });
 
+      // Push + in-app notification to the contributing member
+      try {
+        const { data: welfareName } = await supabaseAdmin
+          .from('welfares')
+          .select('name')
+          .eq('id', welfare_id)
+          .single();
+        const wName = welfareName?.name || 'Welfare';
+
+        await createNotification(supabaseAdmin, {
+          userId: userData.user.id,
+          ...NotificationTemplates.paymentReceived(grossAmount, wName),
+          relatedEntityId: welfare_id,
+          relatedEntityType: 'welfare',
+        });
+
+        // Notify executives of new contribution
+        const { data: executives } = await supabaseAdmin
+          .from('welfare_members')
+          .select('user_id, role')
+          .eq('welfare_id', welfare_id)
+          .eq('status', 'active')
+          .in('role', ['chairman', 'secretary', 'treasurer']);
+
+        const execIds = (executives || [])
+          .map((e: any) => e.user_id)
+          .filter((id: string) => id && id !== userData.user.id);
+
+        if (execIds.length > 0) {
+          await notifyManyUsers(supabaseAdmin, execIds, {
+            title: 'New Welfare Contribution 🤝',
+            message: `A member contributed KES ${grossAmount.toLocaleString()} to "${wName}".`,
+            type: 'success',
+            category: 'welfare',
+            relatedEntityId: welfare_id,
+            relatedEntityType: 'welfare',
+          });
+        }
+      } catch (notifyErr) {
+        console.warn('Failed to send welfare contribution notifications:', notifyErr);
+      }
+
       return new Response(JSON.stringify({ data: contribution }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
