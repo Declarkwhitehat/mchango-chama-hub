@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Wallet, Clock, CheckCircle, XCircle, Loader2, Smartphone, Building2 } from "lucide-react";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+// realtime subscription removed in favor of 30s polling
 import { formatPaymentMethodLabel } from "@/utils/paymentLimits";
 
 interface WithdrawalHistoryProps {
@@ -23,32 +23,17 @@ export const WithdrawalHistory = ({ chamaId, mchangoId, organizationId }: Withdr
   useEffect(() => {
     loadWithdrawals();
 
-    // Set up realtime subscription
-    const channel: RealtimeChannel = supabase
-      .channel('withdrawal-history')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'withdrawals',
-          filter: chamaId ? `chama_id=eq.${chamaId}` : mchangoId ? `mchango_id=eq.${mchangoId}` : `organization_id=eq.${organizationId}`
-        },
-        () => {
-          console.log('Withdrawal changed, reloading...');
-          loadWithdrawals();
-        }
-      )
-      .subscribe();
+    // Poll every 30s instead of realtime subscription
+    const interval = setInterval(() => loadWithdrawals(true), 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [chamaId, mchangoId, organizationId]);
 
-  const loadWithdrawals = async () => {
+  const loadWithdrawals = async (isBackgroundRefetch = false) => {
     try {
-      setIsLoading(true);
+      if (!isBackgroundRefetch) setIsLoading(true);
 
       // Use direct Supabase query - fetch withdrawals only
       let query = supabase
@@ -80,6 +65,19 @@ export const WithdrawalHistory = ({ chamaId, mchangoId, organizationId }: Withdr
         setWithdrawals(data || []);
       }
     } catch (error: any) {
+      console.error("Error loading withdrawals:", error);
+      if (!isBackgroundRefetch) {
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred while loading withdrawals",
+          variant: "destructive",
+        });
+        setWithdrawals([]);
+      }
+    } finally {
+      if (!isBackgroundRefetch) setIsLoading(false);
+    }
+  };
       console.error("Error loading withdrawals:", error);
       toast({
         title: "Error",
