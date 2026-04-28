@@ -78,17 +78,6 @@ export const WithdrawalHistory = ({ chamaId, mchangoId, organizationId }: Withdr
       if (!isBackgroundRefetch) setIsLoading(false);
     }
   };
-      console.error("Error loading withdrawals:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while loading withdrawals",
-        variant: "destructive",
-      });
-      setWithdrawals([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
