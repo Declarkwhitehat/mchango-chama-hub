@@ -188,3 +188,6 @@ verify_jwt = false
 
 [functions.financial-reconciliation]
 verify_jwt = false
+
+[functions.process-email-queue]
+verify_jwt = true
