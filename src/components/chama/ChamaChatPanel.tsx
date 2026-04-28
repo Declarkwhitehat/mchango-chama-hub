@@ -39,33 +39,11 @@ export const ChamaChatPanel = ({ chamaId, isManager }: ChamaChatPanelProps) => {
     loadCurrentUser();
     loadMessages();
 
-    const channel = supabase
-      .channel(`chama-chat-${chamaId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chama_messages',
-          filter: `chama_id=eq.${chamaId}`
-        },
-        async (payload) => {
-          // Fetch the new message with profile info
-          const { data } = await supabase
-            .from('chama_messages' as any)
-            .select('*, profiles:user_id(full_name)')
-            .eq('id', payload.new.id)
-            .single();
-          
-          if (data) {
-            setMessages(prev => [...prev, data as any]);
-          }
-        }
-      )
-      .subscribe();
+    // Poll chat messages every 30s instead of realtime subscription
+    const interval = setInterval(() => loadMessages(true), 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [chamaId]);
 
@@ -81,9 +59,9 @@ export const ChamaChatPanel = ({ chamaId, isManager }: ChamaChatPanelProps) => {
     setCurrentUserId(user?.id || null);
   };
 
-  const loadMessages = async () => {
+  const loadMessages = async (isBackgroundRefetch = false) => {
     try {
-      setIsLoading(true);
+      if (!isBackgroundRefetch) setIsLoading(true);
       const { data, error } = await supabase
         .from('chama_messages' as any)
         .select('*, profiles:user_id(full_name)')
@@ -97,7 +75,7 @@ export const ChamaChatPanel = ({ chamaId, isManager }: ChamaChatPanelProps) => {
         setMessages((data as any[]) || []);
       }
     } finally {
-      setIsLoading(false);
+      if (!isBackgroundRefetch) setIsLoading(false);
     }
   };
 
