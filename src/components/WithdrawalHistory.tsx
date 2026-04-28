@@ -55,12 +55,14 @@ export const WithdrawalHistory = ({ chamaId, mchangoId, organizationId }: Withdr
 
       if (error) {
         console.error("Error loading withdrawals:", error);
-        toast({
-          title: "Failed to Load Withdrawals",
-          description: error.message || "Could not retrieve withdrawal history",
-          variant: "destructive",
-        });
-        setWithdrawals([]);
+        if (!isBackgroundRefetch) {
+          toast({
+            title: "Failed to Load Withdrawals",
+            description: error.message || "Could not retrieve withdrawal history",
+            variant: "destructive",
+          });
+          setWithdrawals([]);
+        }
       } else {
         setWithdrawals(data || []);
       }
