@@ -80,27 +80,14 @@ export const WithdrawalButton = ({
     }
   };
 
-  // Set up realtime subscription
+  // Poll withdrawal status every 30s instead of realtime subscription
   useEffect(() => {
-    const channel = supabase
-      .channel('withdrawals-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'withdrawals',
-        filter: chamaId ? `chama_id=eq.${chamaId}` : mchangoId ? `mchango_id=eq.${mchangoId}` : `organization_id=eq.${organizationId}`
-        },
-        () => {
-          console.log('Withdrawal status changed, reloading...');
-          loadPendingWithdrawal();
-        }
-      )
-      .subscribe();
+    const interval = setInterval(() => {
+      loadPendingWithdrawal();
+    }, 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [chamaId, mchangoId, organizationId]);
 
