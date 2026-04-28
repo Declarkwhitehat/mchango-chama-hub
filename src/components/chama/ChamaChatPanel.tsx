@@ -96,6 +96,8 @@ export const ChamaChatPanel = ({ chamaId, isManager }: ChamaChatPanelProps) => {
       if (error) throw error;
       setNewMessage("");
       setIsAnnouncement(false);
+      // Refresh immediately so the user sees their message without waiting 30s
+      loadMessages(true);
     } catch (error: any) {
       toast({
         title: "Error",
