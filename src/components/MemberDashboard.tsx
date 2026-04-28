@@ -9,7 +9,7 @@ import { CheckCircle2, TrendingUp, CreditCard, AlertCircle } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client";
 import { getNextDay10PmKenyaDeadline } from "@/utils/chamaDeadlines";
 import { toast } from "@/hooks/use-toast";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+// realtime subscription removed in favor of 30s polling
 
 interface MemberDashboardProps {
   chamaId: string;
@@ -24,17 +24,15 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
     loadDashboard();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) loadDashboard();
+      if (session) loadDashboard(true);
     });
 
-    const channel: RealtimeChannel = supabase
-      .channel('contributions-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contributions', filter: `chama_id=eq.${chamaId}` }, () => loadDashboard())
-      .subscribe();
+    // Poll contributions every 30s instead of realtime subscription
+    const interval = setInterval(() => loadDashboard(true), 30000);
 
     return () => {
       subscription.unsubscribe();
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [chamaId]);
 
