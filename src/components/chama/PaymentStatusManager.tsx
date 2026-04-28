@@ -87,7 +87,7 @@ export const PaymentStatusManager = ({
     };
   }, [chamaId]);
 
-  const fetchData = async () => {
+  const fetchData = async (isBackgroundRefetch = false) => {
     try {
       // Fetch members with profiles
       const { data: membersData, error: membersError } = await supabase
@@ -170,7 +170,7 @@ export const PaymentStatusManager = ({
     } catch (error) {
       console.error("Error fetching payment data:", error);
     } finally {
-      setLoading(false);
+      if (!isBackgroundRefetch) setLoading(false);
     }
   };
 
