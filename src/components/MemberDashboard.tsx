@@ -9,7 +9,7 @@ import { CheckCircle2, TrendingUp, CreditCard, AlertCircle } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client";
 import { getNextDay10PmKenyaDeadline } from "@/utils/chamaDeadlines";
 import { toast } from "@/hooks/use-toast";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+// realtime subscription removed in favor of 30s polling
 
 interface MemberDashboardProps {
   chamaId: string;
@@ -24,46 +24,48 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
     loadDashboard();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) loadDashboard();
+      if (session) loadDashboard(true);
     });
 
-    const channel: RealtimeChannel = supabase
-      .channel('contributions-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contributions', filter: `chama_id=eq.${chamaId}` }, () => loadDashboard())
-      .subscribe();
+    // Poll contributions every 30s instead of realtime subscription
+    const interval = setInterval(() => loadDashboard(true), 30000);
 
     return () => {
       subscription.unsubscribe();
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [chamaId]);
 
-  const loadDashboard = async () => {
+  const loadDashboard = async (isBackgroundRefetch = false) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setIsLoading(false); return; }
+      if (!session) { if (!isBackgroundRefetch) setIsLoading(false); return; }
 
       const { data, error } = await supabase.functions.invoke('member-dashboard', {
         body: { chama_id: chamaId }
       });
 
       if (error) {
-        if (error.message?.includes('Pending approval')) {
-          toast({ title: "Pending Approval", description: "Your membership is awaiting manager approval." });
-        } else if (error.message?.includes('Not a member')) {
-          toast({ title: "Not a Member", description: "You need to join this chama to view the dashboard", variant: "destructive" });
-        } else {
-          toast({ title: "Error Loading Dashboard", description: error.message || "Failed to load dashboard data", variant: "destructive" });
+        if (!isBackgroundRefetch) {
+          if (error.message?.includes('Pending approval')) {
+            toast({ title: "Pending Approval", description: "Your membership is awaiting manager approval." });
+          } else if (error.message?.includes('Not a member')) {
+            toast({ title: "Not a Member", description: "You need to join this chama to view the dashboard", variant: "destructive" });
+          } else {
+            toast({ title: "Error Loading Dashboard", description: error.message || "Failed to load dashboard data", variant: "destructive" });
+          }
+          setDashboardData(null);
         }
-        setDashboardData(null);
       } else {
         setDashboardData(data?.data || data);
       }
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to load dashboard", variant: "destructive" });
-      setDashboardData(null);
+      if (!isBackgroundRefetch) {
+        toast({ title: "Error", description: error.message || "Failed to load dashboard", variant: "destructive" });
+        setDashboardData(null);
+      }
     } finally {
-      setIsLoading(false);
+      if (!isBackgroundRefetch) setIsLoading(false);
     }
   };
 

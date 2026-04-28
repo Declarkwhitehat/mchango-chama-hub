@@ -8,6 +8,7 @@ import { Upload, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { compressImage, formatFileSize } from "@/utils/imageCompression";
 
 const KYCUpload = () => {
   const navigate = useNavigate();
@@ -18,31 +19,32 @@ const KYCUpload = () => {
   const [frontPreview, setFrontPreview] = useState<string>("");
   const [backPreview, setBackPreview] = useState<string>("");
 
-  const handleFileChange = (
+  const handleFileChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
     side: 'front' | 'back'
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error("Please upload an image file");
       return;
     }
 
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size must be less than 5MB");
-      return;
-    }
-
-    if (side === 'front') {
-      setFrontFile(file);
-      setFrontPreview(URL.createObjectURL(file));
-    } else {
-      setBackFile(file);
-      setBackPreview(URL.createObjectURL(file));
+    try {
+      const compressed = await compressImage(file);
+      if (file.size !== compressed.size) {
+        toast.success(`Image optimized: ${formatFileSize(file.size)} → ${formatFileSize(compressed.size)}`);
+      }
+      if (side === 'front') {
+        setFrontFile(compressed);
+        setFrontPreview(URL.createObjectURL(compressed));
+      } else {
+        setBackFile(compressed);
+        setBackPreview(URL.createObjectURL(compressed));
+      }
+    } catch {
+      toast.error("Failed to process image");
     }
   };
 

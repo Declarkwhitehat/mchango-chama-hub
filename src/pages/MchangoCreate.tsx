@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle, X, Youtube, ImagePlus } from "lucide-react";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
+import { compressImage, formatFileSize } from "@/utils/imageCompression";
 
 const MchangoCreate = () => {
   const navigate = useNavigate();
@@ -42,29 +43,31 @@ const MchangoCreate = () => {
     checkKycStatus();
   }, [navigate]);
 
-  const handleImageChange = (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error("Please upload an image file (JPG, PNG, etc.)");
       return;
     }
 
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size must be less than 5MB");
-      return;
+    try {
+      const compressed = await compressImage(file);
+      if (file.size !== compressed.size) {
+        toast.success(`Image optimized: ${formatFileSize(file.size)} → ${formatFileSize(compressed.size)}`);
+      }
+
+      const newFiles = [...imageFiles];
+      newFiles[index] = compressed;
+      setImageFiles(newFiles);
+
+      const newPreviews = [...imagePreviews];
+      newPreviews[index] = URL.createObjectURL(compressed);
+      setImagePreviews(newPreviews);
+    } catch {
+      toast.error("Failed to process image");
     }
-
-    const newFiles = [...imageFiles];
-    newFiles[index] = file;
-    setImageFiles(newFiles);
-
-    const newPreviews = [...imagePreviews];
-    newPreviews[index] = URL.createObjectURL(file);
-    setImagePreviews(newPreviews);
   };
 
   const removeImage = (index: number) => {

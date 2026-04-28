@@ -79,26 +79,15 @@ export const PaymentStatusManager = ({
   useEffect(() => {
     fetchData();
 
-    const channel = supabase
-      .channel(`chama-payments-${chamaId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "contributions",
-          filter: `chama_id=eq.${chamaId}`,
-        },
-        () => fetchData()
-      )
-      .subscribe();
+    // Poll contributions every 30s instead of realtime subscription
+    const interval = setInterval(() => fetchData(true), 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [chamaId]);
 
-  const fetchData = async () => {
+  const fetchData = async (isBackgroundRefetch = false) => {
     try {
       // Fetch members with profiles
       const { data: membersData, error: membersError } = await supabase
@@ -181,7 +170,7 @@ export const PaymentStatusManager = ({
     } catch (error) {
       console.error("Error fetching payment data:", error);
     } finally {
-      setLoading(false);
+      if (!isBackgroundRefetch) setLoading(false);
     }
   };
 

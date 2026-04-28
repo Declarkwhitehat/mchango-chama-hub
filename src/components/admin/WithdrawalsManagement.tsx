@@ -68,24 +68,23 @@ export const WithdrawalsManagement = () => {
 
   useEffect(() => {
     loadWithdrawals();
-    const channel = supabase
-      .channel('admin-withdrawals')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'withdrawals' }, () => loadWithdrawals())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'withdrawals' }, () => loadWithdrawals())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Poll every 30s instead of realtime subscription
+    const interval = setInterval(() => loadWithdrawals(true), 30000);
+    return () => { clearInterval(interval); };
   }, []);
 
-  const loadWithdrawals = async () => {
+  const loadWithdrawals = async (isBackgroundRefetch = false) => {
     try {
       const { data, error } = await supabase.functions.invoke('withdrawals-crud', { method: 'GET' });
       if (error) throw error;
       setWithdrawals(data.data || []);
     } catch (error: any) {
       console.error("Error loading withdrawals:", error);
-      toast({ title: "Error", description: "Failed to load withdrawals", variant: "destructive" });
+      if (!isBackgroundRefetch) {
+        toast({ title: "Error", description: "Failed to load withdrawals", variant: "destructive" });
+      }
     } finally {
-      setIsLoading(false);
+      if (!isBackgroundRefetch) setIsLoading(false);
     }
   };
 

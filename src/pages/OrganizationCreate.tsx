@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle, X, Youtube, ImagePlus, Building2, Globe, MapPin, Phone, Mail } from "lucide-react";
+import { compressImage, formatFileSize } from "@/utils/imageCompression";
 
 const OrganizationCreate = () => {
   const navigate = useNavigate();
@@ -43,7 +44,7 @@ const OrganizationCreate = () => {
     checkKycStatus();
   }, [navigate]);
 
-  const handleImageChange = (type: 'logo' | 'cover') => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (type: 'logo' | 'cover') => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -52,17 +53,20 @@ const OrganizationCreate = () => {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size must be less than 5MB");
-      return;
-    }
-
-    if (type === 'logo') {
-      setLogoFile(file);
-      setLogoPreview(URL.createObjectURL(file));
-    } else {
-      setCoverFile(file);
-      setCoverPreview(URL.createObjectURL(file));
+    try {
+      const compressed = await compressImage(file);
+      if (file.size !== compressed.size) {
+        toast.success(`Image optimized: ${formatFileSize(file.size)} → ${formatFileSize(compressed.size)}`);
+      }
+      if (type === 'logo') {
+        setLogoFile(compressed);
+        setLogoPreview(URL.createObjectURL(compressed));
+      } else {
+        setCoverFile(compressed);
+        setCoverPreview(URL.createObjectURL(compressed));
+      }
+    } catch {
+      toast.error("Failed to process image");
     }
   };
 
