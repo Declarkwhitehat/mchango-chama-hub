@@ -79,22 +79,11 @@ export const PaymentStatusManager = ({
   useEffect(() => {
     fetchData();
 
-    const channel = supabase
-      .channel(`chama-payments-${chamaId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "contributions",
-          filter: `chama_id=eq.${chamaId}`,
-        },
-        () => fetchData()
-      )
-      .subscribe();
+    // Poll contributions every 30s instead of realtime subscription
+    const interval = setInterval(() => fetchData(true), 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [chamaId]);
 
