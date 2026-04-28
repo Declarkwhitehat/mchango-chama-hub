@@ -36,32 +36,36 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
     };
   }, [chamaId]);
 
-  const loadDashboard = async () => {
+  const loadDashboard = async (isBackgroundRefetch = false) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setIsLoading(false); return; }
+      if (!session) { if (!isBackgroundRefetch) setIsLoading(false); return; }
 
       const { data, error } = await supabase.functions.invoke('member-dashboard', {
         body: { chama_id: chamaId }
       });
 
       if (error) {
-        if (error.message?.includes('Pending approval')) {
-          toast({ title: "Pending Approval", description: "Your membership is awaiting manager approval." });
-        } else if (error.message?.includes('Not a member')) {
-          toast({ title: "Not a Member", description: "You need to join this chama to view the dashboard", variant: "destructive" });
-        } else {
-          toast({ title: "Error Loading Dashboard", description: error.message || "Failed to load dashboard data", variant: "destructive" });
+        if (!isBackgroundRefetch) {
+          if (error.message?.includes('Pending approval')) {
+            toast({ title: "Pending Approval", description: "Your membership is awaiting manager approval." });
+          } else if (error.message?.includes('Not a member')) {
+            toast({ title: "Not a Member", description: "You need to join this chama to view the dashboard", variant: "destructive" });
+          } else {
+            toast({ title: "Error Loading Dashboard", description: error.message || "Failed to load dashboard data", variant: "destructive" });
+          }
+          setDashboardData(null);
         }
-        setDashboardData(null);
       } else {
         setDashboardData(data?.data || data);
       }
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to load dashboard", variant: "destructive" });
-      setDashboardData(null);
+      if (!isBackgroundRefetch) {
+        toast({ title: "Error", description: error.message || "Failed to load dashboard", variant: "destructive" });
+        setDashboardData(null);
+      }
     } finally {
-      setIsLoading(false);
+      if (!isBackgroundRefetch) setIsLoading(false);
     }
   };
 
