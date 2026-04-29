@@ -197,14 +197,19 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
               />
             </div>
             <div className="space-y-2">
-              <Label>File (PDF, DOC, DOCX — max 3MB)</Label>
+              <Label>File (PDF, DOC, DOCX, JPG, PNG, WEBP — max 5MB)</Label>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
                 onChange={handleFileSelect}
                 className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
               />
+              {selectedFile && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               <Button
