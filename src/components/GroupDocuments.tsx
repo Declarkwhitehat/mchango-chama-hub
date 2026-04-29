@@ -78,18 +78,27 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !title.trim() || !user) return;
+    if (!selectedFile || !title.trim() || !user) {
+      toast.error(!user ? "You must be logged in" : "Provide a title and file");
+      return;
+    }
 
     setUploading(true);
     try {
       const ext = "." + selectedFile.name.split(".").pop()?.toLowerCase();
-      const filePath = `${entityType}/${entityId}/${Date.now()}${ext}`;
+      const filePath = `${entityType}/${entityId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("group-documents")
-        .upload(filePath, selectedFile);
+        .upload(filePath, selectedFile, {
+          contentType: selectedFile.type || undefined,
+          upsert: false,
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw new Error(uploadError.message || "Storage upload failed");
+      }
 
       const { error: insertError } = await supabase
         .from("group_documents")
@@ -102,7 +111,12 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
           uploaded_by: user.id,
         });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error("DB insert error:", insertError);
+        // Clean up the uploaded file if DB insert fails
+        await supabase.storage.from("group-documents").remove([filePath]);
+        throw new Error(insertError.message || "Failed to save document record");
+      }
 
       toast.success("Document uploaded successfully");
       setTitle("");
