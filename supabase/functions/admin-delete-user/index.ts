@@ -70,6 +70,23 @@ serve(async (req) => {
       });
     }
 
+    // Block deletion of admin/super-admin accounts (restore is allowed)
+    if (action !== 'restore') {
+      const { data: targetRoles } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user_id);
+
+      const isTargetAdmin = (targetRoles || []).some((r: any) => r.role === 'admin' || r.role === 'super_admin');
+      if (isTargetAdmin) {
+        return new Response(JSON.stringify({
+          error: 'Admin accounts cannot be deleted. Remove the admin role first, then try again.',
+        }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // Get profile to verify name confirmation
     const { data: profile } = await supabaseAdmin
       .from('profiles')

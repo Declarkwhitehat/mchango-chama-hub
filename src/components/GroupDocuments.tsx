@@ -18,8 +18,8 @@ interface GroupDocumentsProps {
   isAdmin?: boolean;
 }
 
-const MAX_FILE_SIZE = 3 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx"];
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".webp"];
 
 interface DocRecord {
   id: string;
@@ -64,13 +64,13 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
     if (!file) return;
 
     if (file.size > MAX_FILE_SIZE) {
-      toast.error("File size exceeds 3MB limit");
+      toast.error("File size exceeds 5MB limit");
       return;
     }
 
     const ext = "." + file.name.split(".").pop()?.toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      toast.error("Only PDF, DOC, and DOCX files are allowed");
+      toast.error("Allowed: PDF, DOC, DOCX, JPG, PNG, WEBP");
       return;
     }
 
@@ -78,18 +78,27 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !title.trim() || !user) return;
+    if (!selectedFile || !title.trim() || !user) {
+      toast.error(!user ? "You must be logged in" : "Provide a title and file");
+      return;
+    }
 
     setUploading(true);
     try {
       const ext = "." + selectedFile.name.split(".").pop()?.toLowerCase();
-      const filePath = `${entityType}/${entityId}/${Date.now()}${ext}`;
+      const filePath = `${entityType}/${entityId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("group-documents")
-        .upload(filePath, selectedFile);
+        .upload(filePath, selectedFile, {
+          contentType: selectedFile.type || undefined,
+          upsert: false,
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw new Error(uploadError.message || "Storage upload failed");
+      }
 
       const { error: insertError } = await supabase
         .from("group_documents")
@@ -102,7 +111,12 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
           uploaded_by: user.id,
         });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error("DB insert error:", insertError);
+        // Clean up the uploaded file if DB insert fails
+        await supabase.storage.from("group-documents").remove([filePath]);
+        throw new Error(insertError.message || "Failed to save document record");
+      }
 
       toast.success("Document uploaded successfully");
       setTitle("");
@@ -183,14 +197,19 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
               />
             </div>
             <div className="space-y-2">
-              <Label>File (PDF, DOC, DOCX — max 3MB)</Label>
+              <Label>File (PDF, DOC, DOCX, JPG, PNG, WEBP — max 5MB)</Label>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
                 onChange={handleFileSelect}
                 className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
               />
+              {selectedFile && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               <Button
