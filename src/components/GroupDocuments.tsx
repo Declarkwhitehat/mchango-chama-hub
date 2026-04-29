@@ -64,13 +64,13 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
     if (!file) return;
 
     if (file.size > MAX_FILE_SIZE) {
-      toast.error("File size exceeds 3MB limit");
+      toast.error("File size exceeds 5MB limit");
       return;
     }
 
     const ext = "." + file.name.split(".").pop()?.toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      toast.error("Only PDF, DOC, and DOCX files are allowed");
+      toast.error("Allowed: PDF, DOC, DOCX, JPG, PNG, WEBP");
       return;
     }
 
