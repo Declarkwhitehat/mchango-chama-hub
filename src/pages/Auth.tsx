@@ -265,6 +265,7 @@ const Auth = () => {
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const phoneVerifiedRef = useRef(false);
   const [signupStep, setSignupStep] = useState<'details' | 'phone'>('details');
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [biometricIdentifier, setBiometricIdentifier] = useState('');
@@ -546,7 +547,7 @@ const Auth = () => {
   };
 
   const handleSignup = async (data: SignupFormData) => {
-    if (!phoneVerified) {
+    if (!phoneVerifiedRef.current && !phoneVerified) {
       setSignupStep('phone');
       return;
     }
@@ -1154,11 +1155,10 @@ const Auth = () => {
                               phone={signupForm.watch('phone')}
                               onPhoneChange={(phone) => signupForm.setValue('phone', phone)}
                               onVerified={() => {
+                                phoneVerifiedRef.current = true;
                                 setPhoneVerified(true);
                                 toast.success("Phone verified! Creating your account...");
-                                setTimeout(() => {
-                                  signupForm.handleSubmit(handleSignup)();
-                                }, 500);
+                                signupForm.handleSubmit(handleSignup)();
                               }}
                             />
                             <Button

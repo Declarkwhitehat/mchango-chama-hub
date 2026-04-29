@@ -6,6 +6,21 @@ import { supabase } from "@/integrations/supabase/client";
  * @param message - SMS message content (max 160 chars for single SMS)
  * @param eventType - Optional event type for logging (e.g., 'registration', 'chama_created')
  */
+async function readEdgeError(error: any, fallback: string): Promise<string> {
+  let readable = error?.message || fallback;
+  try {
+    const ctx: any = error?.context;
+    if (ctx && typeof ctx.json === 'function') {
+      const body = await ctx.json();
+      if (body?.error) readable = body.error;
+    } else if (ctx && typeof ctx.text === 'function') {
+      const txt = await ctx.text();
+      try { const parsed = JSON.parse(txt); if (parsed?.error) readable = parsed.error; } catch { if (txt) readable = txt; }
+    }
+  } catch { /* ignore */ }
+  return readable;
+}
+
 export const sendTransactionalSMS = async (
   phone: string,
   message: string,
@@ -13,16 +28,13 @@ export const sendTransactionalSMS = async (
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const { data, error } = await supabase.functions.invoke('send-transactional-sms', {
-      body: {
-        phone,
-        message,
-        eventType,
-      },
+      body: { phone, message, eventType },
     });
 
     if (error) {
-      console.error('SMS sending error:', error);
-      return { success: false, error: error.message };
+      const readable = await readEdgeError(error, 'Failed to send SMS');
+      console.error('SMS sending error:', readable);
+      return { success: false, error: readable };
     }
 
     if (!data?.success) {
@@ -33,7 +45,7 @@ export const sendTransactionalSMS = async (
     return { success: true };
   } catch (error: any) {
     console.error('SMS service error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error?.message || 'Failed to send SMS' };
   }
 };
 
@@ -47,8 +59,9 @@ export const sendOTP = async (phone: string): Promise<{ success: boolean; error?
     });
 
     if (error) {
-      console.error('OTP sending error:', error);
-      return { success: false, error: error.message };
+      const readable = await readEdgeError(error, 'Failed to send OTP');
+      console.error('OTP sending error:', readable);
+      return { success: false, error: readable };
     }
 
     if (!data?.success) {
@@ -58,7 +71,7 @@ export const sendOTP = async (phone: string): Promise<{ success: boolean; error?
     return { success: true, expiresIn: data.expiresIn };
   } catch (error: any) {
     console.error('OTP service error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error?.message || 'Failed to send OTP' };
   }
 };
 
@@ -75,9 +88,21 @@ export const verifyOTP = async (
       body: { phone, otp, userId },
     });
 
+    // Edge function may return non-2xx with a JSON body containing { error: "..." }
     if (error) {
-      console.error('OTP verification error:', error);
-      return { success: false, error: error.message };
+      let readable = error.message || 'Failed to verify OTP';
+      try {
+        const ctx: any = (error as any).context;
+        if (ctx && typeof ctx.json === 'function') {
+          const body = await ctx.json();
+          if (body?.error) readable = body.error;
+        } else if (ctx && typeof ctx.text === 'function') {
+          const txt = await ctx.text();
+          try { const parsed = JSON.parse(txt); if (parsed?.error) readable = parsed.error; } catch { if (txt) readable = txt; }
+        }
+      } catch { /* ignore parse errors */ }
+      console.error('OTP verification error:', readable);
+      return { success: false, error: readable };
     }
 
     if (!data?.success) {
@@ -87,7 +112,7 @@ export const verifyOTP = async (
     return { success: true };
   } catch (error: any) {
     console.error('OTP verification service error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error?.message || 'Failed to verify OTP' };
   }
 };
 
