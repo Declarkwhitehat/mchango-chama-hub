@@ -545,8 +545,8 @@ const Auth = () => {
     }
   };
 
-  const handleSignup = async (data: SignupFormData, options?: { skipPhoneCheck?: boolean }) => {
-    if (!options?.skipPhoneCheck && !phoneVerified) {
+  const handleSignup = async (data: SignupFormData) => {
+    if (!phoneVerifiedRef.current && !phoneVerified) {
       setSignupStep('phone');
       return;
     }
