@@ -75,9 +75,21 @@ export const verifyOTP = async (
       body: { phone, otp, userId },
     });
 
+    // Edge function may return non-2xx with a JSON body containing { error: "..." }
     if (error) {
-      console.error('OTP verification error:', error);
-      return { success: false, error: error.message };
+      let readable = error.message || 'Failed to verify OTP';
+      try {
+        const ctx: any = (error as any).context;
+        if (ctx && typeof ctx.json === 'function') {
+          const body = await ctx.json();
+          if (body?.error) readable = body.error;
+        } else if (ctx && typeof ctx.text === 'function') {
+          const txt = await ctx.text();
+          try { const parsed = JSON.parse(txt); if (parsed?.error) readable = parsed.error; } catch { if (txt) readable = txt; }
+        }
+      } catch { /* ignore parse errors */ }
+      console.error('OTP verification error:', readable);
+      return { success: false, error: readable };
     }
 
     if (!data?.success) {
@@ -87,7 +99,7 @@ export const verifyOTP = async (
     return { success: true };
   } catch (error: any) {
     console.error('OTP verification service error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error?.message || 'Failed to verify OTP' };
   }
 };
 
