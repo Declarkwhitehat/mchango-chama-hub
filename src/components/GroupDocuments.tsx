@@ -18,8 +18,8 @@ interface GroupDocumentsProps {
   isAdmin?: boolean;
 }
 
-const MAX_FILE_SIZE = 3 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx"];
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".webp"];
 
 interface DocRecord {
   id: string;
