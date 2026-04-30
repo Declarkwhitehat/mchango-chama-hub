@@ -123,7 +123,19 @@
         d.classList.add('no-transitions');
       })();
     </script>
-    
+
+    <!-- Canonical domain redirect: pamojanova.online -> www.pamojanova.com (preserves path, query, hash) -->
+    <script>
+      (function() {
+        try {
+          var h = window.location.hostname;
+          if (h === 'pamojanova.online' || h === 'www.pamojanova.online') {
+            window.location.replace('https://www.pamojanova.com' + window.location.pathname + window.location.search + window.location.hash);
+          }
+        } catch (e) {}
+      })();
+    </script>
+
     <style>
       html { background-color: #0d1a14; }
       html.dark { background-color: #0d1a14; }
