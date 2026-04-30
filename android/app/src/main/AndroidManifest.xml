@@ -60,11 +60,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep links: https://pamojanova.online/* and https://www.pamojanova.online/* -->
+            <!-- Deep links: pamojanova.com (primary) + pamojanova.online (legacy) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="pamojanova.com" />
+                <data android:scheme="https" android:host="www.pamojanova.com" />
                 <data android:scheme="https" android:host="pamojanova.online" />
                 <data android:scheme="https" android:host="www.pamojanova.online" />
             </intent-filter>
