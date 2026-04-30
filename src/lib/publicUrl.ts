@@ -12,9 +12,11 @@
  * intent filter in `AndroidManifest.xml`).
  */
 
-export const PUBLIC_BASE_URL = 'https://pamojanova.online';
+export const PUBLIC_BASE_URL = 'https://www.pamojanova.com';
 
 const KNOWN_PUBLIC_HOSTS = new Set([
+  'pamojanova.com',
+  'www.pamojanova.com',
   'pamojanova.online',
   'www.pamojanova.online',
 ]);

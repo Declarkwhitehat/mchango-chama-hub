@@ -16,6 +16,7 @@ import { PaymentDetailsSetup } from "@/components/PaymentDetailsSetup";
 import { JoinByCodeForm } from "@/components/chama/JoinByCodeForm";
 import { PendingJoinRequests } from "@/components/chama/PendingJoinRequests";
 import { TwoFactorReminder } from "@/components/TwoFactorReminder";
+import { SEO } from "@/components/SEO";
 
 interface Mchango {
   id: string;
@@ -120,6 +121,7 @@ const Home = () => {
     if (!profile?.kyc_submitted_at) {
       return (
         <Badge variant="secondary" className="flex items-center gap-1">
+        <SEO title="Pamojanova: Online Chama, Mchango & Welfare in Kenya" description="Manage Chama rotating savings, Mchango fundraising, and welfare groups securely with M-Pesa integration." path="/" />
           <AlertCircle className="h-3 w-3" />
           Not Verified
         </Badge>

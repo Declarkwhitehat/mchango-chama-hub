@@ -13,6 +13,8 @@ import { useNavigate, useLocation } from "react-router-dom";
  */
 
 const KNOWN_PUBLIC_HOSTS = new Set([
+  "pamojanova.com",
+  "www.pamojanova.com",
   "pamojanova.online",
   "www.pamojanova.online",
 ]);

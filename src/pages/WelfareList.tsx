@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Shield, Plus, Search, Loader2, Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { SEO } from "@/components/SEO";
 
 const WelfareList = () => {
   const [welfares, setWelfares] = useState<any[]>([]);
@@ -58,6 +59,7 @@ const WelfareList = () => {
 
   return (
     <Layout>
+    <SEO title="Welfare Groups in Kenya | Pamojanova" description="Join digitally-managed welfare groups in Kenya with multi-signature withdrawals and transparent contributions." path="/welfare" />
       <div className="container px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 max-w-4xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
           <div>

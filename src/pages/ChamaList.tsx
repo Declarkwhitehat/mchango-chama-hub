@@ -13,6 +13,7 @@ import { JoinByCodeForm } from "@/components/chama/JoinByCodeForm";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import { SEO } from "@/components/SEO";
 
 const PAGE_SIZE = 20;
 
@@ -111,6 +112,7 @@ const ChamaList = () => {
   if (isLoading && chamas.length === 0) {
     return (
       <Layout>
+      <SEO title="Online Chama Groups in Kenya | Pamojanova" description="Discover and join trusted online chama rotating savings groups in Kenya. Transparent, M-Pesa integrated, secure." path="/chama" />
         <div className="container px-4 py-8 max-w-6xl mx-auto">
           <p className="text-center text-muted-foreground">Loading chama groups...</p>
         </div>

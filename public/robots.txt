@@ -1,8 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /auth
+
 User-agent: Googlebot
 Allow: /
+Disallow: /auth
 
 User-agent: Bingbot
 Allow: /
+Disallow: /auth
 
 User-agent: Twitterbot
 Allow: /
@@ -10,7 +16,4 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
-User-agent: *
-Allow: /
-
-Sitemap: https://pamojanova.online/sitemap.xml
+Sitemap: https://www.pamojanova.com/sitemap.xml
