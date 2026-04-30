@@ -335,7 +335,7 @@ const Auth = () => {
         const result = await authenticate(storedIdentifier);
         if (result.success) {
           toast.success('Welcome back!');
-          navigate('/home', { replace: true });
+          navigate('/', { replace: true });
         } else {
           setBiometricCancelled(true);
           toast.error('Fingerprint authentication failed. Please use your password.');
@@ -381,11 +381,11 @@ const Auth = () => {
         const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
         if (cancelled) return;
         setDidRedirect(true);
-        navigate(data ? "/admin" : "/home", { replace: true });
+        navigate(data ? "/admin" : "/", { replace: true });
       } catch {
         if (cancelled) return;
         setDidRedirect(true);
-        navigate("/home", { replace: true });
+        navigate("/", { replace: true });
       }
     })();
     return () => { cancelled = true; };
@@ -455,7 +455,7 @@ const Auth = () => {
             if (isNative && nativeBiometricConfigured) {
               await storeNativeBiometricSession();
             }
-            navigate("/home", { replace: true });
+            navigate("/", { replace: true });
           }
         }
       }
@@ -478,7 +478,7 @@ const Auth = () => {
         const restored = await restoreNativeBiometricSession();
         if (restored) {
           toast.success('Welcome back!');
-          navigate(returnTo || '/home', { replace: true });
+          navigate(returnTo || '/', { replace: true });
           return;
         }
         toast.error('Your session has expired. Please log in with your password once to re-enable fingerprint.');
@@ -494,7 +494,7 @@ const Auth = () => {
     const result = await authenticate(emailOrPhone);
     if (result.success) {
       localStorage.setItem('lastLoginIdentifier', emailOrPhone);
-      navigate(returnTo || '/home', { replace: true });
+      navigate(returnTo || '/', { replace: true });
     }
   };
 
@@ -512,7 +512,7 @@ const Auth = () => {
           }
           toast.success('Fingerprint login enabled!');
           setShowBiometricSetup(false);
-          navigate(returnTo || (signupStep === 'phone' ? '/kyc-upload' : '/home'), { replace: true });
+          navigate(returnTo || (signupStep === 'phone' ? '/kyc-upload' : '/'), { replace: true });
         } else {
           toast.error(result.error || 'Failed to verify fingerprint');
         }
@@ -528,7 +528,7 @@ const Auth = () => {
         if (returnTo) {
           navigate(returnTo, { replace: true });
         } else {
-          navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
+          navigate(signupStep === 'phone' ? '/kyc-upload' : '/');
         }
       }
     } catch (error: any) {
@@ -543,7 +543,7 @@ const Auth = () => {
     if (returnTo) {
       navigate(returnTo, { replace: true });
     } else {
-      navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
+      navigate(signupStep === 'phone' ? '/kyc-upload' : '/');
     }
   };
 
@@ -710,9 +710,9 @@ const Auth = () => {
         await storeNativeBiometricSession();
       }
 
-      navigate("/home", { replace: true });
+      navigate("/", { replace: true });
     } else {
-      navigate("/home", { replace: true });
+      navigate("/", { replace: true });
     }
   };
 
