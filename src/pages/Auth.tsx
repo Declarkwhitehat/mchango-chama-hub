@@ -31,6 +31,7 @@ import {
   clearStoredSession,
 } from "@/lib/secureStorage";
 import { isNativeApp, authenticateBiometric, getBiometricType as getBioType } from "@/lib/biometricHandler";
+import { SEO } from "@/components/SEO";
 const loginSchema = z.object({
   emailOrPhone: z.string()
     .min(1, "Email or phone number is required")
@@ -724,6 +725,7 @@ const Auth = () => {
   if (show2FA && pending2FAUserId) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col items-center justify-center px-4">
+      <SEO title="Sign In or Register | Pamojanova" description="Sign in or create your Pamojanova account to manage chama groups, mchango campaigns and welfare contributions." path="/auth" />
         <TwoFactorVerification
           userId={pending2FAUserId}
           onVerified={handle2FAVerified}

@@ -3,12 +3,14 @@ import { Users, Target, Heart, Shield, Award, CheckCircle, ArrowLeft } from "luc
 import { useNavigate } from "react-router-dom";
 import declarkPhoto from "@/assets/declark-chacha-ceo.jpg";
 import { Button } from "@/components/ui/button";
+import { SEO } from "@/components/SEO";
 
 export default function AboutUs() {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
+    <SEO title="About Pamojanova | Trusted Chama & Mchango Platform Kenya" description="Learn about Pamojanova, Kenya's leading digital platform for chama, mchango campaigns, welfare groups and organizations." path="/about" />
       {/* Back Navigation */}
       <div className="container mx-auto px-4 pt-4">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">

@@ -12,6 +12,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import { SEO } from "@/components/SEO";
 
 const PAGE_SIZE = 20;
 
@@ -117,6 +118,7 @@ const OrganizationList = () => {
 
   return (
     <Layout>
+    <SEO title="Organizations & Institutions | Pamojanova" description="Discover verified organizations and institutions in Kenya raising funds and managing contributions on Pamojanova." path="/organizations" />
       <div className="container px-4 py-8 max-w-6xl mx-auto space-y-6">
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 rounded-full mb-2"><Building2 className="h-4 w-4 text-primary" /><span className="text-sm font-medium text-primary">Organizations</span></div>

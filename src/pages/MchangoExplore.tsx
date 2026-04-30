@@ -11,6 +11,7 @@ import { Search, Heart, Calendar, TrendingUp } from "lucide-react";
 import { ShareMenu } from "@/components/ShareMenu";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { toast } from "sonner";
+import { SEO } from "@/components/SEO";
 
 interface Mchango {
   id: string;
@@ -102,6 +103,7 @@ const MchangoExplore = () => {
 
   return (
     <div className="min-h-screen bg-background">
+    <SEO title="Explore Mchango Campaigns | Pamojanova" description="Explore active Mchango fundraising campaigns by category, location and trending status across Kenya." path="/mchango/explore" />
       {/* Hero Section */}
       <div className="bg-primary/10 py-12 px-4">
         <div className="max-w-6xl mx-auto text-center">

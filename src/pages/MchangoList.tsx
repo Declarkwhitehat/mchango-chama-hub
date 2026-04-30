@@ -13,6 +13,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import { SEO } from "@/components/SEO";
 
 const PAGE_SIZE = 20;
 
@@ -98,7 +99,8 @@ const MchangoList = () => {
     const progress = calculateProgress(allTimeCollected, Number(mchango.target_amount));
     const daysLeft = getDaysLeft(mchango.end_date);
     return (
-      <Card key={mchango.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/mchango/${mchango.slug}`)}>
+      <Card key={mchango.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() =>
+      <SEO title="Mchango Fundraising Campaigns Kenya | Pamojanova" description="Browse and support active Mchango fundraising campaigns across Kenya with secure M-Pesa donations." path="/mchango" /> navigate(`/mchango/${mchango.slug}`)}>
         <CardHeader>
           <div className="flex justify-between items-start mb-2">
             {mchango.category && <Badge variant="secondary">{mchango.category}</Badge>}

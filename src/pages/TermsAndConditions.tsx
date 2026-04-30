@@ -3,12 +3,14 @@ import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { SEO } from "@/components/SEO";
 
 const TermsAndConditions = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
+    <SEO title="Terms and Conditions | Pamojanova" description="Read the terms and conditions for using the Pamojanova platform for chama, mchango and welfare services." path="/terms" />
       <div className="container max-w-4xl py-8 px-4">
         <Button
           variant="ghost"

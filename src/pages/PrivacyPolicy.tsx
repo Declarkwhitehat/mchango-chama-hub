@@ -3,12 +3,14 @@ import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { SEO } from "@/components/SEO";
 
 const PrivacyPolicy = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
+    <SEO title="Privacy Policy | Pamojanova" description="Learn how Pamojanova collects, stores and protects your personal data across our chama, mchango and welfare services." path="/privacy" />
       <div className="container max-w-4xl py-8 px-4">
         <Button
           variant="ghost"
