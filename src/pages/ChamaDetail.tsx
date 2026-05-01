@@ -37,6 +37,10 @@ import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+const getStoredTab = (key: string, fallback: string) => {
+  if (typeof window === "undefined") return fallback;
+  return sessionStorage.getItem(key) || fallback;
+};
 
 interface ChamaData {
   id: string;
@@ -106,6 +110,8 @@ const ChamaDetail = () => {
   const [completedCyclesCount, setCompletedCyclesCount] = useState(0);
   const [totalCyclesCount, setTotalCyclesCount] = useState(0);
   const [paidOutMemberIds, setPaidOutMemberIds] = useState<Set<string>>(new Set());
+  const tabStorageKey = `chama-detail-tab:${id || "current"}`;
+  const [activeTab, setActiveTab] = useState(() => getStoredTab(tabStorageKey, "dashboard"));
 
   useEffect(() => {
     loadChama();
@@ -133,6 +139,15 @@ const ChamaDetail = () => {
       supabase.removeChannel(channel);
     };
   }, [id]);
+
+  useEffect(() => {
+    setActiveTab(getStoredTab(tabStorageKey, "dashboard"));
+  }, [tabStorageKey]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    sessionStorage.setItem(tabStorageKey, value);
+  };
 
   const loadChama = async () => {
     try {
@@ -810,7 +825,7 @@ const ChamaDetail = () => {
 
         {/* Tabs - Only visible to active approved members and admins */}
         {hasViewAccess && !isRemovedMember && (
-          <Tabs defaultValue="dashboard" className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center">
               <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
               {isManager && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}

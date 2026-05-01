@@ -22,6 +22,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { GroupDocuments } from "@/components/GroupDocuments";
 import { publicUrls } from "@/lib/publicUrl";
 
+const getStoredTab = (key: string, fallback: string) => {
+  if (typeof window === "undefined") return fallback;
+  return sessionStorage.getItem(key) || fallback;
+};
+
 interface Organization {
   id: string;
   name: string;
@@ -64,14 +69,25 @@ const OrganizationDetail = () => {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
+  const tabStorageKey = `organization-detail-tab:${id || "current"}`;
+  const [activeTab, setActiveTab] = useState(() => getStoredTab(tabStorageKey, "about"));
 
   useEffect(() => {
     fetchOrganization();
-  }, [id]);
+  }, [id, user?.id]);
+
+  useEffect(() => {
+    setActiveTab(getStoredTab(tabStorageKey, "about"));
+  }, [tabStorageKey]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    sessionStorage.setItem(tabStorageKey, value);
+  };
 
   const fetchOrganization = async () => {
     try {
-      setLoading(true);
+      if (!organization) setLoading(true);
       
       const { data, error } = await supabase
         .from('organizations')
@@ -261,7 +277,7 @@ const OrganizationDetail = () => {
         )}
 
         {/* Tabs for About/Donate/Donors */}
-        <Tabs defaultValue="about" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="donate">Donate</TabsTrigger>

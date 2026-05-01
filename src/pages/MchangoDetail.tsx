@@ -25,6 +25,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { GroupDocuments } from "@/components/GroupDocuments";
 import { publicUrls } from "@/lib/publicUrl";
 
+const getStoredTab = (key: string, fallback: string) => {
+  if (typeof window === "undefined") return fallback;
+  return sessionStorage.getItem(key) || fallback;
+};
+
 interface Campaign {
   id: string;
   title: string;
@@ -65,14 +70,25 @@ const MchangoDetail = () => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
+  const tabStorageKey = `mchango-detail-tab:${id || "current"}`;
+  const [activeTab, setActiveTab] = useState(() => getStoredTab(tabStorageKey, "details"));
 
   useEffect(() => {
     fetchCampaign();
-  }, [id]);
+  }, [id, user?.id]);
+
+  useEffect(() => {
+    setActiveTab(getStoredTab(tabStorageKey, "details"));
+  }, [tabStorageKey]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    sessionStorage.setItem(tabStorageKey, value);
+  };
 
   const fetchCampaign = async () => {
     try {
-      setLoading(true);
+      if (!campaign) setLoading(true);
       
       // First, try to fetch the campaign
       const { data, error } = await supabase
@@ -333,7 +349,7 @@ const MchangoDetail = () => {
           </Card>
 
           {/* Tabs for Campaign Details vs Withdrawals */}
-          <Tabs defaultValue="details">
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList>
               <TabsTrigger value="details">Campaign</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
