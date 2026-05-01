@@ -64,14 +64,15 @@ const OrganizationDetail = () => {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
+  const [activeTab, setActiveTab] = useState("about");
 
   useEffect(() => {
     fetchOrganization();
-  }, [id]);
+  }, [id, user?.id]);
 
   const fetchOrganization = async () => {
     try {
-      setLoading(true);
+      if (!organization) setLoading(true);
       
       const { data, error } = await supabase
         .from('organizations')
@@ -261,7 +262,7 @@ const OrganizationDetail = () => {
         )}
 
         {/* Tabs for About/Donate/Donors */}
-        <Tabs defaultValue="about" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="donate">Donate</TabsTrigger>
