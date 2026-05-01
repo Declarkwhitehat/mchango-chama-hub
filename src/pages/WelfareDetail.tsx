@@ -24,6 +24,11 @@ import { WelfareWithdrawalStatus } from "@/components/welfare/WelfareWithdrawalS
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
 
+const getStoredTab = (key: string, fallback: string) => {
+  if (typeof window === "undefined") return fallback;
+  return sessionStorage.getItem(key) || fallback;
+};
+
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -35,12 +40,22 @@ const WelfareDetail = () => {
   const [leaving, setLeaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [cooldownActive, setCooldownActive] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
+  const tabStorageKey = `welfare-detail-tab:${id || "current"}`;
+  const [activeTab, setActiveTab] = useState(() => getStoredTab(tabStorageKey, "overview"));
 
   useEffect(() => {
     if (id) fetchWelfare();
     if (user) checkAdmin();
   }, [id, user?.id]);
+
+  useEffect(() => {
+    setActiveTab(getStoredTab(tabStorageKey, "overview"));
+  }, [tabStorageKey]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    sessionStorage.setItem(tabStorageKey, value);
+  };
 
   const checkAdmin = async () => {
     if (!user) return;
@@ -260,7 +275,7 @@ const WelfareDetail = () => {
           </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 6 + (isExecutive ? 2 : 0))}, 1fr)` }}>
             <TabsTrigger value="overview" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Overview</TabsTrigger>
             <TabsTrigger value="contribute" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Contribute</TabsTrigger>
