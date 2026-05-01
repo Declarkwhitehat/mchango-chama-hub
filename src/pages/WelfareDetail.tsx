@@ -35,11 +35,12 @@ const WelfareDetail = () => {
   const [leaving, setLeaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [cooldownActive, setCooldownActive] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     if (id) fetchWelfare();
     if (user) checkAdmin();
-  }, [id, user]);
+  }, [id, user?.id]);
 
   const checkAdmin = async () => {
     if (!user) return;
@@ -54,7 +55,7 @@ const WelfareDetail = () => {
 
   const fetchWelfare = async () => {
     try {
-      setLoading(true);
+      if (!welfare) setLoading(true);
       const { data, error } = await supabase.functions.invoke(`welfare-crud/${id}`, { method: 'GET' });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -259,7 +260,7 @@ const WelfareDetail = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 6 + (isExecutive ? 2 : 0))}, 1fr)` }}>
             <TabsTrigger value="overview" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Overview</TabsTrigger>
             <TabsTrigger value="contribute" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Contribute</TabsTrigger>
