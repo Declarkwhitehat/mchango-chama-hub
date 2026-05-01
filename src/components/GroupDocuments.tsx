@@ -83,21 +83,34 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
       return;
     }
 
+    if (!entityId) {
+      toast.error("Missing group reference. Refresh the page and try again.");
+      return;
+    }
+
     setUploading(true);
     try {
+      // Verify the session is still valid before attempting upload
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        throw new Error("Your session has expired. Please log in again.");
+      }
+
       const ext = "." + selectedFile.name.split(".").pop()?.toLowerCase();
       const filePath = `${entityType}/${entityId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+
+      console.log("[GroupDocuments] Uploading", { filePath, size: selectedFile.size, type: selectedFile.type, entityType, entityId, userId: user.id });
 
       const { error: uploadError } = await supabase.storage
         .from("group-documents")
         .upload(filePath, selectedFile, {
-          contentType: selectedFile.type || undefined,
+          contentType: selectedFile.type || "application/octet-stream",
           upsert: false,
         });
 
       if (uploadError) {
-        console.error("Storage upload error:", uploadError);
-        throw new Error(uploadError.message || "Storage upload failed");
+        console.error("[GroupDocuments] Storage upload error:", uploadError);
+        throw new Error("Storage: " + (uploadError.message || JSON.stringify(uploadError)));
       }
 
       const { error: insertError } = await supabase
@@ -112,10 +125,10 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
         });
 
       if (insertError) {
-        console.error("DB insert error:", insertError);
+        console.error("[GroupDocuments] DB insert error:", insertError);
         // Clean up the uploaded file if DB insert fails
         await supabase.storage.from("group-documents").remove([filePath]);
-        throw new Error(insertError.message || "Failed to save document record");
+        throw new Error("Database: " + (insertError.message || JSON.stringify(insertError)));
       }
 
       toast.success("Document uploaded successfully");
@@ -125,8 +138,8 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
       if (fileInputRef.current) fileInputRef.current.value = "";
       fetchDocuments();
     } catch (err: any) {
-      console.error("Upload error:", err);
-      toast.error(err.message || "Failed to upload document");
+      console.error("[GroupDocuments] Upload error:", err);
+      toast.error(err?.message || "Failed to upload document", { duration: 8000 });
     } finally {
       setUploading(false);
     }
