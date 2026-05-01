@@ -65,14 +65,15 @@ const MchangoDetail = () => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
+  const [activeTab, setActiveTab] = useState("details");
 
   useEffect(() => {
     fetchCampaign();
-  }, [id]);
+  }, [id, user?.id]);
 
   const fetchCampaign = async () => {
     try {
-      setLoading(true);
+      if (!campaign) setLoading(true);
       
       // First, try to fetch the campaign
       const { data, error } = await supabase
@@ -333,7 +334,7 @@ const MchangoDetail = () => {
           </Card>
 
           {/* Tabs for Campaign Details vs Withdrawals */}
-          <Tabs defaultValue="details">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="details">Campaign</TabsTrigger>
               <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
