@@ -131,6 +131,7 @@ const MchangoList = () => {
 
   return (
     <Layout>
+      <SEO title="Mchango Fundraising Campaigns Kenya | Pamojanova" description="Browse and support active Mchango fundraising campaigns across Kenya with secure M-Pesa donations." path="/mchango" />
       <div className="container px-4 py-8 max-w-6xl mx-auto space-y-6">
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 rounded-full mb-2"><Heart className="h-4 w-4 text-primary" /><span className="text-sm font-medium text-primary">Campaigns</span></div>
