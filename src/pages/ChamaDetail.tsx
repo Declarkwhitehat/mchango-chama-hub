@@ -106,6 +106,7 @@ const ChamaDetail = () => {
   const [completedCyclesCount, setCompletedCyclesCount] = useState(0);
   const [totalCyclesCount, setTotalCyclesCount] = useState(0);
   const [paidOutMemberIds, setPaidOutMemberIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   useEffect(() => {
     loadChama();
@@ -810,7 +811,7 @@ const ChamaDetail = () => {
 
         {/* Tabs - Only visible to active approved members and admins */}
         {hasViewAccess && !isRemovedMember && (
-          <Tabs defaultValue="dashboard" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center">
               <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
               {isManager && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
