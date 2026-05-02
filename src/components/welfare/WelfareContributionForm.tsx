@@ -30,6 +30,76 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
+  // "Pay for another member" state
+  const [payForOther, setPayForOther] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; member_code: string; full_name: string; user_id: string }>>([]);
+  const [selectedRecipient, setSelectedRecipient] = useState<{ member_code: string; full_name: string } | null>(null);
+
+  const recipientCode = payForOther ? selectedRecipient?.member_code || "" : memberCode;
+
+  const searchMembers = async () => {
+    const q = searchQuery.trim();
+    if (!q) {
+      toast.error("Enter a Member ID or name to search");
+      return;
+    }
+    setSearching(true);
+    setSearchResults([]);
+    try {
+      // Get active members of this welfare
+      const { data: members, error } = await supabase
+        .from("welfare_members")
+        .select("id, member_code, user_id, status")
+        .eq("welfare_id", welfareId)
+        .eq("status", "active");
+
+      if (error) throw error;
+      if (!members || members.length === 0) {
+        toast.error("No active members found");
+        return;
+      }
+
+      // Fetch profiles for these members
+      const userIds = members.map((m: any) => m.user_id);
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+      if (pErr) throw pErr;
+
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name || ""]));
+      const upper = q.toUpperCase();
+      const lower = q.toLowerCase();
+
+      const matches = members
+        .map((m: any) => ({
+          id: m.id,
+          member_code: m.member_code || "",
+          user_id: m.user_id,
+          full_name: profileMap.get(m.user_id) || "Unknown",
+        }))
+        // Exclude removed/left and exclude self (paying for self uses the default flow)
+        .filter((m) => m.user_id !== user?.id)
+        .filter(
+          (m) =>
+            m.member_code.toUpperCase().includes(upper) ||
+            m.full_name.toLowerCase().includes(lower)
+        )
+        .slice(0, 20);
+
+      if (matches.length === 0) {
+        toast.error("No active members matched your search");
+      }
+      setSearchResults(matches);
+    } catch (err: any) {
+      toast.error(err.message || "Search failed");
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const handleStkPush = async () => {
     const numAmount = Number(amount);
     if (!numAmount || numAmount < 1) {
