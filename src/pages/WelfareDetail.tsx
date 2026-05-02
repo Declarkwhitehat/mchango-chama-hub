@@ -21,6 +21,7 @@ import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecut
 import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
 import { GroupDocuments } from "@/components/GroupDocuments";
 import { WelfareWithdrawalStatus } from "@/components/welfare/WelfareWithdrawalStatus";
+import { WelfareLeaveRequests } from "@/components/welfare/WelfareLeaveRequests";
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
 
