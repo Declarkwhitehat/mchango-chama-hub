@@ -444,7 +444,7 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
 
           <Button
             onClick={handleStkPush}
-            disabled={isProcessing || !phone || !amount || !name.trim()}
+            disabled={isProcessing || !phone || !amount || !name.trim() || (payForOther && !selectedRecipient)}
             className="w-full"
           >
             {isProcessing ? (
