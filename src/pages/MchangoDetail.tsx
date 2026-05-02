@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { GroupDocuments } from "@/components/GroupDocuments";
 import { publicUrls } from "@/lib/publicUrl";
+import { renderTextWithLinks } from "@/utils/linkify";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
