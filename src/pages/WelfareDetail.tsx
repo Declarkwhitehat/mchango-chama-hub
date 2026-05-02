@@ -31,7 +31,7 @@ const getStoredTab = (key: string, fallback: string) => {
 
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [welfare, setWelfare] = useState<any>(null);
   const [loading, setLoading] = useState(true);
