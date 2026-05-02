@@ -3103,6 +3103,63 @@ export type Database = {
           },
         ]
       }
+      welfare_leave_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_notes: string | null
+          id: string
+          member_id: string
+          reason: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          welfare_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_notes?: string | null
+          id?: string
+          member_id: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          welfare_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_notes?: string | null
+          id?: string
+          member_id?: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          welfare_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_leave_requests_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "welfare_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "welfare_leave_requests_welfare_id_fkey"
+            columns: ["welfare_id"]
+            isOneToOne: false
+            referencedRelation: "welfares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       welfare_members: {
         Row: {
           created_at: string
