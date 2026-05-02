@@ -334,6 +334,11 @@ const WelfareDetail = () => {
             )}
 
             {isMember && <WelfareWithdrawalStatus welfareId={welfare.id} isAdmin={isAdmin} />}
+            <WelfareLeaveRequests
+              welfareId={welfare.id}
+              canDecide={isExecutive}
+              onDecided={fetchWelfare}
+            />
             <WelfareExecutivePanel
               members={activeMembers}
               welfareId={welfare.id}
