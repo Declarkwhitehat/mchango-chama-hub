@@ -120,13 +120,48 @@ const WelfareDetail = () => {
   const handleLeave = async () => {
     setLeaving(true);
     try {
-      const { data, error } = await supabase.functions.invoke(`welfare-members?action=leave&welfare_id=${id}`, { method: 'DELETE' });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success("You have left the welfare group");
-      navigate('/welfare');
+      if (!user?.id || !myMemberId) {
+        throw new Error("You are not a member of this welfare");
+      }
+      // Create a pending leave request — managers must approve before the member is removed
+      const { error } = await supabase
+        .from('welfare_leave_requests')
+        .insert({
+          welfare_id: welfare.id,
+          member_id: myMemberId,
+          user_id: user.id,
+          status: 'pending',
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.info("You already have a pending leave request. Wait for a manager to decide.");
+          return;
+        }
+        throw error;
+      }
+
+      // Notify managers
+      const managers = (welfare.welfare_members || []).filter(
+        (m: any) => m.status === 'active' && ['chairman', 'secretary', 'treasurer'].includes(m.role)
+      );
+      await Promise.all(
+        managers.map((m: any) =>
+          supabase.from('notifications').insert({
+            user_id: m.user_id,
+            title: 'Leave Request Pending Approval',
+            message: `${profile?.full_name || 'A member'} has requested to leave "${welfare.name}". Review and approve or reject.`,
+            category: 'welfare',
+            type: 'action_required',
+            related_entity_type: 'welfare',
+            related_entity_id: welfare.id,
+          })
+        )
+      );
+
+      toast.success("Leave request submitted. A manager must approve it.");
     } catch (error: any) {
-      toast.error(error.message || "Failed to leave welfare");
+      toast.error(error.message || "Failed to submit leave request");
     } finally {
       setLeaving(false);
     }
