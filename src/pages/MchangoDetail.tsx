@@ -317,8 +317,8 @@ const MchangoDetail = () => {
                 </div>
               )}
               
-              <p className="text-foreground leading-relaxed whitespace-pre-wrap">
-                {campaign.description}
+              <p className="text-foreground leading-relaxed whitespace-pre-wrap break-words">
+                {renderTextWithLinks(campaign.description || "")}
               </p>
 
               <div className="space-y-2 pt-4">
