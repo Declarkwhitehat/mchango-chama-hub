@@ -114,11 +114,13 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
     if (!normalized) {
       toast.error("Enter a valid Safaricom phone number (e.g. 0707874790)");
       return;
+    }
     if (payForOther && !selectedRecipient?.member_code) {
       toast.error("Search and select the member you want to pay for");
       return;
     }
 
+    setPaymentStatus("sending");
     setStatusMessage("Sending payment request to your phone...");
 
     try {
