@@ -306,6 +306,98 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
             </p>
           )}
 
+          {/* Pay for another member toggle */}
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="pay-for-other" className="flex items-center gap-2 text-sm font-semibold">
+                  <UserCheck className="h-4 w-4" />
+                  Pay for another member
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Search by Member ID or full name
+                </p>
+              </div>
+              <Switch
+                id="pay-for-other"
+                checked={payForOther}
+                onCheckedChange={(checked) => {
+                  setPayForOther(checked);
+                  setSelectedRecipient(null);
+                  setSearchResults([]);
+                  setSearchQuery("");
+                }}
+                disabled={isProcessing}
+              />
+            </div>
+
+            {payForOther && (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Member ID (e.g. WFXXM0001) or name"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        searchMembers();
+                      }
+                    }}
+                    disabled={isProcessing || searching}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={searchMembers}
+                    disabled={isProcessing || searching || !searchQuery.trim()}
+                  >
+                    {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                </div>
+
+                {selectedRecipient ? (
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-green-500/50 bg-green-50 dark:bg-green-950/30 p-2">
+                    <div className="text-sm">
+                      <div className="font-semibold">{selectedRecipient.full_name}</div>
+                      <div className="text-xs font-mono text-muted-foreground">{selectedRecipient.member_code}</div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedRecipient(null)}
+                      disabled={isProcessing}
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  searchResults.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto space-y-1 rounded-md border bg-background p-1">
+                      {searchResults.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          className="w-full text-left px-2 py-2 rounded hover:bg-muted transition-colors flex items-center justify-between gap-2"
+                          onClick={() => {
+                            setSelectedRecipient({ member_code: m.member_code, full_name: m.full_name });
+                            setSearchResults([]);
+                          }}
+                          disabled={isProcessing}
+                        >
+                          <span className="text-sm font-medium truncate">{m.full_name}</span>
+                          <span className="text-xs font-mono text-muted-foreground shrink-0">{m.member_code}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+
+
           <div className="space-y-2">
             <Label>Full Name</Label>
             <Input
