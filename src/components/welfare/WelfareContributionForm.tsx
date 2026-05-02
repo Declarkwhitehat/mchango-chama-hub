@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Wallet, Smartphone, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Loader2, Wallet, Smartphone, CheckCircle, XCircle, Clock, Search, UserCheck } from "lucide-react";
 import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { normalizePhone, isValidKenyanPhone } from "@/utils/phoneUtils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +30,76 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
+  // "Pay for another member" state
+  const [payForOther, setPayForOther] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; member_code: string; full_name: string; user_id: string }>>([]);
+  const [selectedRecipient, setSelectedRecipient] = useState<{ member_code: string; full_name: string } | null>(null);
+
+  const recipientCode = payForOther ? selectedRecipient?.member_code || "" : memberCode;
+
+  const searchMembers = async () => {
+    const q = searchQuery.trim();
+    if (!q) {
+      toast.error("Enter a Member ID or name to search");
+      return;
+    }
+    setSearching(true);
+    setSearchResults([]);
+    try {
+      // Get active members of this welfare
+      const { data: members, error } = await supabase
+        .from("welfare_members")
+        .select("id, member_code, user_id, status")
+        .eq("welfare_id", welfareId)
+        .eq("status", "active");
+
+      if (error) throw error;
+      if (!members || members.length === 0) {
+        toast.error("No active members found");
+        return;
+      }
+
+      // Fetch profiles for these members
+      const userIds = members.map((m: any) => m.user_id);
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+      if (pErr) throw pErr;
+
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name || ""]));
+      const upper = q.toUpperCase();
+      const lower = q.toLowerCase();
+
+      const matches = members
+        .map((m: any) => ({
+          id: m.id,
+          member_code: m.member_code || "",
+          user_id: m.user_id,
+          full_name: profileMap.get(m.user_id) || "Unknown",
+        }))
+        // Exclude removed/left and exclude self (paying for self uses the default flow)
+        .filter((m) => m.user_id !== user?.id)
+        .filter(
+          (m) =>
+            m.member_code.toUpperCase().includes(upper) ||
+            m.full_name.toLowerCase().includes(lower)
+        )
+        .slice(0, 20);
+
+      if (matches.length === 0) {
+        toast.error("No active members matched your search");
+      }
+      setSearchResults(matches);
+    } catch (err: any) {
+      toast.error(err.message || "Search failed");
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const handleStkPush = async () => {
     const numAmount = Number(amount);
     if (!numAmount || numAmount < 1) {
@@ -42,6 +113,10 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
     const normalized = normalizePhone(phone);
     if (!normalized) {
       toast.error("Enter a valid Safaricom phone number (e.g. 0707874790)");
+      return;
+    }
+    if (payForOther && !selectedRecipient?.member_code) {
+      toast.error("Search and select the member you want to pay for");
       return;
     }
 
@@ -65,7 +140,7 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
           // Use the member's unique ID (e.g. G7BZM0001) so the STK prompt
           // shows the correct account and C2B can match the contribution to
           // this specific member, not just the welfare group.
-          account_reference: memberCode || paybillAccountId || `WF-${welfareId.substring(0, 8)}`,
+          account_reference: recipientCode || paybillAccountId || `WF-${welfareId.substring(0, 8)}`,
           transaction_desc: "Welfare contrib",
           callback_metadata: {
             type: "welfare_contribution",
@@ -231,6 +306,98 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
             </p>
           )}
 
+          {/* Pay for another member toggle */}
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="pay-for-other" className="flex items-center gap-2 text-sm font-semibold">
+                  <UserCheck className="h-4 w-4" />
+                  Pay for another member
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Search by Member ID or full name
+                </p>
+              </div>
+              <Switch
+                id="pay-for-other"
+                checked={payForOther}
+                onCheckedChange={(checked) => {
+                  setPayForOther(checked);
+                  setSelectedRecipient(null);
+                  setSearchResults([]);
+                  setSearchQuery("");
+                }}
+                disabled={isProcessing}
+              />
+            </div>
+
+            {payForOther && (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Member ID (e.g. WFXXM0001) or name"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        searchMembers();
+                      }
+                    }}
+                    disabled={isProcessing || searching}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={searchMembers}
+                    disabled={isProcessing || searching || !searchQuery.trim()}
+                  >
+                    {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                </div>
+
+                {selectedRecipient ? (
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-green-500/50 bg-green-50 dark:bg-green-950/30 p-2">
+                    <div className="text-sm">
+                      <div className="font-semibold">{selectedRecipient.full_name}</div>
+                      <div className="text-xs font-mono text-muted-foreground">{selectedRecipient.member_code}</div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedRecipient(null)}
+                      disabled={isProcessing}
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  searchResults.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto space-y-1 rounded-md border bg-background p-1">
+                      {searchResults.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          className="w-full text-left px-2 py-2 rounded hover:bg-muted transition-colors flex items-center justify-between gap-2"
+                          onClick={() => {
+                            setSelectedRecipient({ member_code: m.member_code, full_name: m.full_name });
+                            setSearchResults([]);
+                          }}
+                          disabled={isProcessing}
+                        >
+                          <span className="text-sm font-medium truncate">{m.full_name}</span>
+                          <span className="text-xs font-mono text-muted-foreground shrink-0">{m.member_code}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+
+
           <div className="space-y-2">
             <Label>Full Name</Label>
             <Input
@@ -277,7 +444,7 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
 
           <Button
             onClick={handleStkPush}
-            disabled={isProcessing || !phone || !amount || !name.trim()}
+            disabled={isProcessing || !phone || !amount || !name.trim() || (payForOther && !selectedRecipient)}
             className="w-full"
           >
             {isProcessing ? (

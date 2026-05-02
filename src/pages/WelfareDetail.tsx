@@ -21,6 +21,7 @@ import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecut
 import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
 import { GroupDocuments } from "@/components/GroupDocuments";
 import { WelfareWithdrawalStatus } from "@/components/welfare/WelfareWithdrawalStatus";
+import { WelfareLeaveRequests } from "@/components/welfare/WelfareLeaveRequests";
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
 
@@ -31,7 +32,7 @@ const getStoredTab = (key: string, fallback: string) => {
 
 const WelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [welfare, setWelfare] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -120,13 +121,48 @@ const WelfareDetail = () => {
   const handleLeave = async () => {
     setLeaving(true);
     try {
-      const { data, error } = await supabase.functions.invoke(`welfare-members?action=leave&welfare_id=${id}`, { method: 'DELETE' });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success("You have left the welfare group");
-      navigate('/welfare');
+      if (!user?.id || !myMemberId) {
+        throw new Error("You are not a member of this welfare");
+      }
+      // Create a pending leave request — managers must approve before the member is removed
+      const { error } = await supabase
+        .from('welfare_leave_requests')
+        .insert({
+          welfare_id: welfare.id,
+          member_id: myMemberId,
+          user_id: user.id,
+          status: 'pending',
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.info("You already have a pending leave request. Wait for a manager to decide.");
+          return;
+        }
+        throw error;
+      }
+
+      // Notify managers
+      const managers = (welfare.welfare_members || []).filter(
+        (m: any) => m.status === 'active' && ['chairman', 'secretary', 'treasurer'].includes(m.role)
+      );
+      await Promise.all(
+        managers.map((m: any) =>
+          supabase.from('notifications').insert({
+            user_id: m.user_id,
+            title: 'Leave Request Pending Approval',
+            message: `${profile?.full_name || 'A member'} has requested to leave "${welfare.name}". Review and approve or reject.`,
+            category: 'welfare',
+            type: 'action_required',
+            related_entity_type: 'welfare',
+            related_entity_id: welfare.id,
+          })
+        )
+      );
+
+      toast.success("Leave request submitted. A manager must approve it.");
     } catch (error: any) {
-      toast.error(error.message || "Failed to leave welfare");
+      toast.error(error.message || "Failed to submit leave request");
     } finally {
       setLeaving(false);
     }
@@ -162,21 +198,22 @@ const WelfareDetail = () => {
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" size="sm" className="text-destructive border-destructive hover:bg-destructive/10">
                     <LogOut className="h-4 w-4 mr-1" />
-                    Leave
+                    Request to Leave
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Leave Welfare Group?</AlertDialogTitle>
+                    <AlertDialogTitle>Request to Leave?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to leave "{welfare.name}"? You will lose access to the group and your membership will end.
+                      Submitting this request will notify the chairman, secretary, and treasurer of "{welfare.name}". 
+                      Any one of them must approve before your membership ends. You will remain a member until then.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleLeave} disabled={leaving} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                       {leaving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                      Leave Group
+                      Submit Leave Request
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -297,6 +334,11 @@ const WelfareDetail = () => {
             )}
 
             {isMember && <WelfareWithdrawalStatus welfareId={welfare.id} isAdmin={isAdmin} />}
+            <WelfareLeaveRequests
+              welfareId={welfare.id}
+              canDecide={isExecutive}
+              onDecided={fetchWelfare}
+            />
             <WelfareExecutivePanel
               members={activeMembers}
               welfareId={welfare.id}
