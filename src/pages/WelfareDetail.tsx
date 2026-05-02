@@ -202,16 +202,17 @@ const WelfareDetail = () => {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Leave Welfare Group?</AlertDialogTitle>
+                    <AlertDialogTitle>Request to Leave?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to leave "{welfare.name}"? You will lose access to the group and your membership will end.
+                      Submitting this request will notify the chairman, secretary, and treasurer of "{welfare.name}". 
+                      Any one of them must approve before your membership ends. You will remain a member until then.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleLeave} disabled={leaving} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                       {leaving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                      Leave Group
+                      Submit Leave Request
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
