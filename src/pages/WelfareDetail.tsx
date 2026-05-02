@@ -197,7 +197,7 @@ const WelfareDetail = () => {
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" size="sm" className="text-destructive border-destructive hover:bg-destructive/10">
                     <LogOut className="h-4 w-4 mr-1" />
-                    Leave
+                    Request to Leave
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
