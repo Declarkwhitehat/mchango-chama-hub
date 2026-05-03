@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Calendar, Loader2, AlertCircle, UserPlus, Bell, Shield, Eye } from "lucide-react";
+import { Calendar, Loader2, AlertCircle, UserPlus, Bell, Shield, Eye, Smartphone } from "lucide-react";
 import { ShareMenu } from "@/components/ShareMenu";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
