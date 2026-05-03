@@ -216,15 +216,28 @@ const MchangoDetail = () => {
                     </div>
                   </div>
                   
-                  {/* CTA */}
-                  <Button 
-                    size="lg" 
-                    className="flex-shrink-0 font-extrabold shadow-lg px-8 text-base bg-amber-500 hover:bg-amber-600 text-white border-0"
-                    onClick={() => navigate('/auth')}
-                  >
-                    <UserPlus className="h-5 w-5 mr-2" />
-                    Create Free Account
-                  </Button>
+                  {/* CTAs */}
+                  <div className="flex flex-col gap-2 flex-shrink-0">
+                    <Button
+                      size="lg"
+                      className="font-extrabold shadow-lg px-8 text-base bg-amber-500 hover:bg-amber-600 text-white border-0"
+                      onClick={() => navigate('/auth')}
+                    >
+                      <UserPlus className="h-5 w-5 mr-2" />
+                      Create Free Account
+                    </Button>
+                    {!(window as any).Capacitor?.isNativePlatform?.() && (
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="font-bold px-8 text-base border-amber-500/60 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                        onClick={() => window.open("https://github.com/Declarkwhitehat/mchango-chama-hub/releases/latest/download/app-debug.apk", "_blank")}
+                      >
+                        <Smartphone className="h-5 w-5 mr-2" />
+                        Download Our App
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
