@@ -77,50 +77,27 @@ export const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-2 lg:gap-4">
-            {isAdmin ? (
-              <Button 
-                variant="ghost" 
-                onClick={() => navigate('/admin')}
-                className="gap-2"
-              >
+            <Button variant="ghost" onClick={() => navigate('/mchango')} className="gap-2">
+              <Heart className="h-4 w-4" />
+              Campaigns
+            </Button>
+            <Button variant="ghost" onClick={() => navigate('/chama')} className="gap-2">
+              <Users className="h-4 w-4" />
+              Chamas
+            </Button>
+            <Button variant="ghost" onClick={() => navigate('/welfare')} className="gap-2">
+              <Shield className="h-4 w-4" />
+              Welfare
+            </Button>
+            <Button variant="ghost" onClick={() => navigate('/organizations')} className="gap-2">
+              <Building2 className="h-4 w-4" />
+              Organizations
+            </Button>
+            {isAdmin && (
+              <Button variant="ghost" onClick={() => navigate('/admin')} className="gap-2">
                 <LayoutDashboard className="h-4 w-4" />
-                Admin Dashboard
+                Admin
               </Button>
-            ) : (
-              <>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => navigate('/chama')}
-                  className="gap-2"
-                >
-                  <Users className="h-4 w-4" />
-                  Browse Chamas
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => navigate('/mchango')}
-                  className="gap-2"
-                >
-                  <Heart className="h-4 w-4" />
-                  Campaigns
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => navigate('/organizations')}
-                  className="gap-2"
-                >
-                  <Building2 className="h-4 w-4" />
-                  Organizations
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => navigate('/welfare')}
-                  className="gap-2"
-                >
-                  <Shield className="h-4 w-4" />
-                  Welfare
-                </Button>
-              </>
             )}
             {user ? (
               <>
