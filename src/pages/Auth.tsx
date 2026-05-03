@@ -481,7 +481,7 @@ const Auth = () => {
           navigate(returnTo || '/', { replace: true });
           return;
         }
-        toast.error('Your session has expired. Please log in with your password once to re-enable fingerprint.');
+        toast.error("Session expired. Log in with your password to continue, or tap 'Sign Up' if you don't have an account yet.");
       }
       return;
     }
