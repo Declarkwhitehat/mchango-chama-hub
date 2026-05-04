@@ -26,6 +26,7 @@ const AdminCommissionConfig = () => {
     { key: "commission_rate_welfare", label: "Welfare", description: "Welfare contribution commission", rate: 5 },
   ]);
   const [verificationFee, setVerificationFee] = useState(200);
+  const [accountVerificationFee, setAccountVerificationFee] = useState(1500);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -38,7 +39,7 @@ const AdminCommissionConfig = () => {
 
   const fetchRates = async () => {
     try {
-      const allKeys = [...rates.map(r => r.key), "verification_fee"];
+      const allKeys = [...rates.map(r => r.key), "verification_fee", "user_verification_fee"];
       const { data, error } = await supabase
         .from("platform_settings")
         .select("setting_key, setting_value")
@@ -60,6 +61,11 @@ const AdminCommissionConfig = () => {
         if (feeSetting && typeof feeSetting.setting_value === 'object' && feeSetting.setting_value !== null) {
           const val = feeSetting.setting_value as { amount?: number };
           setVerificationFee(val.amount || 200);
+        }
+        const acctFee = data.find((d: any) => d.setting_key === "user_verification_fee");
+        if (acctFee && typeof acctFee.setting_value === 'object' && acctFee.setting_value !== null) {
+          const val = acctFee.setting_value as { amount?: number };
+          setAccountVerificationFee(val.amount || 1500);
         }
       }
     } catch (err: any) {
