@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Save, Percent, Shield, BadgeCheck } from "lucide-react";
+import { Loader2, Lock, Save, Percent, Shield, BadgeCheck, Coins } from "lucide-react";
 
 const SUPER_ADMIN_CODE = "D3E9C0L1A3R9K";
 
@@ -27,6 +27,10 @@ const AdminCommissionConfig = () => {
   ]);
   const [verificationFee, setVerificationFee] = useState(200);
   const [accountVerificationFee, setAccountVerificationFee] = useState(1500);
+  const [minChamaContribution, setMinChamaContribution] = useState(100);
+  const [minWithdrawalChama, setMinWithdrawalChama] = useState(100);
+  const [minWithdrawalMchango, setMinWithdrawalMchango] = useState(100);
+  const [minWithdrawalWelfare, setMinWithdrawalWelfare] = useState(100);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -39,7 +43,13 @@ const AdminCommissionConfig = () => {
 
   const fetchRates = async () => {
     try {
-      const allKeys = [...rates.map(r => r.key), "verification_fee", "user_verification_fee"];
+      const minimumKeys = [
+        "min_chama_contribution",
+        "min_withdrawal_chama",
+        "min_withdrawal_mchango",
+        "min_withdrawal_welfare",
+      ];
+      const allKeys = [...rates.map(r => r.key), "verification_fee", "user_verification_fee", ...minimumKeys];
       const { data, error } = await supabase
         .from("platform_settings")
         .select("setting_key, setting_value")
@@ -67,6 +77,19 @@ const AdminCommissionConfig = () => {
           const val = acctFee.setting_value as { amount?: number };
           setAccountVerificationFee(val.amount || 1500);
         }
+
+        const readAmount = (key: string, fallback: number) => {
+          const row = data.find((d: any) => d.setting_key === key);
+          if (row && typeof row.setting_value === 'object' && row.setting_value !== null) {
+            const v = row.setting_value as { amount?: number };
+            return Number.isFinite(v.amount) ? Number(v.amount) : fallback;
+          }
+          return fallback;
+        };
+        setMinChamaContribution(readAmount("min_chama_contribution", 100));
+        setMinWithdrawalChama(readAmount("min_withdrawal_chama", 100));
+        setMinWithdrawalMchango(readAmount("min_withdrawal_mchango", 100));
+        setMinWithdrawalWelfare(readAmount("min_withdrawal_welfare", 100));
       }
     } catch (err: any) {
       console.error(err);
