@@ -303,7 +303,7 @@ serve(async (req) => {
 
       const graceDeadlineStr = graceDeadline.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 
-      const message = `🎉 "${chama.name}" has started! You are Member #${memberIndex}. You have a 24hr grace period - first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 10:00 PM. Contribute ${frequencyText}. Your payout date: ${payoutDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}. ${i === 0 ? 'You are first in line!' : `${memberIndex - 1} member(s) before you.`}`;
+      const message = `Pamojanova: "${chama.name}" has started. You are Member #${memberIndex}. You have a 24-hour grace period — your first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 10:00 PM. Contribute ${frequencyText}. Your payout date: ${payoutDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}. ${i === 0 ? 'You are first in line.' : `${memberIndex - 1} member(s) before you.`}`;
 
       if (member.profiles?.phone) {
         try {
