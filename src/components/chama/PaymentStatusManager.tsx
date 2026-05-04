@@ -57,6 +57,7 @@ interface PaymentStatusManagerProps {
   chamaName: string;
   contributionAmount: number;
   commissionRate?: number;
+  chamaStatus?: string;
 }
 
 type PeriodType = "today" | "week" | "month";
@@ -66,6 +67,7 @@ export const PaymentStatusManager = ({
   chamaName,
   contributionAmount,
   commissionRate = 0,
+  chamaStatus,
 }: PaymentStatusManagerProps) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
