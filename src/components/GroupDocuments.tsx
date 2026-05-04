@@ -1,20 +1,40 @@
-// GroupDocuments - shared document upload/download component
+// GroupDocuments - shared document upload/download component with 72h deletion cooldown
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText, Upload, Download, Loader2, AlertCircle, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import {
+  FileText,
+  Upload,
+  Download,
+  Loader2,
+  AlertCircle,
+  Plus,
+  Trash2,
+  Clock,
+} from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface GroupDocumentsProps {
   entityType: "welfare" | "chama" | "mchango" | "organization";
   entityId: string;
   canUpload: boolean;
+  /** Group manager / executive — can request deletion (72h cooldown). */
+  isManager?: boolean;
+  /** Backwards compat — treated as manager too. */
   isAdmin?: boolean;
 }
 
@@ -28,18 +48,31 @@ interface DocRecord {
   file_path: string;
   uploaded_by: string;
   created_at: string;
+  deletion_status: string | null;
+  deletion_requested_at: string | null;
+  deletion_scheduled_for: string | null;
+  deletion_reason: string | null;
 }
 
-export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = false }: GroupDocumentsProps) => {
+export const GroupDocuments = ({
+  entityType,
+  entityId,
+  canUpload,
+  isManager = false,
+  isAdmin = false,
+}: GroupDocumentsProps) => {
   const { user } = useAuth();
+  const canRequestDelete = isManager || isAdmin;
   const [documents, setDocuments] = useState<DocRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [requestingId, setRequestingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DocRecord | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,18 +95,15 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > MAX_FILE_SIZE) {
       toast.error("File size exceeds 5MB limit");
       return;
     }
-
     const ext = "." + file.name.split(".").pop()?.toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       toast.error("Allowed: PDF, DOC, DOCX, JPG, PNG, WEBP");
       return;
     }
-
     setSelectedFile(file);
   };
 
@@ -82,7 +112,6 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
       toast.error(!user ? "You must be logged in" : "Provide a title and file");
       return;
     }
-
     if (!entityId) {
       toast.error("Missing group reference. Refresh the page and try again.");
       return;
@@ -90,16 +119,15 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
 
     setUploading(true);
     try {
-      // Verify the session is still valid before attempting upload
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData.session) {
         throw new Error("Your session has expired. Please log in again.");
       }
 
       const ext = "." + selectedFile.name.split(".").pop()?.toLowerCase();
-      const filePath = `${entityType}/${entityId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-
-      console.log("[GroupDocuments] Uploading", { filePath, size: selectedFile.size, type: selectedFile.type, entityType, entityId, userId: user.id });
+      const filePath = `${entityType}/${entityId}/${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("group-documents")
@@ -108,10 +136,7 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
           upsert: false,
         });
 
-      if (uploadError) {
-        console.error("[GroupDocuments] Storage upload error:", uploadError);
-        throw new Error("Storage: " + (uploadError.message || JSON.stringify(uploadError)));
-      }
+      if (uploadError) throw new Error("Storage: " + (uploadError.message || JSON.stringify(uploadError)));
 
       const { error: insertError } = await supabase
         .from("group_documents")
@@ -125,8 +150,6 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
         });
 
       if (insertError) {
-        console.error("[GroupDocuments] DB insert error:", insertError);
-        // Clean up the uploaded file if DB insert fails
         await supabase.storage.from("group-documents").remove([filePath]);
         throw new Error("Database: " + (insertError.message || JSON.stringify(insertError)));
       }
@@ -151,9 +174,7 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
       const { data, error } = await supabase.storage
         .from("group-documents")
         .download(doc.file_path);
-
       if (error) throw error;
-
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
       a.href = url;
@@ -167,6 +188,30 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
       toast.error("Failed to download document");
     } finally {
       setDownloadingId(null);
+    }
+  };
+
+  const submitDeletionRequest = async () => {
+    if (!deleteTarget) return;
+    setRequestingId(deleteTarget.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("request-document-deletion", {
+        body: { document_id: deleteTarget.id, reason: deleteReason.trim() || null },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(
+        "Deletion scheduled. The document will be removed in 72 hours unless an admin cancels.",
+        { duration: 6000 },
+      );
+      setDeleteTarget(null);
+      setDeleteReason("");
+      fetchDocuments();
+    } catch (err: any) {
+      console.error("Deletion request error:", err);
+      toast.error(err?.message || "Failed to request deletion");
+    } finally {
+      setRequestingId(null);
     }
   };
 
@@ -225,16 +270,8 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
               )}
             </div>
             <div className="flex gap-2">
-              <Button
-                onClick={handleUpload}
-                disabled={uploading || !selectedFile || !title.trim()}
-                size="sm"
-              >
-                {uploading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-1" />
-                )}
+              <Button onClick={handleUpload} disabled={uploading || !selectedFile || !title.trim()} size="sm">
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
                 Upload
               </Button>
               <Button
@@ -255,63 +292,75 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
         {/* Documents List */}
         {documents.length > 0 ? (
           <div className="space-y-3">
-            {documents.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-              >
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-foreground">{doc.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {format(new Date(doc.created_at), "dd MMM yyyy, HH:mm")}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDownload(doc)}
-                  disabled={downloadingId === doc.id}
+            {documents.map((doc) => {
+              const isPending = doc.deletion_status === "pending" && doc.deletion_scheduled_for;
+              return (
+                <div
+                  key={doc.id}
+                  className={`p-3 rounded-lg border bg-card transition-colors ${
+                    isPending ? "border-amber-300 bg-amber-50/40 dark:bg-amber-950/10" : "hover:bg-muted/50"
+                  }`}
                 >
-                  {downloadingId === doc.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                </Button>
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={async () => {
-                      if (!confirm("Delete this document permanently?")) return;
-                      setDeletingId(doc.id);
-                      try {
-                        await supabase.storage.from("group-documents").remove([doc.file_path]);
-                        await supabase.from("group_documents").delete().eq("id", doc.id);
-                        toast.success("Document deleted");
-                        fetchDocuments();
-                      } catch {
-                        toast.error("Failed to delete document");
-                      } finally {
-                        setDeletingId(null);
-                      }
-                    }}
-                    disabled={deletingId === doc.id}
-                  >
-                    {deletingId === doc.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <FileText className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-foreground">{doc.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Uploaded {format(new Date(doc.created_at), "dd MMM yyyy, HH:mm")}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDownload(doc)}
+                      disabled={downloadingId === doc.id}
+                    >
+                      {downloadingId === doc.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                    </Button>
+                    {canRequestDelete && !isPending && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setDeleteTarget(doc);
+                          setDeleteReason("");
+                        }}
+                        disabled={requestingId === doc.id}
+                      >
+                        {requestingId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
                     )}
-                  </Button>
-                )}
-              </div>
-            ))}
+                  </div>
+
+                  {isPending && (
+                    <div className="mt-3 p-2.5 rounded-md bg-amber-100/60 dark:bg-amber-950/30 border border-amber-300 text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300">
+                        <Clock className="h-3.5 w-3.5" />
+                        Scheduled for deletion {formatDistanceToNow(new Date(doc.deletion_scheduled_for!), { addSuffix: true })}
+                      </div>
+                      {doc.deletion_reason && (
+                        <p className="text-amber-700 dark:text-amber-400">Reason: {doc.deletion_reason}</p>
+                      )}
+                      <p className="text-amber-700/80 dark:text-amber-400/80">
+                        An admin can cancel or expedite this deletion.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           !showForm && (
@@ -326,12 +375,58 @@ export const GroupDocuments = ({ entityType, entityId, canUpload, isAdmin = fals
           )
         )}
 
-        {/* Deletion notice */}
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-muted text-xs text-muted-foreground">
-          <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-          <p>To delete a document, please contact customer care.</p>
-        </div>
+        {canRequestDelete && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-muted text-xs text-muted-foreground">
+            <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+            <p>
+              Deleting a document starts a 72-hour cooldown. All members are notified and the document remains
+              visible during this period. A platform admin can cancel or expedite the deletion.
+            </p>
+          </div>
+        )}
       </CardContent>
+
+      {/* Confirm Delete Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request document deletion</DialogTitle>
+            <DialogDescription>
+              "{deleteTarget?.title}" will be permanently deleted in <strong>72 hours</strong>. All members will
+              be notified now and again when the document is removed. A platform admin can cancel this request
+              before it completes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="del-reason">Reason (optional)</Label>
+            <Textarea
+              id="del-reason"
+              placeholder="Why is this being deleted?"
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              maxLength={300}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={submitDeletionRequest}
+              disabled={requestingId === deleteTarget?.id}
+            >
+              {requestingId === deleteTarget?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-1" />
+              )}
+              Schedule Deletion
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
