@@ -862,9 +862,11 @@ const ChamaDetail = () => {
             <TabsContent value="members" className="space-y-4">
               {/* WhatsApp Group Link Manager */}
               <WhatsAppLinkManager
-                chamaId={chama.id}
+                entityId={chama.id}
+                table="chama"
                 currentLink={chama.whatsapp_link}
                 isManager={isManager}
+                entityLabel="chama"
                 onUpdate={loadChama}
               />
 
