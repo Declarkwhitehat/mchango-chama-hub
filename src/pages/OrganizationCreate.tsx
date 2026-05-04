@@ -203,46 +203,10 @@ const OrganizationCreate = () => {
 
   const { execute: handleSubmit, isProcessing } = useDebounceAction(handleSubmitInner);
 
-  if (kycStatus === null) {
-    return (
-      <Layout showBackButton title="Register Organization">
-        <div className="container px-4 py-6 max-w-2xl mx-auto">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-muted-foreground">Loading...</p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout showBackButton title="Register Organization">
       <div className="container px-4 py-6 max-w-2xl mx-auto">
-        {kycStatus !== "approved" && (
-          <Alert className="mb-4 border-warning bg-warning/10">
-            <AlertCircle className="h-4 w-4 text-warning" />
-            <AlertDescription>
-              <strong>You must complete verification before registering an organization.</strong>
-              <br />
-              Only KYC-approved users can register organizations.{" "}
-              <a href="/kyc-upload" className="underline font-medium">
-                Complete KYC now
-              </a>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {kycStatus === "approved" && (
-          <Alert className="mb-4 border-success bg-success/10">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <AlertDescription>
-              Your KYC is approved. You can now register an organization.
-            </AlertDescription>
-          </Alert>
-        )}
-
+        <KycGate featureLabel="organization">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
