@@ -365,6 +365,7 @@ const OrganizationDetail = () => {
               entityType="organization"
               entityId={organization.id}
               canUpload={isCreator}
+              isManager={isCreator}
             />
           </TabsContent>
         </Tabs>
