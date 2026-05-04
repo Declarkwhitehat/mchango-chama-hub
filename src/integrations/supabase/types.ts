@@ -75,6 +75,7 @@ export type Database = {
           id: string
           is_defining_cycle: boolean
           is_public: boolean | null
+          is_test: boolean
           is_verified: boolean
           last_cycle_completed_at: string | null
           max_members: number
@@ -111,6 +112,7 @@ export type Database = {
           id?: string
           is_defining_cycle?: boolean
           is_public?: boolean | null
+          is_test?: boolean
           is_verified?: boolean
           last_cycle_completed_at?: string | null
           max_members?: number
@@ -147,6 +149,7 @@ export type Database = {
           id?: string
           is_defining_cycle?: boolean
           is_public?: boolean | null
+          is_test?: boolean
           is_verified?: boolean
           last_cycle_completed_at?: string | null
           max_members?: number
@@ -496,6 +499,7 @@ export type Database = {
           first_payment_completed: boolean | null
           id: string
           is_manager: boolean
+          is_test: boolean
           joined_at: string
           last_payment_date: string | null
           member_code: string
@@ -532,6 +536,7 @@ export type Database = {
           first_payment_completed?: boolean | null
           id?: string
           is_manager?: boolean
+          is_test?: boolean
           joined_at?: string
           last_payment_date?: string | null
           member_code: string
@@ -568,6 +573,7 @@ export type Database = {
           first_payment_completed?: boolean | null
           id?: string
           is_manager?: boolean
+          is_test?: boolean
           joined_at?: string
           last_payment_date?: string | null
           member_code?: string
@@ -740,6 +746,7 @@ export type Database = {
         Row: {
           chama_id: string
           id: string
+          is_test: boolean
           notes: string | null
           previous_member_id: string | null
           requested_at: string | null
@@ -751,6 +758,7 @@ export type Database = {
         Insert: {
           chama_id: string
           id?: string
+          is_test?: boolean
           notes?: string | null
           previous_member_id?: string | null
           requested_at?: string | null
@@ -762,6 +770,7 @@ export type Database = {
         Update: {
           chama_id?: string
           id?: string
+          is_test?: boolean
           notes?: string | null
           previous_member_id?: string | null
           requested_at?: string | null
@@ -1308,6 +1317,7 @@ export type Database = {
           image_url_2: string | null
           image_url_3: string | null
           is_public: boolean | null
+          is_test: boolean
           is_verified: boolean
           managers: string[] | null
           paybill_account_id: string
@@ -1337,6 +1347,7 @@ export type Database = {
           image_url_2?: string | null
           image_url_3?: string | null
           is_public?: boolean | null
+          is_test?: boolean
           is_verified?: boolean
           managers?: string[] | null
           paybill_account_id: string
@@ -1366,6 +1377,7 @@ export type Database = {
           image_url_2?: string | null
           image_url_3?: string | null
           is_public?: boolean | null
+          is_test?: boolean
           is_verified?: boolean
           managers?: string[] | null
           paybill_account_id?: string
@@ -1529,6 +1541,7 @@ export type Database = {
       member_trust_scores: {
         Row: {
           id: string
+          is_test: boolean
           total_chamas_completed: number
           total_late_payments: number
           total_missed_payments: number
@@ -1540,6 +1553,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          is_test?: boolean
           total_chamas_completed?: number
           total_late_payments?: number
           total_missed_payments?: number
@@ -1551,6 +1565,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          is_test?: boolean
           total_chamas_completed?: number
           total_late_payments?: number
           total_missed_payments?: number
@@ -2251,6 +2266,7 @@ export type Database = {
           id_back_url: string | null
           id_front_url: string | null
           id_number: string
+          is_test: boolean
           is_verified: boolean
           kyc_rejection_reason: string | null
           kyc_reviewed_at: string | null
@@ -2284,6 +2300,7 @@ export type Database = {
           id_back_url?: string | null
           id_front_url?: string | null
           id_number: string
+          is_test?: boolean
           is_verified?: boolean
           kyc_rejection_reason?: string | null
           kyc_reviewed_at?: string | null
@@ -2317,6 +2334,7 @@ export type Database = {
           id_back_url?: string | null
           id_front_url?: string | null
           id_number?: string
+          is_test?: boolean
           is_verified?: boolean
           kyc_rejection_reason?: string | null
           kyc_reviewed_at?: string | null
@@ -2450,6 +2468,48 @@ export type Database = {
           id?: string
           settled_at?: string
           settlement_result?: Json | null
+        }
+        Relationships: []
+      }
+      simulation_runs: {
+        Row: {
+          created_at: string
+          current_stage: string | null
+          failed: number
+          finished_at: string | null
+          id: string
+          passed: number
+          report: Json
+          run_by: string
+          started_at: string
+          status: string
+          total_tests: number
+        }
+        Insert: {
+          created_at?: string
+          current_stage?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          passed?: number
+          report?: Json
+          run_by: string
+          started_at?: string
+          status?: string
+          total_tests?: number
+        }
+        Update: {
+          created_at?: string
+          current_stage?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          passed?: number
+          report?: Json
+          run_by?: string
+          started_at?: string
+          status?: string
+          total_tests?: number
         }
         Relationships: []
       }
@@ -3300,6 +3360,7 @@ export type Database = {
           id: string
           is_frozen: boolean | null
           is_public: boolean | null
+          is_test: boolean
           is_verified: boolean | null
           min_contribution_period_months: number | null
           name: string
@@ -3333,6 +3394,7 @@ export type Database = {
           id?: string
           is_frozen?: boolean | null
           is_public?: boolean | null
+          is_test?: boolean
           is_verified?: boolean | null
           min_contribution_period_months?: number | null
           name: string
@@ -3366,6 +3428,7 @@ export type Database = {
           id?: string
           is_frozen?: boolean | null
           is_public?: boolean | null
+          is_test?: boolean
           is_verified?: boolean | null
           min_contribution_period_months?: number | null
           name?: string
@@ -3400,6 +3463,7 @@ export type Database = {
           created_at: string
           cycle_id: string | null
           id: string
+          is_test: boolean
           last_b2c_attempt_at: string | null
           mchango_id: string | null
           net_amount: number
@@ -3430,6 +3494,7 @@ export type Database = {
           created_at?: string
           cycle_id?: string | null
           id?: string
+          is_test?: boolean
           last_b2c_attempt_at?: string | null
           mchango_id?: string | null
           net_amount: number
@@ -3460,6 +3525,7 @@ export type Database = {
           created_at?: string
           cycle_id?: string | null
           id?: string
+          is_test?: boolean
           last_b2c_attempt_at?: string | null
           mchango_id?: string | null
           net_amount?: number
@@ -3591,6 +3657,7 @@ export type Database = {
     }
     Functions: {
       admin_clear_payout_default: { Args: { p_user_id: string }; Returns: Json }
+      admin_purge_simulation_data: { Args: never; Returns: Json }
       calculate_available_loan_pool: {
         Args: { p_group_id: string }
         Returns: number
