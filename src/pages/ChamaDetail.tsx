@@ -828,7 +828,7 @@ const ChamaDetail = () => {
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center">
               <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
-              {isManager && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
+              {isManager && !isPendingStatus && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               <TabsTrigger value="members" className="text-xs sm:text-sm">Members</TabsTrigger>
               {isMember && <TabsTrigger value="chat" className="text-xs sm:text-sm flex items-center gap-1"><MessageSquare className="h-3 w-3" />Chat</TabsTrigger>}
               <TabsTrigger value="documents" className="text-xs sm:text-sm">Docs</TabsTrigger>
@@ -848,7 +848,7 @@ const ChamaDetail = () => {
             </TabsContent>
 
 
-            {isManager && (
+            {isManager && !isPendingStatus && (
               <TabsContent value="payments">
                 <PaymentStatusManager
                   chamaId={chama.id}
