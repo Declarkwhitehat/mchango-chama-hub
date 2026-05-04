@@ -1306,6 +1306,13 @@ export type Database = {
       group_documents: {
         Row: {
           created_at: string
+          deletion_cancelled_at: string | null
+          deletion_cancelled_by: string | null
+          deletion_reason: string | null
+          deletion_requested_at: string | null
+          deletion_requested_by: string | null
+          deletion_scheduled_for: string | null
+          deletion_status: string | null
           entity_id: string
           entity_type: string
           file_name: string
@@ -1316,6 +1323,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deletion_cancelled_at?: string | null
+          deletion_cancelled_by?: string | null
+          deletion_reason?: string | null
+          deletion_requested_at?: string | null
+          deletion_requested_by?: string | null
+          deletion_scheduled_for?: string | null
+          deletion_status?: string | null
           entity_id: string
           entity_type: string
           file_name: string
@@ -1326,6 +1340,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deletion_cancelled_at?: string | null
+          deletion_cancelled_by?: string | null
+          deletion_reason?: string | null
+          deletion_requested_at?: string | null
+          deletion_requested_by?: string | null
+          deletion_scheduled_for?: string | null
+          deletion_status?: string | null
           entity_id?: string
           entity_type?: string
           file_name?: string
@@ -3698,6 +3719,10 @@ export type Database = {
       }
       is_chama_member: {
         Args: { _chama_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_entity_manager: {
+        Args: { _entity_id: string; _entity_type: string; _user_id: string }
         Returns: boolean
       }
       is_savings_group_manager: {
