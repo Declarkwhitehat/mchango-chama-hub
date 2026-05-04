@@ -67,6 +67,19 @@ const SOURCE_LABELS: Record<string, string> = {
 // the dashboard total to prevent double-counting.
 const LEDGER_DUPLICATED_EARNINGS = new Set(["COMMISSION"]);
 
+// Ledger transaction types that represent INFLOWS (real revenue events).
+// Payouts and other outflow types are excluded from Gross/Commission/Net KPIs
+// because they are disbursements of funds already collected — counting them
+// would double the gross figure and dilute the effective commission rate.
+const REVENUE_TX_TYPES = new Set([
+  "contribution",
+  "contribution_summary",
+  "donation",
+  "commission",
+]);
+const isRevenueEntry = (e: { transaction_type?: string | null }) =>
+  REVENUE_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
+
 // Map company_earnings.source → dashboard breakdown bucket key
 const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
   VERIFICATION_FEE: "verification_fee",
