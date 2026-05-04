@@ -92,7 +92,7 @@ const OrganizationCreate = () => {
       const { data: userCheck } = await supabase.auth.getUser();
       if (!session?.access_token || !userCheck?.user) {
         toast.error("Session expired. Please log in again");
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         navigate("/auth");
         return;
       }

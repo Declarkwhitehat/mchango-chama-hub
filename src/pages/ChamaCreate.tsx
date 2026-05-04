@@ -57,7 +57,7 @@ const ChamaCreate = () => {
           description: "Please log in again",
           variant: "destructive",
         });
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         navigate("/auth");
         return;
       }
