@@ -18,7 +18,9 @@ import {
   BadgeCheck,
   ShieldAlert,
   CheckCircle,
-  Trash2
+  Trash2,
+  MessageSquareMore,
+  Wrench
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -182,6 +184,8 @@ export function AdminSidebar() {
     { title: "Verify Document", url: "/admin/documents", icon: FileText },
     { title: "Document Deletions", url: "/admin/document-deletions", icon: Trash2 },
     { title: "Data Export", url: "/admin/export", icon: Download },
+    { title: "SMS Balance", url: "/admin/sms-balance", icon: MessageSquareMore },
+    { title: "Maintenance Mode", url: "/admin/maintenance", icon: Wrench },
   ];
 
   const renderMenuItem = (item: MenuItem) => {
