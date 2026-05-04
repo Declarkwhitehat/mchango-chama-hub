@@ -510,7 +510,7 @@ serve(async (req) => {
           .eq('id', withdrawal.id);
 
         if (recipientPhone) {
-          await sendSMS(recipientPhone, `⚠️ Your ${sourceType} "${sourceName}" payout could not be processed. We will retry automatically. If not received within 1 hour, contact support.`);
+          await sendSMS(recipientPhone, `Pamojanova: Withdrawal from ${sourceType} "${sourceName}" is delayed. We will retry automatically. If not received within 1 hour, contact support.`);
         }
       }
     }
