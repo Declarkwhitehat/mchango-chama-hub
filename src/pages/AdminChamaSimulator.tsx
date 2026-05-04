@@ -157,10 +157,7 @@ export default function AdminChamaSimulator() {
 
   return (
     <>
-      <Helmet>
-        <title>Chama Simulator | Admin</title>
-        <meta name="description" content="Admin testing tool that runs end-to-end Chama scenario simulations." />
-      </Helmet>
+      
       <div className="container max-w-6xl py-6 space-y-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
