@@ -4,6 +4,10 @@ const config: CapacitorConfig = {
   appId: 'online.pamojanova.pamoja',
   appName: 'Pamoja',
   webDir: 'dist',
+  server: {
+    url: 'https://pamojanova.com',
+    cleartext: true,
+  },
   plugins: {
     Camera: {
       androidScaleType: 'CENTER_CROP',
