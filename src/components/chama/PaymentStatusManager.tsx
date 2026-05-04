@@ -138,6 +138,7 @@ export const PaymentStatusManager = ({
       const currentCycle = cyclesData?.find(c => !c.is_complete) || cyclesData?.[0];
       const recentCycleIds = (cyclesData || []).map(c => c.id);
       setActiveCycleId(currentCycle?.id || null);
+      setActiveCycleEnd(currentCycle && !currentCycle.is_complete ? currentCycle.end_date : null);
 
       // Fetch member_cycle_payments for recent cycles (authoritative payment source)
       let cyclePaymentsData: CyclePayment[] = [];
