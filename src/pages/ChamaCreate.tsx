@@ -14,6 +14,7 @@ import { AlertCircle, CheckCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { usePlatformMinimums } from "@/hooks/usePlatformMinimums";
+import { KycGate } from "@/components/KycGate";
 
 const DAY_OPTIONS = Array.from({ length: 28 }, (_, i) => i + 1);
 
