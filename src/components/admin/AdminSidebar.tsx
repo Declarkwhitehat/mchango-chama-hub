@@ -189,6 +189,10 @@ export function AdminSidebar() {
     { title: "Maintenance Mode", url: "/admin/maintenance", icon: Wrench },
   ];
 
+  const testingItems: MenuItem[] = [
+    { title: "Chama Simulator", url: "/admin/chama-simulator", icon: FlaskConical },
+  ];
+
   const renderMenuItem = (item: MenuItem) => {
     const content = (
       <NavLink 
