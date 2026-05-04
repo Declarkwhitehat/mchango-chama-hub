@@ -62,11 +62,6 @@ export default function AdminSmsBalance() {
 
   useEffect(() => {
     fetchBalance();
-    const interval = window.setInterval(() => {
-      fetchBalance(true);
-    }, 30000);
-
-    return () => window.clearInterval(interval);
   }, [fetchBalance]);
 
   const formattedBalance = useMemo(() => {
@@ -96,7 +91,7 @@ export default function AdminSmsBalance() {
               SMS Balance
             </h1>
             <p className="text-muted-foreground">
-              Monitor the remaining SMS credit from your messaging provider with automatic refresh.
+              Monitor the remaining SMS credit from your messaging provider. Tap refresh to fetch the latest value.
             </p>
           </div>
           <Button variant="outline" onClick={() => fetchBalance(true)} disabled={refreshing} className="gap-2 w-full sm:w-auto">
@@ -136,7 +131,7 @@ export default function AdminSmsBalance() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                {data?.currency || "KES"} • updates every 30 seconds while this page is open
+                {data?.currency || "KES"} • refreshes only when you tap “Refresh now”
               </p>
             </CardContent>
           </Card>
@@ -155,11 +150,11 @@ export default function AdminSmsBalance() {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Refresh state</p>
-                <p className="font-medium">{refreshing ? "Refreshing…" : "Watching live"}</p>
+                <p className="font-medium">{refreshing ? "Refreshing…" : "Idle (manual refresh)"}</p>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Keep this page open during campaigns or heavy SMS usage to watch the credit reduce in near real time.
+              The balance is fetched only when you tap “Refresh now” to avoid unnecessary provider calls.
             </p>
           </CardContent>
         </Card>
