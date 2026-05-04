@@ -67,6 +67,7 @@ export type Database = {
           contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
           created_at: string
           created_by: string
+          creator_is_verified: boolean
           current_cycle_round: number | null
           description: string | null
           every_n_days_count: number | null
@@ -98,6 +99,7 @@ export type Database = {
           contribution_frequency: Database["public"]["Enums"]["contribution_frequency"]
           created_at?: string
           created_by: string
+          creator_is_verified?: boolean
           current_cycle_round?: number | null
           description?: string | null
           every_n_days_count?: number | null
@@ -129,6 +131,7 @@ export type Database = {
           contribution_frequency?: Database["public"]["Enums"]["contribution_frequency"]
           created_at?: string
           created_by?: string
+          creator_is_verified?: boolean
           current_cycle_round?: number | null
           description?: string | null
           every_n_days_count?: number | null
@@ -1364,6 +1367,7 @@ export type Database = {
           category: string | null
           created_at: string
           created_by: string
+          creator_is_verified: boolean
           current_amount: number
           description: string | null
           end_date: string | null
@@ -1392,6 +1396,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by: string
+          creator_is_verified?: boolean
           current_amount?: number
           description?: string | null
           end_date?: string | null
@@ -1420,6 +1425,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string
+          creator_is_verified?: boolean
           current_amount?: number
           description?: string | null
           end_date?: string | null
@@ -1763,6 +1769,7 @@ export type Database = {
           cover_image_url: string | null
           created_at: string
           created_by: string
+          creator_is_verified: boolean
           current_amount: number
           description: string | null
           email: string | null
@@ -1791,6 +1798,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by: string
+          creator_is_verified?: boolean
           current_amount?: number
           description?: string | null
           email?: string | null
@@ -1819,6 +1827,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by?: string
+          creator_is_verified?: boolean
           current_amount?: number
           description?: string | null
           email?: string | null
@@ -2310,6 +2319,7 @@ export type Database = {
           id_back_url: string | null
           id_front_url: string | null
           id_number: string
+          is_verified: boolean
           kyc_rejection_reason: string | null
           kyc_reviewed_at: string | null
           kyc_reviewed_by: string | null
@@ -2323,6 +2333,7 @@ export type Database = {
           phone_verified: boolean | null
           signup_ip: unknown
           updated_at: string
+          verified_at: string | null
         }
         Insert: {
           created_at?: string
@@ -2336,6 +2347,7 @@ export type Database = {
           id_back_url?: string | null
           id_front_url?: string | null
           id_number: string
+          is_verified?: boolean
           kyc_rejection_reason?: string | null
           kyc_reviewed_at?: string | null
           kyc_reviewed_by?: string | null
@@ -2349,6 +2361,7 @@ export type Database = {
           phone_verified?: boolean | null
           signup_ip?: unknown
           updated_at?: string
+          verified_at?: string | null
         }
         Update: {
           created_at?: string
@@ -2362,6 +2375,7 @@ export type Database = {
           id_back_url?: string | null
           id_front_url?: string | null
           id_number?: string
+          is_verified?: boolean
           kyc_rejection_reason?: string | null
           kyc_reviewed_at?: string | null
           kyc_reviewed_by?: string | null
@@ -2375,6 +2389,7 @@ export type Database = {
           phone_verified?: boolean | null
           signup_ip?: unknown
           updated_at?: string
+          verified_at?: string | null
         }
         Relationships: []
       }
@@ -2833,6 +2848,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_verification_requests: {
+        Row: {
+          created_at: string
+          fee_amount: number
+          id: string
+          paid_at: string | null
+          payment_reference: string | null
+          payment_status: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          selfie_path: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          paid_at?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_path: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          paid_at?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_path?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       verification_requests: {
         Row: {
@@ -3306,6 +3369,7 @@ export type Database = {
           contribution_frequency: string | null
           created_at: string
           created_by: string
+          creator_is_verified: boolean
           current_amount: number | null
           description: string | null
           frozen_at: string | null
@@ -3338,6 +3402,7 @@ export type Database = {
           contribution_frequency?: string | null
           created_at?: string
           created_by: string
+          creator_is_verified?: boolean
           current_amount?: number | null
           description?: string | null
           frozen_at?: string | null
@@ -3370,6 +3435,7 @@ export type Database = {
           contribution_frequency?: string | null
           created_at?: string
           created_by?: string
+          creator_is_verified?: boolean
           current_amount?: number | null
           description?: string | null
           frozen_at?: string | null
