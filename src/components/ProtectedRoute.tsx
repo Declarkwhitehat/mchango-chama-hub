@@ -80,20 +80,11 @@ export const ProtectedRoute = ({ children, requireKYC = false }: ProtectedRouteP
 
     redirectAttemptRef.current = 0;
 
-    if (requireKYC && profile) {
-      if (!profile.kyc_submitted_at) {
-        toast.error("Please complete KYC verification first");
-        lastRedirectRef.current = now;
-        navigate("/kyc-upload", { replace: true });
-        return;
-      }
-      if (profile.kyc_status !== 'approved') {
-        toast.error(`Your KYC status is: ${profile.kyc_status}. Only approved users can access this feature.`);
-        lastRedirectRef.current = now;
-        navigate("/home", { replace: true });
-        return;
-      }
-    }
+    // Note: KYC enforcement is intentionally handled inline by <KycGate /> on
+    // each page that needs it, so users see a clear status card (upload vs
+    // wait-for-review vs rejected) instead of being redirected to a blank
+    // screen with a generic toast. The `requireKYC` prop is kept for API
+    // compatibility but is now a no-op at the route level.
   }, [user, profile, loading, requireKYC, navigate]);
 
   if (loading) {
