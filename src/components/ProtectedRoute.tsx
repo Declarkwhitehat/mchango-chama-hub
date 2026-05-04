@@ -96,7 +96,8 @@ export const ProtectedRoute = ({ children, requireKYC = false }: ProtectedRouteP
   }
 
   if (!user) return null;
-  if (requireKYC && profile && profile.kyc_status !== 'approved') return null;
+  // KYC gating is now handled inside the page via <KycGate />, so we always
+  // render children here once auth + PIN checks pass.
   if (!pinChecked && location.pathname !== '/pin-setup') {
     return (
       <div className="min-h-screen flex items-center justify-center">
