@@ -475,15 +475,6 @@ const MchangoDetail = () => {
                 </Card>
               )}
 
-              {/* WhatsApp Group */}
-              <WhatsAppLinkManager
-                entityId={campaign.id}
-                table="mchango"
-                currentLink={campaign.whatsapp_link}
-                isManager={isCreator}
-                entityLabel="campaign"
-                onUpdate={fetchCampaign}
-              />
             </TabsContent>
 
             <TabsContent value="withdrawals" className="space-y-6">
