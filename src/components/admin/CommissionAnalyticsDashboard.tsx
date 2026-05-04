@@ -77,8 +77,8 @@ export const CommissionAnalyticsDashboard = () => {
   const [ledgerData, setLedgerData] = useState<LedgerEntry[]>([]);
   const [summary, setSummary] = useState<SummaryData>({
     totalGross: 0, totalCommission: 0, totalNet: 0,
-    mchangoCommission: 0, chamaCommission: 0, orgCommission: 0,
-    mchangoGross: 0, chamaGross: 0, orgGross: 0, transactionCount: 0
+    mchangoCommission: 0, chamaCommission: 0, orgCommission: 0, welfareCommission: 0,
+    mchangoGross: 0, chamaGross: 0, orgGross: 0, welfareGross: 0, transactionCount: 0
   });
   const [trendData, setTrendData] = useState<TrendPoint[]>([]);
   const [dateFrom, setDateFrom] = useState(format(new Date(), "yyyy-MM-dd"));
