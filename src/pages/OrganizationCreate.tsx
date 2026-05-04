@@ -460,6 +460,7 @@ const OrganizationCreate = () => {
             </form>
           </CardContent>
         </Card>
+        </KycGate>
       </div>
     </Layout>
   );
