@@ -234,7 +234,7 @@ const OrganizationCreate = () => {
                     name="name"
                     placeholder="e.g., St. Mary's Catholic Church"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -245,7 +245,7 @@ const OrganizationCreate = () => {
                     name="category"
                     placeholder="e.g., Church, School, Orphanage, NGO, Hospital"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -257,7 +257,7 @@ const OrganizationCreate = () => {
                     placeholder="Brief description of your organization (shown in listings)"
                     rows={2}
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -268,7 +268,7 @@ const OrganizationCreate = () => {
                     name="about"
                     placeholder="Tell the full story of your organization - its history, mission, impact, and goals..."
                     rows={6}
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
               </div>
@@ -306,7 +306,7 @@ const OrganizationCreate = () => {
                           type="file"
                           accept="image/*"
                           onChange={handleImageChange('logo')}
-                          disabled={kycStatus !== "approved"}
+
                           className="hidden"
                         />
                       </label>
@@ -341,7 +341,7 @@ const OrganizationCreate = () => {
                           type="file"
                           accept="image/*"
                           onChange={handleImageChange('cover')}
-                          disabled={kycStatus !== "approved"}
+
                           className="hidden"
                         />
                       </label>
@@ -364,7 +364,7 @@ const OrganizationCreate = () => {
                         name="phone"
                         type="tel"
                         placeholder="+254..."
-                        disabled={kycStatus !== "approved"}
+
                         className="pl-10"
                       />
                     </div>
@@ -379,7 +379,7 @@ const OrganizationCreate = () => {
                         name="email"
                         type="email"
                         placeholder="info@organization.org"
-                        disabled={kycStatus !== "approved"}
+
                         className="pl-10"
                       />
                     </div>
@@ -394,7 +394,7 @@ const OrganizationCreate = () => {
                       id="location"
                       name="location"
                       placeholder="e.g., Nairobi, Kenya"
-                      disabled={kycStatus !== "approved"}
+
                       className="pl-10"
                     />
                   </div>
@@ -409,7 +409,7 @@ const OrganizationCreate = () => {
                       name="website"
                       type="url"
                       placeholder="https://..."
-                      disabled={kycStatus !== "approved"}
+
                       className="pl-10"
                     />
                   </div>
@@ -422,7 +422,7 @@ const OrganizationCreate = () => {
                     name="whatsapp"
                     type="url"
                     placeholder="https://chat.whatsapp.com/..."
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -437,7 +437,7 @@ const OrganizationCreate = () => {
                       value={youtubeUrl}
                       onChange={(e) => setYoutubeUrl(e.target.value)}
                       placeholder="https://youtube.com/watch?v=..."
-                      disabled={kycStatus !== "approved"}
+
                       className="pl-10"
                     />
                   </div>
@@ -452,7 +452,7 @@ const OrganizationCreate = () => {
                   type="submit"
                   variant="default"
                   className="w-full"
-                  disabled={isLoading || isProcessing || kycStatus !== "approved"}
+                  disabled={isLoading || isProcessing}
                 >
                   {isLoading ? "Registering..." : "Register Organization"}
                 </Button>
