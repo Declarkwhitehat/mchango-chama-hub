@@ -276,7 +276,8 @@ export function RevenueDashboard() {
     const map: Record<string, { gross: number; commission: number; count: number }> = {};
 
     // Ledger contributes commission per source_type (chama / mchango / organization / welfare)
-    entries.forEach(e => {
+    // Payouts are excluded — they are outflows, not revenue.
+    entries.filter(isRevenueEntry).forEach(e => {
       if (!map[e.source_type]) map[e.source_type] = { gross: 0, commission: 0, count: 0 };
       map[e.source_type].gross += Number(e.gross_amount);
       map[e.source_type].commission += Number(e.commission_amount);
