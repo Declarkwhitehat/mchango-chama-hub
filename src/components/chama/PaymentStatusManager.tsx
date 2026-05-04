@@ -73,10 +73,17 @@ export const PaymentStatusManager = ({
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [cyclePayments, setCyclePayments] = useState<CyclePayment[]>([]);
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
+  const [activeCycleEnd, setActiveCycleEnd] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodType>("today");
   const [pdfPeriod, setPdfPeriod] = useState<PeriodType>("today");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     fetchData();
