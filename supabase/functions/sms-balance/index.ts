@@ -73,12 +73,16 @@ serve(async (req) => {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
+        // Onfon requires AccessKey header on all API requests (AccessKey == ClientId per their account setup)
+        'AccessKey': onfonClientId,
+        'Accesskey': onfonClientId,
       },
     });
 
     const responseText = await providerResponse.text();
-    let providerData: Record<string, unknown> | null = null;
+    console.log('Onfon balance raw response:', providerResponse.status, responseText);
 
+    let providerData: Record<string, unknown> | null = null;
     try {
       providerData = JSON.parse(responseText) as Record<string, unknown>;
     } catch (_error) {
@@ -95,10 +99,31 @@ serve(async (req) => {
       });
     }
 
+    // Onfon balance response shape varies; probe several known fields
     const rawData = providerData?.Data;
-    const firstEntry = Array.isArray(rawData) ? rawData[0] as Record<string, unknown> | undefined : undefined;
-    const balanceValue = firstEntry?.Balance ?? providerData?.Balance ?? providerData?.balance ?? null;
-    const currencyValue = firstEntry?.Currency ?? providerData?.Currency ?? providerData?.currency ?? 'KES';
+    const firstEntry = Array.isArray(rawData)
+      ? (rawData[0] as Record<string, unknown> | undefined)
+      : (rawData && typeof rawData === 'object' ? (rawData as Record<string, unknown>) : undefined);
+
+    const pickNumeric = (obj: Record<string, unknown> | null | undefined, keys: string[]): unknown => {
+      if (!obj) return null;
+      for (const k of keys) {
+        if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
+      }
+      return null;
+    };
+
+    const balanceKeys = ['Balance', 'balance', 'Credits', 'credits', 'SMSBalance', 'SmsBalance', 'sms_balance', 'AvailableCredits', 'CurrentBalance'];
+    const currencyKeys = ['Currency', 'currency'];
+
+    const balanceValue =
+      pickNumeric(firstEntry, balanceKeys) ??
+      pickNumeric(providerData, balanceKeys);
+
+    const currencyValue =
+      pickNumeric(firstEntry, currencyKeys) ??
+      pickNumeric(providerData, currencyKeys) ??
+      'KES';
 
     return new Response(JSON.stringify({
       success: true,
@@ -106,7 +131,7 @@ serve(async (req) => {
       balance: balanceValue,
       currency: currencyValue,
       checkedAt: new Date().toISOString(),
-      raw: providerData,
+      raw: providerData ?? responseText,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
