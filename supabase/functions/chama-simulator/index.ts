@@ -105,11 +105,11 @@ async function stage1(ctx: SimContext) {
     async () => {
       const stamp = Date.now().toString().slice(-8);
       for (let i = 1; i <= 10; i++) {
-        const phone = `+25470000${stamp.slice(-4)}${String(i).padStart(2, '0')}`.slice(0, 13);
+        const phone = `+2547000${stamp}${String(i).padStart(2, '0')}`.slice(0, 13);
         const email = `testmember${stamp}_${i}@simulator.test`;
         const { data: created, error } = await ctx.admin.auth.admin.createUser({
           email, password: 'SimTest!2026', email_confirm: true,
-          phone_confirm: true, user_metadata: { is_test: true, sim_seq: i },
+          user_metadata: { is_test: true, sim_seq: i },
         });
         if (error || !created.user) throw new Error('createUser failed: ' + error?.message);
         const userId = created.user.id;
