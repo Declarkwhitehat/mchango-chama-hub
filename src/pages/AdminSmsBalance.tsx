@@ -62,11 +62,6 @@ export default function AdminSmsBalance() {
 
   useEffect(() => {
     fetchBalance();
-    const interval = window.setInterval(() => {
-      fetchBalance(true);
-    }, 30000);
-
-    return () => window.clearInterval(interval);
   }, [fetchBalance]);
 
   const formattedBalance = useMemo(() => {
