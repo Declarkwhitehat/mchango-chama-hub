@@ -600,7 +600,9 @@ export const PaymentStatusManager = ({
                 <span>{String(secs).padStart(2,'0')}<span className="text-xs font-normal ml-1">s</span></span>
               </div>
               <p className="text-xs text-center mt-2 opacity-80">
-                Unpaid members after the cutoff will be marked late and may incur penalties.
+                {isGracePeriod
+                  ? "Grace period active — no penalties yet. Members have until the cutoff to make their first payment."
+                  : "Unpaid members after the cutoff will be marked late and may incur penalties."}
               </p>
             </div>
           );
