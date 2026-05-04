@@ -1,76 +1,43 @@
-## Goals
+## Issues identified
 
-1. **Don't show "pending payment"** in a chama that hasn't been officially started (status = `pending`).
-2. **Confirm/enforce the grace-period rule**: when a chama starts, the first contribution deadline is **10:00 PM Kenya time the next day** (already implemented). Allow members to contribute starting immediately (≈10+ hours before deadline — already the case).
-3. **Send a push notification ~10 hours before the deadline** to all unpaid members on the app.
-4. **Send an SMS ~6 hours before the deadline** to unpaid members, warning them they will be removed from the chama if they don't pay in time.
+Looking at the SMS you received and the dashboard:
 
-The auto-removal of unpaid members at the 10 PM cutoff is already handled by the existing chama engine (member-auto-removal logic), so this plan focuses on **UI gating + reminders**.
+1. **Wrong payout date in SMS for Member #3.** The current formula is `startDate + (position - 1) × cycleLength`, so for position 3 daily it produces "May 6" — the same as the first deadline. It ignores the grace period and the cycle boundary (each cycle ends at 10:00 PM Kenya time). Correct payout for Member #3 should land on cycle 3's end = **Friday, May 8, 2026, 10:00 PM EAT**.
 
----
+2. **"7 Pending" / "Pending Payment" badges show during the grace period.** During the first 24-hour grace window nobody has missed anything yet, so showing 7 members as "pending" alongside the countdown is confusing. The countdown timer (1d 21h … to May 6, 10:00 PM EAT) is actually correct — only the labeling around it is wrong.
 
-## 1. Hide payment UI for unstarted chamas (frontend)
+3. **The unprofessional "dY %" garble** in the SMS — already addressed by the global SMS sanitizer in the previous turn; the reissued template below stays plain ASCII so it won't reappear.
 
-In `src/components/MemberDashboard.tsx`, the `<CyclePaymentStatus>` block (which renders the payment countdown / "Amount to Pay") is shown regardless of `chama.status`. We will gate it so it only renders when `chama.status === 'active'` (or `cycle_complete` with a current cycle). For `status === 'pending'` we will instead show a small informational card:
+## Fixes
 
-> "This chama hasn't started yet. Once the manager starts it, you'll have until 10:00 PM the next day to make your first contribution."
+### A. Correct payout-date math in `supabase/functions/chama-start/index.ts`
+- Anchor the projection to the first cycle's 10:00 PM Kenya cutoff (`graceDeadline`), not to `startDate`.
+- New formula: `payoutDate = graceDeadline + (memberIndex - 1) × cycleLength days`.
+- Format the date in EAT (`Africa/Nairobi`) and append " at 10:00 PM" so members see the exact moment, e.g. *"Friday, May 8, 2026 at 10:00 PM"*.
+- Clean wording (no emojis, no "before you" when it's 0):
 
-Also tighten:
-- `src/components/chama/AmountToPayCard.tsx` — early-return a "not started" state if no current cycle exists.
-- `src/pages/ChamaDetail.tsx` — make sure none of the payment cards/banners render in the `pending` status branch (they currently shouldn't, but verify the MemberDashboard pathway is the only entry point).
+  ```
+  Pamojanova: "<chama>" has started. You are Member #<n> of <total>.
+  Grace period: first payment of KES <amount> is due by <Tue May 5, 10:00 PM EAT>.
+  Contribute <frequency>. Your payout: <Fri May 8, 2026 at 10:00 PM EAT>.
+  Members ahead of you: <n-1>.
+  ```
 
-This eliminates the "1 pending payment due" the user is seeing on a freshly created (not-yet-started) chama.
+### B. Suppress "pending" noise during the grace period
 
-## 2. Grace period (already correct — verify only)
+`src/components/chama/PaymentStatusManager.tsx`
+- Compute `isGracePeriod` from `chamaStartDate` using the existing `getNextDay10PmKenyaDeadline` helper.
+- While in grace period:
+  - Replace the red "X Pending" badge with a neutral "X yet to pay (grace period)" badge.
+  - Replace the red "Pending Payment (n)" section header with "Yet to Pay — Grace Period".
+  - Hide the "Unpaid members after the cutoff will be marked late…" warning under the timer (no penalties apply yet).
 
-Confirmed in `supabase/functions/chama-start/index.ts` and `supabase/functions/_shared/chamaDeadlines.ts`:
-- On start, the first cycle `end_date` is set to `getNextDay10PmKenyaDeadline(startDate)` (next day 22:00 EAT).
-- `MemberDashboard` and `PaymentCountdownTimer` already render the grace-period countdown.
+`src/components/chama/DailyPaymentStatus.tsx` already hides the "missed cycles" alert and financial summary during grace; no change needed there.
 
-No change needed here beyond what's in step 1.
+### C. Verify nothing else mislabels grace-period state
+- `daily-cycle-manager` `all-cycles` already returns `status: 'pending'` (not 'missed') while end_date is in the future — no change.
+- The countdown component is already correct; leave it untouched (the user confirmed "1d 21h 11m" lands on May 6, 10:00 PM EAT).
 
-## 3. New edge function: `chama-grace-reminders`
+### D. Re-deploy `chama-start`
 
-A scheduled function that runs **every 30 minutes** and, for every chama in its first cycle (grace period):
-
-For each unpaid approved member of cycle 1:
-- Compute hours remaining until the cycle `end_date` (10 PM Kenya next day).
-- **Push notification window — between ~10h and ~9.5h remaining**: insert a row into `notifications` with title "Pay your first contribution today" and body explaining the deadline + amount. The existing `notify_push_on_notification_insert` trigger forwards this to `send-push-notification`, so push delivery is automatic.
-- **SMS window — between ~6h and ~5.5h remaining**: call `send-transactional-sms` with: *"⚠️ Pamoja Nova: Your first contribution of KES X for "<chama>" is due by 10:00 PM today. If you don't pay in time, you will be REMOVED from the chama. Pay now via the app."*
-
-To avoid duplicates, add a tiny tracking table:
-
-```text
-chama_grace_reminders_sent
-  member_id uuid
-  cycle_id uuid
-  reminder_type text  -- 'push_10h' | 'sms_6h'
-  sent_at timestamptz
-  PRIMARY KEY (member_id, cycle_id, reminder_type)
-```
-
-The function INSERTs into this table inside the same transaction so a re-run of the cron in the same window is a no-op.
-
-## 4. Schedule the cron
-
-Add a `pg_cron` job (via the insert tool, since it embeds the project URL + anon key) to call `chama-grace-reminders` every 30 minutes:
-
-```text
-*/30 * * * *  →  POST https://<project>.supabase.co/functions/v1/chama-grace-reminders
-```
-
-## 5. Files touched
-
-**Edited**
-- `src/components/MemberDashboard.tsx` — gate payment block on `chama.status === 'active'`.
-- `src/components/chama/AmountToPayCard.tsx` — show "not started" empty state when no current cycle.
-
-**Created**
-- `supabase/functions/chama-grace-reminders/index.ts` — the reminder edge function.
-- Migration: create `chama_grace_reminders_sent` table with RLS (service role only).
-- pg_cron job (via insert tool) for every-30-min schedule.
-
-## Out of scope
-
-- The actual auto-removal logic at 10 PM cutoff (already handled by the existing chama engine).
-- Changing the grace-period length or 10 PM Kenya time policy (already enforced).
+No DB schema or migration changes. No new memories required (existing SMS-sanitization and 22:00-EAT-deadline policies already cover this).

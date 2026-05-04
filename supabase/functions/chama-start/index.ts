@@ -292,18 +292,24 @@ serve(async (req) => {
 
     const cycleLength = getCycleLengthInDays(chama.contribution_frequency, chama.every_n_days_count);
 
+    const fmtEAT = (d: Date) => d.toLocaleDateString('en-US', {
+      weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Nairobi'
+    });
+
     for (let i = 0; i < sortedMembers.length; i++) {
       const member = sortedMembers[i];
       const memberIndex = i + 1;
-      
-      // Calculate payout date based on position
-      const daysUntilPayout = (memberIndex - 1) * cycleLength;
-      const payoutDate = new Date(startDate);
-      payoutDate.setDate(payoutDate.getDate() + daysUntilPayout);
 
-      const graceDeadlineStr = graceDeadline.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+      // Payout lands on cycle N's 10:00 PM EAT close.
+      // Cycle 1 closes at graceDeadline; each subsequent cycle is +cycleLength days.
+      const payoutDate = new Date(graceDeadline);
+      payoutDate.setUTCDate(payoutDate.getUTCDate() + (memberIndex - 1) * cycleLength);
 
-      const message = `Pamojanova: "${chama.name}" has started. You are Member #${memberIndex}. You have a 24-hour grace period — your first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 10:00 PM. Contribute ${frequencyText}. Your payout date: ${payoutDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}. ${i === 0 ? 'You are first in line.' : `${memberIndex - 1} member(s) before you.`}`;
+      const graceDeadlineStr = fmtEAT(graceDeadline);
+      const payoutStr = fmtEAT(payoutDate);
+      const aheadLine = i === 0 ? 'You are first in line.' : `Members ahead of you: ${memberIndex - 1}.`;
+
+      const message = `Pamojanova: "${chama.name}" has started. You are Member #${memberIndex} of ${sortedMembers.length}. Grace period: first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 10:00 PM EAT. Contribute ${frequencyText}. Your payout: ${payoutStr} at 10:00 PM EAT. ${aheadLine}`;
 
       if (member.profiles?.phone) {
         try {
