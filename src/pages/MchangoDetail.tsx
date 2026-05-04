@@ -23,6 +23,7 @@ import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { GroupDocuments } from "@/components/GroupDocuments";
+import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 import { publicUrls } from "@/lib/publicUrl";
 import { renderTextWithLinks } from "@/utils/linkify";
 
