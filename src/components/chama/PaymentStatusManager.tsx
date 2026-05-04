@@ -57,6 +57,7 @@ interface PaymentStatusManagerProps {
   chamaName: string;
   contributionAmount: number;
   commissionRate?: number;
+  chamaStatus?: string;
 }
 
 type PeriodType = "today" | "week" | "month";
@@ -66,6 +67,7 @@ export const PaymentStatusManager = ({
   chamaName,
   contributionAmount,
   commissionRate = 0,
+  chamaStatus,
 }: PaymentStatusManagerProps) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
@@ -480,6 +482,26 @@ export const PaymentStatusManager = ({
       <Card>
         <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (chamaStatus === 'pending') {
+    return (
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            Chama hasn't started yet
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            No contributions are due until you officially start this chama.
+            Once started, members will have until 10:00 PM the next day (Kenya time)
+            to make their first contribution. Payment status will appear here.
+          </p>
         </CardContent>
       </Card>
     );
