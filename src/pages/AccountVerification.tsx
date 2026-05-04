@@ -48,6 +48,39 @@ const AccountVerification = () => {
     setPreviewUrl(f ? URL.createObjectURL(f) : null);
   };
 
+  const takeNativeSelfie = async () => {
+    try {
+      const photo = await CapCamera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+        direction: 'FRONT' as any,
+        saveToGallery: false,
+      });
+      const b64 = photo.base64String;
+      if (!b64) throw new Error("No image captured");
+      const mime = `image/${photo.format || 'jpeg'}`;
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const file = new File([bytes], `selfie.${photo.format || 'jpg'}`, { type: mime });
+      onFile(file);
+    } catch (e: any) {
+      if (e?.message && !/cancel/i.test(e.message)) {
+        toast({ title: "Camera error", description: e.message, variant: "destructive" });
+      }
+    }
+  };
+
+  const handleTakeSelfie = () => {
+    if (Capacitor.isNativePlatform()) {
+      takeNativeSelfie();
+    } else {
+      fileRef.current?.click();
+    }
+  };
+
   const submit = async () => {
     if (!user) return;
     if (!selfie) { toast({ title: "Selfie required", variant: "destructive" }); return; }
