@@ -335,7 +335,7 @@ serve(async (req) => {
       const grossAmount = paidAmount || donation.amount;
       
       // Calculate commission using shared constant (7%)
-      const commissionRate = COMMISSION_RATES.MCHANGO;
+      const commissionRate = await getCommissionRate(supabaseClient, "mchango");
       const commissionAmount = grossAmount * commissionRate;
       const netAmount = grossAmount - commissionAmount;
       
@@ -499,7 +499,7 @@ serve(async (req) => {
       }
 
       const grossAmount = paidAmount || orgDonation.amount;
-      const commissionRate = COMMISSION_RATES.ORGANIZATION;
+      const commissionRate = await getCommissionRate(supabaseClient, "organization");
       const commissionAmount = grossAmount * commissionRate;
       const netAmount = grossAmount - commissionAmount;
 

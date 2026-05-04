@@ -434,7 +434,7 @@ serve(async (req) => {
       console.log('Found Mchango campaign:', mchangoData);
 
       // Calculate commission (7% for mchango - from shared config)
-      const commissionRate = COMMISSION_RATES.MCHANGO;
+      const commissionRate = await getCommissionRate(supabase, "mchango");
       const grossAmount = parseFloat(amount);
       const commissionAmount = grossAmount * commissionRate;
       const netAmount = grossAmount - commissionAmount;
