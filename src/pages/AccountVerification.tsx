@@ -166,7 +166,7 @@ const AccountVerification = () => {
                 <input ref={fileRef} type="file" accept="image/*" capture="user" hidden
                   onChange={(e) => onFile(e.target.files?.[0] || null)} />
                 <div className="mt-2 flex items-center gap-3">
-                  <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} className="gap-2">
+                  <Button type="button" variant="outline" onClick={handleTakeSelfie} className="gap-2">
                     <Camera className="h-4 w-4" /> {selfie ? "Retake" : "Take selfie"}
                   </Button>
                   {previewUrl && <img src={previewUrl} alt="selfie preview" className="h-16 w-16 rounded-full object-cover border" />}
