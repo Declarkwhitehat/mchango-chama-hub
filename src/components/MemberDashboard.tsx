@@ -132,6 +132,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
   const missedCount = member.missed_payments_count || 0;
   const totalOutstanding = member.total_outstanding || 0;
   const isCycleComplete = chama.status === 'cycle_complete';
+  const isPendingStart = chama.status === 'pending';
 
   const graceDeadline = chama.status === 'active'
     ? getNextDay10PmKenyaDeadline(chama.start_date)
