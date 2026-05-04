@@ -1,124 +1,88 @@
-## Overview
+## Goal
 
-Six independent security hardening fixes. Each is scoped to avoid regressions: callbacks gain IP whitelisting, profile identity fields become immutable post-signup, OTP requests get strict rate-limiting, CORS becomes origin-restricted, B2C payouts gain admin + approval guards, and STK-push contributions get server-side amount validation.
+1. **Testing mode**: drop chama minimum contribution from KES 100 → KES 20 (revert later on request).
+2. **Admin-configurable minimums**: add admin-controlled settings for:
+   - Chama minimum contribution amount
+   - Withdrawal minimum (one value per entity type: chama, mchango campaign, welfare)
 
-## Important note on terminology
+All minimums become single-source-of-truth values stored in `platform_settings` and read by both the frontend and edge functions.
 
-The user's spec mentions `is_admin` on the `profiles` table. This project does **not** store admin status there — it uses the standard `user_roles` table with `has_role(user_id, 'admin')`. All admin checks below use that established pattern (matches `admin_clear_payout_default` and the existing "Admins can update all profiles" RLS policy). UX is identical.
+---
 
-## Fix 1 — M-Pesa callback IP whitelisting
+## New `platform_settings` keys
 
-Create `supabase/functions/_shared/safaricomIp.ts` exporting:
-- `getCallbackClientIP(req)` — reads `x-forwarded-for` (first hop), then `x-real-ip`, then `cf-connecting-ip`.
-- `isSafaricomCallbackIP(ip)` — checks `196.201.214.0/24` and `196.201.216.0/24` via integer CIDR math, plus comma-separated `MPESA_CALLBACK_BYPASS_IPS` env var.
+Insert four rows (idempotent) into the existing `platform_settings` table:
 
-In `payment-stk-callback/index.ts` and `b2c-callback/index.ts`, immediately after the OPTIONS handler:
-```ts
-const clientIp = getCallbackClientIP(req);
-if (!isSafaricomCallbackIP(clientIp)) {
-  console.warn('[security] Rejected callback from non-Safaricom IP:', clientIp);
-  return new Response(JSON.stringify({ error: 'Forbidden' }), {
-    status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}
-```
+| setting_key | initial value | description |
+|---|---|---|
+| `min_chama_contribution` | `{"amount": 20}` | Minimum chama contribution amount (testing value; production = 100) |
+| `min_withdrawal_chama` | `{"amount": 100}` | Minimum chama payout/withdrawal amount |
+| `min_withdrawal_mchango` | `{"amount": 100}` | Minimum mchango campaign withdrawal amount |
+| `min_withdrawal_welfare` | `{"amount": 100}` | Minimum welfare withdrawal amount |
 
-## Fix 2 — Phone & ID number immutable post-signup
+A small shared helper `supabase/functions/_shared/getPlatformMinimums.ts` will read these (with safe fallbacks of 20 / 100 / 100 / 100) so every edge function uses the same source.
 
-**Migration**: add a BEFORE UPDATE trigger on `public.profiles` that blocks any change to `phone` or `id_number` once they are non-null, unless the caller is an admin (`has_role(auth.uid(),'admin')`) or the service role (`auth.uid() IS NULL`, i.e. backend functions). Initial INSERT is unaffected.
+---
 
-```sql
-CREATE OR REPLACE FUNCTION public.prevent_identity_changes()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-DECLARE v_admin boolean := false;
-BEGIN
-  IF auth.uid() IS NULL THEN RETURN NEW; END IF; -- service role bypass
-  v_admin := public.has_role(auth.uid(), 'admin'::app_role);
-  IF v_admin THEN RETURN NEW; END IF;
-  IF OLD.phone IS NOT NULL AND NEW.phone IS DISTINCT FROM OLD.phone THEN
-    RAISE EXCEPTION 'Phone number cannot be changed. Contact support.' USING ERRCODE='P0001';
-  END IF;
-  IF OLD.id_number IS NOT NULL AND NEW.id_number IS DISTINCT FROM OLD.id_number THEN
-    RAISE EXCEPTION 'ID number cannot be changed. Contact support.' USING ERRCODE='P0001';
-  END IF;
-  RETURN NEW;
-END $$;
-DROP TRIGGER IF EXISTS trg_prevent_identity_changes ON public.profiles;
-CREATE TRIGGER trg_prevent_identity_changes BEFORE UPDATE ON public.profiles
-  FOR EACH ROW EXECUTE FUNCTION public.prevent_identity_changes();
-```
+## Backend changes
 
-**Frontend** (`src/pages/Profile.tsx`): the phone and ID number sections are already display-only (no `<input>`). Add a small muted helper line under each: "Contact support to change this." Keep both fields visible.
+### `supabase/functions/chama-crud/index.ts`
+On chama create/update, fetch `min_chama_contribution` and reject if `contribution_amount < min` with a clear error showing the configured minimum.
 
-## Fix 3 — OTP rate limit
+### `supabase/functions/withdrawals-crud/index.ts`
+The current Zod schema hardcodes `min(10, 'Minimum withdrawal is KES 10')`. Replace with a runtime check that loads the right minimum based on which entity ID is present (`chama_id` → chama, `mchango_id` → mchango, `organization_id` → mchango, welfare flow → welfare). Return a 400 with the configured minimum if violated.
 
-In `send-otp/index.ts`, the existing `checkRateLimit(supabase, phone, 'phone', 'forgot_password')` defaults to 3 attempts per 4 hours. Change the action to a dedicated key and tighten the window to 10 minutes, keeping max 3:
+### `supabase/functions/welfare-withdrawal-approve/index.ts` and `welfare-cooling-off-payout/index.ts`
+Add the same minimum check using `min_withdrawal_welfare` so welfare withdrawals are also gated.
 
-```ts
-const phoneRateLimit = await checkRateLimit(
-  supabase, phone, 'phone', 'send_otp',
-  10 * 60 * 1000,  // 10 minutes
-  3,               // max 3 OTPs
-);
-```
+### `supabase/functions/payment-stk-push/index.ts`
+Keep the existing `>= 1` floor (M-Pesa technical floor). Chama-specific floor is enforced upstream by the contribution form + chama-crud, so no change here.
 
-Error response already includes `resetTime` and a "try again in N minutes" message — no other changes needed. Leave the IP rate limit and OTP generation logic untouched.
+---
 
-## Fix 4 — Restrict CORS
+## Frontend changes
 
-Replace `supabase/functions/_shared/cors.ts` with an origin-aware module:
-- `buildCorsHeaders(req)` — returns headers with `Access-Control-Allow-Origin` set to the request `Origin` if it matches the allow-list, otherwise the production domain. Includes `Vary: Origin`.
-- `resolveAllowedOrigin(origin)` — pure helper.
-- Allow-list defaults: `pamojanova.com`, `www.pamojanova.com`, `pamojanova.online`, `www.pamojanova.online`, `mchango-chama-hub.lovable.app`, the Lovable preview URL, `localhost:3000/5173/8080`, `capacitor://localhost`. Override via `ALLOWED_ORIGINS` env var (comma-separated).
-- **Backwards-compatible**: keep the existing `export const corsHeaders` so the ~50 functions that import it keep working. The static export uses the production origin as default; over time individual functions can switch to `buildCorsHeaders(req)`. Other CORS headers (Allow-Headers, Allow-Methods) are unchanged.
+### Shared hook: `src/hooks/usePlatformMinimums.ts` (new)
+Reads the four `platform_settings` rows once via React Query (5-min cache), exposes `{ minChamaContribution, minWithdrawal: { chama, mchango, welfare } }` with the same safe fallbacks.
 
-This does not touch any other function's logic; only the value of `Access-Control-Allow-Origin` changes.
+### `src/pages/ChamaCreate.tsx`
+Replace the hardcoded `min="100"` on the contribution input with `min={minChamaContribution}`, and update the surrounding helper text + validation error to show the live value.
 
-## Fix 5 — B2C payout admin + approval guards
+### `src/components/ChamaPaymentForm.tsx`
+The "amount must be ≥ contribution_amount" check stays as-is (driven by the chama itself), so this works automatically once the chama is created with a 20 KES floor.
 
-In `b2c-payout/index.ts`, immediately after parsing the request body and before the existing withdrawal lookup, add:
+### Withdrawal forms (chama, mchango, welfare)
+Wherever a withdrawal amount is entered, swap the hardcoded floor for the configured value and show "Minimum withdrawal: KES X" beneath the input.
 
-1. **Caller check** — accept either:
-   - The Authorization bearer token equals `SUPABASE_SERVICE_ROLE_KEY` (internal callers like `retry-failed-payouts`), OR
-   - `supabaseAdmin.auth.getUser(token)` returns a user AND `has_role(user.id, 'admin')` is true.
+### Admin settings page: `src/pages/AdminCommissionConfig.tsx`
+Extend the existing commission-config page with a new "Minimums" card that lets admins edit:
+- Chama minimum contribution
+- Withdrawal minimums (chama / mchango / welfare)
 
-   On failure: log `{ caller_user_id, withdrawal_id, reason }`, return 403.
+Saves write to `platform_settings` (admin-only RLS already exists) and log to `audit_logs` like the existing commission settings do.
 
-2. **Withdrawal approval check** — after the existing withdrawal fetch, additionally require:
-   - `withdrawal.status === 'approved'` (the current code also accepts `pending_retry`/`processing` for legitimate retry flows — keep those as valid states but require that they have a non-null `approved_by`).
-   - `withdrawal.approved_by !== null`.
+---
 
-   On failure: log `{ caller_user_id, withdrawal_id, status, approved_by }`, return 403.
+## Reverting after testing
 
-The actual M-Pesa OAuth + B2C HTTP call is untouched.
+When you say "go back to 100", I'll just update the `min_chama_contribution` row back to `{"amount": 100}` in `platform_settings` — no code changes needed. Or you can do it yourself from the new admin Minimums card.
 
-## Fix 6 — Server-side chama contribution amount check
-
-In `payment-stk-push/index.ts`, after the existing `validateAmount` block, when `body.callback_metadata?.type === 'chama_contribution'` (and `chama_id` + `member_id` are present):
-
-1. Fetch chama: `select contribution_amount from chama where id = chama_id`.
-2. Compute the member's outstanding due for the active cycle by calling the existing `check_member_schedule_eligibility(member_id, chama_id)` RPC, which returns `total_amount_owed` minus `carry_forward_credit`. The required minimum is `max(contribution_amount, total_amount_owed - carry_forward)`. If no active cycle / no debts, fall back to `contribution_amount`.
-3. If `body.amount < required`, return 400 with `{ error: 'Amount below required contribution', required, submitted }`.
-4. Overpayments are explicitly allowed (no upper cap added beyond the existing 1..1,000,000).
-
-Mchango / organization donations and all other paths keep the existing `validateAmount` only.
+---
 
 ## Files touched
 
 **New**
-- `supabase/functions/_shared/safaricomIp.ts`
-- `supabase/migrations/<ts>_prevent_profile_identity_changes.sql`
+- `supabase/functions/_shared/getPlatformMinimums.ts`
+- `src/hooks/usePlatformMinimums.ts`
+- One migration to insert the four `platform_settings` rows
 
 **Edited**
-- `supabase/functions/_shared/cors.ts` (origin allow-list, keep `corsHeaders` export)
-- `supabase/functions/payment-stk-callback/index.ts` (IP guard at top)
-- `supabase/functions/b2c-callback/index.ts` (IP guard at top)
-- `supabase/functions/send-otp/index.ts` (rate-limit window tightened)
-- `supabase/functions/b2c-payout/index.ts` (admin/service-role + approval guards)
-- `supabase/functions/payment-stk-push/index.ts` (chama amount verification)
-- `src/pages/Profile.tsx` (helper text under phone & ID)
+- `supabase/functions/chama-crud/index.ts`
+- `supabase/functions/withdrawals-crud/index.ts`
+- `supabase/functions/welfare-withdrawal-approve/index.ts`
+- `supabase/functions/welfare-cooling-off-payout/index.ts`
+- `src/pages/ChamaCreate.tsx`
+- `src/pages/AdminCommissionConfig.tsx`
+- Withdrawal request UI (chama withdrawal, mchango withdrawal, welfare withdrawal forms)
 
-## Optional follow-ups (not in this change set)
-
-- New env vars to set in Cloud secrets when ready: `MPESA_CALLBACK_BYPASS_IPS` (optional), `ALLOWED_ORIGINS` (optional). Both have sensible defaults; not setting them keeps current behavior secure.
-- Memory note: update `mem://auth/signup-uniqueness-validation` reference to also mention identity-immutability trigger.
+No changes to commission logic, M-Pesa flow, or settlement engine.
