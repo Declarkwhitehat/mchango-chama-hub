@@ -1,60 +1,89 @@
-## Why push notifications are not arriving
+## Goal
 
-Investigation findings:
+Let group managers request deletion of any uploaded document. The document remains visible during a 72-hour cooldown, all members get a push notification, and platform admins can either force-delete immediately or cancel the request. After 72h with no admin action, the document is permanently removed.
 
-1. **Device tokens are registered correctly** — the user has multiple FCM tokens stored in `device_tokens` (most recent today).
-2. **The `send-push-notification` edge function has never been called** — its logs are completely empty. The push pipeline is plumbed (DB trigger → edge function → FCM HTTP v1) but the trigger only fires when a row is inserted into `public.notifications`.
-3. **The payment-success code paths are not inserting notification rows.** The `notifications` table has no entries newer than April 5; recent payments and withdrawals never wrote to it. Specifically:
-   - `payment-stk-callback` (chama contributions) → only sends an SMS, no notification row.
-   - `payment-stk-callback` (mchango / organization donations) → no notification at all (neither donor nor campaign owner).
-   - `c2b-confirm-payment` (offline PayBill donations) → only sends SMS to the donor; campaign owner not notified.
-   - `b2c-callback` (withdrawal completion) → no notification when M‑Pesa actually pays out.
-   - Reminder cron jobs (`daily-reminder-cron`, `daily-payout-cron`) write reminders but those rows are old.
+## 1. Database changes (migration)
 
-So the fix is **not** in the FCM/Firebase plumbing — that part is correct. The fix is to insert a `notifications` row at every transaction event, which automatically fans out a push via the existing trigger.
+Add deletion-state columns to `public.group_documents`:
 
-## Plan
+- `deletion_requested_at timestamptz`
+- `deletion_requested_by uuid` (manager who requested)
+- `deletion_scheduled_for timestamptz` (requested_at + 72h)
+- `deletion_reason text`
+- `deletion_status text` — `null` (active) | `'pending'` | `'cancelled'`
+- `deleted_at timestamptz` (final tombstone marker, set when actually purged)
 
-### 1. Add notifications on every payment success (chama contributions)
+Index: `(deletion_status, deletion_scheduled_for)` for the cron scan.
 
-In `supabase/functions/payment-stk-callback/index.ts`, when `status === 'completed'` for a chama contribution, also call `createNotification(...)` for:
-- The payer (always) — "Payment Confirmed ✅ KES X to {chama}. Receipt: {ref}".
-- The beneficiary, if someone else paid for them — "{Payer} paid KES X for your contribution".
+RLS: keep current SELECT policy (members can still see). Add UPDATE policy so:
+- group managers/executives (chama manager / welfare exec / mchango manager / org owner) can set `deletion_status='pending'`.
+- admins (`has_role(auth.uid(),'admin')`) can update to `cancelled` or hard-delete.
 
-### 2. Add notifications for donations (mchango + organizations)
+## 2. Edge function: `request-document-deletion`
 
-In **both** `payment-stk-callback` and `c2b-confirm-payment`:
-- Notify the **donor** if they have a Pamoja account (lookup by phone in `profiles`) — "Donation received ✅ KES X to {campaign}".
-- Notify the **campaign creator / organization owner / additional managers** — "💝 New donation: {donor} gave KES X to {campaign}".
-- Notify the campaign creator on **paid contributions to chamas** they manage (manager visibility) — only when relevant.
+Input: `{ document_id, reason? }`. Validates JWT, confirms caller is a manager of the parent entity (uses existing helpers `is_chama_manager`, `is_welfare_chairman/secretary`, mchango `managers[]`, org owner). Then:
+1. Updates row → `deletion_status='pending'`, sets `deletion_requested_*`, `deletion_scheduled_for = now()+72h`.
+2. Resolves all member user_ids for the entity.
+3. Bulk-inserts a row per member into `notifications` with category `'document_deletion'`, title "Document scheduled for deletion", message including doc title + 72h notice. The existing `notify_push_on_notification_insert` trigger fans out push notifications automatically.
 
-### 3. Add notifications when a withdrawal actually pays out
+## 3. Edge function: `process-document-deletions` (cron)
 
-In `supabase/functions/b2c-callback/index.ts`, on M‑Pesa B2C `ResultCode === 0`:
-- Notify the requester — "Withdrawal Complete ✅ KES X sent to your M‑Pesa. Ref: {receipt}".
-- For mchango/organization withdrawals, also notify all donors that funds were withdrawn (best‑effort, deduplicated by `user_id`) using the existing `campaignWithdrawal` template.
+Scheduled hourly via `supabase/config.toml` cron (or `pg_cron`). For every row where `deletion_status='pending'` AND `deletion_scheduled_for <= now()`:
+- Remove file from `group-documents` storage bucket.
+- Delete the DB row (or set `deleted_at` + remove file — we'll hard-delete to match current admin behavior).
+- Insert a final notification per member: "Document deleted".
 
-### 4. Add reminder push for due payments
+## 4. Frontend — `src/components/GroupDocuments.tsx`
 
-The `daily-reminder-cron` and `daily-payout-cron` already insert notification rows, so they will get push automatically once the trigger is in place — verify the trigger is active (`notifications_push_after_insert`) and re-deploy if needed.
+Replace the current admin-only delete button with a manager Trash button that opens a confirm dialog asking for an optional reason, then calls `request-document-deletion`.
 
-### 5. Android notification channel
+For documents with `deletion_status='pending'`, render an amber banner inside the row:
+- "Scheduled for deletion in Xh Ym (by {manager name})"
+- Reason if present.
+- Download still works.
 
-Create the `transactions` notification channel referenced in `send-push-notification` (`channel_id: 'transactions'`) so high‑priority banners + sound work on Android 8+. Add a small native bootstrap call in `usePushNotifications.ts` using `PushNotifications.createChannel(...)` immediately after registration.
+Props update: pass new `isManager` prop from each detail page (managers can now request; current `isAdmin` retained for direct override path inside the same component is removed — admin override lives on admin dashboard).
 
-### 6. Verification step
+Update callers (`ChamaDetail.tsx`, `WelfareDetail.tsx`, `MchangoDetail.tsx`, `OrganizationDetail.tsx`) to pass `isManager` based on already-known role flags.
 
-After deploying, perform a small donation/contribution end‑to‑end and confirm:
-- A `notifications` row appears.
-- `send-push-notification` logs show a 200 from FCM.
-- The Android device shows a heads‑up banner.
+## 5. Admin dashboard — new page `src/pages/AdminDocumentDeletions.tsx`
 
-## Files to touch
+Lists all `group_documents` where `deletion_status='pending'`:
 
-- `supabase/functions/payment-stk-callback/index.ts` — add `createNotification` calls for chama payer/beneficiary, mchango donor + creator + managers, organization donor + creator.
-- `supabase/functions/c2b-confirm-payment/index.ts` — add notifications for mchango and organization offline donations (donor + creator).
-- `supabase/functions/b2c-callback/index.ts` — add `withdrawalCompleted` notification + donor fan‑out for campaign withdrawals.
-- `supabase/functions/_shared/notifications.ts` — add a small `notifyManyUsers(...)` helper that dedupes user IDs to send the same notification to a list (for donor fan‑out).
-- `src/hooks/usePushNotifications.ts` — register a `transactions` Android notification channel on init so the channel referenced by `send-push-notification` exists.
+```text
+[Document title]   entity name/type   requested by   scheduled for   reason
+[Cancel] [Delete now] [Download]
+```
 
-No DB schema changes are needed — the trigger and FCM service account are already in place.
+- **Cancel**: sets `deletion_status='cancelled'`, clears `deletion_scheduled_for`, notifies members ("Deletion cancelled by admin").
+- **Delete now**: removes from storage, deletes row, notifies members.
+- **Download**: existing storage download.
+
+Wire into `AdminSidebar.tsx` under existing Documents section, route added in `App.tsx` (e.g. `/admin/document-deletions`), guarded by `AdminProtectedRoute`.
+
+## 6. Notifications
+
+Use existing `notifications` table + `notify_push_on_notification_insert` trigger — no extra wiring needed for push delivery. Category strings:
+- `document_deletion_scheduled`
+- `document_deletion_cancelled`
+- `document_deleted`
+
+## Files to add / edit
+
+**New**
+- `supabase/migrations/<ts>_group_document_deletion_workflow.sql`
+- `supabase/functions/request-document-deletion/index.ts`
+- `supabase/functions/process-document-deletions/index.ts`
+- `src/pages/AdminDocumentDeletions.tsx`
+
+**Edited**
+- `src/components/GroupDocuments.tsx` — request flow, pending banner, countdown
+- `src/pages/ChamaDetail.tsx`, `WelfareDetail.tsx`, `MchangoDetail.tsx`, `OrganizationDetail.tsx` — pass `isManager`
+- `src/App.tsx` — admin route
+- `src/components/admin/AdminSidebar.tsx` — nav entry
+- `supabase/config.toml` — cron schedule for `process-document-deletions`
+
+## Out of scope
+
+- Per-document email digests (push + in-app notification only).
+- Restoring already hard-deleted files (no soft-delete recovery beyond cooldown).

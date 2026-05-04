@@ -1017,6 +1017,7 @@ const ChamaDetail = () => {
                 entityType="chama"
                 entityId={chama.id}
                 canUpload={isManager}
+                isManager={isManager}
               />
             </TabsContent>
 

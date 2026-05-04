@@ -380,6 +380,7 @@ const WelfareDetail = () => {
               entityType="welfare"
               entityId={welfare.id}
               canUpload={isExecutive}
+              isManager={isExecutive}
             />
             {/* PDF Report for all members */}
             {isMember && (

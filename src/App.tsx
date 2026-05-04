@@ -80,6 +80,7 @@ const AdminWelfareExecutiveChanges = lazy(() => import("./pages/AdminWelfareExec
 const AdminDocuments = lazy(() => import("./pages/AdminDocuments"));
 const AdminCommissionConfig = lazy(() => import("./pages/AdminCommissionConfig"));
 const AdminSuperManagers = lazy(() => import("./pages/AdminSuperManagers"));
+const AdminDocumentDeletions = lazy(() => import("./pages/AdminDocumentDeletions"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -189,6 +190,7 @@ const AppContent = () => {
           <Route path="/admin/documents" element={<AdminProtectedRoute><AdminDocuments /></AdminProtectedRoute>} />
           <Route path="/admin/commission-config" element={<AdminProtectedRoute><AdminCommissionConfig /></AdminProtectedRoute>} />
           <Route path="/admin/super-managers" element={<AdminProtectedRoute><AdminSuperManagers /></AdminProtectedRoute>} />
+          <Route path="/admin/document-deletions" element={<AdminProtectedRoute><AdminDocumentDeletions /></AdminProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

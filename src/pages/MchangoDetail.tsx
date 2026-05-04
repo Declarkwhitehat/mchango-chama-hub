@@ -499,6 +499,7 @@ const MchangoDetail = () => {
                 entityType="mchango"
                 entityId={campaign.id}
                 canUpload={isCreator}
+                isManager={isCreator}
               />
             </TabsContent>
           </Tabs>

@@ -17,7 +17,8 @@ import {
   Landmark,
   BadgeCheck,
   ShieldAlert,
-  CheckCircle
+  CheckCircle,
+  Trash2
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -178,6 +179,7 @@ export function AdminSidebar() {
   const systemItems: MenuItem[] = [
     { title: "Audit Logs", url: "/admin/audit", icon: FileText },
     { title: "Verify Document", url: "/admin/documents", icon: FileText },
+    { title: "Document Deletions", url: "/admin/document-deletions", icon: Trash2 },
     { title: "Data Export", url: "/admin/export", icon: Download },
   ];
 
