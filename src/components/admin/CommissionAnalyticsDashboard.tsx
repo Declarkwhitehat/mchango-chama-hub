@@ -164,8 +164,8 @@ export const CommissionAnalyticsDashboard = () => {
 
       const s: SummaryData = {
         totalGross: 0, totalCommission: 0, totalNet: 0,
-        mchangoCommission: 0, chamaCommission: 0, orgCommission: 0,
-        mchangoGross: 0, chamaGross: 0, orgGross: 0,
+        mchangoCommission: 0, chamaCommission: 0, orgCommission: 0, welfareCommission: 0,
+        mchangoGross: 0, chamaGross: 0, orgGross: 0, welfareGross: 0,
         transactionCount: entries.length
       };
 
@@ -182,6 +182,9 @@ export const CommissionAnalyticsDashboard = () => {
         } else if (e.source_type === "organization") {
           s.orgCommission += Number(e.commission_amount);
           s.orgGross += Number(e.gross_amount);
+        } else if (e.source_type === "welfare") {
+          s.welfareCommission += Number(e.commission_amount);
+          s.welfareGross += Number(e.gross_amount);
         }
       }
       setSummary(s);
