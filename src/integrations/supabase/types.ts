@@ -299,6 +299,27 @@ export type Database = {
           },
         ]
       }
+      chama_grace_reminders_sent: {
+        Row: {
+          cycle_id: string
+          member_id: string
+          reminder_type: string
+          sent_at: string
+        }
+        Insert: {
+          cycle_id: string
+          member_id: string
+          reminder_type: string
+          sent_at?: string
+        }
+        Update: {
+          cycle_id?: string
+          member_id?: string
+          reminder_type?: string
+          sent_at?: string
+        }
+        Relationships: []
+      }
       chama_invite_codes: {
         Row: {
           chama_id: string

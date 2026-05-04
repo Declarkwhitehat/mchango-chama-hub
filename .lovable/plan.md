@@ -1,81 +1,76 @@
-## Problem
+## Goals
 
-When a user without `kyc_status = 'approved'` opens any create page (`/welfare/create`, `/chama/create`, `/mchango/create`, `/organizations/create`):
+1. **Don't show "pending payment"** in a chama that hasn't been officially started (status = `pending`).
+2. **Confirm/enforce the grace-period rule**: when a chama starts, the first contribution deadline is **10:00 PM Kenya time the next day** (already implemented). Allow members to contribute starting immediately (≈10+ hours before deadline — already the case).
+3. **Send a push notification ~10 hours before the deadline** to all unpaid members on the app.
+4. **Send an SMS ~6 hours before the deadline** to unpaid members, warning them they will be removed from the chama if they don't pay in time.
 
-- `ProtectedRoute requireKYC` fires `toast.error(...)` and `navigate(...)`, while `return null` flashes a **blank screen** before the redirect lands.
-- The toast message is generic (`"Your KYC status is: pending..."`) and doesn't tell the user whether to **upload KYC** or just **wait for review**.
-- `WelfareCreate.tsx` has no inline KYC gate at all (the other three create pages do, but inconsistently styled and with the same blank-flash issue from the route guard).
+The auto-removal of unpaid members at the 10 PM cutoff is already handled by the existing chama engine (member-auto-removal logic), so this plan focuses on **UI gating + reminders**.
 
-## Goal
+---
 
-Show a clear, friendly status card on the create page itself based on the user's KYC state. No blank screens, no surprise redirects.
+## 1. Hide payment UI for unstarted chamas (frontend)
 
-## Approach
+In `src/components/MemberDashboard.tsx`, the `<CyclePaymentStatus>` block (which renders the payment countdown / "Amount to Pay") is shown regardless of `chama.status`. We will gate it so it only renders when `chama.status === 'active'` (or `cycle_complete` with a current cycle). For `status === 'pending'` we will instead show a small informational card:
 
-### 1. Stop ProtectedRoute from redirecting on non-approved KYC
+> "This chama hasn't started yet. Once the manager starts it, you'll have until 10:00 PM the next day to make your first contribution."
 
-In `src/components/ProtectedRoute.tsx`:
+Also tighten:
+- `src/components/chama/AmountToPayCard.tsx` — early-return a "not started" state if no current cycle exists.
+- `src/pages/ChamaDetail.tsx` — make sure none of the payment cards/banners render in the `pending` status branch (they currently shouldn't, but verify the MemberDashboard pathway is the only entry point).
 
-- Keep the **auth** check (redirect to `/auth` if not logged in) and the **PIN** check.
-- **Remove** the KYC redirect block (the `if (requireKYC && profile)` branch in the effect, plus the `if (requireKYC && profile && profile.kyc_status !== 'approved') return null;` line).
-- Instead, pass `requireKYC` through and let the page render. The page itself owns the KYC UX.
+This eliminates the "1 pending payment due" the user is seeing on a freshly created (not-yet-started) chama.
 
-This eliminates the blank flash and the noisy toast.
+## 2. Grace period (already correct — verify only)
 
-### 2. Create a shared `KycGate` component
+Confirmed in `supabase/functions/chama-start/index.ts` and `supabase/functions/_shared/chamaDeadlines.ts`:
+- On start, the first cycle `end_date` is set to `getNextDay10PmKenyaDeadline(startDate)` (next day 22:00 EAT).
+- `MemberDashboard` and `PaymentCountdownTimer` already render the grace-period countdown.
 
-New file: `src/components/KycGate.tsx`
+No change needed here beyond what's in step 1.
 
-Props: `{ children: React.ReactNode; featureLabel: string }` (e.g. `"welfare group"`, `"chama"`, `"campaign"`, `"organization"`).
+## 3. New edge function: `chama-grace-reminders`
 
-Behavior:
+A scheduled function that runs **every 30 minutes** and, for every chama in its first cycle (grace period):
 
-- Reads `profile` from `useAuth()` (already loaded — no extra fetch needed).
-- While `profile` is `null` and `loading`, show a small skeleton/spinner inside `Layout`-friendly markup (no full-page blank).
-- Branches on state:
+For each unpaid approved member of cycle 1:
+- Compute hours remaining until the cycle `end_date` (10 PM Kenya next day).
+- **Push notification window — between ~10h and ~9.5h remaining**: insert a row into `notifications` with title "Pay your first contribution today" and body explaining the deadline + amount. The existing `notify_push_on_notification_insert` trigger forwards this to `send-push-notification`, so push delivery is automatic.
+- **SMS window — between ~6h and ~5.5h remaining**: call `send-transactional-sms` with: *"⚠️ Pamoja Nova: Your first contribution of KES X for "<chama>" is due by 10:00 PM today. If you don't pay in time, you will be REMOVED from the chama. Pay now via the app."*
 
-  | State | UI |
-  |---|---|
-  | `kyc_status === 'approved'` | Render `children` (with optional small green confirmation alert) |
-  | `!kyc_submitted_at` (never uploaded) | Amber card: "Verify your identity to create a {featureLabel}." Primary button → `/kyc-upload`. |
-  | `kyc_submitted_at` && `kyc_status === 'pending'` | Blue/info card: "Your KYC documents are under review. You'll be able to create a {featureLabel} once an admin approves them — usually within 24 hours." No action button (or a secondary "Back to Home"). |
-  | `kyc_status === 'rejected'` | Red card: show rejection reason if available, button → `/kyc-upload` to resubmit. |
+To avoid duplicates, add a tiny tracking table:
 
-- Does NOT render the create form's children unless approved, so all existing form logic stays untouched.
+```text
+chama_grace_reminders_sent
+  member_id uuid
+  cycle_id uuid
+  reminder_type text  -- 'push_10h' | 'sms_6h'
+  sent_at timestamptz
+  PRIMARY KEY (member_id, cycle_id, reminder_type)
+```
 
-### 3. Wrap each create page with `KycGate`
+The function INSERTs into this table inside the same transaction so a re-run of the cron in the same window is a no-op.
 
-Edit:
+## 4. Schedule the cron
 
-- `src/pages/WelfareCreate.tsx` — wrap the inner `<div className="container ...">` content with `<KycGate featureLabel="welfare group">…</KycGate>` (inside `<Layout>`). Remove no existing logic; the form simply won't render until approved.
-- `src/pages/ChamaCreate.tsx` — replace the existing inline `kycStatus` fetch + alert blocks with `<KycGate featureLabel="chama">`. Remove the now-redundant `useEffect` + `kycStatus` state.
-- `src/pages/MchangoCreate.tsx` — same treatment, `featureLabel="campaign"`.
-- `src/pages/OrganizationCreate.tsx` — same treatment, `featureLabel="organization"`.
+Add a `pg_cron` job (via the insert tool, since it embeds the project URL + anon key) to call `chama-grace-reminders` every 30 minutes:
 
-This consolidates four divergent implementations into one consistent, clearer UX.
+```text
+*/30 * * * *  →  POST https://<project>.supabase.co/functions/v1/chama-grace-reminders
+```
 
-### 4. Keep the route prop for future-proofing
+## 5. Files touched
 
-Leave `requireKYC` accepted by `ProtectedRoute` (no-op for now) so `App.tsx` doesn't need changes. This avoids a sweeping refactor and lets us re-enable a route-level guard later if desired.
+**Edited**
+- `src/components/MemberDashboard.tsx` — gate payment block on `chama.status === 'active'`.
+- `src/components/chama/AmountToPayCard.tsx` — show "not started" empty state when no current cycle.
 
-## Files Changed
+**Created**
+- `supabase/functions/chama-grace-reminders/index.ts` — the reminder edge function.
+- Migration: create `chama_grace_reminders_sent` table with RLS (service role only).
+- pg_cron job (via insert tool) for every-30-min schedule.
 
-- `src/components/ProtectedRoute.tsx` — remove KYC redirect branch and the `null` short-circuit for unapproved KYC.
-- `src/components/KycGate.tsx` — **new**, shared gating component with three friendly states.
-- `src/pages/WelfareCreate.tsx` — wrap form with `KycGate`.
-- `src/pages/ChamaCreate.tsx` — wrap form with `KycGate`, remove duplicate KYC state/effect/alerts.
-- `src/pages/MchangoCreate.tsx` — same.
-- `src/pages/OrganizationCreate.tsx` — same.
+## Out of scope
 
-## Out of Scope
-
-- No backend / RLS changes (server-side KYC enforcement on insert remains in place).
-- No changes to KYC upload page itself.
-- No changes to non-create pages.
-
-## User-Visible Result
-
-- Non-KYC user clicking "Create Welfare" (or any other create option): sees a clear amber card asking them to verify identity, with a button to KYC upload — never a blank screen.
-- User who already submitted KYC and is awaiting review: sees a calm info card saying "We're reviewing your documents — please wait." No misleading "upload KYC" prompt.
-- Rejected user: sees the reason and a button to resubmit.
-- Approved user: sees the create form exactly as today.
+- The actual auto-removal logic at 10 PM cutoff (already handled by the existing chama engine).
+- Changing the grace-period length or 10 PM Kenya time policy (already enforced).
