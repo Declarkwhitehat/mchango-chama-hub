@@ -543,7 +543,7 @@ export function RevenueDashboard() {
                 <card.icon className={cn("h-4 w-4", card.accent)} />
               </div>
               <div className="text-2xl font-bold tracking-tight">{loading ? "—" : card.value}</div>
-              {!loading && <PctBadge value={card.pct} />}
+              {!loading && !card.hidePct && <PctBadge value={card.pct} />}
             </CardContent>
           </Card>
         ))}
