@@ -83,6 +83,9 @@ export const PaymentStatusManager = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [now, setNow] = useState(Date.now());
 
+  const graceDeadline = getNextDay10PmKenyaDeadline(chamaStartDate);
+  const isGracePeriod = !!graceDeadline && now < graceDeadline.getTime();
+
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
