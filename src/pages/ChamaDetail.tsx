@@ -856,6 +856,7 @@ const ChamaDetail = () => {
                   contributionAmount={chama.contribution_amount}
                   commissionRate={chama.commission_rate}
                   chamaStatus={chama.status}
+                  chamaStartDate={chama.start_date}
                 />
               </TabsContent>
             )}
