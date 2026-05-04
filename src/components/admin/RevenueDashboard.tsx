@@ -528,12 +528,13 @@ export function RevenueDashboard() {
       </Card>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { title: "Total Revenue", value: fmtKES(kpis.totalRevenue), pct: kpis.revenuePct, icon: DollarSign, accent: "text-emerald-600" },
-          { title: "Gross Volume", value: fmtKES(kpis.totalGross), pct: kpis.grossPct, icon: BarChart3, accent: "text-blue-600" },
-          { title: "Transactions", value: kpis.count.toLocaleString(), pct: kpis.countPct, icon: Hash, accent: "text-purple-600" },
-          { title: "Avg Commission", value: fmtKES(kpis.avgCommission), pct: kpis.avgPct, icon: TrendingUp, accent: "text-amber-600" },
+          { title: "Total Revenue", value: fmtKES(kpis.totalRevenue), pct: kpis.revenuePct, icon: DollarSign, accent: "text-emerald-600", hidePct: false },
+          { title: "Gross Volume", value: fmtKES(kpis.totalGross), pct: kpis.grossPct, icon: BarChart3, accent: "text-blue-600", hidePct: false },
+          { title: "Payouts (outflow)", value: fmtKES(kpis.totalPayouts), pct: 0, icon: TrendingUp, accent: "text-rose-600", hidePct: true },
+          { title: "Transactions", value: kpis.count.toLocaleString(), pct: kpis.countPct, icon: Hash, accent: "text-purple-600", hidePct: false },
+          { title: "Avg Commission", value: fmtKES(kpis.avgCommission), pct: kpis.avgPct, icon: TrendingUp, accent: "text-amber-600", hidePct: false },
         ].map(card => (
           <Card key={card.title}>
             <CardContent className="pt-5 pb-4">
