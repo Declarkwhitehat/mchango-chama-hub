@@ -28,32 +28,11 @@ const ChamaCreate = () => {
   const navigate = useNavigate();
   const { minChamaContribution } = usePlatformMinimums();
   const [isLoading, setIsLoading] = useState(false);
-  const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [frequency, setFrequency] = useState<string>("monthly");
   const [showEveryNDays, setShowEveryNDays] = useState(false);
   const [monthlyDay, setMonthlyDay] = useState<string>("");
   const [monthlyDay2, setMonthlyDay2] = useState<string>("");
   const formRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    const checkKycStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("kyc_status")
-        .eq("id", user.id)
-        .single();
-
-      setKycStatus(profile?.kyc_status || null);
-    };
-
-    checkKycStatus();
-  }, [navigate]);
 
   const handleFrequencyChange = (value: string) => {
     setFrequency(value);
