@@ -354,25 +354,19 @@ serve(async (req) => {
 
       // Send tailored payout confirmation SMS
       if (recipientPhone) {
-        // Fetch remaining balance for non-chama sources (after atomic deduction)
+        // Only campaigns (mchango) include remaining balance
         let remainingBalance: number | null = null;
-        try {
-          if (withdrawal.mchango_id) {
+        if (withdrawal.mchango_id) {
+          try {
             const { data } = await supabaseAdmin.from('mchango').select('available_balance').eq('id', withdrawal.mchango_id).maybeSingle();
             remainingBalance = Number(data?.available_balance ?? 0);
-          } else if (withdrawal.organization_id) {
-            const { data } = await supabaseAdmin.from('organizations').select('available_balance').eq('id', withdrawal.organization_id).maybeSingle();
-            remainingBalance = Number(data?.available_balance ?? 0);
-          } else if (withdrawal.welfare_id) {
-            const { data } = await supabaseAdmin.from('welfares').select('available_balance').eq('id', withdrawal.welfare_id).maybeSingle();
-            remainingBalance = Number(data?.available_balance ?? 0);
+          } catch (_e) {
+            remainingBalance = null;
           }
-        } catch (_e) {
-          remainingBalance = null;
         }
 
         const amountStr = `KES ${transactionAmount.toFixed(2)}`;
-        const balanceLine = (remainingBalance !== null && !withdrawal.chama_id)
+        const balanceLine = (withdrawal.mchango_id && remainingBalance !== null)
           ? `\nBalance: KES ${remainingBalance.toFixed(2)}`
           : '';
         const successMessage = `Pamojanova: Withdrawal of ${amountStr} from ${sourceType} "${sourceName}" successful. Ref: ${transactionId}.${balanceLine}`;
