@@ -20,8 +20,7 @@ import {
   CheckCircle,
   Trash2,
   MessageSquareMore,
-  Wrench,
-  FlaskConical
+  Wrench
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -189,10 +188,6 @@ export function AdminSidebar() {
     { title: "Maintenance Mode", url: "/admin/maintenance", icon: Wrench },
   ];
 
-  const testingItems: MenuItem[] = [
-    { title: "Chama Simulator", url: "/admin/chama-simulator", icon: FlaskConical },
-  ];
-
   const renderMenuItem = (item: MenuItem) => {
     const content = (
       <NavLink 
@@ -287,7 +282,6 @@ export function AdminSidebar() {
         {renderMenuGroup("Security", securityItems)}
         {renderMenuGroup("Support", supportItems)}
         {renderMenuGroup("System", systemItems)}
-        {renderMenuGroup("Testing", testingItems)}
       </SidebarContent>
 
       {/* Sidebar Footer with Back to App */}
