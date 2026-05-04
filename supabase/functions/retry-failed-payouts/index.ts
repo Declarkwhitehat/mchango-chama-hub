@@ -20,7 +20,17 @@ function extractConversationId(notes?: string | null): string | null {
   return null;
 }
 
+function sanitizeSmsMessage(raw: string): string {
+  if (!raw) return '';
+  let t = raw.normalize('NFKC');
+  t = t.replace(/[\u{1F000}-\u{1FFFF}]/gu, '').replace(/[\u{2600}-\u{27BF}]/gu, '');
+  t = t.replace(/[\u200D\uFE0F\u20E3]/g, '');
+  t = t.replace(/[\u2018\u2019\u201A\u2032]/g, "'").replace(/[\u201C\u201D\u201E\u2033]/g, '"').replace(/[\u2013\u2014\u2212]/g, '-').replace(/[\u2026]/g, '...').replace(/[\u00A0\u2007\u202F]/g, ' ');
+  return t.replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
+}
+
 async function sendSMS(phone: string, message: string) {
+  message = sanitizeSmsMessage(message);
   if (!celcomApiKey || !celcomPartnerId || !celcomShortcode) {
     console.error('SMS credentials not configured');
     return { success: false, error: 'SMS not configured' };

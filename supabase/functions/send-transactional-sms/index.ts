@@ -43,9 +43,30 @@ const getProviderMessage = (value: unknown): string | undefined => {
   return trimmed;
 };
 
+// Strip emojis and non-GSM-7-safe symbols so SMS gateway never sends garbled glyphs ("dY%" etc.)
+const sanitizeSmsMessage = (raw: string): string => {
+  if (!raw) return '';
+  let text = raw.normalize('NFKC');
+  // Remove emoji & pictographic symbols (surrogate pairs, misc symbols, dingbats, variation selectors, ZWJ)
+  text = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, '');
+  text = text.replace(/[\u{2600}-\u{27BF}]/gu, '');
+  text = text.replace(/[\u200D\uFE0F\u20E3]/g, '');
+  // Smart punctuation -> ASCII
+  text = text
+    .replace(/[\u2018\u2019\u201A\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u2033]/g, '"')
+    .replace(/[\u2013\u2014\u2212]/g, '-')
+    .replace(/[\u2026]/g, '...')
+    .replace(/[\u00A0\u2007\u202F]/g, ' ');
+  // Collapse stray whitespace
+  text = text.replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
+  return text;
+};
+
 const sendSMS = async (phone: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> => {
   try {
     const normalizedPhone = phone.startsWith('+') ? phone.substring(1) : phone;
+    message = sanitizeSmsMessage(message);
 
     const response = await fetch('https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS', {
       method: 'POST',
