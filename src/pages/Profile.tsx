@@ -130,6 +130,17 @@ const Profile = () => {
                 Your documents are being reviewed by our team. This usually takes 1-2 business days.
               </p>
             )}
+            <div className="pt-2 border-t">
+              {(profile as any).is_verified ? (
+                <Badge className="gap-1 bg-blue-500 hover:bg-blue-600 text-white">
+                  <CheckCircle className="h-3 w-3" /> Verified Account
+                </Badge>
+              ) : (
+                <Button variant="outline" onClick={() => navigate("/account/verify")} className="w-full text-sm sm:text-base gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-500" /> Get Verified Account
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 

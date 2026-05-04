@@ -1,89 +1,64 @@
 ## Goal
+Add **account-level verification** (selfie + KES 1,500 paid via M-Pesa STK), make verified accounts' campaigns/groups appear first, auto-verify any entity created by a verified account, expose the new fee in Commission Config, and fix the **Mchango commission rate** being unchangeable from the admin panel.
 
-Let group managers request deletion of any uploaded document. The document remains visible during a 72-hour cooldown, all members get a push notification, and platform admins can either force-delete immediately or cancel the request. After 72h with no admin action, the document is permanently removed.
+## 1. Account Verification
 
-## 1. Database changes (migration)
+### Database
+- `profiles.is_verified boolean default false`, `profiles.verified_at timestamptz`.
+- New table `user_verification_requests`:
+  - `id, user_id, selfie_path, fee_amount, payment_status` (`pending|paid|failed`), `payment_reference, paid_at, status` (`pending|approved|rejected`), `rejection_reason, reviewed_by, reviewed_at, created_at`.
+  - RLS: owner can SELECT/INSERT own; admins manage all.
+- Storage bucket `verification-selfies` (private). RLS: user can upload own folder; admins read all.
+- New `platform_settings` row `user_verification_fee` = 1500.
+- Trigger on insert into `mchango`, `chama`, `welfares`, `organizations`: if creator's `profiles.is_verified = true` → set `is_verified = true` on the new row (no fee).
 
-Add deletion-state columns to `public.group_documents`:
+### Edge functions
+- `request-account-verification`: validate input, upload-key check, create `user_verification_requests` row in `pending/payment_status=pending`, trigger STK push for KES 1,500 with `AccountReference = ACCV-<short>`.
+- Extend `payment-stk-callback` to handle the `account_verification` purpose: on success, mark `user_verification_requests.payment_status='paid'`, log to `company_earnings` (`source='accountVerificationFee'`).
+- `admin-account-verification`: approve (`profiles.is_verified=true, verified_at=now()`) or reject (auto-refund optional — initial scope: no refund, manual only).
 
-- `deletion_requested_at timestamptz`
-- `deletion_requested_by uuid` (manager who requested)
-- `deletion_scheduled_for timestamptz` (requested_at + 72h)
-- `deletion_reason text`
-- `deletion_status text` — `null` (active) | `'pending'` | `'cancelled'`
-- `deleted_at timestamptz` (final tombstone marker, set when actually purged)
+### Frontend
+- New page **`/account/verify`** (entry from Profile dropdown and a "Get Verified" CTA on profile/settings):
+  - Step 1: capture/upload selfie (camera or file).
+  - Step 2: confirm phone, show fee, trigger STK.
+  - Step 3: poll status; show pending/approved/rejected badge.
+- Profile screen shows blue "Verified Account" badge when `is_verified=true`.
+- Mchango / Chama / Welfare / Organization list queries: change order to `created_by_verified DESC, is_verified DESC, created_at DESC`. Implement by joining/filtering on creator profile via embedded select (`profiles!inner(is_verified)`) or a generated column `creator_is_verified` populated by trigger for cheap sorting. **Chosen approach:** add `creator_is_verified boolean default false` to the four entity tables; trigger sets it from creator profile on insert; updated when profile flips to verified (one-shot UPDATE to all that user's rows).
 
-Index: `(deletion_status, deletion_scheduled_for)` for the cron scan.
+### Auto-verify on create (no fee)
+- The same `creator_is_verified=true` trigger also sets `is_verified=true` on the entity row (skipping the existing entity-level verification request flow).
 
-RLS: keep current SELECT policy (members can still see). Add UPDATE policy so:
-- group managers/executives (chama manager / welfare exec / mchango manager / org owner) can set `deletion_status='pending'`.
-- admins (`has_role(auth.uid(),'admin')`) can update to `cancelled` or hard-delete.
+## 2. Commission Config fixes
 
-## 2. Edge function: `request-document-deletion`
+### Add User Verification Fee row
+- In `AdminCommissionConfig.tsx`, add a new card row "Account Verification Fee" bound to `platform_settings.user_verification_fee`.
 
-Input: `{ document_id, reason? }`. Validates JWT, confirms caller is a manager of the parent entity (uses existing helpers `is_chama_manager`, `is_welfare_chairman/secretary`, mchango `managers[]`, org owner). Then:
-1. Updates row → `deletion_status='pending'`, sets `deletion_requested_*`, `deletion_scheduled_for = now()+72h`.
-2. Resolves all member user_ids for the entity.
-3. Bulk-inserts a row per member into `notifications` with category `'document_deletion'`, title "Document scheduled for deletion", message including doc title + 72h notice. The existing `notify_push_on_notification_insert` trigger fans out push notifications automatically.
+### Fix Mchango commission rate not editable
+**Root cause:** `payment-stk-callback` and `c2b-confirm-payment` use the hardcoded `COMMISSION_RATES.MCHANGO = 0.07` from `_shared/commissionRates.ts`. The admin slider writes to `platform_settings.commission_rate_mchango` but nothing reads it.
 
-## 3. Edge function: `process-document-deletions` (cron)
+**Fix:** Make the rate dynamic.
+- New helper `_shared/getCommissionRate.ts` that fetches `platform_settings.commission_rate_<type>` (mchango/organization/welfare) with fallback to the constant.
+- Update mchango branch in `payment-stk-callback/index.ts` and `c2b-confirm-payment/index.ts` to call `await getCommissionRate(supabase, 'mchango')`.
+- Same for organizations and welfare branches (welfare currently reads from `welfares.commission_rate` — keep that but seed from platform setting on welfare creation; admin slider stays the source of truth for new entities).
+- Chama remains per-row (existing UI for that already works).
 
-Scheduled hourly via `supabase/config.toml` cron (or `pg_cron`). For every row where `deletion_status='pending'` AND `deletion_scheduled_for <= now()`:
-- Remove file from `group-documents` storage bucket.
-- Delete the DB row (or set `deleted_at` + remove file — we'll hard-delete to match current admin behavior).
-- Insert a final notification per member: "Document deleted".
-
-## 4. Frontend — `src/components/GroupDocuments.tsx`
-
-Replace the current admin-only delete button with a manager Trash button that opens a confirm dialog asking for an optional reason, then calls `request-document-deletion`.
-
-For documents with `deletion_status='pending'`, render an amber banner inside the row:
-- "Scheduled for deletion in Xh Ym (by {manager name})"
-- Reason if present.
-- Download still works.
-
-Props update: pass new `isManager` prop from each detail page (managers can now request; current `isAdmin` retained for direct override path inside the same component is removed — admin override lives on admin dashboard).
-
-Update callers (`ChamaDetail.tsx`, `WelfareDetail.tsx`, `MchangoDetail.tsx`, `OrganizationDetail.tsx`) to pass `isManager` based on already-known role flags.
-
-## 5. Admin dashboard — new page `src/pages/AdminDocumentDeletions.tsx`
-
-Lists all `group_documents` where `deletion_status='pending'`:
-
-```text
-[Document title]   entity name/type   requested by   scheduled for   reason
-[Cancel] [Delete now] [Download]
-```
-
-- **Cancel**: sets `deletion_status='cancelled'`, clears `deletion_scheduled_for`, notifies members ("Deletion cancelled by admin").
-- **Delete now**: removes from storage, deletes row, notifies members.
-- **Download**: existing storage download.
-
-Wire into `AdminSidebar.tsx` under existing Documents section, route added in `App.tsx` (e.g. `/admin/document-deletions`), guarded by `AdminProtectedRoute`.
-
-## 6. Notifications
-
-Use existing `notifications` table + `notify_push_on_notification_insert` trigger — no extra wiring needed for push delivery. Category strings:
-- `document_deletion_scheduled`
-- `document_deletion_cancelled`
-- `document_deleted`
-
-## Files to add / edit
+## Files to add/change
 
 **New**
-- `supabase/migrations/<ts>_group_document_deletion_workflow.sql`
-- `supabase/functions/request-document-deletion/index.ts`
-- `supabase/functions/process-document-deletions/index.ts`
-- `src/pages/AdminDocumentDeletions.tsx`
+- `supabase/migrations/<ts>_account_verification.sql` (columns, table, bucket, RLS, triggers).
+- `supabase/functions/request-account-verification/index.ts`
+- `supabase/functions/admin-account-verification/index.ts`
+- `supabase/functions/_shared/getCommissionRate.ts`
+- `src/pages/AccountVerification.tsx`
+- `src/pages/AdminUserVerifications.tsx`
+- `src/components/profile/VerifiedBadge.tsx`
 
 **Edited**
-- `src/components/GroupDocuments.tsx` — request flow, pending banner, countdown
-- `src/pages/ChamaDetail.tsx`, `WelfareDetail.tsx`, `MchangoDetail.tsx`, `OrganizationDetail.tsx` — pass `isManager`
-- `src/App.tsx` — admin route
-- `src/components/admin/AdminSidebar.tsx` — nav entry
-- `supabase/config.toml` — cron schedule for `process-document-deletions`
+- `supabase/functions/payment-stk-callback/index.ts` — handle `account_verification` purpose; use dynamic rate for mchango/org.
+- `supabase/functions/c2b-confirm-payment/index.ts` — dynamic rate for mchango/org.
+- `src/pages/AdminCommissionConfig.tsx` — add user verification fee field.
+- `src/components/admin/AdminSidebar.tsx` & `src/App.tsx` — route + nav for new admin page.
+- Mchango/Chama/Welfare/Organization listing pages — order by `creator_is_verified, is_verified, created_at`.
+- `src/components/Profile*` (or wherever profile menu lives) — "Get Verified" entry + badge.
 
-## Out of scope
-
-- Per-document email digests (push + in-app notification only).
-- Restoring already hard-deleted files (no soft-delete recovery beyond cooldown).
+No changes to chama-level commission UI. Existing entity-level `VerificationRequestButton` stays for groups whose creator is not yet verified (unchanged flow).

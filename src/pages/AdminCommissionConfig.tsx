@@ -26,6 +26,7 @@ const AdminCommissionConfig = () => {
     { key: "commission_rate_welfare", label: "Welfare", description: "Welfare contribution commission", rate: 5 },
   ]);
   const [verificationFee, setVerificationFee] = useState(200);
+  const [accountVerificationFee, setAccountVerificationFee] = useState(1500);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -38,7 +39,7 @@ const AdminCommissionConfig = () => {
 
   const fetchRates = async () => {
     try {
-      const allKeys = [...rates.map(r => r.key), "verification_fee"];
+      const allKeys = [...rates.map(r => r.key), "verification_fee", "user_verification_fee"];
       const { data, error } = await supabase
         .from("platform_settings")
         .select("setting_key, setting_value")
@@ -60,6 +61,11 @@ const AdminCommissionConfig = () => {
         if (feeSetting && typeof feeSetting.setting_value === 'object' && feeSetting.setting_value !== null) {
           const val = feeSetting.setting_value as { amount?: number };
           setVerificationFee(val.amount || 200);
+        }
+        const acctFee = data.find((d: any) => d.setting_key === "user_verification_fee");
+        if (acctFee && typeof acctFee.setting_value === 'object' && acctFee.setting_value !== null) {
+          const val = acctFee.setting_value as { amount?: number };
+          setAccountVerificationFee(val.amount || 1500);
         }
       }
     } catch (err: any) {
@@ -123,6 +129,16 @@ const AdminCommissionConfig = () => {
 
       if (feeError) throw feeError;
 
+      // Update / upsert account verification fee
+      const { error: acctFeeError } = await supabase
+        .from("platform_settings")
+        .upsert({
+          setting_key: "user_verification_fee",
+          setting_value: { amount: accountVerificationFee },
+          updated_by: user?.id || null,
+        }, { onConflict: "setting_key" });
+      if (acctFeeError) throw acctFeeError;
+
       // Log audit
       await supabase.from("audit_logs").insert({
         table_name: "platform_settings",
@@ -131,6 +147,7 @@ const AdminCommissionConfig = () => {
         new_values: {
           ...Object.fromEntries(rates.map(r => [r.key, r.rate / 100])),
           verification_fee: verificationFee,
+          user_verification_fee: accountVerificationFee,
         },
       });
 
@@ -223,6 +240,38 @@ const AdminCommissionConfig = () => {
                   step="50"
                   value={verificationFee}
                   onChange={(e) => handleFeeChange(e.target.value)}
+                  className="text-right font-mono"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <BadgeCheck className="h-4 w-4 text-blue-500" /> Account Verification Fee
+            </CardTitle>
+            <CardDescription>Charged via M-Pesa STK push when a user requests an account-level verified badge. Goes 100% to platform revenue.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <Label className="font-semibold">Account Verification Fee (KSh)</Label>
+                <p className="text-xs text-muted-foreground">Verified accounts auto-verify any group/campaign they create at no extra cost.</p>
+              </div>
+              <div className="flex items-center gap-2 w-36">
+                <span className="text-sm font-medium text-muted-foreground">KSh</span>
+                <Input
+                  type="number"
+                  min="0"
+                  max="50000"
+                  step="100"
+                  value={accountVerificationFee}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value);
+                    if (!isNaN(n) && n >= 0 && n <= 50000) setAccountVerificationFee(n);
+                  }}
                   className="text-right font-mono"
                 />
               </div>

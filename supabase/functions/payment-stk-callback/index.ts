@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { COMMISSION_RATES } from "../_shared/commissionRates.ts";
+import { getCommissionRate } from "../_shared/getCommissionRate.ts";
 import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
 
 const corsHeaders = {
@@ -49,6 +50,37 @@ serve(async (req) => {
       }
       
       console.log('Payment details:', { mpesaReceiptNumber, paidAmount });
+    }
+
+    // ═══ Account Verification Fee STK Push ═══
+    {
+      const { data: verReq } = await supabaseClient
+        .from('user_verification_requests')
+        .select('*')
+        .eq('payment_reference', checkoutRequestId)
+        .maybeSingle();
+      if (verReq) {
+        if (status === 'completed' && verReq.payment_status !== 'paid') {
+          const grossAmount = paidAmount || verReq.fee_amount;
+          await supabaseClient.from('user_verification_requests').update({
+            payment_status: 'paid',
+            paid_at: new Date().toISOString(),
+            payment_reference: mpesaReceiptNumber || checkoutRequestId,
+          }).eq('id', verReq.id);
+          await supabaseClient.from('company_earnings').insert({
+            amount: grossAmount,
+            source: 'accountVerificationFee',
+            description: `Account verification fee from user ${verReq.user_id}`,
+            reference_id: verReq.id,
+          });
+        } else if (status === 'failed') {
+          await supabaseClient.from('user_verification_requests').update({
+            payment_status: 'failed',
+          }).eq('id', verReq.id);
+        }
+        return new Response(JSON.stringify({ success: true, message: 'Account verification payment processed' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     // First, check if this is a chama contribution
@@ -335,7 +367,7 @@ serve(async (req) => {
       const grossAmount = paidAmount || donation.amount;
       
       // Calculate commission using shared constant (7%)
-      const commissionRate = COMMISSION_RATES.MCHANGO;
+      const commissionRate = await getCommissionRate(supabaseClient, "mchango");
       const commissionAmount = grossAmount * commissionRate;
       const netAmount = grossAmount - commissionAmount;
       
@@ -499,7 +531,7 @@ serve(async (req) => {
       }
 
       const grossAmount = paidAmount || orgDonation.amount;
-      const commissionRate = COMMISSION_RATES.ORGANIZATION;
+      const commissionRate = await getCommissionRate(supabaseClient, "organization");
       const commissionAmount = grossAmount * commissionRate;
       const netAmount = grossAmount - commissionAmount;
 
