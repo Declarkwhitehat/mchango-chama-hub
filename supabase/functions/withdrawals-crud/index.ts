@@ -1255,6 +1255,65 @@ serve(async (req) => {
       
       const isManualCompletion = status === 'completed' && payment_reference;
 
+      // ─────────────────────────────────────────────────────────────────
+      // DOUBLE-PAYMENT GUARD: never let a manual completion overlap with
+      // an in-flight automatic (B2C) payout. The automatic path can land
+      // a callback at any moment and complete the same withdrawal.
+      // ─────────────────────────────────────────────────────────────────
+      if (isManualCompletion) {
+        const blockedStatuses = ['processing', 'pending_retry', 'completed'];
+        if (blockedStatuses.includes(existingWithdrawal.status)) {
+          const reason = existingWithdrawal.status === 'completed'
+            ? 'Withdrawal is already completed.'
+            : 'An automatic M-Pesa payout is currently in progress for this withdrawal. Wait for the M-Pesa callback to resolve, or mark the withdrawal as failed first, before recording a manual payment.';
+
+          // Audit the rejected attempt
+          await supabaseAdmin.from('audit_logs').insert({
+            user_id: user.id,
+            action: 'manual_completion_blocked_double_payment',
+            table_name: 'withdrawals',
+            record_id: withdrawal_id,
+            old_values: { status: existingWithdrawal.status, b2c_attempt_count: existingWithdrawal.b2c_attempt_count },
+            new_values: { attempted_payment_reference: payment_reference },
+          });
+
+          return new Response(JSON.stringify({
+            error: 'Cannot mark as manually paid while automatic payout is in progress',
+            reason,
+            current_status: existingWithdrawal.status,
+          }), {
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Reject if another withdrawal already used this M-Pesa receipt
+        const { data: dupRef } = await supabaseAdmin
+          .from('withdrawals')
+          .select('id, status')
+          .eq('payment_reference', payment_reference)
+          .eq('status', 'completed')
+          .neq('id', withdrawal_id)
+          .maybeSingle();
+
+        if (dupRef) {
+          await supabaseAdmin.from('audit_logs').insert({
+            user_id: user.id,
+            action: 'manual_completion_blocked_duplicate_receipt',
+            table_name: 'withdrawals',
+            record_id: withdrawal_id,
+            new_values: { attempted_payment_reference: payment_reference, conflicting_withdrawal_id: dupRef.id },
+          });
+          return new Response(JSON.stringify({
+            error: 'This payment reference is already used on another completed withdrawal',
+            conflicting_withdrawal_id: dupRef.id,
+          }), {
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       // Standard update (approval or rejection without swap)
       const { data: withdrawal, error } = await supabaseAdmin
         .from('withdrawals')
