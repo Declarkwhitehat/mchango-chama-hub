@@ -159,46 +159,10 @@ const ChamaCreate = () => {
 
   const { execute: handleSubmit, isProcessing } = useDebounceAction(handleSubmitInner);
 
-  if (kycStatus === null) {
-    return (
-      <Layout showBackButton title="Create Chama">
-        <div className="container px-4 py-6 max-w-2xl mx-auto">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-muted-foreground">Loading...</p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout showBackButton title="Create Chama">
       <div className="container px-4 py-6 max-w-2xl mx-auto">
-        {kycStatus !== "approved" && (
-          <Alert className="mb-4 border-warning bg-warning/10">
-            <AlertCircle className="h-4 w-4 text-warning" />
-            <AlertDescription>
-              <strong>You must complete verification before creating a Chama.</strong>
-              <br />
-              Only KYC-approved users can create chamas.{" "}
-              <a href="/kyc-upload" className="underline font-medium">
-                Complete KYC now
-              </a>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {kycStatus === "approved" && (
-          <Alert className="mb-4 border-success bg-success/10">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <AlertDescription>
-              Your KYC is approved. You can now create a chama.
-            </AlertDescription>
-          </Alert>
-        )}
-
+        <KycGate featureLabel="chama">
         <Card>
           <CardHeader>
             <CardTitle>Start a Chama Group</CardTitle>
