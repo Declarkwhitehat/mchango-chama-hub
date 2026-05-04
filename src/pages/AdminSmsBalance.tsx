@@ -91,7 +91,7 @@ export default function AdminSmsBalance() {
               SMS Balance
             </h1>
             <p className="text-muted-foreground">
-              Monitor the remaining SMS credit from your messaging provider with automatic refresh.
+              Monitor the remaining SMS credit from your messaging provider. Tap refresh to fetch the latest value.
             </p>
           </div>
           <Button variant="outline" onClick={() => fetchBalance(true)} disabled={refreshing} className="gap-2 w-full sm:w-auto">
