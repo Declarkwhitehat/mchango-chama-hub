@@ -73,15 +73,16 @@ serve(async (req) => {
       }),
     });
     const stkData = await stkRes.json();
-    if (!stkRes.ok || !stkData?.checkout_request_id) {
+    const checkoutId = stkData?.CheckoutRequestID || stkData?.checkout_request_id;
+    if (!stkRes.ok || !checkoutId) {
       return new Response(JSON.stringify({ error: stkData?.error || 'Failed to initiate STK push' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     await supabase.from('user_verification_requests').update({
-      payment_reference: stkData.checkout_request_id,
+      payment_reference: checkoutId,
     }).eq('id', reqId);
 
-    return new Response(JSON.stringify({ success: true, request_id: reqId, checkout_request_id: stkData.checkout_request_id }),
+    return new Response(JSON.stringify({ success: true, request_id: reqId, checkout_request_id: checkoutId }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     console.error('request-account-verification error', e);
