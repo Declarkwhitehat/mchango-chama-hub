@@ -162,6 +162,19 @@ const AdminCommissionConfig = () => {
         }, { onConflict: "setting_key" });
       if (acctFeeError) throw acctFeeError;
 
+      // Upsert minimum amount settings
+      const minimumUpserts = [
+        { setting_key: "min_chama_contribution", setting_value: { amount: minChamaContribution } },
+        { setting_key: "min_withdrawal_chama", setting_value: { amount: minWithdrawalChama } },
+        { setting_key: "min_withdrawal_mchango", setting_value: { amount: minWithdrawalMchango } },
+        { setting_key: "min_withdrawal_welfare", setting_value: { amount: minWithdrawalWelfare } },
+      ].map(row => ({ ...row, updated_by: user?.id || null }));
+
+      const { error: minError } = await supabase
+        .from("platform_settings")
+        .upsert(minimumUpserts, { onConflict: "setting_key" });
+      if (minError) throw minError;
+
       // Log audit
       await supabase.from("audit_logs").insert({
         table_name: "platform_settings",
@@ -171,6 +184,10 @@ const AdminCommissionConfig = () => {
           ...Object.fromEntries(rates.map(r => [r.key, r.rate / 100])),
           verification_fee: verificationFee,
           user_verification_fee: accountVerificationFee,
+          min_chama_contribution: minChamaContribution,
+          min_withdrawal_chama: minWithdrawalChama,
+          min_withdrawal_mchango: minWithdrawalMchango,
+          min_withdrawal_welfare: minWithdrawalWelfare,
         },
       });
 
