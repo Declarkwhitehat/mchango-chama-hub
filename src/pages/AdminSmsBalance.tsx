@@ -131,7 +131,7 @@ export default function AdminSmsBalance() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                {data?.currency || "KES"} • updates every 30 seconds while this page is open
+                {data?.currency || "KES"} • refreshes only when you tap “Refresh now”
               </p>
             </CardContent>
           </Card>
