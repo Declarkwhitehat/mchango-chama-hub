@@ -24,25 +24,8 @@ const MchangoCreate = () => {
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    const checkKycStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
+  // KYC status check is delegated to <KycGate /> below — no local fetch needed.
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("kyc_status")
-        .eq("id", user.id)
-        .single();
-
-      setKycStatus(profile?.kyc_status || null);
-    };
-
-    checkKycStatus();
-  }, [navigate]);
 
   const handleImageChange = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
