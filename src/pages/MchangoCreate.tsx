@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { AlertCircle, CheckCircle, X, Youtube, ImagePlus } from "lucide-react";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { compressImage, formatFileSize } from "@/utils/imageCompression";
+import { KycGate } from "@/components/KycGate";
 
 const MchangoCreate = () => {
   const navigate = useNavigate();
