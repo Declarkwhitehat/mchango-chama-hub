@@ -20,7 +20,8 @@ import {
   CheckCircle,
   Trash2,
   MessageSquareMore,
-  Wrench
+  Wrench,
+  FlaskConical
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
