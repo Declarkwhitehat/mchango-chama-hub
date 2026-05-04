@@ -395,6 +395,7 @@ const ChamaCreate = () => {
             </form>
           </CardContent>
         </Card>
+        </KycGate>
       </div>
     </Layout>
   );
