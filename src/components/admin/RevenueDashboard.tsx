@@ -602,8 +602,19 @@ export function RevenueDashboard() {
 
         {/* Breakdown table */}
         <Card className="lg:col-span-2">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Source Breakdown</CardTitle>
+            {!loading && sourceBreakdown.length > 0 && (
+              reconciliation.matches ? (
+                <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-600/40">
+                  <CheckCircle2 className="h-3 w-3" /> Reconciled
+                </Badge>
+              ) : (
+                <Badge variant="destructive" className="gap-1" title={`Breakdown ${fmtKES(reconciliation.breakdownSum)} vs Total ${fmtKES(kpis.totalRevenue)} — diff ${fmtKES(reconciliation.diff)}`}>
+                  <AlertTriangle className="h-3 w-3" /> Mismatch {fmtKES(reconciliation.diff)}
+                </Badge>
+              )
+            )}
           </CardHeader>
           <CardContent>
             <Table>
