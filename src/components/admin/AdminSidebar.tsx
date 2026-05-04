@@ -132,6 +132,7 @@ export function AdminSidebar() {
       icon: BadgeCheck,
       badge: pendingVerifications > 0 ? pendingVerifications : null
     },
+    { title: "Account Verifications", url: "/admin/account-verifications", icon: BadgeCheck },
   ];
 
   const financialItems: MenuItem[] = [
