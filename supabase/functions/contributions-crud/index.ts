@@ -692,10 +692,13 @@ async function settleDebts(
   }
 
   // ── STEP 5: Update chama financial tracking ──
-  // Only count the gross that went to the cycle/debts, NOT the carry-forward portion
-  // Carry-forward is stored at full value (no commission), so subtract it directly
-  const chamaGross = grossPaymentAmount - carryForward;
+  // INVARIANT: gross_amount in financial_ledger MUST equal the real M-Pesa payment.
+  // Carry-forward is tracked separately on chama_overpayment_wallet — it must NOT be
+  // subtracted from gross. Commission is computed on the full payment, so this keeps
+  // commission_amount = gross_amount × commission_rate consistent on every row.
+  const chamaGross = grossPaymentAmount;
   const chamaCommission = toCompany;
+  const chamaNet = chamaGross - chamaCommission;
 
   if (chamaGross > 0 || toCyclePot > 0) {
     const { data: chamaData } = await supabase
@@ -720,10 +723,10 @@ async function settleDebts(
       source_id: chamaId,
       gross_amount: chamaGross,
       commission_amount: 0,
-      net_amount: chamaGross - chamaCommission,
+      net_amount: chamaNet,
       commission_rate: 0,
       reference_id: contributionId || null,
-      description: `FIFO debt settlement. Debts cleared: ${periodsCleared}. Carry-forward: ${carryForward.toFixed(2)}. Penalty: ${allocations.filter(a => a.type === 'penalty_clearance').reduce((s, a) => s + a.amount, 0).toFixed(2)}`
+      description: `FIFO debt settlement. Paid: KES ${chamaGross.toFixed(2)}. Debts cleared: ${periodsCleared}. Carry-forward: ${carryForward.toFixed(2)}. Penalty: ${allocations.filter(a => a.type === 'penalty_clearance').reduce((s, a) => s + a.amount, 0).toFixed(2)}`
     });
   }
 

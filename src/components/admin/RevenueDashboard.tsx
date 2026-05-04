@@ -67,6 +67,19 @@ const SOURCE_LABELS: Record<string, string> = {
 // the dashboard total to prevent double-counting.
 const LEDGER_DUPLICATED_EARNINGS = new Set(["COMMISSION"]);
 
+// Ledger transaction types that represent INFLOWS (real revenue events).
+// Payouts and other outflow types are excluded from Gross/Commission/Net KPIs
+// because they are disbursements of funds already collected — counting them
+// would double the gross figure and dilute the effective commission rate.
+const REVENUE_TX_TYPES = new Set([
+  "contribution",
+  "contribution_summary",
+  "donation",
+  "commission",
+]);
+const isRevenueEntry = (e: { transaction_type?: string | null }) =>
+  REVENUE_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
+
 // Map company_earnings.source → dashboard breakdown bucket key
 const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
   VERIFICATION_FEE: "verification_fee",
@@ -192,27 +205,33 @@ export function RevenueDashboard() {
   const standaloneEarningsSum = (rows: EarningsEntry[]) =>
     rows.reduce((s, e) => LEDGER_DUPLICATED_EARNINGS.has(e.source) ? s : s + Number(e.amount), 0);
 
-  // KPI calculations
+  // KPI calculations — payouts are explicitly excluded from gross/commission/net
+  // so revenue figures reflect ONLY money flowing into the platform.
   const kpis = useMemo(() => {
-    const commissionRevenue = entries.reduce((s, e) => s + Number(e.commission_amount), 0);
+    const revenueEntries = entries.filter(isRevenueEntry);
+    const payoutEntries = entries.filter(e => !isRevenueEntry(e));
+    const prevRevenueEntries = prevEntries.filter(isRevenueEntry);
+
+    const commissionRevenue = revenueEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
     const feesRevenue = standaloneEarningsSum(earnings);
     const totalRevenue = commissionRevenue + feesRevenue;
-    const totalGross = entries.reduce((s, e) => s + Number(e.gross_amount), 0);
+    const totalGross = revenueEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
+    const totalPayouts = payoutEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
     const standaloneEarningsCount = earnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
-    const count = entries.length + standaloneEarningsCount;
+    const count = revenueEntries.length + standaloneEarningsCount;
     const avgCommission = count > 0 ? totalRevenue / count : 0;
 
-    const prevCommissionRevenue = prevEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
+    const prevCommissionRevenue = prevRevenueEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
     const prevFeesRevenue = standaloneEarningsSum(prevEarnings);
     const prevRevenue = prevCommissionRevenue + prevFeesRevenue;
-    const prevGross = prevEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
-    const prevCount = prevEntries.length + prevEarnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
+    const prevGross = prevRevenueEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
+    const prevCount = prevRevenueEntries.length + prevEarnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
     const prevAvg = prevCount > 0 ? prevRevenue / prevCount : 0;
 
     const pctChange = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev) * 100;
 
     return {
-      totalRevenue, totalGross, count, avgCommission,
+      totalRevenue, totalGross, totalPayouts, count, avgCommission,
       revenuePct: pctChange(totalRevenue, prevRevenue),
       grossPct: pctChange(totalGross, prevGross),
       countPct: pctChange(count, prevCount),
@@ -257,7 +276,8 @@ export function RevenueDashboard() {
     const map: Record<string, { gross: number; commission: number; count: number }> = {};
 
     // Ledger contributes commission per source_type (chama / mchango / organization / welfare)
-    entries.forEach(e => {
+    // Payouts are excluded — they are outflows, not revenue.
+    entries.filter(isRevenueEntry).forEach(e => {
       if (!map[e.source_type]) map[e.source_type] = { gross: 0, commission: 0, count: 0 };
       map[e.source_type].gross += Number(e.gross_amount);
       map[e.source_type].commission += Number(e.commission_amount);
@@ -508,12 +528,13 @@ export function RevenueDashboard() {
       </Card>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { title: "Total Revenue", value: fmtKES(kpis.totalRevenue), pct: kpis.revenuePct, icon: DollarSign, accent: "text-emerald-600" },
-          { title: "Gross Volume", value: fmtKES(kpis.totalGross), pct: kpis.grossPct, icon: BarChart3, accent: "text-blue-600" },
-          { title: "Transactions", value: kpis.count.toLocaleString(), pct: kpis.countPct, icon: Hash, accent: "text-purple-600" },
-          { title: "Avg Commission", value: fmtKES(kpis.avgCommission), pct: kpis.avgPct, icon: TrendingUp, accent: "text-amber-600" },
+          { title: "Total Revenue", value: fmtKES(kpis.totalRevenue), pct: kpis.revenuePct, icon: DollarSign, accent: "text-emerald-600", hidePct: false },
+          { title: "Gross Volume", value: fmtKES(kpis.totalGross), pct: kpis.grossPct, icon: BarChart3, accent: "text-blue-600", hidePct: false },
+          { title: "Payouts (outflow)", value: fmtKES(kpis.totalPayouts), pct: 0, icon: TrendingUp, accent: "text-rose-600", hidePct: true },
+          { title: "Transactions", value: kpis.count.toLocaleString(), pct: kpis.countPct, icon: Hash, accent: "text-purple-600", hidePct: false },
+          { title: "Avg Commission", value: fmtKES(kpis.avgCommission), pct: kpis.avgPct, icon: TrendingUp, accent: "text-amber-600", hidePct: false },
         ].map(card => (
           <Card key={card.title}>
             <CardContent className="pt-5 pb-4">
@@ -522,7 +543,7 @@ export function RevenueDashboard() {
                 <card.icon className={cn("h-4 w-4", card.accent)} />
               </div>
               <div className="text-2xl font-bold tracking-tight">{loading ? "—" : card.value}</div>
-              {!loading && <PctBadge value={card.pct} />}
+              {!loading && !card.hidePct && <PctBadge value={card.pct} />}
             </CardContent>
           </Card>
         ))}

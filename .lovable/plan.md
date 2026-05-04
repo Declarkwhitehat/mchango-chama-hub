@@ -1,88 +1,77 @@
-## Goal
+## The Problem (confirmed via DB queries)
 
-1. **Testing mode**: drop chama minimum contribution from KES 100 → KES 20 (revert later on request).
-2. **Admin-configurable minimums**: add admin-controlled settings for:
-   - Chama minimum contribution amount
-   - Withdrawal minimum (one value per entity type: chama, mchango campaign, welfare)
+Your dashboard shows **Chama Gross KES 3,066.30** but **Commission KES 35.80**. That's only ~1.17% — impossible when the rate is 5%.
 
-All minimums become single-source-of-truth values stored in `platform_settings` and read by both the frontend and edge functions.
+Two distinct bugs are combining:
 
----
+### Bug 1 — Payouts are being counted as gross revenue
+The `financial_ledger` has 3 chama **payout** rows (KES 190 + 95 + 2,375 = **2,660**) being summed into "gross". Payouts are *outflows* of money already collected — they must never be added to gross collected. Real chama gross from contributions = **KES 406.30**, commission **KES 35.80** (≈8.8%, which is correct given a penalty was charged on one row).
 
-## New `platform_settings` keys
+### Bug 2 — The stray .30 (and why fractional shillings appear)
+The ledger row of `gross_amount = 100.30` corresponds to a real M-Pesa payment of **KES 106** (receipt UD67RBWEG4). The settlement engine split it:
+- 100.30 logged as "cycle gross"
+- 5.70 held as carry-forward (excluded from gross)
+- 5.30 commission (5% of the full 106)
 
-Insert four rows (idempotent) into the existing `platform_settings` table:
+So the *real* gross was 106, but the ledger stored 100.30 because carry-forward was subtracted from the gross figure while commission was still computed on the full 106. The `gross_amount` column should always equal what the customer actually paid — never an internal accounting fragment.
 
-| setting_key | initial value | description |
-|---|---|---|
-| `min_chama_contribution` | `{"amount": 20}` | Minimum chama contribution amount (testing value; production = 100) |
-| `min_withdrawal_chama` | `{"amount": 100}` | Minimum chama payout/withdrawal amount |
-| `min_withdrawal_mchango` | `{"amount": 100}` | Minimum mchango campaign withdrawal amount |
-| `min_withdrawal_welfare` | `{"amount": 100}` | Minimum welfare withdrawal amount |
+## The Fix
 
-A small shared helper `supabase/functions/_shared/getPlatformMinimums.ts` will read these (with safe fallbacks of 20 / 100 / 100 / 100) so every edge function uses the same source.
+### 1. RevenueDashboard — exclude payouts from "Gross"
+File: `src/components/admin/RevenueDashboard.tsx`
 
----
+In `fetchAllEntries` (lines 135–158) and the source-breakdown reducer (lines 257–273), filter out rows where `transaction_type = 'payout'` for **gross/commission/net** aggregation. Payouts are not revenue events; they should only be visible in the raw transactions table (filterable), never in the Gross/Commission KPIs or the per-source totals.
 
-## Backend changes
+Approach:
+- Add a constant `REVENUE_TX_TYPES = ['contribution', 'donation']` (i.e. inflow types).
+- Filter `entries` and `prevEntries` by `REVENUE_TX_TYPES` before computing `totalGross`, `totalCommission`, `totalNet`, `grossPct`, `commissionPct`, `netPct`, the timeseries, and the source breakdown.
+- Keep the raw transactions table showing all rows (so payouts are still auditable), but tag them visually so it's obvious they don't count toward gross.
+- Add a small "Payouts (outflow)" stat card so admins still see total payouts processed — clearly separated from revenue.
 
-### `supabase/functions/chama-crud/index.ts`
-On chama create/update, fetch `min_chama_contribution` and reject if `contribution_amount < min` with a clear error showing the configured minimum.
+### 2. contributions-crud — store the real payment amount as gross
+File: `supabase/functions/contributions-crud/index.ts` (around line 695–727)
 
-### `supabase/functions/withdrawals-crud/index.ts`
-The current Zod schema hardcodes `min(10, 'Minimum withdrawal is KES 10')`. Replace with a runtime check that loads the right minimum based on which entity ID is present (`chama_id` → chama, `mchango_id` → mchango, `organization_id` → mchango, welfare flow → welfare). Return a 400 with the configured minimum if violated.
+Currently:
+```ts
+const chamaGross = grossPaymentAmount - carryForward;  // produces 100.30
+```
 
-### `supabase/functions/welfare-withdrawal-approve/index.ts` and `welfare-cooling-off-payout/index.ts`
-Add the same minimum check using `min_withdrawal_welfare` so welfare withdrawals are also gated.
+Change to:
+```ts
+const chamaGross = grossPaymentAmount;  // the actual KES the user paid (e.g. 106)
+```
 
-### `supabase/functions/payment-stk-push/index.ts`
-Keep the existing `>= 1` floor (M-Pesa technical floor). Chama-specific floor is enforced upstream by the contribution form + chama-crud, so no change here.
+The ledger's `gross_amount` MUST equal the real M-Pesa amount. Carry-forward is tracked separately on `chama_overpayment_wallet` and `member.carry_forward_credit` — it should not subtract from the recorded gross. Commission is already computed on the full payment, so this restores the invariant: **commission_amount = gross_amount × commission_rate**, always.
 
----
+Update the description to keep the carry-forward note for transparency:
+```
+FIFO debt settlement. Paid: KES 106. Cleared: 1 period. Carry-forward: 5.70. Penalty: 0.00
+```
 
-## Frontend changes
+### 3. Backfill the existing bad row
+A one-time migration to correct the historical row:
+- Update `financial_ledger` row `abb80138...` from `gross_amount = 100.30` → `106.00`, `net_amount = 95.00` → `100.70`.
+- This brings your historical totals to whole shillings and matches reality.
 
-### Shared hook: `src/hooks/usePlatformMinimums.ts` (new)
-Reads the four `platform_settings` rows once via React Query (5-min cache), exposes `{ minChamaContribution, minWithdrawal: { chama, mchango, welfare } }` with the same safe fallbacks.
+### 4. Add an integrity check (defensive)
+A new validation trigger on `financial_ledger` INSERT/UPDATE: reject rows where `abs(gross_amount - commission_amount - net_amount) > 0.01` for `transaction_type IN ('contribution','donation')`. Prevents future drift.
 
-### `src/pages/ChamaCreate.tsx`
-Replace the hardcoded `min="100"` on the contribution input with `min={minChamaContribution}`, and update the surrounding helper text + validation error to show the live value.
+## Result After Fix
 
-### `src/components/ChamaPaymentForm.tsx`
-The "amount must be ≥ contribution_amount" check stays as-is (driven by the chama itself), so this works automatically once the chama is created with a 20 KES floor.
+For your current data the dashboard will show:
+- **Chama Gross: KES 412.00** (was 3,066.30) — real money collected
+- **Chama Commission: KES 35.80** — unchanged, correct at ~8.7% (one payment had a penalty)
+- **Chama Payouts (outflow): KES 2,660** — shown separately
+- No more fractional shillings.
 
-### Withdrawal forms (chama, mchango, welfare)
-Wherever a withdrawal amount is entered, swap the hardcoded floor for the configured value and show "Minimum withdrawal: KES X" beneath the input.
+## Files Touched
 
-### Admin settings page: `src/pages/AdminCommissionConfig.tsx`
-Extend the existing commission-config page with a new "Minimums" card that lets admins edit:
-- Chama minimum contribution
-- Withdrawal minimums (chama / mchango / welfare)
+- `src/components/admin/RevenueDashboard.tsx` — filter payouts out of revenue aggregations, add payouts stat card
+- `supabase/functions/contributions-crud/index.ts` — record real payment as `gross_amount`
+- `supabase/migrations/<new>.sql` — backfill the one bad row + add validation trigger
+- No changes to commission logic, payment flow, or user-facing payment screens.
 
-Saves write to `platform_settings` (admin-only RLS already exists) and log to `audit_logs` like the existing commission settings do.
+## Out of Scope
 
----
-
-## Reverting after testing
-
-When you say "go back to 100", I'll just update the `min_chama_contribution` row back to `{"amount": 100}` in `platform_settings` — no code changes needed. Or you can do it yourself from the new admin Minimums card.
-
----
-
-## Files touched
-
-**New**
-- `supabase/functions/_shared/getPlatformMinimums.ts`
-- `src/hooks/usePlatformMinimums.ts`
-- One migration to insert the four `platform_settings` rows
-
-**Edited**
-- `supabase/functions/chama-crud/index.ts`
-- `supabase/functions/withdrawals-crud/index.ts`
-- `supabase/functions/welfare-withdrawal-approve/index.ts`
-- `supabase/functions/welfare-cooling-off-payout/index.ts`
-- `src/pages/ChamaCreate.tsx`
-- `src/pages/AdminCommissionConfig.tsx`
-- Withdrawal request UI (chama withdrawal, mchango withdrawal, welfare withdrawal forms)
-
-No changes to commission logic, M-Pesa flow, or settlement engine.
+- Welfare and Mchango ledger sums look mathematically consistent — no changes there.
+- Payout entries themselves remain in the ledger for audit; only their classification in the dashboard changes.
