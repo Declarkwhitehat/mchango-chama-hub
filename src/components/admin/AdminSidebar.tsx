@@ -287,6 +287,7 @@ export function AdminSidebar() {
         {renderMenuGroup("Security", securityItems)}
         {renderMenuGroup("Support", supportItems)}
         {renderMenuGroup("System", systemItems)}
+        {renderMenuGroup("Testing", testingItems)}
       </SidebarContent>
 
       {/* Sidebar Footer with Back to App */}
