@@ -106,10 +106,9 @@ const PinSetup = () => {
       }
 
       toast.success("PIN and security questions set successfully!");
-      // Always send users to the landing page ("/") after first-time PIN setup,
-      // regardless of where the PIN flow was triggered from.
+      const returnTo = sessionStorage.getItem('pinSetupReturnTo');
       sessionStorage.removeItem('pinSetupReturnTo');
-      navigate('/', { replace: true });
+      navigate(returnTo || '/kyc-upload', { replace: true });
     } catch (err) {
       toast.error('An error occurred');
     } finally {
