@@ -18,6 +18,7 @@ import { jsPDF } from "jspdf";
 import { toast } from "sonner";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 import { addPDFBrandingFooter } from "@/utils/pdfBranding";
+import { cn } from "@/lib/utils";
 
 interface Member {
   id: string;
