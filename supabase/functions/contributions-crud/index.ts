@@ -712,14 +712,16 @@ async function settleDebts(
       }).eq('id', chamaId);
     }
 
+    // Summary row only — commission is recorded separately in 'commission' rows above
+    // to keep the analytics dashboard's totals consistent (no double-counting).
     await supabase.from('financial_ledger').insert({
-      transaction_type: 'contribution',
+      transaction_type: 'contribution_summary',
       source_type: 'chama',
       source_id: chamaId,
       gross_amount: chamaGross,
-      commission_amount: chamaCommission,
+      commission_amount: 0,
       net_amount: chamaGross - chamaCommission,
-      commission_rate: chamaGross > 0 ? chamaCommission / chamaGross : ONTIME_RATE,
+      commission_rate: 0,
       reference_id: contributionId || null,
       description: `FIFO debt settlement. Debts cleared: ${periodsCleared}. Carry-forward: ${carryForward.toFixed(2)}. Penalty: ${allocations.filter(a => a.type === 'penalty_clearance').reduce((s, a) => s + a.amount, 0).toFixed(2)}`
     });
