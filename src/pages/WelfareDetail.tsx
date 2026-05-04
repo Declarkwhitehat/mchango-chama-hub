@@ -326,6 +326,14 @@ const WelfareDetail = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            <WhatsAppLinkManager
+              entityId={welfare.id}
+              table="welfares"
+              currentLink={welfare.whatsapp_link}
+              isManager={isExecutive}
+              entityLabel="welfare"
+              onUpdate={fetchWelfare}
+            />
             {/* Active Cycle Status with unpaid tracking */}
             {isMember && (
               <WelfareCycleStatus
