@@ -8,14 +8,33 @@ import { Badge } from "@/components/ui/badge";
 import { User, Mail, Phone, LogOut, Edit, AlertCircle, CheckCircle, Clock, Wallet, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PaymentMethodsManager } from "@/components/PaymentMethodsManager";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
+import { supabase } from "@/integrations/supabase/client";
 
 const Profile = () => {
   const navigate = useNavigate();
   const { profile, signOut, lockApp, refreshProfile } = useAuth();
   const { isNativeApp: isNative } = useNativeBiometrics();
+
+  // Refresh profile on mount and subscribe to realtime updates so KYC
+  // approvals/rejections reflect immediately without re-login.
+  useEffect(() => {
+    refreshProfile();
+    if (!profile?.id) return;
+    const channel = supabase
+      .channel(`profile-${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${profile.id}` },
+        () => { refreshProfile(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
 
   const handleLogout = async () => {
     const { error } = await signOut();
