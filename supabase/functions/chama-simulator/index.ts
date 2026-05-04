@@ -103,10 +103,13 @@ async function stage1(ctx: SimContext) {
   await tryStage(ctx, 1, 'Create 10 test members',
     '10 auth users + profiles created with is_test=true and KYC approved',
     async () => {
-      const stamp = Date.now().toString().slice(-8);
+      const rand = () => Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0');
+      const runTag = rand();
       for (let i = 1; i <= 10; i++) {
-        const phone = `+2547000${stamp}${String(i).padStart(2, '0')}`.slice(0, 13);
-        const email = `testmember${stamp}_${i}@simulator.test`;
+        // Kenyan mobile format +2547XXXXXXXX (13 chars total). Use random 8 digits prefixed with run tag.
+        const phone = `+2547${runTag}${String(i).padStart(2, '0')}`; // 5 + 6 + 2 = 13 chars after +254
+        const email = `testmember_${runTag}_${i}@simulator.test`;
+        const idNum = `SIM${runTag}${String(i).padStart(2, '0')}`;
         const { data: created, error } = await ctx.admin.auth.admin.createUser({
           email,
           phone,
@@ -118,7 +121,7 @@ async function stage1(ctx: SimContext) {
             sim_seq: i,
             full_name: `Test Member ${i}`,
             phone,
-            id_number: `SIM${stamp}${String(i).padStart(2, '0')}`,
+            id_number: idNum,
           },
         });
         if (error || !created.user) throw new Error('createUser failed: ' + error?.message);
@@ -128,7 +131,7 @@ async function stage1(ctx: SimContext) {
           full_name: `Test Member ${i}`,
           email,
           phone,
-          id_number: `SIM${stamp}${String(i).padStart(2, '0')}`,
+          id_number: idNum,
           kyc_status: 'approved',
           is_verified: true,
           is_test: true,
