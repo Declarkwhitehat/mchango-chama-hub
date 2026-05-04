@@ -621,9 +621,9 @@ export const PaymentStatusManager = ({
                 <Check className="h-3 w-3 mr-1" />
                 {paidMembers.length} Paid
               </Badge>
-              <Badge variant="destructive">
-                <X className="h-3 w-3 mr-1" />
-                {unpaidMembers.length} Pending
+              <Badge variant={isGracePeriod ? "secondary" : "destructive"}>
+                <Clock className="h-3 w-3 mr-1" />
+                {unpaidMembers.length} {isGracePeriod ? "Yet to Pay (grace)" : "Pending"}
               </Badge>
             </div>
           </div>
