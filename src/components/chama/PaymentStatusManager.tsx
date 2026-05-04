@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
 import { addPDFBrandingFooter } from "@/utils/pdfBranding";
 import { cn } from "@/lib/utils";
-
+import { getNextDay10PmKenyaDeadline } from "@/utils/chamaDeadlines";
 interface Member {
   id: string;
   user_id: string | null;
@@ -59,6 +59,7 @@ interface PaymentStatusManagerProps {
   contributionAmount: number;
   commissionRate?: number;
   chamaStatus?: string;
+  chamaStartDate?: string | null;
 }
 
 type PeriodType = "today" | "week" | "month";
@@ -69,6 +70,7 @@ export const PaymentStatusManager = ({
   contributionAmount,
   commissionRate = 0,
   chamaStatus,
+  chamaStartDate,
 }: PaymentStatusManagerProps) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
@@ -80,6 +82,9 @@ export const PaymentStatusManager = ({
   const [pdfPeriod, setPdfPeriod] = useState<PeriodType>("today");
   const [isGenerating, setIsGenerating] = useState(false);
   const [now, setNow] = useState(Date.now());
+
+  const graceDeadline = getNextDay10PmKenyaDeadline(chamaStartDate);
+  const isGracePeriod = !!graceDeadline && now < graceDeadline.getTime();
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -595,7 +600,9 @@ export const PaymentStatusManager = ({
                 <span>{String(secs).padStart(2,'0')}<span className="text-xs font-normal ml-1">s</span></span>
               </div>
               <p className="text-xs text-center mt-2 opacity-80">
-                Unpaid members after the cutoff will be marked late and may incur penalties.
+                {isGracePeriod
+                  ? "Grace period active — no penalties yet. Members have until the cutoff to make their first payment."
+                  : "Unpaid members after the cutoff will be marked late and may incur penalties."}
               </p>
             </div>
           );
@@ -614,9 +621,9 @@ export const PaymentStatusManager = ({
                 <Check className="h-3 w-3 mr-1" />
                 {paidMembers.length} Paid
               </Badge>
-              <Badge variant="destructive">
-                <X className="h-3 w-3 mr-1" />
-                {unpaidMembers.length} Pending
+              <Badge variant={isGracePeriod ? "secondary" : "destructive"}>
+                <Clock className="h-3 w-3 mr-1" />
+                {unpaidMembers.length} {isGracePeriod ? "Yet to Pay (grace)" : "Pending"}
               </Badge>
             </div>
           </div>
@@ -670,9 +677,9 @@ export const PaymentStatusManager = ({
             {/* Unpaid Members */}
             {unpaidMembers.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold text-red-600 mb-2 flex items-center gap-1">
+                <h4 className={cn("text-sm font-semibold mb-2 flex items-center gap-1", isGracePeriod ? "text-muted-foreground" : "text-red-600")}>
                   <Clock className="h-4 w-4" />
-                  Pending Payment ({unpaidMembers.length})
+                  {isGracePeriod ? `Yet to Pay — Grace Period (${unpaidMembers.length})` : `Pending Payment (${unpaidMembers.length})`}
                 </h4>
                 <div className="space-y-2">
                   {unpaidMembers.map((member) => {
