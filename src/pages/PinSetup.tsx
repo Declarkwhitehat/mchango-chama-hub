@@ -106,9 +106,10 @@ const PinSetup = () => {
       }
 
       toast.success("PIN and security questions set successfully!");
-      const returnTo = sessionStorage.getItem('pinSetupReturnTo') || '/home';
+      // Always send users to the landing page ("/") after first-time PIN setup,
+      // regardless of where the PIN flow was triggered from.
       sessionStorage.removeItem('pinSetupReturnTo');
-      navigate(returnTo, { replace: true });
+      navigate('/', { replace: true });
     } catch (err) {
       toast.error('An error occurred');
     } finally {
