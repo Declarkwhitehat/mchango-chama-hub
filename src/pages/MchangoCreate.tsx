@@ -342,6 +342,7 @@ const MchangoCreate = () => {
             </form>
           </CardContent>
         </Card>
+        </KycGate>
       </div>
     </Layout>
   );
