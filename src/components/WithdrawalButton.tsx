@@ -206,6 +206,15 @@ export const WithdrawalButton = ({
       return;
     }
 
+    if (withdrawAmount < minAmount) {
+      toast({
+        title: "Below Minimum",
+        description: `Minimum withdrawal is KES ${minAmount.toLocaleString()}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
