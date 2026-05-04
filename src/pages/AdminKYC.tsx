@@ -168,20 +168,14 @@ const AdminKYC = () => {
   const handleApprove = async (submissionId: string) => {
     setProcessing(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          kyc_status: 'approved',
-          kyc_reviewed_at: new Date().toISOString(),
-          kyc_reviewed_by: user?.id,
-        })
-        .eq('id', submissionId);
-
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('kyc-review', {
+        body: { user_id: submissionId, action: 'approve' },
+      });
+      if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Failed to approve');
 
       toast({
         title: "Success!",
-        description: "KYC approved successfully",
+        description: "KYC approved. The user has been notified by SMS and push.",
       });
       fetchSubmissions();
       setSelectedSubmission(null);
