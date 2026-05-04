@@ -8,7 +8,7 @@ import { Upload, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { compressImage, formatFileSize } from "@/utils/imageCompression";
+// KYC ID photos are uploaded at full original quality (no compression) for clarity.
 
 const KYCUpload = () => {
   const navigate = useNavigate();
@@ -31,20 +31,18 @@ const KYCUpload = () => {
       return;
     }
 
-    try {
-      const compressed = await compressImage(file);
-      if (file.size !== compressed.size) {
-        toast.success(`Image optimized: ${formatFileSize(file.size)} → ${formatFileSize(compressed.size)}`);
-      }
-      if (side === 'front') {
-        setFrontFile(compressed);
-        setFrontPreview(URL.createObjectURL(compressed));
-      } else {
-        setBackFile(compressed);
-        setBackPreview(URL.createObjectURL(compressed));
-      }
-    } catch {
-      toast.error("Failed to process image");
+    // No compression for KYC — keep ID photo at full original quality.
+    const MAX_BYTES = 15 * 1024 * 1024; // 15 MB safety cap
+    if (file.size > MAX_BYTES) {
+      toast.error("Image too large. Please use a photo under 15 MB.");
+      return;
+    }
+    if (side === 'front') {
+      setFrontFile(file);
+      setFrontPreview(URL.createObjectURL(file));
+    } else {
+      setBackFile(file);
+      setBackPreview(URL.createObjectURL(file));
     }
   };
 
