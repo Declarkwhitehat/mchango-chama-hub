@@ -48,6 +48,24 @@ export const ChamaPendingRequests = ({ chamaId, isManager, onUpdate }: ChamaPend
 
   useEffect(() => {
     loadPendingMembers();
+
+    // Realtime subscription so managers see new join requests instantly
+    const channel = supabase
+      .channel(`chama-pending-${chamaId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chama_members', filter: `chama_id=eq.${chamaId}` },
+        () => { loadPendingMembers(); }
+      )
+      .subscribe();
+
+    // Safety net: poll every 30s in case realtime drops
+    const interval = setInterval(loadPendingMembers, 30000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, [chamaId]);
 
   const loadPendingMembers = async () => {
