@@ -206,7 +206,7 @@ const MchangoCreate = () => {
                   name="title"
                   placeholder="e.g., Medical Emergency Fund"
                   required
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -218,7 +218,7 @@ const MchangoCreate = () => {
                   placeholder="Tell your story and explain why you need support..."
                   rows={5}
                   required
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -232,7 +232,7 @@ const MchangoCreate = () => {
                     placeholder="50000"
                     min="1000"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -246,7 +246,7 @@ const MchangoCreate = () => {
                     min="1"
                     max="90"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
               </div>
@@ -258,7 +258,7 @@ const MchangoCreate = () => {
                   name="category"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   required
-                  disabled={kycStatus !== "approved"}
+
                 >
                   <option value="">Select a category</option>
                   <option value="medical">Medical</option>
@@ -301,7 +301,7 @@ const MchangoCreate = () => {
                         type="file"
                         accept="image/*"
                         onChange={handleImageChange(0)}
-                        disabled={kycStatus !== "approved"}
+
                         className="hidden"
                       />
                     </label>
@@ -320,7 +320,7 @@ const MchangoCreate = () => {
                     value={youtubeUrl}
                     onChange={(e) => setYoutubeUrl(e.target.value)}
                     placeholder="https://youtube.com/watch?v=..."
-                    disabled={kycStatus !== "approved"}
+
                     className="pl-10"
                   />
                 </div>
@@ -334,7 +334,7 @@ const MchangoCreate = () => {
                   type="submit"
                   variant="default"
                   className="w-full"
-                  disabled={isLoading || isProcessing || kycStatus !== "approved"}
+                  disabled={isLoading || isProcessing}
                 >
                   {isLoading ? "Creating..." : "Create Campaign"}
                 </Button>
