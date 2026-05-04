@@ -143,13 +143,21 @@ serve(async (req) => {
       );
     }
 
-    const phoneRateLimit = await checkRateLimit(supabase, phone, 'phone', 'forgot_password');
+    // Strict OTP rate limit: max 3 OTP requests per phone per 10 minutes.
+    const phoneRateLimit = await checkRateLimit(
+      supabase,
+      phone,
+      'phone',
+      'send_otp',
+      10 * 60 * 1000, // 10-minute window
+      3,              // max 3 OTPs
+    );
     if (!phoneRateLimit.allowed) {
       return new Response(
         JSON.stringify({
-          error: phoneRateLimit.error || 'Too many OTP requests. Please try again later.',
+          error: phoneRateLimit.error || 'Too many OTP requests. Please wait before requesting another OTP.',
           remainingAttempts: phoneRateLimit.remainingAttempts,
-          resetTime: phoneRateLimit.resetTime
+          resetTime: phoneRateLimit.resetTime,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
       );

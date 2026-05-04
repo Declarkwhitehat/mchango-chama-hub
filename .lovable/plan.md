@@ -1,82 +1,124 @@
-## Goal
+## Overview
 
-Eliminate the race condition where two users submitting identical phone/ID/email at the same millisecond can both pass the uniqueness check before either profile row is written.
+Six independent security hardening fixes. Each is scoped to avoid regressions: callbacks gain IP whitelisting, profile identity fields become immutable post-signup, OTP requests get strict rate-limiting, CORS becomes origin-restricted, B2C payouts gain admin + approval guards, and STK-push contributions get server-side amount validation.
 
-## Important constraint (why we can't do exactly what was asked)
+## Important note on terminology
 
-Supabase's `auth.users` table is owned by GoTrue. Passwords are hashed and users created **only** through the Auth API (`supabase.auth.signUp`) — a Postgres function cannot insert into `auth.users` with a usable password. So a single SQL `register_user(... password ...)` that creates the auth user atomically is not possible on Supabase.
+The user's spec mentions `is_admin` on the `profiles` table. This project does **not** store admin status there — it uses the standard `user_roles` table with `has_role(user_id, 'admin')`. All admin checks below use that established pattern (matches `admin_clear_payout_default` and the existing "Admins can update all profiles" RLS policy). UX is identical.
 
-The correct equivalent — and what this plan implements — is an **atomic reservation pattern**:
+## Fix 1 — M-Pesa callback IP whitelisting
 
-1. A new SQL RPC `reserve_signup_identity(phone, id_number, email)` runs the three uniqueness checks **inside a single transaction protected by transaction-scoped Postgres advisory locks** keyed on phone + id_number + email.
-2. While that transaction holds the locks, any concurrent caller with the same phone/ID/email blocks and then fails the check.
-3. The frontend immediately calls `supabase.auth.signUp` after the RPC returns success.
-4. The existing `profiles_phone_unique` and `profiles_id_number_key` unique constraints remain as the final database-level safety net (they catch the tiny remaining window between RPC commit and `handle_new_user` trigger firing).
+Create `supabase/functions/_shared/safaricomIp.ts` exporting:
+- `getCallbackClientIP(req)` — reads `x-forwarded-for` (first hop), then `x-real-ip`, then `cf-connecting-ip`.
+- `isSafaricomCallbackIP(ip)` — checks `196.201.214.0/24` and `196.201.216.0/24` via integer CIDR math, plus comma-separated `MPESA_CALLBACK_BYPASS_IPS` env var.
 
-This collapses the race window from "two separate round trips" to "the time GoTrue takes to insert one row," and the unique indexes guarantee correctness even in that window.
-
-## Changes
-
-### 1. New migration — `reserve_signup_identity` RPC
-
-```sql
-CREATE OR REPLACE FUNCTION public.reserve_signup_identity(
-  p_phone text, p_id_number text, p_email text
-) RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
-AS $$
-DECLARE
-  v_phone_key  bigint := hashtextextended(lower(p_phone), 0);
-  v_id_key     bigint := hashtextextended(lower(p_id_number), 0);
-  v_email_key  bigint := hashtextextended(lower(p_email), 0);
-BEGIN
-  -- Transaction-scoped locks: serialize concurrent signups for same identity
-  PERFORM pg_advisory_xact_lock(v_phone_key);
-  PERFORM pg_advisory_xact_lock(v_id_key);
-  PERFORM pg_advisory_xact_lock(v_email_key);
-
-  IF EXISTS (SELECT 1 FROM profiles WHERE phone = p_phone) THEN
-    RAISE EXCEPTION 'phone_exists' USING ERRCODE = 'P0001';
-  END IF;
-  IF EXISTS (SELECT 1 FROM profiles WHERE id_number = p_id_number) THEN
-    RAISE EXCEPTION 'id_number_exists' USING ERRCODE = 'P0001';
-  END IF;
-  IF EXISTS (SELECT 1 FROM auth.users WHERE lower(email) = lower(p_email)) THEN
-    RAISE EXCEPTION 'email_exists' USING ERRCODE = 'P0001';
-  END IF;
-
-  RETURN jsonb_build_object('ok', true);
-END $$;
-
-GRANT EXECUTE ON FUNCTION public.reserve_signup_identity(text,text,text) TO anon, authenticated;
+In `payment-stk-callback/index.ts` and `b2c-callback/index.ts`, immediately after the OPTIONS handler:
+```ts
+const clientIp = getCallbackClientIP(req);
+if (!isSafaricomCallbackIP(clientIp)) {
+  console.warn('[security] Rejected callback from non-Safaricom IP:', clientIp);
+  return new Response(JSON.stringify({ error: 'Forbidden' }), {
+    status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
 ```
 
-Also verify and (re)create if missing:
-- `CREATE UNIQUE INDEX IF NOT EXISTS profiles_phone_unique ON profiles (phone);`
-- `profiles_id_number_key` already exists per schema; assert via `IF NOT EXISTS`.
+## Fix 2 — Phone & ID number immutable post-signup
 
-### 2. `src/pages/Auth.tsx` — replace two-step check with reservation RPC
+**Migration**: add a BEFORE UPDATE trigger on `public.profiles` that blocks any change to `phone` or `id_number` once they are non-null, unless the caller is an admin (`has_role(auth.uid(),'admin')`) or the service role (`auth.uid() IS NULL`, i.e. backend functions). Initial INSERT is unaffected.
 
-In `handleSignup` (lines ~558–589):
-- Remove the call to `check_signup_uniqueness`.
-- Call `supabase.rpc('reserve_signup_identity', { p_phone, p_id_number, p_email })`.
-- On error, map the message (`phone_exists` / `id_number_exists` / `email_exists`) to the existing toast strings — same UX as today.
-- On success, immediately call `signUp(...)` (unchanged).
-- Keep the existing `signUpError` mapping block as the final safety net for the unique-constraint violations (`profiles_phone_unique`, `profiles_id_number_key`, GoTrue "already registered").
+```sql
+CREATE OR REPLACE FUNCTION public.prevent_identity_changes()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_admin boolean := false;
+BEGIN
+  IF auth.uid() IS NULL THEN RETURN NEW; END IF; -- service role bypass
+  v_admin := public.has_role(auth.uid(), 'admin'::app_role);
+  IF v_admin THEN RETURN NEW; END IF;
+  IF OLD.phone IS NOT NULL AND NEW.phone IS DISTINCT FROM OLD.phone THEN
+    RAISE EXCEPTION 'Phone number cannot be changed. Contact support.' USING ERRCODE='P0001';
+  END IF;
+  IF OLD.id_number IS NOT NULL AND NEW.id_number IS DISTINCT FROM OLD.id_number THEN
+    RAISE EXCEPTION 'ID number cannot be changed. Contact support.' USING ERRCODE='P0001';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_prevent_identity_changes ON public.profiles;
+CREATE TRIGGER trg_prevent_identity_changes BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_identity_changes();
+```
 
-### 3. Keep / leave alone
+**Frontend** (`src/pages/Profile.tsx`): the phone and ID number sections are already display-only (no `<input>`). Add a small muted helper line under each: "Contact support to change this." Keep both fields visible.
 
-- `check_signup_uniqueness` RPC stays in the DB (used elsewhere for non-blocking pre-validation hints if needed) but is no longer on the signup critical path.
-- `AuthContext.signUp` is unchanged.
-- All other signup steps (consent insert, SMS, biometric prompt) unchanged.
+## Fix 3 — OTP rate limit
 
-## Result
+In `send-otp/index.ts`, the existing `checkRateLimit(supabase, phone, 'phone', 'forgot_password')` defaults to 3 attempts per 4 hours. Change the action to a dedicated key and tighten the window to 10 minutes, keeping max 3:
 
-- Two simultaneous signups with the same phone/ID/email: the second transaction blocks on `pg_advisory_xact_lock`, then fails the existence check and returns a clean `phone_exists` / `id_number_exists` / `email_exists` error. Only one reaches `auth.signUp`.
-- Even in the worst case (lock released before `handle_new_user` writes the profile), the `profiles_phone_unique` and `profiles_id_number_key` indexes reject the duplicate and the existing error-mapping shows the correct toast.
-- Frontend UX and error messages are unchanged.
+```ts
+const phoneRateLimit = await checkRateLimit(
+  supabase, phone, 'phone', 'send_otp',
+  10 * 60 * 1000,  // 10 minutes
+  3,               // max 3 OTPs
+);
+```
+
+Error response already includes `resetTime` and a "try again in N minutes" message — no other changes needed. Leave the IP rate limit and OTP generation logic untouched.
+
+## Fix 4 — Restrict CORS
+
+Replace `supabase/functions/_shared/cors.ts` with an origin-aware module:
+- `buildCorsHeaders(req)` — returns headers with `Access-Control-Allow-Origin` set to the request `Origin` if it matches the allow-list, otherwise the production domain. Includes `Vary: Origin`.
+- `resolveAllowedOrigin(origin)` — pure helper.
+- Allow-list defaults: `pamojanova.com`, `www.pamojanova.com`, `pamojanova.online`, `www.pamojanova.online`, `mchango-chama-hub.lovable.app`, the Lovable preview URL, `localhost:3000/5173/8080`, `capacitor://localhost`. Override via `ALLOWED_ORIGINS` env var (comma-separated).
+- **Backwards-compatible**: keep the existing `export const corsHeaders` so the ~50 functions that import it keep working. The static export uses the production origin as default; over time individual functions can switch to `buildCorsHeaders(req)`. Other CORS headers (Allow-Headers, Allow-Methods) are unchanged.
+
+This does not touch any other function's logic; only the value of `Access-Control-Allow-Origin` changes.
+
+## Fix 5 — B2C payout admin + approval guards
+
+In `b2c-payout/index.ts`, immediately after parsing the request body and before the existing withdrawal lookup, add:
+
+1. **Caller check** — accept either:
+   - The Authorization bearer token equals `SUPABASE_SERVICE_ROLE_KEY` (internal callers like `retry-failed-payouts`), OR
+   - `supabaseAdmin.auth.getUser(token)` returns a user AND `has_role(user.id, 'admin')` is true.
+
+   On failure: log `{ caller_user_id, withdrawal_id, reason }`, return 403.
+
+2. **Withdrawal approval check** — after the existing withdrawal fetch, additionally require:
+   - `withdrawal.status === 'approved'` (the current code also accepts `pending_retry`/`processing` for legitimate retry flows — keep those as valid states but require that they have a non-null `approved_by`).
+   - `withdrawal.approved_by !== null`.
+
+   On failure: log `{ caller_user_id, withdrawal_id, status, approved_by }`, return 403.
+
+The actual M-Pesa OAuth + B2C HTTP call is untouched.
+
+## Fix 6 — Server-side chama contribution amount check
+
+In `payment-stk-push/index.ts`, after the existing `validateAmount` block, when `body.callback_metadata?.type === 'chama_contribution'` (and `chama_id` + `member_id` are present):
+
+1. Fetch chama: `select contribution_amount from chama where id = chama_id`.
+2. Compute the member's outstanding due for the active cycle by calling the existing `check_member_schedule_eligibility(member_id, chama_id)` RPC, which returns `total_amount_owed` minus `carry_forward_credit`. The required minimum is `max(contribution_amount, total_amount_owed - carry_forward)`. If no active cycle / no debts, fall back to `contribution_amount`.
+3. If `body.amount < required`, return 400 with `{ error: 'Amount below required contribution', required, submitted }`.
+4. Overpayments are explicitly allowed (no upper cap added beyond the existing 1..1,000,000).
+
+Mchango / organization donations and all other paths keep the existing `validateAmount` only.
 
 ## Files touched
 
-- New: `supabase/migrations/<timestamp>_reserve_signup_identity.sql`
-- Edited: `src/pages/Auth.tsx` (handleSignup body only)
+**New**
+- `supabase/functions/_shared/safaricomIp.ts`
+- `supabase/migrations/<ts>_prevent_profile_identity_changes.sql`
+
+**Edited**
+- `supabase/functions/_shared/cors.ts` (origin allow-list, keep `corsHeaders` export)
+- `supabase/functions/payment-stk-callback/index.ts` (IP guard at top)
+- `supabase/functions/b2c-callback/index.ts` (IP guard at top)
+- `supabase/functions/send-otp/index.ts` (rate-limit window tightened)
+- `supabase/functions/b2c-payout/index.ts` (admin/service-role + approval guards)
+- `supabase/functions/payment-stk-push/index.ts` (chama amount verification)
+- `src/pages/Profile.tsx` (helper text under phone & ID)
+
+## Optional follow-ups (not in this change set)
+
+- New env vars to set in Cloud secrets when ready: `MPESA_CALLBACK_BYPASS_IPS` (optional), `ALLOWED_ORIGINS` (optional). Both have sensible defaults; not setting them keeps current behavior secure.
+- Memory note: update `mem://auth/signup-uniqueness-validation` reference to also mention identity-immutability trigger.

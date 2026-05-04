@@ -85,6 +85,68 @@ serve(async (req) => {
       );
     }
 
+    // ═══ SERVER-SIDE CHAMA CONTRIBUTION AMOUNT VERIFICATION ═══
+    // For chama contributions, ensure the requested amount is at least the required
+    // contribution for this member's current cycle (overpayments allowed). For mchango
+    // and other paths, the existing 1..1,000,000 validation is the only check.
+    if (
+      body.callback_metadata?.type === 'chama_contribution' &&
+      body.chama_id &&
+      body.callback_metadata?.member_id
+    ) {
+      const chamaId = body.chama_id as string;
+      const memberId = body.callback_metadata.member_id as string;
+
+      const { data: chamaRow, error: chamaErr } = await supabaseClient
+        .from('chama')
+        .select('contribution_amount')
+        .eq('id', chamaId)
+        .maybeSingle();
+
+      if (chamaErr || !chamaRow) {
+        console.error('Chama lookup failed for STK amount verification:', chamaErr);
+        return new Response(
+          JSON.stringify({ error: 'Could not verify contribution amount. Please try again.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const baseContribution = Number(chamaRow.contribution_amount || 0);
+      let outstanding = 0;
+      let carry = 0;
+
+      const { data: scheduleRows, error: scheduleErr } = await supabaseClient
+        .rpc('check_member_schedule_eligibility', {
+          p_member_id: memberId,
+          p_chama_id: chamaId,
+        });
+
+      if (!scheduleErr && Array.isArray(scheduleRows) && scheduleRows.length > 0) {
+        const row = scheduleRows[0] as { total_amount_owed?: number; carry_forward?: number };
+        outstanding = Number(row?.total_amount_owed || 0);
+        carry = Number(row?.carry_forward || 0);
+      } else if (scheduleErr) {
+        console.warn('Schedule eligibility lookup failed, falling back to base contribution:', scheduleErr);
+      }
+
+      const owedAfterCredit = Math.max(outstanding - carry, 0);
+      const required = Math.max(baseContribution, owedAfterCredit);
+
+      if (required > 0 && body.amount < required) {
+        console.warn('[security] STK push rejected — chama amount below required', {
+          chamaId, memberId, submitted: body.amount, required,
+        });
+        return new Response(
+          JSON.stringify({
+            error: `Amount below required contribution. Required: KES ${required}, Submitted: KES ${body.amount}.`,
+            required,
+            submitted: body.amount,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // --- Optional: Create organization donation row up-front (avoids client-side RLS issues) ---
     let organizationDonationId: string | null = null;
     if (body.callback_metadata?.type === 'organization_donation') {

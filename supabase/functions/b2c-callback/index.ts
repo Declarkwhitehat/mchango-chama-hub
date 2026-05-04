@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
+import { getCallbackClientIP, isSafaricomCallbackIP } from "../_shared/safaricomIp.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -202,6 +203,18 @@ async function findWithdrawal(supabaseAdmin: any, result: any) {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // ═══ SAFARICOM IP WHITELIST ═══
+  // Reject any B2C callback that does not originate from Safaricom's known callback ranges.
+  // MPESA_CALLBACK_BYPASS_IPS env var can allow additional IPs during testing.
+  const clientIp = getCallbackClientIP(req);
+  if (!isSafaricomCallbackIP(clientIp)) {
+    console.warn('[security] Rejected M-Pesa B2C callback from non-Safaricom IP:', clientIp);
+    return new Response(
+      JSON.stringify({ error: 'Forbidden' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   try {
