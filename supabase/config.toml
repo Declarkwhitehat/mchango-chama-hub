@@ -1,4 +1,196 @@
 project_id = "ahhcbwbvueimezmtftte"
 
+[functions.chama-reports]
+verify_jwt = true
+
+[functions.send-otp]
+verify_jwt = false
+
+[functions.verify-otp]
+verify_jwt = false
+
+[functions.send-transactional-sms]
+verify_jwt = true
+
+[functions.mchango-crud]
+verify_jwt = false
+
+[functions.chama-crud]
+verify_jwt = true
+
+[functions.chama-invite]
+verify_jwt = false
+
+[functions.chama-join]
+verify_jwt = true
+
+[functions.chama-start]
+verify_jwt = true
+
+[functions.contributions-crud]
+verify_jwt = false
+
+[functions.transactions-crud]
+verify_jwt = true
+
+[functions.member-dashboard]
+verify_jwt = true
+
+[functions.admin-search]
+verify_jwt = true
+
+[functions.admin-export]
+verify_jwt = true
+
+[functions.payment-stk-push]
+verify_jwt = false
+
+[functions.payment-stk-callback]
+verify_jwt = false
+
+[functions.savings-group-invite]
+verify_jwt = false
+
+[functions.savings-group-crud]
+verify_jwt = true
+
+[functions.savings-group-members]
+verify_jwt = true
+
+[functions.chat-support]
+verify_jwt = false
+
+[functions.c2b-confirm-payment]
+verify_jwt = false
+
+[functions.c2b-validate-payment]
+verify_jwt = false
+
+[functions.daily-cycle-manager]
+verify_jwt = false
+
+[functions.daily-reminder-cron]
+verify_jwt = false
+
+[functions.daily-payout-cron]
+verify_jwt = false
+
+[functions.login]
+verify_jwt = false
+
+[functions.reset-password-phone]
+verify_jwt = false
+
+[functions.request-password-reset]
+verify_jwt = false
+
+[functions.webauthn-register]
+verify_jwt = true
+
+[functions.webauthn-authenticate]
+verify_jwt = false
+
+[functions.capture-login-ip]
+verify_jwt = false
+
+[functions.chama-cycle-complete]
+verify_jwt = false
+
+[functions.chama-rejoin]
+verify_jwt = true
+
+[functions.chama-start-new-cycle]
+verify_jwt = true
+
+[functions.b2c-payout]
+verify_jwt = false
+
+[functions.b2c-callback]
+verify_jwt = false
+
+[functions.payment-stk-query]
+verify_jwt = false
+
+[functions.withdrawals-crud]
+verify_jwt = false
+
+[functions.payment-methods]
+verify_jwt = true
+
+[functions.payment-config]
+verify_jwt = false
+
+[functions.retry-failed-payouts]
+verify_jwt = false
+
+[functions.withdrawal-member-analytics]
+verify_jwt = false
+
+[functions.cycle-auto-create]
+verify_jwt = false
+
+[functions.admin-payment-search]
+verify_jwt = false
+
+[functions.fraud-monitor]
+verify_jwt = false
+
+[functions.register-c2b-urls]
+verify_jwt = false
+
+[functions.totp-2fa]
+verify_jwt = false
+
+[functions.welfare-crud]
+verify_jwt = false
+
+[functions.welfare-members]
+verify_jwt = false
+
+[functions.welfare-contributions]
+verify_jwt = false
+
+[functions.welfare-cycles]
+verify_jwt = false
+
+[functions.welfare-withdrawal-approve]
+verify_jwt = false
+
+[functions.b2c-status-query]
+verify_jwt = false
+
+[functions.admin-transactions]
+verify_jwt = false
+
+[functions.admin-member-activity]
+verify_jwt = false
+
+[functions.compute-trust-scores]
+verify_jwt = false
+
+[functions.cleanup-failed-transactions]
+verify_jwt = false
+
+[functions.cleanup-job-status]
+verify_jwt = false
+
+[functions.chama-auto-cleanup]
+verify_jwt = false
+
+[functions.chama-auto-restart]
+verify_jwt = false
+
+[functions.payout-approval]
+verify_jwt = false
+
+[functions.admin-delete-user]
+verify_jwt = false
+
+[functions.financial-reconciliation]
+verify_jwt = false
+
+[functions.process-email-queue]
+verify_jwt = true
+
 [functions.admin-wipe-storage]
 verify_jwt = false
