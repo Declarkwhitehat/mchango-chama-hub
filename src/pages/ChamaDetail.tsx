@@ -21,7 +21,7 @@ import { PaymentStatusManager } from "@/components/chama/PaymentStatusManager";
 import { SkippedMemberAlert } from "@/components/chama/SkippedMemberAlert";
 import { FirstPaymentStatus } from "@/components/chama/FirstPaymentStatus";
 import { PreStartDashboard } from "@/components/chama/PreStartDashboard";
-import { WhatsAppLinkManager } from "@/components/chama/WhatsAppLinkManager";
+import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 import { ChamaEndDate } from "@/components/chama/ChamaEndDate";
 // CyclePaymentStatus now used only inside MemberDashboard
 import { VerifiedBadge } from "@/components/VerifiedBadge";
@@ -862,9 +862,11 @@ const ChamaDetail = () => {
             <TabsContent value="members" className="space-y-4">
               {/* WhatsApp Group Link Manager */}
               <WhatsAppLinkManager
-                chamaId={chama.id}
+                entityId={chama.id}
+                table="chama"
                 currentLink={chama.whatsapp_link}
                 isManager={isManager}
+                entityLabel="chama"
                 onUpdate={loadChama}
               />
 

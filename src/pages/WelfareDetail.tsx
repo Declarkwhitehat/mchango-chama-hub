@@ -24,6 +24,7 @@ import { WelfareWithdrawalStatus } from "@/components/welfare/WelfareWithdrawalS
 import { WelfareLeaveRequests } from "@/components/welfare/WelfareLeaveRequests";
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
+import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
@@ -427,6 +428,14 @@ const WelfareDetail = () => {
           )}
 
           <TabsContent value="members" className="space-y-4">
+            <WhatsAppLinkManager
+              entityId={welfare.id}
+              table="welfares"
+              currentLink={welfare.whatsapp_link}
+              isManager={isExecutive}
+              entityLabel="welfare"
+              onUpdate={fetchWelfare}
+            />
             {/* Success Rate Summary */}
             <div className="grid grid-cols-2 gap-4">
               <Card>

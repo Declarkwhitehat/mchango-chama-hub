@@ -20,6 +20,7 @@ import { WithdrawalButton } from "@/components/WithdrawalButton";
 import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { useAuth } from "@/contexts/AuthContext";
 import { GroupDocuments } from "@/components/GroupDocuments";
+import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 import { publicUrls } from "@/lib/publicUrl";
 
 const getStoredTab = (key: string, fallback: string) => {
@@ -286,6 +287,14 @@ const OrganizationDetail = () => {
           </TabsList>
 
           <TabsContent value="about" className="space-y-4">
+            <WhatsAppLinkManager
+              entityId={organization.id}
+              table="organizations"
+              currentLink={organization.whatsapp_link}
+              isManager={isCreator}
+              entityLabel="organization"
+              onUpdate={fetchOrganization}
+            />
             {/* About Section */}
             {organization.about && (
               <Card>
