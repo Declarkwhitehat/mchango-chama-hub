@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Shield, Loader2 } from "lucide-react";
+import { KycGate } from "@/components/KycGate";
 
 const WelfareCreate = () => {
   const navigate = useNavigate();
