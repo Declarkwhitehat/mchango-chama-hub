@@ -15,6 +15,7 @@ type SmsBalanceResponse = {
   currency?: string | null;
   checkedAt?: string;
   details?: string;
+  raw?: unknown;
 };
 
 export default function AdminSmsBalance() {
