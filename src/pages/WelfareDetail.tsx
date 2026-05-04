@@ -24,6 +24,7 @@ import { WelfareWithdrawalStatus } from "@/components/welfare/WelfareWithdrawalS
 import { WelfareLeaveRequests } from "@/components/welfare/WelfareLeaveRequests";
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
+import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
