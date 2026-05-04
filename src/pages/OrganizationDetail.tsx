@@ -287,6 +287,14 @@ const OrganizationDetail = () => {
           </TabsList>
 
           <TabsContent value="about" className="space-y-4">
+            <WhatsAppLinkManager
+              entityId={organization.id}
+              table="organizations"
+              currentLink={organization.whatsapp_link}
+              isManager={isCreator}
+              entityLabel="organization"
+              onUpdate={fetchOrganization}
+            />
             {/* About Section */}
             {organization.about && (
               <Card>
