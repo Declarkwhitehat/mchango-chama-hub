@@ -466,20 +466,15 @@ const MchangoDetail = () => {
                 </Card>
               )}
 
-              {/* WhatsApp Link */}
-              {campaign.whatsapp_link && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => window.open(campaign.whatsapp_link, '_blank')}
-                    >
-                      Join WhatsApp Group
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
+              {/* WhatsApp Group */}
+              <WhatsAppLinkManager
+                entityId={campaign.id}
+                table="mchango"
+                currentLink={campaign.whatsapp_link}
+                isManager={isCreator}
+                entityLabel="campaign"
+                onUpdate={fetchCampaign}
+              />
             </TabsContent>
 
             <TabsContent value="withdrawals" className="space-y-6">
