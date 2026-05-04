@@ -129,6 +129,16 @@ const AdminCommissionConfig = () => {
 
       if (feeError) throw feeError;
 
+      // Update / upsert account verification fee
+      const { error: acctFeeError } = await supabase
+        .from("platform_settings")
+        .upsert({
+          setting_key: "user_verification_fee",
+          setting_value: { amount: accountVerificationFee },
+          updated_by: user?.id || null,
+        }, { onConflict: "setting_key" });
+      if (acctFeeError) throw acctFeeError;
+
       // Log audit
       await supabase.from("audit_logs").insert({
         table_name: "platform_settings",
@@ -137,6 +147,7 @@ const AdminCommissionConfig = () => {
         new_values: {
           ...Object.fromEntries(rates.map(r => [r.key, r.rate / 100])),
           verification_fee: verificationFee,
+          user_verification_fee: accountVerificationFee,
         },
       });
 
