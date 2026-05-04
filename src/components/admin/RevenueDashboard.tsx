@@ -14,7 +14,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { 
   DollarSign, TrendingUp, TrendingDown, Hash, BarChart3, 
   Download, FileText, CalendarIcon, Loader2, Search, 
-  ArrowUpRight, ArrowDownRight, X
+  ArrowUpRight, ArrowDownRight, X, AlertTriangle, CheckCircle2
 } from "lucide-react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subWeeks, subMonths, subYears, eachDayOfInterval, eachMonthOfInterval, eachHourOfInterval, isWithinInterval } from "date-fns";
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -45,6 +45,10 @@ const SOURCE_COLORS: Record<string, string> = {
   mchango: "hsl(340, 70%, 55%)",
   organization: "hsl(270, 60%, 55%)",
   welfare: "hsl(150, 60%, 45%)",
+  verification_fee: "hsl(40, 90%, 50%)",
+  loan_fees: "hsl(180, 60%, 45%)",
+  withdrawal_fees: "hsl(20, 70%, 50%)",
+  other: "hsl(0, 0%, 55%)",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -52,6 +56,23 @@ const SOURCE_LABELS: Record<string, string> = {
   mchango: "Mchango",
   organization: "Organization",
   welfare: "Welfare",
+  verification_fee: "Verification Fees",
+  loan_fees: "Loan Fees",
+  withdrawal_fees: "Withdrawal Fees",
+  other: "Other",
+};
+
+// Earnings sources whose commission is ALREADY recorded in financial_ledger
+// (they were inserted as paired rows by contributions-crud). Excluded from
+// the dashboard total to prevent double-counting.
+const LEDGER_DUPLICATED_EARNINGS = new Set(["COMMISSION"]);
+
+// Map company_earnings.source → dashboard breakdown bucket key
+const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
+  VERIFICATION_FEE: "verification_fee",
+  LOAN_FEES: "loan_fees",
+  WITHDRAWAL_FEES: "withdrawal_fees",
+  OTHER: "other",
 };
 
 interface EarningsEntry {
