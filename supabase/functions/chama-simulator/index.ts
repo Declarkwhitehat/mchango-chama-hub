@@ -131,7 +131,7 @@ async function stage1(ctx: SimContext) {
           full_name: `Test Member ${i}`,
           email,
           phone,
-          id_number: `SIM${stamp}${String(i).padStart(2, '0')}`,
+          id_number: idNum,
           kyc_status: 'approved',
           is_verified: true,
           is_test: true,
