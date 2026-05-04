@@ -556,31 +556,31 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      const { data: uniqueCheck } = await supabase
-        .rpc('check_signup_uniqueness', {
+      // Atomic uniqueness reservation: transaction-scoped advisory locks in the
+      // RPC eliminate the race window between checking and creating the auth user.
+      const { error: reserveError } = await supabase
+        .rpc('reserve_signup_identity', {
           p_phone: data.phone,
           p_id_number: data.id_number,
           p_email: data.email,
         });
 
-      if (uniqueCheck) {
-        const check = typeof uniqueCheck === 'string' ? JSON.parse(uniqueCheck) : uniqueCheck;
-        if (check.phone_exists) {
+      if (reserveError) {
+        const msg = reserveError.message || '';
+        if (msg.includes('phone_exists')) {
           toast.error("This phone number is already registered. Please use a different number or log in.");
-          setIsLoading(false);
-          return;
-        }
-        if (check.id_number_exists) {
+        } else if (msg.includes('id_number_exists')) {
           toast.error("This ID number is already registered. Please contact support if you believe this is an error.");
-          setIsLoading(false);
-          return;
-        }
-        if (check.email_exists) {
+        } else if (msg.includes('email_exists')) {
           toast.error("This email is already registered. Please log in or use a different email.");
-          setIsLoading(false);
-          return;
+        } else if (msg.includes('missing_identity_fields')) {
+          toast.error("Please fill in all required fields.");
+        } else {
+          toast.error(msg || "Could not start registration. Please try again.");
         }
-      } 
+        setIsLoading(false);
+        return;
+      }
 
     const { error: signUpError } = await signUp(data.email, data.password, {
         full_name: data.full_name,
