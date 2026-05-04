@@ -188,20 +188,25 @@ export function RevenueDashboard() {
     load();
   }, [from, to, prevFrom, prevTo, sourceFilter, fetchAllEntries, fetchEarnings]);
 
+  // Sum of company_earnings rows that are NOT already mirrored in financial_ledger
+  const standaloneEarningsSum = (rows: EarningsEntry[]) =>
+    rows.reduce((s, e) => LEDGER_DUPLICATED_EARNINGS.has(e.source) ? s : s + Number(e.amount), 0);
+
   // KPI calculations
   const kpis = useMemo(() => {
     const commissionRevenue = entries.reduce((s, e) => s + Number(e.commission_amount), 0);
-    const feesRevenue = earnings.reduce((s, e) => s + Number(e.amount), 0);
+    const feesRevenue = standaloneEarningsSum(earnings);
     const totalRevenue = commissionRevenue + feesRevenue;
     const totalGross = entries.reduce((s, e) => s + Number(e.gross_amount), 0);
-    const count = entries.length + earnings.length;
+    const standaloneEarningsCount = earnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
+    const count = entries.length + standaloneEarningsCount;
     const avgCommission = count > 0 ? totalRevenue / count : 0;
 
     const prevCommissionRevenue = prevEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
-    const prevFeesRevenue = prevEarnings.reduce((s, e) => s + Number(e.amount), 0);
+    const prevFeesRevenue = standaloneEarningsSum(prevEarnings);
     const prevRevenue = prevCommissionRevenue + prevFeesRevenue;
     const prevGross = prevEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
-    const prevCount = prevEntries.length + prevEarnings.length;
+    const prevCount = prevEntries.length + prevEarnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
     const prevAvg = prevCount > 0 ? prevRevenue / prevCount : 0;
 
     const pctChange = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev) * 100;
@@ -245,15 +250,31 @@ export function RevenueDashboard() {
     });
   }, [entries, period, from, to]);
 
-  // Pie data - source breakdown
+  // Source breakdown — combines ledger entries (per source_type) with
+  // standalone company_earnings rows (verification fees, loan fees, etc.).
+  // The sum of all rows must equal kpis.totalRevenue.
   const sourceBreakdown = useMemo(() => {
     const map: Record<string, { gross: number; commission: number; count: number }> = {};
+
+    // Ledger contributes commission per source_type (chama / mchango / organization / welfare)
     entries.forEach(e => {
       if (!map[e.source_type]) map[e.source_type] = { gross: 0, commission: 0, count: 0 };
       map[e.source_type].gross += Number(e.gross_amount);
       map[e.source_type].commission += Number(e.commission_amount);
       map[e.source_type].count += 1;
     });
+
+    // Standalone earnings (NOT mirrored in ledger) get their own bucket
+    earnings.forEach(e => {
+      if (LEDGER_DUPLICATED_EARNINGS.has(e.source)) return;
+      const bucket = EARNINGS_SOURCE_TO_BUCKET[e.source] || "other";
+      if (!map[bucket]) map[bucket] = { gross: 0, commission: 0, count: 0 };
+      const amt = Number(e.amount);
+      map[bucket].gross += amt;        // for fees, gross == commission (100% to platform)
+      map[bucket].commission += amt;
+      map[bucket].count += 1;
+    });
+
     const total = kpis.totalRevenue || 1;
     return Object.entries(map).map(([source, v]) => ({
       source,
@@ -263,7 +284,18 @@ export function RevenueDashboard() {
       avgRate: v.gross > 0 ? (v.commission / v.gross) * 100 : 0,
       color: SOURCE_COLORS[source] || "hsl(0,0%,60%)",
     }));
-  }, [entries, kpis.totalRevenue]);
+  }, [entries, earnings, kpis.totalRevenue]);
+
+  // Reconciliation: sum of breakdown rows must equal totalRevenue from KPI
+  const reconciliation = useMemo(() => {
+    const breakdownSum = sourceBreakdown.reduce((s, r) => s + r.commission, 0);
+    const diff = Math.abs(breakdownSum - kpis.totalRevenue);
+    return {
+      breakdownSum,
+      matches: diff < 0.01,
+      diff,
+    };
+  }, [sourceBreakdown, kpis.totalRevenue]);
 
   // Filtered ledger for table
   const filteredEntries = useMemo(() => {
