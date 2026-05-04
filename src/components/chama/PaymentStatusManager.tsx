@@ -677,9 +677,9 @@ export const PaymentStatusManager = ({
             {/* Unpaid Members */}
             {unpaidMembers.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold text-red-600 mb-2 flex items-center gap-1">
+                <h4 className={cn("text-sm font-semibold mb-2 flex items-center gap-1", isGracePeriod ? "text-muted-foreground" : "text-red-600")}>
                   <Clock className="h-4 w-4" />
-                  Pending Payment ({unpaidMembers.length})
+                  {isGracePeriod ? `Yet to Pay — Grace Period (${unpaidMembers.length})` : `Pending Payment (${unpaidMembers.length})`}
                 </h4>
                 <div className="space-y-2">
                   {unpaidMembers.map((member) => {
