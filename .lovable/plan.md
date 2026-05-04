@@ -1,45 +1,81 @@
+## Problem
+
+When a user without `kyc_status = 'approved'` opens any create page (`/welfare/create`, `/chama/create`, `/mchango/create`, `/organizations/create`):
+
+- `ProtectedRoute requireKYC` fires `toast.error(...)` and `navigate(...)`, while `return null` flashes a **blank screen** before the redirect lands.
+- The toast message is generic (`"Your KYC status is: pending..."`) and doesn't tell the user whether to **upload KYC** or just **wait for review**.
+- `WelfareCreate.tsx` has no inline KYC gate at all (the other three create pages do, but inconsistently styled and with the same blank-flash issue from the route guard).
+
 ## Goal
 
-1. Reset the database to a clean testing state — keep only the single admin account (`declark07chacha@gmail.com`) and wipe everything else.
-2. Stop compressing KYC ID photos so they upload at full original quality (matching the user's complaint about compressed images on campaigns/orgs being unclear).
+Show a clear, friendly status card on the create page itself based on the user's KYC state. No blank screens, no surprise redirects.
 
----
+## Approach
 
-## Part 1 — Database Wipe
+### 1. Stop ProtectedRoute from redirecting on non-approved KYC
 
-**Preserve:** admin user `d8e34397-ba8c-4e33-b556-34965d4a269d` (auth.users row, profile, user_roles entry, their PIN/security questions so they can still log in), plus configuration tables (`fraud_config`, `platform_settings`).
+In `src/components/ProtectedRoute.tsx`:
 
-**Delete everything else** via a migration (TRUNCATE … CASCADE where safe, or DELETE with admin-preservation filter). Tables to clear:
+- Keep the **auth** check (redirect to `/auth` if not logged in) and the **PIN** check.
+- **Remove** the KYC redirect block (the `if (requireKYC && profile)` branch in the effect, plus the `if (requireKYC && profile && profile.kyc_status !== 'approved') return null;` line).
+- Instead, pass `requireKYC` through and let the page render. The page itself owns the KYC UX.
 
-- Groups & members: `chama`, `chama_members`, `chama_invite_codes`, `chama_messages`, `chama_member_debts`, `chama_member_removals`, `chama_cycle_deficits`, `chama_cycle_history`, `chama_overpayment_wallet`, `chama_rejoin_requests`, `contribution_cycles`, `contributions`, `member_cycle_payments`, `payout_skips`, `payouts`, `payout_approval_requests`, `member_trust_scores`
-- Welfare: `welfares`, `welfare_members`, `welfare_contributions`, `welfare_contribution_cycles`, `welfare_withdrawal_approvals`, `welfare_executive_changes`, `welfare_leave_requests`
-- Organizations: `organizations`, `organization_donations`
-- Campaigns: `mchango`, `mchango_donations`
-- Financial: `withdrawals`, `transactions`, `financial_ledger`, `company_earnings`, `platform_financial_summary`, `reconciliation_logs`, `settlement_locks`, `payment_methods`
-- Misc: `notifications`, `device_tokens`, `chat_messages`, `customer_callbacks`, `generated_documents`, `group_documents`, `fraud_events`, `audit_logs`, `rate_limit_attempts`, `otp_verifications`, `verification_requests`, `user_verification_requests`, `user_consents`, `user_risk_profiles`
-- All non-admin user data: delete from `auth.users` where id ≠ admin id (cascades via FKs to `profiles`, `user_roles`, `user_pins`, `totp_secrets`, `webauthn_credentials`, `security_questions`, `user_security_answers`).
+This eliminates the blank flash and the noisy toast.
 
-**Sequences**: reset `document_serial_seq` and any member-code sequences so test data starts at 1.
+### 2. Create a shared `KycGate` component
 
-**Storage buckets**: ask user if KYC/avatar/group-document storage objects should also be wiped (separate operation; not auto-included).
+New file: `src/components/KycGate.tsx`
 
-## Part 2 — KYC Photo Quality Fix
+Props: `{ children: React.ReactNode; featureLabel: string }` (e.g. `"welfare group"`, `"chama"`, `"campaign"`, `"organization"`).
 
-File: `src/pages/KYCUpload.tsx`
+Behavior:
 
-Currently both front and back ID photos are run through `compressImage()` from `src/utils/imageCompression.ts`, which lowers quality and resolution. ID photos need full clarity.
+- Reads `profile` from `useAuth()` (already loaded — no extra fetch needed).
+- While `profile` is `null` and `loading`, show a small skeleton/spinner inside `Layout`-friendly markup (no full-page blank).
+- Branches on state:
 
-Change: bypass `compressImage` entirely in `KYCUpload.tsx` — store the original `File` directly into `setFrontFile` / `setBackFile` and use the original blob for preview. Keep a sane file-size guard (e.g. reject > 10 MB) and convert HEIC if needed, but no quality reduction.
+  | State | UI |
+  |---|---|
+  | `kyc_status === 'approved'` | Render `children` (with optional small green confirmation alert) |
+  | `!kyc_submitted_at` (never uploaded) | Amber card: "Verify your identity to create a {featureLabel}." Primary button → `/kyc-upload`. |
+  | `kyc_submitted_at` && `kyc_status === 'pending'` | Blue/info card: "Your KYC documents are under review. You'll be able to create a {featureLabel} once an admin approves them — usually within 24 hours." No action button (or a secondary "Back to Home"). |
+  | `kyc_status === 'rejected'` | Red card: show rejection reason if available, button → `/kyc-upload` to resubmit. |
 
-Note: `AccountVerification.tsx` selfie uses Capacitor camera `quality: 80`. Bump to `quality: 100` so selfies are also uncompressed.
+- Does NOT render the create form's children unless approved, so all existing form logic stays untouched.
 
-`OrganizationCreate.tsx` and `MchangoCreate.tsx` keep their existing compression (those are public-facing thumbnails — the user only flagged KYC).
+### 3. Wrap each create page with `KycGate`
 
----
+Edit:
 
-## Confirmations needed before I run the wipe
+- `src/pages/WelfareCreate.tsx` — wrap the inner `<div className="container ...">` content with `<KycGate featureLabel="welfare group">…</KycGate>` (inside `<Layout>`). Remove no existing logic; the form simply won't render until approved.
+- `src/pages/ChamaCreate.tsx` — replace the existing inline `kycStatus` fetch + alert blocks with `<KycGate featureLabel="chama">`. Remove the now-redundant `useEffect` + `kycStatus` state.
+- `src/pages/MchangoCreate.tsx` — same treatment, `featureLabel="campaign"`.
+- `src/pages/OrganizationCreate.tsx` — same treatment, `featureLabel="organization"`.
 
-1. Wipe also clears Storage objects (KYC docs, group documents, mchango images)? Y/N
-2. Confirm the only admin to keep is `declark07chacha@gmail.com` (id `d8e34397…`)? Y/N
+This consolidates four divergent implementations into one consistent, clearer UX.
 
-I'll proceed once you approve. The wipe is irreversible.
+### 4. Keep the route prop for future-proofing
+
+Leave `requireKYC` accepted by `ProtectedRoute` (no-op for now) so `App.tsx` doesn't need changes. This avoids a sweeping refactor and lets us re-enable a route-level guard later if desired.
+
+## Files Changed
+
+- `src/components/ProtectedRoute.tsx` — remove KYC redirect branch and the `null` short-circuit for unapproved KYC.
+- `src/components/KycGate.tsx` — **new**, shared gating component with three friendly states.
+- `src/pages/WelfareCreate.tsx` — wrap form with `KycGate`.
+- `src/pages/ChamaCreate.tsx` — wrap form with `KycGate`, remove duplicate KYC state/effect/alerts.
+- `src/pages/MchangoCreate.tsx` — same.
+- `src/pages/OrganizationCreate.tsx` — same.
+
+## Out of Scope
+
+- No backend / RLS changes (server-side KYC enforcement on insert remains in place).
+- No changes to KYC upload page itself.
+- No changes to non-create pages.
+
+## User-Visible Result
+
+- Non-KYC user clicking "Create Welfare" (or any other create option): sees a clear amber card asking them to verify identity, with a button to KYC upload — never a blank screen.
+- User who already submitted KYC and is awaiting review: sees a calm info card saying "We're reviewing your documents — please wait." No misleading "upload KYC" prompt.
+- Rejected user: sees the reason and a button to resubmit.
+- Approved user: sees the create form exactly as today.

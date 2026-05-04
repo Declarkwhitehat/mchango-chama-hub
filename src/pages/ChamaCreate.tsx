@@ -14,6 +14,7 @@ import { AlertCircle, CheckCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { usePlatformMinimums } from "@/hooks/usePlatformMinimums";
+import { KycGate } from "@/components/KycGate";
 
 const DAY_OPTIONS = Array.from({ length: 28 }, (_, i) => i + 1);
 
@@ -27,32 +28,11 @@ const ChamaCreate = () => {
   const navigate = useNavigate();
   const { minChamaContribution } = usePlatformMinimums();
   const [isLoading, setIsLoading] = useState(false);
-  const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [frequency, setFrequency] = useState<string>("monthly");
   const [showEveryNDays, setShowEveryNDays] = useState(false);
   const [monthlyDay, setMonthlyDay] = useState<string>("");
   const [monthlyDay2, setMonthlyDay2] = useState<string>("");
   const formRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    const checkKycStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("kyc_status")
-        .eq("id", user.id)
-        .single();
-
-      setKycStatus(profile?.kyc_status || null);
-    };
-
-    checkKycStatus();
-  }, [navigate]);
 
   const handleFrequencyChange = (value: string) => {
     setFrequency(value);
@@ -179,46 +159,10 @@ const ChamaCreate = () => {
 
   const { execute: handleSubmit, isProcessing } = useDebounceAction(handleSubmitInner);
 
-  if (kycStatus === null) {
-    return (
-      <Layout showBackButton title="Create Chama">
-        <div className="container px-4 py-6 max-w-2xl mx-auto">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-muted-foreground">Loading...</p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout showBackButton title="Create Chama">
       <div className="container px-4 py-6 max-w-2xl mx-auto">
-        {kycStatus !== "approved" && (
-          <Alert className="mb-4 border-warning bg-warning/10">
-            <AlertCircle className="h-4 w-4 text-warning" />
-            <AlertDescription>
-              <strong>You must complete verification before creating a Chama.</strong>
-              <br />
-              Only KYC-approved users can create chamas.{" "}
-              <a href="/kyc-upload" className="underline font-medium">
-                Complete KYC now
-              </a>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {kycStatus === "approved" && (
-          <Alert className="mb-4 border-success bg-success/10">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <AlertDescription>
-              Your KYC is approved. You can now create a chama.
-            </AlertDescription>
-          </Alert>
-        )}
-
+        <KycGate featureLabel="chama">
         <Card>
           <CardHeader>
             <CardTitle>Start a Chama Group</CardTitle>
@@ -235,7 +179,7 @@ const ChamaCreate = () => {
                   name="name"
                   placeholder="e.g., Women Empowerment Group"
                   required
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -247,7 +191,7 @@ const ChamaCreate = () => {
                   placeholder="Describe the purpose and goals of your group..."
                   rows={4}
                   required
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -261,7 +205,7 @@ const ChamaCreate = () => {
                     placeholder={String(minChamaContribution)}
                     min={minChamaContribution}
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                   <p className="text-xs text-muted-foreground">
                     Minimum: KES {minChamaContribution.toLocaleString()}
@@ -273,7 +217,7 @@ const ChamaCreate = () => {
                   <Select
                     value={frequency}
                     onValueChange={handleFrequencyChange}
-                    disabled={kycStatus !== "approved"}
+
                   >
                     <SelectTrigger id="contribution_frequency">
                       <SelectValue placeholder="Select frequency" />
@@ -295,7 +239,7 @@ const ChamaCreate = () => {
                   <Select
                     value={monthlyDay}
                     onValueChange={setMonthlyDay}
-                    disabled={kycStatus !== "approved"}
+
                   >
                     <SelectTrigger id="monthly_day">
                       <SelectValue placeholder="Select day" />
@@ -321,7 +265,7 @@ const ChamaCreate = () => {
                     <Select
                       value={monthlyDay}
                       onValueChange={setMonthlyDay}
-                      disabled={kycStatus !== "approved"}
+
                     >
                       <SelectTrigger id="monthly_day_1">
                         <SelectValue placeholder="Select day" />
@@ -340,7 +284,7 @@ const ChamaCreate = () => {
                     <Select
                       value={monthlyDay2}
                       onValueChange={setMonthlyDay2}
-                      disabled={kycStatus !== "approved"}
+
                     >
                       <SelectTrigger id="monthly_day_2">
                         <SelectValue placeholder="Select day" />
@@ -370,7 +314,7 @@ const ChamaCreate = () => {
                     placeholder="e.g., 7 for weekly, 14 for bi-weekly"
                     min="1"
                     required={showEveryNDays}
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
               )}
@@ -385,7 +329,7 @@ const ChamaCreate = () => {
                     placeholder="2"
                     defaultValue="2"
                     min="2"
-                    disabled={kycStatus !== "approved"}
+
                   />
                   <p className="text-xs text-muted-foreground">Minimum 2 members</p>
                 </div>
@@ -400,7 +344,7 @@ const ChamaCreate = () => {
                     min="2"
                     max="100"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                   <p className="text-xs text-muted-foreground">Maximum 100 members</p>
                 </div>
@@ -411,7 +355,7 @@ const ChamaCreate = () => {
                 <Select
                   name="is_public"
                   defaultValue="true"
-                  disabled={kycStatus !== "approved"}
+
                 >
                   <SelectTrigger id="is_public">
                     <SelectValue placeholder="Select visibility" />
@@ -434,7 +378,7 @@ const ChamaCreate = () => {
                   name="whatsapp_link"
                   type="url"
                   placeholder="https://chat.whatsapp.com/..."
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -443,7 +387,7 @@ const ChamaCreate = () => {
                   type="submit"
                   variant="default"
                   className="w-full"
-                  disabled={isLoading || isProcessing || kycStatus !== "approved"}
+                  disabled={isLoading || isProcessing}
                 >
                   {isLoading ? "Creating..." : "Create Chama Group"}
                 </Button>
@@ -451,6 +395,7 @@ const ChamaCreate = () => {
             </form>
           </CardContent>
         </Card>
+        </KycGate>
       </div>
     </Layout>
   );

@@ -12,37 +12,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle, X, Youtube, ImagePlus, Building2, Globe, MapPin, Phone, Mail } from "lucide-react";
 import { compressImage, formatFileSize } from "@/utils/imageCompression";
+import { KycGate } from "@/components/KycGate";
 
 const OrganizationCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [kycStatus, setKycStatus] = useState<string | null>(null);
+  // KYC status check is delegated to <KycGate /> below — no local fetch needed.
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    const checkKycStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("kyc_status")
-        .eq("id", user.id)
-        .single();
-
-      setKycStatus(profile?.kyc_status || null);
-    };
-
-    checkKycStatus();
-  }, [navigate]);
 
   const handleImageChange = (type: 'logo' | 'cover') => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -222,46 +203,10 @@ const OrganizationCreate = () => {
 
   const { execute: handleSubmit, isProcessing } = useDebounceAction(handleSubmitInner);
 
-  if (kycStatus === null) {
-    return (
-      <Layout showBackButton title="Register Organization">
-        <div className="container px-4 py-6 max-w-2xl mx-auto">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-muted-foreground">Loading...</p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout showBackButton title="Register Organization">
       <div className="container px-4 py-6 max-w-2xl mx-auto">
-        {kycStatus !== "approved" && (
-          <Alert className="mb-4 border-warning bg-warning/10">
-            <AlertCircle className="h-4 w-4 text-warning" />
-            <AlertDescription>
-              <strong>You must complete verification before registering an organization.</strong>
-              <br />
-              Only KYC-approved users can register organizations.{" "}
-              <a href="/kyc-upload" className="underline font-medium">
-                Complete KYC now
-              </a>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {kycStatus === "approved" && (
-          <Alert className="mb-4 border-success bg-success/10">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <AlertDescription>
-              Your KYC is approved. You can now register an organization.
-            </AlertDescription>
-          </Alert>
-        )}
-
+        <KycGate featureLabel="organization">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -289,7 +234,7 @@ const OrganizationCreate = () => {
                     name="name"
                     placeholder="e.g., St. Mary's Catholic Church"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -300,7 +245,7 @@ const OrganizationCreate = () => {
                     name="category"
                     placeholder="e.g., Church, School, Orphanage, NGO, Hospital"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -312,7 +257,7 @@ const OrganizationCreate = () => {
                     placeholder="Brief description of your organization (shown in listings)"
                     rows={2}
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -323,7 +268,7 @@ const OrganizationCreate = () => {
                     name="about"
                     placeholder="Tell the full story of your organization - its history, mission, impact, and goals..."
                     rows={6}
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
               </div>
@@ -361,7 +306,7 @@ const OrganizationCreate = () => {
                           type="file"
                           accept="image/*"
                           onChange={handleImageChange('logo')}
-                          disabled={kycStatus !== "approved"}
+
                           className="hidden"
                         />
                       </label>
@@ -396,7 +341,7 @@ const OrganizationCreate = () => {
                           type="file"
                           accept="image/*"
                           onChange={handleImageChange('cover')}
-                          disabled={kycStatus !== "approved"}
+
                           className="hidden"
                         />
                       </label>
@@ -419,7 +364,7 @@ const OrganizationCreate = () => {
                         name="phone"
                         type="tel"
                         placeholder="+254..."
-                        disabled={kycStatus !== "approved"}
+
                         className="pl-10"
                       />
                     </div>
@@ -434,7 +379,7 @@ const OrganizationCreate = () => {
                         name="email"
                         type="email"
                         placeholder="info@organization.org"
-                        disabled={kycStatus !== "approved"}
+
                         className="pl-10"
                       />
                     </div>
@@ -449,7 +394,7 @@ const OrganizationCreate = () => {
                       id="location"
                       name="location"
                       placeholder="e.g., Nairobi, Kenya"
-                      disabled={kycStatus !== "approved"}
+
                       className="pl-10"
                     />
                   </div>
@@ -464,7 +409,7 @@ const OrganizationCreate = () => {
                       name="website"
                       type="url"
                       placeholder="https://..."
-                      disabled={kycStatus !== "approved"}
+
                       className="pl-10"
                     />
                   </div>
@@ -477,7 +422,7 @@ const OrganizationCreate = () => {
                     name="whatsapp"
                     type="url"
                     placeholder="https://chat.whatsapp.com/..."
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -492,7 +437,7 @@ const OrganizationCreate = () => {
                       value={youtubeUrl}
                       onChange={(e) => setYoutubeUrl(e.target.value)}
                       placeholder="https://youtube.com/watch?v=..."
-                      disabled={kycStatus !== "approved"}
+
                       className="pl-10"
                     />
                   </div>
@@ -507,7 +452,7 @@ const OrganizationCreate = () => {
                   type="submit"
                   variant="default"
                   className="w-full"
-                  disabled={isLoading || isProcessing || kycStatus !== "approved"}
+                  disabled={isLoading || isProcessing}
                 >
                   {isLoading ? "Registering..." : "Register Organization"}
                 </Button>
@@ -515,6 +460,7 @@ const OrganizationCreate = () => {
             </form>
           </CardContent>
         </Card>
+        </KycGate>
       </div>
     </Layout>
   );

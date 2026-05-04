@@ -13,35 +13,19 @@ import { toast } from "sonner";
 import { AlertCircle, CheckCircle, X, Youtube, ImagePlus } from "lucide-react";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { compressImage, formatFileSize } from "@/utils/imageCompression";
+import { KycGate } from "@/components/KycGate";
 
 const MchangoCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [kycStatus, setKycStatus] = useState<string | null>(null);
+  // KYC status is now handled by <KycGate /> below.
   const [imageFiles, setImageFiles] = useState<(File | null)[]>([null]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([""]);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    const checkKycStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
+  // KYC status check is delegated to <KycGate /> below — no local fetch needed.
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("kyc_status")
-        .eq("id", user.id)
-        .single();
-
-      setKycStatus(profile?.kyc_status || null);
-    };
-
-    checkKycStatus();
-  }, [navigate]);
 
   const handleImageChange = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -202,46 +186,10 @@ const MchangoCreate = () => {
 
   const { execute: handleSubmit, isProcessing } = useDebounceAction(handleSubmitInner);
 
-  if (kycStatus === null) {
-    return (
-      <Layout showBackButton title="Create Mchango">
-        <div className="container px-4 py-6 max-w-2xl mx-auto">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-muted-foreground">Loading...</p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout showBackButton title="Create Mchango">
       <div className="container px-4 py-6 max-w-2xl mx-auto">
-        {kycStatus !== "approved" && (
-          <Alert className="mb-4 border-warning bg-warning/10">
-            <AlertCircle className="h-4 w-4 text-warning" />
-            <AlertDescription>
-              <strong>You must complete verification before creating a Mchango.</strong>
-              <br />
-              Only KYC-approved users can create fundraising campaigns.{" "}
-              <a href="/kyc-upload" className="underline font-medium">
-                Complete KYC now
-              </a>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {kycStatus === "approved" && (
-          <Alert className="mb-4 border-success bg-success/10">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <AlertDescription>
-              Your KYC is approved. You can now create a campaign.
-            </AlertDescription>
-          </Alert>
-        )}
-
+        <KycGate featureLabel="campaign">
         <Card>
           <CardHeader>
             <CardTitle>Start a Fundraiser</CardTitle>
@@ -258,7 +206,7 @@ const MchangoCreate = () => {
                   name="title"
                   placeholder="e.g., Medical Emergency Fund"
                   required
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -270,7 +218,7 @@ const MchangoCreate = () => {
                   placeholder="Tell your story and explain why you need support..."
                   rows={5}
                   required
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -284,7 +232,7 @@ const MchangoCreate = () => {
                     placeholder="50000"
                     min="1000"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
 
@@ -298,7 +246,7 @@ const MchangoCreate = () => {
                     min="1"
                     max="90"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
               </div>
@@ -310,7 +258,7 @@ const MchangoCreate = () => {
                   name="category"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   required
-                  disabled={kycStatus !== "approved"}
+
                 >
                   <option value="">Select a category</option>
                   <option value="medical">Medical</option>
@@ -353,7 +301,7 @@ const MchangoCreate = () => {
                         type="file"
                         accept="image/*"
                         onChange={handleImageChange(0)}
-                        disabled={kycStatus !== "approved"}
+
                         className="hidden"
                       />
                     </label>
@@ -372,7 +320,7 @@ const MchangoCreate = () => {
                     value={youtubeUrl}
                     onChange={(e) => setYoutubeUrl(e.target.value)}
                     placeholder="https://youtube.com/watch?v=..."
-                    disabled={kycStatus !== "approved"}
+
                     className="pl-10"
                   />
                 </div>
@@ -386,7 +334,7 @@ const MchangoCreate = () => {
                   type="submit"
                   variant="default"
                   className="w-full"
-                  disabled={isLoading || isProcessing || kycStatus !== "approved"}
+                  disabled={isLoading || isProcessing}
                 >
                   {isLoading ? "Creating..." : "Create Campaign"}
                 </Button>
@@ -394,6 +342,7 @@ const MchangoCreate = () => {
             </form>
           </CardContent>
         </Card>
+        </KycGate>
       </div>
     </Layout>
   );
