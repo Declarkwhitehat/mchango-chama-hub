@@ -247,11 +247,37 @@ const AdminCommissionConfig = () => {
           </CardContent>
         </Card>
 
-        <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save All Changes
-        </Button>
-      </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <BadgeCheck className="h-4 w-4 text-blue-500" /> Account Verification Fee
+            </CardTitle>
+            <CardDescription>Charged via M-Pesa STK push when a user requests an account-level verified badge. Goes 100% to platform revenue.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <Label className="font-semibold">Account Verification Fee (KSh)</Label>
+                <p className="text-xs text-muted-foreground">Verified accounts auto-verify any group/campaign they create at no extra cost.</p>
+              </div>
+              <div className="flex items-center gap-2 w-36">
+                <span className="text-sm font-medium text-muted-foreground">KSh</span>
+                <Input
+                  type="number"
+                  min="0"
+                  max="50000"
+                  step="100"
+                  value={accountVerificationFee}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value);
+                    if (!isNaN(n) && n >= 0 && n <= 50000) setAccountVerificationFee(n);
+                  }}
+                  className="text-right font-mono"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
