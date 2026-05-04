@@ -205,27 +205,33 @@ export function RevenueDashboard() {
   const standaloneEarningsSum = (rows: EarningsEntry[]) =>
     rows.reduce((s, e) => LEDGER_DUPLICATED_EARNINGS.has(e.source) ? s : s + Number(e.amount), 0);
 
-  // KPI calculations
+  // KPI calculations — payouts are explicitly excluded from gross/commission/net
+  // so revenue figures reflect ONLY money flowing into the platform.
   const kpis = useMemo(() => {
-    const commissionRevenue = entries.reduce((s, e) => s + Number(e.commission_amount), 0);
+    const revenueEntries = entries.filter(isRevenueEntry);
+    const payoutEntries = entries.filter(e => !isRevenueEntry(e));
+    const prevRevenueEntries = prevEntries.filter(isRevenueEntry);
+
+    const commissionRevenue = revenueEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
     const feesRevenue = standaloneEarningsSum(earnings);
     const totalRevenue = commissionRevenue + feesRevenue;
-    const totalGross = entries.reduce((s, e) => s + Number(e.gross_amount), 0);
+    const totalGross = revenueEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
+    const totalPayouts = payoutEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
     const standaloneEarningsCount = earnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
-    const count = entries.length + standaloneEarningsCount;
+    const count = revenueEntries.length + standaloneEarningsCount;
     const avgCommission = count > 0 ? totalRevenue / count : 0;
 
-    const prevCommissionRevenue = prevEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
+    const prevCommissionRevenue = prevRevenueEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
     const prevFeesRevenue = standaloneEarningsSum(prevEarnings);
     const prevRevenue = prevCommissionRevenue + prevFeesRevenue;
-    const prevGross = prevEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
-    const prevCount = prevEntries.length + prevEarnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
+    const prevGross = prevRevenueEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
+    const prevCount = prevRevenueEntries.length + prevEarnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
     const prevAvg = prevCount > 0 ? prevRevenue / prevCount : 0;
 
     const pctChange = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev) * 100;
 
     return {
-      totalRevenue, totalGross, count, avgCommission,
+      totalRevenue, totalGross, totalPayouts, count, avgCommission,
       revenuePct: pctChange(totalRevenue, prevRevenue),
       grossPct: pctChange(totalGross, prevGross),
       countPct: pctChange(count, prevCount),
