@@ -122,14 +122,14 @@ const ChamaDetail = () => {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'chama_members',
           filter: `chama_id=eq.${id}`
         },
         (payload) => {
-          console.log('Member status changed:', payload);
-          // Reload chama data when any member's status changes
+          console.log('Member change:', payload);
+          // Reload on insert/update/delete so new join requests appear instantly
           loadChama();
         }
       )
