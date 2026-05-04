@@ -120,10 +120,10 @@ const AdminDashboard = () => {
     }
   }, []);
 
-  // Initial fetch + 30-second auto-refresh interval
+  // Initial fetch + 3-hour auto-refresh interval (use manual Refresh button for on-demand updates)
   useEffect(() => {
     fetchDashboardData();
-    intervalRef.current = setInterval(() => fetchDashboardData(true), 30000);
+    intervalRef.current = setInterval(() => fetchDashboardData(true), 3 * 60 * 60 * 1000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
