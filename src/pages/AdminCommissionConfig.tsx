@@ -279,6 +279,12 @@ const AdminCommissionConfig = () => {
           </CardContent>
         </Card>
 
+        <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save All Changes
+        </Button>
+      </div>
+
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
           <DialogHeader>
