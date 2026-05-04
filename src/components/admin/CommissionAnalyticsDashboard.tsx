@@ -54,9 +54,11 @@ interface SummaryData {
   mchangoCommission: number;
   chamaCommission: number;
   orgCommission: number;
+  welfareCommission: number;
   mchangoGross: number;
   chamaGross: number;
   orgGross: number;
+  welfareGross: number;
   transactionCount: number;
 }
 
@@ -75,8 +77,8 @@ export const CommissionAnalyticsDashboard = () => {
   const [ledgerData, setLedgerData] = useState<LedgerEntry[]>([]);
   const [summary, setSummary] = useState<SummaryData>({
     totalGross: 0, totalCommission: 0, totalNet: 0,
-    mchangoCommission: 0, chamaCommission: 0, orgCommission: 0,
-    mchangoGross: 0, chamaGross: 0, orgGross: 0, transactionCount: 0
+    mchangoCommission: 0, chamaCommission: 0, orgCommission: 0, welfareCommission: 0,
+    mchangoGross: 0, chamaGross: 0, orgGross: 0, welfareGross: 0, transactionCount: 0
   });
   const [trendData, setTrendData] = useState<TrendPoint[]>([]);
   const [dateFrom, setDateFrom] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -84,6 +86,7 @@ export const CommissionAnalyticsDashboard = () => {
   const [liveVerification, setLiveVerification] = useState<{
     mchangoDonations: number;
     orgDonations: number;
+    welfareContributions: number;
     chamaContributions: number;
     totalLive: number;
   } | null>(null);
@@ -105,7 +108,7 @@ export const CommissionAnalyticsDashboard = () => {
       const fromISO = startOfDay(parseISO(dateFrom)).toISOString();
       const toISO = endOfDay(parseISO(dateTo)).toISOString();
 
-      const [mchangoRes, orgRes] = await Promise.all([
+      const [mchangoRes, orgRes, welfareRes] = await Promise.all([
         supabase.from("mchango_donations")
           .select("commission_amount")
           .eq("payment_status", "completed")
@@ -116,16 +119,23 @@ export const CommissionAnalyticsDashboard = () => {
           .eq("payment_status", "completed")
           .gte("completed_at", fromISO)
           .lte("completed_at", toISO),
+        supabase.from("welfare_contributions")
+          .select("commission_amount")
+          .eq("payment_status", "completed")
+          .gte("completed_at", fromISO)
+          .lte("completed_at", toISO),
       ]);
 
       const mchangoTotal = (mchangoRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
       const orgTotal = (orgRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
+      const welfareTotal = (welfareRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
 
       setLiveVerification({
         mchangoDonations: mchangoTotal,
         orgDonations: orgTotal,
-        chamaContributions: 0, // chama commissions are in financial_ledger only
-        totalLive: mchangoTotal + orgTotal,
+        welfareContributions: welfareTotal,
+        chamaContributions: 0, // chama commissions live in financial_ledger only
+        totalLive: mchangoTotal + orgTotal + welfareTotal,
       });
     } catch (err) {
       console.error("Live verification error:", err);
@@ -154,8 +164,8 @@ export const CommissionAnalyticsDashboard = () => {
 
       const s: SummaryData = {
         totalGross: 0, totalCommission: 0, totalNet: 0,
-        mchangoCommission: 0, chamaCommission: 0, orgCommission: 0,
-        mchangoGross: 0, chamaGross: 0, orgGross: 0,
+        mchangoCommission: 0, chamaCommission: 0, orgCommission: 0, welfareCommission: 0,
+        mchangoGross: 0, chamaGross: 0, orgGross: 0, welfareGross: 0,
         transactionCount: entries.length
       };
 
@@ -172,6 +182,9 @@ export const CommissionAnalyticsDashboard = () => {
         } else if (e.source_type === "organization") {
           s.orgCommission += Number(e.commission_amount);
           s.orgGross += Number(e.gross_amount);
+        } else if (e.source_type === "welfare") {
+          s.welfareCommission += Number(e.commission_amount);
+          s.welfareGross += Number(e.gross_amount);
         }
       }
       setSummary(s);
@@ -484,44 +497,86 @@ export const CommissionAnalyticsDashboard = () => {
         </Card>
       </div>
 
-      {/* Live Data Verification */}
-      {liveVerification && (
-        <Card className="border border-dashed border-primary/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              Live Data Cross-Verification
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Comparing ledger totals with live donation tables for {dateFrom === dateTo ? "today" : "selected period"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Mchango (Donations)</p>
-                <p className="font-semibold">KES {liveVerification.mchangoDonations.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+      {/* Live Data Verification — per-source comparison */}
+      {liveVerification && (() => {
+        const TOL = 0.01; // 1 cent
+        const rows = [
+          { label: "Mchango",      ledger: summary.mchangoCommission, live: liveVerification.mchangoDonations },
+          { label: "Organizations",ledger: summary.orgCommission,     live: liveVerification.orgDonations },
+          { label: "Welfare",      ledger: summary.welfareCommission, live: liveVerification.welfareContributions },
+          { label: "Chama",        ledger: summary.chamaCommission,   live: null as number | null },
+        ];
+        const fmt = (n: number) => `KES ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const allMatch = rows.every(r => r.live === null || Math.abs(r.ledger - r.live) <= TOL);
+        return (
+          <Card className="border border-dashed border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                Live Data Cross-Verification
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Comparing ledger totals with live tables for {dateFrom === dateTo ? "today" : "selected period"}. Chama commissions live in the ledger only.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-muted-foreground border-b">
+                      <th className="py-2 pr-4">Source</th>
+                      <th className="py-2 pr-4 text-right">Ledger</th>
+                      <th className="py-2 pr-4 text-right">Live Table</th>
+                      <th className="py-2 pr-4 text-right">Variance</th>
+                      <th className="py-2 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(r => {
+                      const variance = r.live === null ? 0 : r.ledger - r.live;
+                      const ok = r.live === null || Math.abs(variance) <= TOL;
+                      return (
+                        <tr key={r.label} className="border-b last:border-0">
+                          <td className="py-2 pr-4 font-medium">{r.label}</td>
+                          <td className="py-2 pr-4 text-right font-mono">{fmt(r.ledger)}</td>
+                          <td className="py-2 pr-4 text-right font-mono">{r.live === null ? <span className="text-muted-foreground">—</span> : fmt(r.live)}</td>
+                          <td className={`py-2 pr-4 text-right font-mono ${ok ? "text-muted-foreground" : "text-amber-600"}`}>
+                            {r.live === null ? "—" : (variance === 0 ? "0.00" : (variance > 0 ? "+" : "") + variance.toFixed(2))}
+                          </td>
+                          <td className="py-2 text-right">
+                            {r.live === null ? (
+                              <Badge variant="outline" className="text-xs">Ledger only</Badge>
+                            ) : ok ? (
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">✓ Match</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">⚠ Mismatch</Badge>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="font-semibold">
+                      <td className="py-2 pr-4">Total</td>
+                      <td className="py-2 pr-4 text-right font-mono">{fmt(summary.totalCommission)}</td>
+                      <td className="py-2 pr-4 text-right font-mono">{fmt(liveVerification.totalLive + summary.chamaCommission)}</td>
+                      <td className="py-2 pr-4 text-right font-mono">
+                        {(summary.totalCommission - (liveVerification.totalLive + summary.chamaCommission)).toFixed(2)}
+                      </td>
+                      <td className="py-2 text-right">
+                        {allMatch ? (
+                          <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">✓ Verified</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">⚠ Investigate</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <p className="text-muted-foreground">Organizations (Donations)</p>
-                <p className="font-semibold">KES {liveVerification.orgDonations.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Ledger Total</p>
-                <p className="font-semibold">KES {summary.totalCommission.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Status</p>
-                {Math.abs(summary.totalCommission - (liveVerification.mchangoDonations + liveVerification.orgDonations + summary.chamaCommission)) < 1 ? (
-                  <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">✓ Verified</Badge>
-                ) : (
-                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">⚠ Check Chama entries</Badge>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Trend Chart */}
