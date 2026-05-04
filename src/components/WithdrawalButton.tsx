@@ -15,6 +15,7 @@ import { Wallet, Loader2, Clock, AlertCircle, Smartphone, Building2 } from "luci
 import { PAYMENT_METHOD_LIMITS, type PaymentMethodType } from "@/utils/paymentLimits";
 import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 import { PinEntryDialog } from "@/components/PinEntryDialog";
+import { usePlatformMinimums } from "@/hooks/usePlatformMinimums";
 
 interface WithdrawalButtonProps {
   chamaId?: string;
@@ -35,6 +36,7 @@ export const WithdrawalButton = ({
   onSuccess 
 }: WithdrawalButtonProps) => {
   const navigate = useNavigate();
+  const { minWithdrawal } = usePlatformMinimums();
   const [isOpen, setIsOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [customAmount, setCustomAmount] = useState("");
@@ -49,6 +51,11 @@ export const WithdrawalButton = ({
 
   // For campaigns and organizations, allow custom amount; for chamas, use full balance
   const allowCustomAmount = !chamaId && (!!mchangoId || !!organizationId);
+  const minAmount = chamaId
+    ? minWithdrawal.chama
+    : (mchangoId || organizationId)
+      ? minWithdrawal.mchango
+      : minWithdrawal.chama;
 
   useEffect(() => {
     if (isOpen) {
@@ -194,6 +201,15 @@ export const WithdrawalButton = ({
       toast({
         title: "No Funds Available",
         description: "There are no funds available to withdraw",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (withdrawAmount < minAmount) {
+      toast({
+        title: "Below Minimum",
+        description: `Minimum withdrawal is KES ${minAmount.toLocaleString()}`,
         variant: "destructive",
       });
       return;
@@ -433,12 +449,18 @@ export const WithdrawalButton = ({
                 <Input
                   id="withdraw-amount"
                   type="number"
-                  min="1"
+                  min={minAmount}
                   max={totalAvailable}
                   value={customAmount}
                   onChange={(e) => setCustomAmount(e.target.value)}
                   placeholder={`Enter amount (max ${totalAvailable.toLocaleString()})`}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Minimum withdrawal: KES {minAmount.toLocaleString()}
+                </p>
+                {customAmount && Number(customAmount) > 0 && Number(customAmount) < minAmount && (
+                  <p className="text-xs text-destructive">Amount is below the minimum withdrawal of KES {minAmount.toLocaleString()}</p>
+                )}
                 {customAmount && Number(customAmount) > totalAvailable && (
                   <p className="text-xs text-destructive">Amount exceeds available balance</p>
                 )}

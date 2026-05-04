@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
+import { usePlatformMinimums } from "@/hooks/usePlatformMinimums";
 
 const DAY_OPTIONS = Array.from({ length: 28 }, (_, i) => i + 1);
 
@@ -24,6 +25,7 @@ const getOrdinalSuffix = (n: number) => {
 
 const ChamaCreate = () => {
   const navigate = useNavigate();
+  const { minChamaContribution } = usePlatformMinimums();
   const [isLoading, setIsLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [frequency, setFrequency] = useState<string>("monthly");
@@ -256,11 +258,14 @@ const ChamaCreate = () => {
                     id="contribution_amount"
                     name="contribution_amount"
                     type="number"
-                    placeholder="5000"
-                    min="100"
+                    placeholder={String(minChamaContribution)}
+                    min={minChamaContribution}
                     required
                     disabled={kycStatus !== "approved"}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Minimum: KES {minChamaContribution.toLocaleString()}
+                  </p>
                 </div>
 
                 <div className="space-y-2">

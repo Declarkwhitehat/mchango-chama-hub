@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Save, Percent, Shield, BadgeCheck } from "lucide-react";
+import { Loader2, Lock, Save, Percent, Shield, BadgeCheck, Coins } from "lucide-react";
 
 const SUPER_ADMIN_CODE = "D3E9C0L1A3R9K";
 
@@ -27,6 +27,10 @@ const AdminCommissionConfig = () => {
   ]);
   const [verificationFee, setVerificationFee] = useState(200);
   const [accountVerificationFee, setAccountVerificationFee] = useState(1500);
+  const [minChamaContribution, setMinChamaContribution] = useState(100);
+  const [minWithdrawalChama, setMinWithdrawalChama] = useState(100);
+  const [minWithdrawalMchango, setMinWithdrawalMchango] = useState(100);
+  const [minWithdrawalWelfare, setMinWithdrawalWelfare] = useState(100);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -39,7 +43,13 @@ const AdminCommissionConfig = () => {
 
   const fetchRates = async () => {
     try {
-      const allKeys = [...rates.map(r => r.key), "verification_fee", "user_verification_fee"];
+      const minimumKeys = [
+        "min_chama_contribution",
+        "min_withdrawal_chama",
+        "min_withdrawal_mchango",
+        "min_withdrawal_welfare",
+      ];
+      const allKeys = [...rates.map(r => r.key), "verification_fee", "user_verification_fee", ...minimumKeys];
       const { data, error } = await supabase
         .from("platform_settings")
         .select("setting_key, setting_value")
@@ -67,6 +77,19 @@ const AdminCommissionConfig = () => {
           const val = acctFee.setting_value as { amount?: number };
           setAccountVerificationFee(val.amount || 1500);
         }
+
+        const readAmount = (key: string, fallback: number) => {
+          const row = data.find((d: any) => d.setting_key === key);
+          if (row && typeof row.setting_value === 'object' && row.setting_value !== null) {
+            const v = row.setting_value as { amount?: number };
+            return Number.isFinite(v.amount) ? Number(v.amount) : fallback;
+          }
+          return fallback;
+        };
+        setMinChamaContribution(readAmount("min_chama_contribution", 100));
+        setMinWithdrawalChama(readAmount("min_withdrawal_chama", 100));
+        setMinWithdrawalMchango(readAmount("min_withdrawal_mchango", 100));
+        setMinWithdrawalWelfare(readAmount("min_withdrawal_welfare", 100));
       }
     } catch (err: any) {
       console.error(err);
@@ -139,6 +162,19 @@ const AdminCommissionConfig = () => {
         }, { onConflict: "setting_key" });
       if (acctFeeError) throw acctFeeError;
 
+      // Upsert minimum amount settings
+      const minimumUpserts = [
+        { setting_key: "min_chama_contribution", setting_value: { amount: minChamaContribution } },
+        { setting_key: "min_withdrawal_chama", setting_value: { amount: minWithdrawalChama } },
+        { setting_key: "min_withdrawal_mchango", setting_value: { amount: minWithdrawalMchango } },
+        { setting_key: "min_withdrawal_welfare", setting_value: { amount: minWithdrawalWelfare } },
+      ].map(row => ({ ...row, updated_by: user?.id || null }));
+
+      const { error: minError } = await supabase
+        .from("platform_settings")
+        .upsert(minimumUpserts, { onConflict: "setting_key" });
+      if (minError) throw minError;
+
       // Log audit
       await supabase.from("audit_logs").insert({
         table_name: "platform_settings",
@@ -148,6 +184,10 @@ const AdminCommissionConfig = () => {
           ...Object.fromEntries(rates.map(r => [r.key, r.rate / 100])),
           verification_fee: verificationFee,
           user_verification_fee: accountVerificationFee,
+          min_chama_contribution: minChamaContribution,
+          min_withdrawal_chama: minWithdrawalChama,
+          min_withdrawal_mchango: minWithdrawalMchango,
+          min_withdrawal_welfare: minWithdrawalWelfare,
         },
       });
 
@@ -276,6 +316,47 @@ const AdminCommissionConfig = () => {
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Coins className="h-4 w-4 text-amber-500" /> Minimum Amounts
+            </CardTitle>
+            <CardDescription>
+              Floors used across the platform. Lower the chama contribution minimum during testing; raise it for production.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[
+              { label: "Chama contribution minimum", desc: "Lowest contribution amount allowed when creating a chama", value: minChamaContribution, setter: setMinChamaContribution },
+              { label: "Chama withdrawal minimum", desc: "Lowest payout amount chamas can request", value: minWithdrawalChama, setter: setMinWithdrawalChama },
+              { label: "Campaign (mchango) withdrawal minimum", desc: "Lowest withdrawal for mchango campaigns and organizations", value: minWithdrawalMchango, setter: setMinWithdrawalMchango },
+              { label: "Welfare withdrawal minimum", desc: "Lowest withdrawal for welfare groups", value: minWithdrawalWelfare, setter: setMinWithdrawalWelfare },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label className="font-semibold">{row.label}</Label>
+                  <p className="text-xs text-muted-foreground">{row.desc}</p>
+                </div>
+                <div className="flex items-center gap-2 w-36">
+                  <span className="text-sm font-medium text-muted-foreground">KSh</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="1000000"
+                    step="10"
+                    value={row.value}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value);
+                      if (!isNaN(n) && n >= 1 && n <= 1000000) row.setter(n);
+                    }}
+                    className="text-right font-mono"
+                  />
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 

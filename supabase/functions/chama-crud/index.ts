@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { getPlatformMinimums } from "../_shared/getPlatformMinimums.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -424,6 +425,19 @@ serve(async (req) => {
         });
       }
 
+      // Enforce admin-configured minimum chama contribution
+      const platformMins = await getPlatformMinimums();
+      const contributionAmount = Number(body.contribution_amount);
+      if (!Number.isFinite(contributionAmount) || contributionAmount < platformMins.minChamaContribution) {
+        return new Response(JSON.stringify({
+          error: `Contribution amount must be at least KES ${platformMins.minChamaContribution}`,
+          minimum: platformMins.minChamaContribution,
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       // Validate constraints
       const minMembers = body.min_members || 2;
       const maxMembers = body.max_members || 50;
@@ -573,6 +587,22 @@ serve(async (req) => {
             filteredBody[key] = body[key];
           }
         }
+
+        // Enforce minimum if contribution_amount is being changed
+        if (filteredBody.contribution_amount !== undefined) {
+          const platformMins = await getPlatformMinimums();
+          const newAmt = Number(filteredBody.contribution_amount);
+          if (!Number.isFinite(newAmt) || newAmt < platformMins.minChamaContribution) {
+            return new Response(JSON.stringify({
+              error: `Contribution amount must be at least KES ${platformMins.minChamaContribution}`,
+              minimum: platformMins.minChamaContribution,
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
         filteredBody.updated_at = new Date().toISOString();
 
         const { data, error } = await supabaseClient
