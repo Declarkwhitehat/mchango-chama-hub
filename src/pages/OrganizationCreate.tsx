@@ -17,33 +17,13 @@ import { KycGate } from "@/components/KycGate";
 const OrganizationCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [kycStatus, setKycStatus] = useState<string | null>(null);
+  // KYC status check is delegated to <KycGate /> below — no local fetch needed.
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    const checkKycStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("kyc_status")
-        .eq("id", user.id)
-        .single();
-
-      setKycStatus(profile?.kyc_status || null);
-    };
-
-    checkKycStatus();
-  }, [navigate]);
 
   const handleImageChange = (type: 'logo' | 'cover') => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
