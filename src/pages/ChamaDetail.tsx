@@ -848,7 +848,7 @@ const ChamaDetail = () => {
             </TabsContent>
 
 
-            {isManager && (
+            {isManager && !isPendingStatus && (
               <TabsContent value="payments">
                 <PaymentStatusManager
                   chamaId={chama.id}
