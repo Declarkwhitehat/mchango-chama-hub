@@ -319,6 +319,47 @@ const AdminCommissionConfig = () => {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Coins className="h-4 w-4 text-amber-500" /> Minimum Amounts
+            </CardTitle>
+            <CardDescription>
+              Floors used across the platform. Lower the chama contribution minimum during testing; raise it for production.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[
+              { label: "Chama contribution minimum", desc: "Lowest contribution amount allowed when creating a chama", value: minChamaContribution, setter: setMinChamaContribution },
+              { label: "Chama withdrawal minimum", desc: "Lowest payout amount chamas can request", value: minWithdrawalChama, setter: setMinWithdrawalChama },
+              { label: "Campaign (mchango) withdrawal minimum", desc: "Lowest withdrawal for mchango campaigns and organizations", value: minWithdrawalMchango, setter: setMinWithdrawalMchango },
+              { label: "Welfare withdrawal minimum", desc: "Lowest withdrawal for welfare groups", value: minWithdrawalWelfare, setter: setMinWithdrawalWelfare },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label className="font-semibold">{row.label}</Label>
+                  <p className="text-xs text-muted-foreground">{row.desc}</p>
+                </div>
+                <div className="flex items-center gap-2 w-36">
+                  <span className="text-sm font-medium text-muted-foreground">KSh</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="1000000"
+                    step="10"
+                    value={row.value}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value);
+                      if (!isNaN(n) && n >= 1 && n <= 1000000) row.setter(n);
+                    }}
+                    className="text-right font-mono"
+                  />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
         <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Save All Changes
