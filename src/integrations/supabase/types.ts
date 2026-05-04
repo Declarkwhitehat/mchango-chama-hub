@@ -73,6 +73,7 @@ export type Database = {
           every_n_days_count: number | null
           group_code: string | null
           id: string
+          is_defining_cycle: boolean
           is_public: boolean | null
           is_verified: boolean
           last_cycle_completed_at: string | null
@@ -82,6 +83,9 @@ export type Database = {
           monthly_contribution_day_2: number | null
           name: string
           payout_order: string | null
+          restart_opened_at: string | null
+          restart_window_ends_at: string | null
+          restart_window_hours: number
           slug: string
           start_date: string | null
           status: Database["public"]["Enums"]["chama_status"]
@@ -105,6 +109,7 @@ export type Database = {
           every_n_days_count?: number | null
           group_code?: string | null
           id?: string
+          is_defining_cycle?: boolean
           is_public?: boolean | null
           is_verified?: boolean
           last_cycle_completed_at?: string | null
@@ -114,6 +119,9 @@ export type Database = {
           monthly_contribution_day_2?: number | null
           name: string
           payout_order?: string | null
+          restart_opened_at?: string | null
+          restart_window_ends_at?: string | null
+          restart_window_hours?: number
           slug: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["chama_status"]
@@ -137,6 +145,7 @@ export type Database = {
           every_n_days_count?: number | null
           group_code?: string | null
           id?: string
+          is_defining_cycle?: boolean
           is_public?: boolean | null
           is_verified?: boolean
           last_cycle_completed_at?: string | null
@@ -146,6 +155,9 @@ export type Database = {
           monthly_contribution_day_2?: number | null
           name?: string
           payout_order?: string | null
+          restart_opened_at?: string | null
+          restart_window_ends_at?: string | null
+          restart_window_hours?: number
           slug?: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["chama_status"]
@@ -494,6 +506,8 @@ export type Database = {
           original_order_index: number | null
           payout_deferred_count: number | null
           position_swapped_at: string | null
+          received_payout_at: string | null
+          received_payout_this_chama: boolean
           removal_reason: string | null
           removed_at: string | null
           requires_admin_verification: boolean | null
@@ -528,6 +542,8 @@ export type Database = {
           original_order_index?: number | null
           payout_deferred_count?: number | null
           position_swapped_at?: string | null
+          received_payout_at?: string | null
+          received_payout_this_chama?: boolean
           removal_reason?: string | null
           removed_at?: string | null
           requires_admin_verification?: boolean | null
@@ -562,6 +578,8 @@ export type Database = {
           original_order_index?: number | null
           payout_deferred_count?: number | null
           position_swapped_at?: string | null
+          received_payout_at?: string | null
+          received_payout_this_chama?: boolean
           removal_reason?: string | null
           removed_at?: string | null
           requires_admin_verification?: boolean | null
@@ -2228,6 +2246,7 @@ export type Database = {
           email: string
           email_verified: boolean | null
           full_name: string
+          has_payout_default: boolean
           id: string
           id_back_url: string | null
           id_front_url: string | null
@@ -2241,6 +2260,10 @@ export type Database = {
           last_login_at: string | null
           last_login_ip: unknown
           payment_details_completed: boolean | null
+          payout_default_cleared_at: string | null
+          payout_default_cleared_by: string | null
+          payout_default_reason: string | null
+          payout_default_set_at: string | null
           phone: string | null
           phone_otp_verified: boolean | null
           phone_verified: boolean | null
@@ -2256,6 +2279,7 @@ export type Database = {
           email: string
           email_verified?: boolean | null
           full_name: string
+          has_payout_default?: boolean
           id: string
           id_back_url?: string | null
           id_front_url?: string | null
@@ -2269,6 +2293,10 @@ export type Database = {
           last_login_at?: string | null
           last_login_ip?: unknown
           payment_details_completed?: boolean | null
+          payout_default_cleared_at?: string | null
+          payout_default_cleared_by?: string | null
+          payout_default_reason?: string | null
+          payout_default_set_at?: string | null
           phone?: string | null
           phone_otp_verified?: boolean | null
           phone_verified?: boolean | null
@@ -2284,6 +2312,7 @@ export type Database = {
           email?: string
           email_verified?: boolean | null
           full_name?: string
+          has_payout_default?: boolean
           id?: string
           id_back_url?: string | null
           id_front_url?: string | null
@@ -2297,6 +2326,10 @@ export type Database = {
           last_login_at?: string | null
           last_login_ip?: unknown
           payment_details_completed?: boolean | null
+          payout_default_cleared_at?: string | null
+          payout_default_cleared_by?: string | null
+          payout_default_reason?: string | null
+          payout_default_set_at?: string | null
           phone?: string | null
           phone_otp_verified?: boolean | null
           phone_verified?: boolean | null
@@ -3557,6 +3590,7 @@ export type Database = {
       }
     }
     Functions: {
+      admin_clear_payout_default: { Args: { p_user_id: string }; Returns: Json }
       calculate_available_loan_pool: {
         Args: { p_group_id: string }
         Returns: number
