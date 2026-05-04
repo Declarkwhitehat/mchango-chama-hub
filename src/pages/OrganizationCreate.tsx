@@ -35,7 +35,8 @@ const OrganizationCreate = () => {
     }
 
     try {
-      const compressed = await compressImage(file);
+      // Aggressive compression for org logo/cover (display assets, not identity docs)
+      const compressed = await compressImage(file, { maxBytes: 100 * 1024 });
       if (file.size !== compressed.size) {
         toast.success(`Image optimized: ${formatFileSize(file.size)} → ${formatFileSize(compressed.size)}`);
       }
