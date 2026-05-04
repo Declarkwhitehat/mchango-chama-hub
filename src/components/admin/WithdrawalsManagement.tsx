@@ -68,8 +68,8 @@ export const WithdrawalsManagement = () => {
 
   useEffect(() => {
     loadWithdrawals();
-    // Poll every 30s instead of realtime subscription
-    const interval = setInterval(() => loadWithdrawals(true), 30000);
+    // Poll every 3 hours; admins use the manual Refresh button for on-demand updates
+    const interval = setInterval(() => loadWithdrawals(true), 3 * 60 * 60 * 1000);
     return () => { clearInterval(interval); };
   }, []);
 
