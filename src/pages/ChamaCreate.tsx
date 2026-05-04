@@ -179,7 +179,7 @@ const ChamaCreate = () => {
                   name="name"
                   placeholder="e.g., Women Empowerment Group"
                   required
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -191,7 +191,7 @@ const ChamaCreate = () => {
                   placeholder="Describe the purpose and goals of your group..."
                   rows={4}
                   required
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -205,7 +205,7 @@ const ChamaCreate = () => {
                     placeholder={String(minChamaContribution)}
                     min={minChamaContribution}
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                   <p className="text-xs text-muted-foreground">
                     Minimum: KES {minChamaContribution.toLocaleString()}
@@ -217,7 +217,7 @@ const ChamaCreate = () => {
                   <Select
                     value={frequency}
                     onValueChange={handleFrequencyChange}
-                    disabled={kycStatus !== "approved"}
+
                   >
                     <SelectTrigger id="contribution_frequency">
                       <SelectValue placeholder="Select frequency" />
@@ -239,7 +239,7 @@ const ChamaCreate = () => {
                   <Select
                     value={monthlyDay}
                     onValueChange={setMonthlyDay}
-                    disabled={kycStatus !== "approved"}
+
                   >
                     <SelectTrigger id="monthly_day">
                       <SelectValue placeholder="Select day" />
@@ -265,7 +265,7 @@ const ChamaCreate = () => {
                     <Select
                       value={monthlyDay}
                       onValueChange={setMonthlyDay}
-                      disabled={kycStatus !== "approved"}
+
                     >
                       <SelectTrigger id="monthly_day_1">
                         <SelectValue placeholder="Select day" />
@@ -284,7 +284,7 @@ const ChamaCreate = () => {
                     <Select
                       value={monthlyDay2}
                       onValueChange={setMonthlyDay2}
-                      disabled={kycStatus !== "approved"}
+
                     >
                       <SelectTrigger id="monthly_day_2">
                         <SelectValue placeholder="Select day" />
@@ -314,7 +314,7 @@ const ChamaCreate = () => {
                     placeholder="e.g., 7 for weekly, 14 for bi-weekly"
                     min="1"
                     required={showEveryNDays}
-                    disabled={kycStatus !== "approved"}
+
                   />
                 </div>
               )}
@@ -329,7 +329,7 @@ const ChamaCreate = () => {
                     placeholder="2"
                     defaultValue="2"
                     min="2"
-                    disabled={kycStatus !== "approved"}
+
                   />
                   <p className="text-xs text-muted-foreground">Minimum 2 members</p>
                 </div>
@@ -344,7 +344,7 @@ const ChamaCreate = () => {
                     min="2"
                     max="100"
                     required
-                    disabled={kycStatus !== "approved"}
+
                   />
                   <p className="text-xs text-muted-foreground">Maximum 100 members</p>
                 </div>
@@ -355,7 +355,7 @@ const ChamaCreate = () => {
                 <Select
                   name="is_public"
                   defaultValue="true"
-                  disabled={kycStatus !== "approved"}
+
                 >
                   <SelectTrigger id="is_public">
                     <SelectValue placeholder="Select visibility" />
@@ -378,7 +378,7 @@ const ChamaCreate = () => {
                   name="whatsapp_link"
                   type="url"
                   placeholder="https://chat.whatsapp.com/..."
-                  disabled={kycStatus !== "approved"}
+
                 />
               </div>
 
@@ -387,7 +387,7 @@ const ChamaCreate = () => {
                   type="submit"
                   variant="default"
                   className="w-full"
-                  disabled={isLoading || isProcessing || kycStatus !== "approved"}
+                  disabled={isLoading || isProcessing}
                 >
                   {isLoading ? "Creating..." : "Create Chama Group"}
                 </Button>
