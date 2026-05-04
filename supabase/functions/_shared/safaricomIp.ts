@@ -1,8 +1,13 @@
 // Safaricom official M-Pesa callback IP ranges.
 // Used by payment-stk-callback and b2c-callback to reject spoofed callbacks.
 const SAFARICOM_CIDR_RANGES: ReadonlyArray<readonly [string, number]> = [
+  // Official Safaricom Daraja callback ranges (per Safaricom documentation)
   ['196.201.214.0', 24],
   ['196.201.216.0', 24],
+  ['196.201.213.0', 24],
+  ['196.201.212.0', 24],
+  ['196.201.217.0', 24],
+  ['196.201.215.0', 24],
 ];
 
 /** Convert dotted-quad IPv4 → 32-bit unsigned integer, or null if invalid. */
