@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle, X, Youtube, ImagePlus, Building2, Globe, MapPin, Phone, Mail } from "lucide-react";
 import { compressImage, formatFileSize } from "@/utils/imageCompression";
+import { KycGate } from "@/components/KycGate";
 
 const OrganizationCreate = () => {
   const navigate = useNavigate();
