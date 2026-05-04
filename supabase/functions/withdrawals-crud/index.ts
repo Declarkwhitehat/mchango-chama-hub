@@ -54,14 +54,13 @@ serve(async (req) => {
     if (req.method === 'POST') {
       const body = await req.json();
       
-      // Validate input with Zod
+      // Validate input with Zod (lower floor — entity-specific minimum is enforced below)
       const withdrawalSchema = z.object({
         chama_id: z.string().uuid().optional(),
         mchango_id: z.string().uuid().optional(),
         organization_id: z.string().uuid().optional(),
         amount: z.number()
           .positive('Amount must be positive')
-          .min(10, 'Minimum withdrawal is KES 10')
           .max(10000000, 'Maximum withdrawal is KES 10M')
           .multipleOf(0.01, 'Amount must have max 2 decimal places'),
         notes: z.string()
@@ -85,6 +84,22 @@ serve(async (req) => {
       }
       
       const { chama_id, mchango_id, organization_id, amount, notes } = body;
+
+      // Enforce admin-configured per-entity minimum withdrawal
+      const { getPlatformMinimums, withdrawalMinFor } = await import('../_shared/getPlatformMinimums.ts');
+      const platformMins = await getPlatformMinimums();
+      const { kind: entityKind, min: minWithdrawal } = withdrawalMinFor(platformMins, { chama_id, mchango_id, organization_id });
+      if (amount < minWithdrawal) {
+        return new Response(JSON.stringify({
+          error: `Minimum ${entityKind} withdrawal is KES ${minWithdrawal.toLocaleString()}`,
+          minimum: minWithdrawal,
+          requested: amount,
+          entity_kind: entityKind,
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       console.log('Creating withdrawal request:', body);
       
