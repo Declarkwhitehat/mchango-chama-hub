@@ -1,0 +1,1 @@
+DELETE FROM public.rate_limit_attempts WHERE action IN ('forgot_password','send_otp') AND identifier_type='ip';

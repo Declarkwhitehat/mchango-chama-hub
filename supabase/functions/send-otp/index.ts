@@ -164,7 +164,12 @@ serve(async (req) => {
     }
 
     const clientIP = getClientIP(req);
-    const ipRateLimit = await checkRateLimit(supabase, clientIP, 'ip', 'forgot_password');
+    // Use a dedicated, lenient IP bucket for OTP sending to avoid sharing with
+    // the strict forgot_password limit (which locks shared/NAT IPs for hours).
+    const ipAction = purpose === 'password_reset' ? 'forgot_password' : 'send_otp_ip';
+    const ipWindowMs = purpose === 'password_reset' ? 4 * 60 * 60 * 1000 : 60 * 60 * 1000; // 1h for signup
+    const ipMaxAttempts = purpose === 'password_reset' ? 3 : 20;                            // 20/h for signup
+    const ipRateLimit = await checkRateLimit(supabase, clientIP, 'ip', ipAction, ipWindowMs, ipMaxAttempts);
     if (!ipRateLimit.allowed) {
       return new Response(
         JSON.stringify({
