@@ -80,12 +80,20 @@ const REVENUE_TX_TYPES = new Set([
 const isRevenueEntry = (e: { transaction_type?: string | null }) =>
   REVENUE_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
 
-// Map company_earnings.source → dashboard breakdown bucket key
+// Map company_earnings.source → dashboard breakdown bucket key.
+// Lookups are case-insensitive (see earningsBucketFor) so historical
+// camelCase sources like 'accountVerificationFee' map correctly.
 const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
-  VERIFICATION_FEE: "verification_fee",
-  LOAN_FEES: "loan_fees",
-  WITHDRAWAL_FEES: "withdrawal_fees",
-  OTHER: "other",
+  verification_fee: "verification_fee",
+  accountverificationfee: "verification_fee",
+  account_verification_fee: "verification_fee",
+  loan_fees: "loan_fees",
+  withdrawal_fees: "withdrawal_fees",
+  other: "other",
+};
+const earningsBucketFor = (source: string) => {
+  const key = String(source || "").toLowerCase().replace(/[\s-]/g, "_");
+  return EARNINGS_SOURCE_TO_BUCKET[key] || EARNINGS_SOURCE_TO_BUCKET[key.replace(/_/g, "")] || "other";
 };
 
 interface EarningsEntry {
@@ -287,7 +295,7 @@ export function RevenueDashboard() {
     // Standalone earnings (NOT mirrored in ledger) get their own bucket
     earnings.forEach(e => {
       if (LEDGER_DUPLICATED_EARNINGS.has(e.source)) return;
-      const bucket = EARNINGS_SOURCE_TO_BUCKET[e.source] || "other";
+      const bucket = earningsBucketFor(e.source);
       if (!map[bucket]) map[bucket] = { gross: 0, commission: 0, count: 0 };
       const amt = Number(e.amount);
       map[bucket].gross += amt;        // for fees, gross == commission (100% to platform)
