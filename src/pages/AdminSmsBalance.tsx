@@ -150,11 +150,11 @@ export default function AdminSmsBalance() {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Refresh state</p>
-                <p className="font-medium">{refreshing ? "Refreshing…" : "Watching live"}</p>
+                <p className="font-medium">{refreshing ? "Refreshing…" : "Idle (manual refresh)"}</p>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Keep this page open during campaigns or heavy SMS usage to watch the credit reduce in near real time.
+              The balance is fetched only when you tap “Refresh now” to avoid unnecessary provider calls.
             </p>
           </CardContent>
         </Card>
