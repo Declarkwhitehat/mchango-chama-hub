@@ -295,7 +295,7 @@ export function RevenueDashboard() {
     // Standalone earnings (NOT mirrored in ledger) get their own bucket
     earnings.forEach(e => {
       if (LEDGER_DUPLICATED_EARNINGS.has(e.source)) return;
-      const bucket = EARNINGS_SOURCE_TO_BUCKET[e.source] || "other";
+      const bucket = earningsBucketFor(e.source);
       if (!map[bucket]) map[bucket] = { gross: 0, commission: 0, count: 0 };
       const amt = Number(e.amount);
       map[bucket].gross += amt;        // for fees, gross == commission (100% to platform)
