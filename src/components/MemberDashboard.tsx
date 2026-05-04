@@ -198,13 +198,30 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         </Card>
       )}
 
-      {/* Cycle Payment Status — the consolidated payment view */}
-      <CyclePaymentStatus 
-        chamaId={chamaId} 
-        frequency={chama.contribution_frequency}
-        chamaStartDate={chama.start_date}
-        onPayNow={onPayNow}
-      />
+      {/* Cycle Payment Status — only when chama has officially started */}
+      {isPendingStart ? (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold text-primary">Chama hasn't started yet</p>
+                <p className="text-sm text-muted-foreground">
+                  No contributions are due until the manager officially starts this chama.
+                  Once started, you'll have until <strong>10:00 PM Kenya time the next day</strong> to make your first payment.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <CyclePaymentStatus
+          chamaId={chamaId}
+          frequency={chama.contribution_frequency}
+          chamaStartDate={chama.start_date}
+          onPayNow={onPayNow}
+        />
+      )}
 
       {/* Member ID */}
       <CopyableUniqueId uniqueId={member.member_code} label="Member ID (Account No.)" />
