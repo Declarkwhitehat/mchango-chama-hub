@@ -14,7 +14,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { 
   DollarSign, TrendingUp, TrendingDown, Hash, BarChart3, 
   Download, FileText, CalendarIcon, Loader2, Search, 
-  ArrowUpRight, ArrowDownRight, X
+  ArrowUpRight, ArrowDownRight, X, AlertTriangle, CheckCircle2
 } from "lucide-react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subWeeks, subMonths, subYears, eachDayOfInterval, eachMonthOfInterval, eachHourOfInterval, isWithinInterval } from "date-fns";
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -45,6 +45,10 @@ const SOURCE_COLORS: Record<string, string> = {
   mchango: "hsl(340, 70%, 55%)",
   organization: "hsl(270, 60%, 55%)",
   welfare: "hsl(150, 60%, 45%)",
+  verification_fee: "hsl(40, 90%, 50%)",
+  loan_fees: "hsl(180, 60%, 45%)",
+  withdrawal_fees: "hsl(20, 70%, 50%)",
+  other: "hsl(0, 0%, 55%)",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -52,6 +56,23 @@ const SOURCE_LABELS: Record<string, string> = {
   mchango: "Mchango",
   organization: "Organization",
   welfare: "Welfare",
+  verification_fee: "Verification Fees",
+  loan_fees: "Loan Fees",
+  withdrawal_fees: "Withdrawal Fees",
+  other: "Other",
+};
+
+// Earnings sources whose commission is ALREADY recorded in financial_ledger
+// (they were inserted as paired rows by contributions-crud). Excluded from
+// the dashboard total to prevent double-counting.
+const LEDGER_DUPLICATED_EARNINGS = new Set(["COMMISSION"]);
+
+// Map company_earnings.source → dashboard breakdown bucket key
+const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
+  VERIFICATION_FEE: "verification_fee",
+  LOAN_FEES: "loan_fees",
+  WITHDRAWAL_FEES: "withdrawal_fees",
+  OTHER: "other",
 };
 
 interface EarningsEntry {
@@ -167,20 +188,25 @@ export function RevenueDashboard() {
     load();
   }, [from, to, prevFrom, prevTo, sourceFilter, fetchAllEntries, fetchEarnings]);
 
+  // Sum of company_earnings rows that are NOT already mirrored in financial_ledger
+  const standaloneEarningsSum = (rows: EarningsEntry[]) =>
+    rows.reduce((s, e) => LEDGER_DUPLICATED_EARNINGS.has(e.source) ? s : s + Number(e.amount), 0);
+
   // KPI calculations
   const kpis = useMemo(() => {
     const commissionRevenue = entries.reduce((s, e) => s + Number(e.commission_amount), 0);
-    const feesRevenue = earnings.reduce((s, e) => s + Number(e.amount), 0);
+    const feesRevenue = standaloneEarningsSum(earnings);
     const totalRevenue = commissionRevenue + feesRevenue;
     const totalGross = entries.reduce((s, e) => s + Number(e.gross_amount), 0);
-    const count = entries.length + earnings.length;
+    const standaloneEarningsCount = earnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
+    const count = entries.length + standaloneEarningsCount;
     const avgCommission = count > 0 ? totalRevenue / count : 0;
 
     const prevCommissionRevenue = prevEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
-    const prevFeesRevenue = prevEarnings.reduce((s, e) => s + Number(e.amount), 0);
+    const prevFeesRevenue = standaloneEarningsSum(prevEarnings);
     const prevRevenue = prevCommissionRevenue + prevFeesRevenue;
     const prevGross = prevEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
-    const prevCount = prevEntries.length + prevEarnings.length;
+    const prevCount = prevEntries.length + prevEarnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
     const prevAvg = prevCount > 0 ? prevRevenue / prevCount : 0;
 
     const pctChange = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev) * 100;
@@ -224,15 +250,31 @@ export function RevenueDashboard() {
     });
   }, [entries, period, from, to]);
 
-  // Pie data - source breakdown
+  // Source breakdown — combines ledger entries (per source_type) with
+  // standalone company_earnings rows (verification fees, loan fees, etc.).
+  // The sum of all rows must equal kpis.totalRevenue.
   const sourceBreakdown = useMemo(() => {
     const map: Record<string, { gross: number; commission: number; count: number }> = {};
+
+    // Ledger contributes commission per source_type (chama / mchango / organization / welfare)
     entries.forEach(e => {
       if (!map[e.source_type]) map[e.source_type] = { gross: 0, commission: 0, count: 0 };
       map[e.source_type].gross += Number(e.gross_amount);
       map[e.source_type].commission += Number(e.commission_amount);
       map[e.source_type].count += 1;
     });
+
+    // Standalone earnings (NOT mirrored in ledger) get their own bucket
+    earnings.forEach(e => {
+      if (LEDGER_DUPLICATED_EARNINGS.has(e.source)) return;
+      const bucket = EARNINGS_SOURCE_TO_BUCKET[e.source] || "other";
+      if (!map[bucket]) map[bucket] = { gross: 0, commission: 0, count: 0 };
+      const amt = Number(e.amount);
+      map[bucket].gross += amt;        // for fees, gross == commission (100% to platform)
+      map[bucket].commission += amt;
+      map[bucket].count += 1;
+    });
+
     const total = kpis.totalRevenue || 1;
     return Object.entries(map).map(([source, v]) => ({
       source,
@@ -242,7 +284,18 @@ export function RevenueDashboard() {
       avgRate: v.gross > 0 ? (v.commission / v.gross) * 100 : 0,
       color: SOURCE_COLORS[source] || "hsl(0,0%,60%)",
     }));
-  }, [entries, kpis.totalRevenue]);
+  }, [entries, earnings, kpis.totalRevenue]);
+
+  // Reconciliation: sum of breakdown rows must equal totalRevenue from KPI
+  const reconciliation = useMemo(() => {
+    const breakdownSum = sourceBreakdown.reduce((s, r) => s + r.commission, 0);
+    const diff = Math.abs(breakdownSum - kpis.totalRevenue);
+    return {
+      breakdownSum,
+      matches: diff < 0.01,
+      diff,
+    };
+  }, [sourceBreakdown, kpis.totalRevenue]);
 
   // Filtered ledger for table
   const filteredEntries = useMemo(() => {
@@ -549,8 +602,19 @@ export function RevenueDashboard() {
 
         {/* Breakdown table */}
         <Card className="lg:col-span-2">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Source Breakdown</CardTitle>
+            {!loading && sourceBreakdown.length > 0 && (
+              reconciliation.matches ? (
+                <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-600/40">
+                  <CheckCircle2 className="h-3 w-3" /> Reconciled
+                </Badge>
+              ) : (
+                <Badge variant="destructive" className="gap-1" title={`Breakdown ${fmtKES(reconciliation.breakdownSum)} vs Total ${fmtKES(kpis.totalRevenue)} — diff ${fmtKES(reconciliation.diff)}`}>
+                  <AlertTriangle className="h-3 w-3" /> Mismatch {fmtKES(reconciliation.diff)}
+                </Badge>
+              )
+            )}
           </CardHeader>
           <CardContent>
             <Table>

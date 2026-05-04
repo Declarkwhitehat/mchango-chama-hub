@@ -237,12 +237,24 @@ async function settleDebts(
       debtAllocEntry.payment_gross += penaltyPay;
       debtUpdates.penalty_remaining = debt.penalty_remaining - penaltyPay;
 
-      // Record penalty earning
+      // Record penalty earning (running company total)
       await supabase.from('company_earnings').insert({
-        source: 'chama_late_penalty',
+        source: 'COMMISSION',
         amount: penaltyPay,
         group_id: chamaId,
-        description: `Late penalty cleared for cycle #${cycleNum}`
+        description: `Chama late penalty (commission) — Cycle #${cycleNum}`
+      });
+      // Paired analytics row in financial_ledger
+      await supabase.from('financial_ledger').insert({
+        transaction_type: 'commission',
+        source_type: 'chama',
+        source_id: chamaId,
+        gross_amount: penaltyPay,
+        commission_amount: penaltyPay,
+        net_amount: 0,
+        commission_rate: 1,
+        reference_id: contributionId || null,
+        description: `Late penalty commission — Cycle #${cycleNum}`
       });
 
       allocations.push({
@@ -519,12 +531,24 @@ async function settleDebts(
       description: `Net contribution to Cycle #${cycle.cycle_number}`
     });
 
-    // Record commission
+    // Record commission (running company total)
     await supabase.from('company_earnings').insert({
-      source: 'chama_commission',
+      source: 'COMMISSION',
       amount: commission,
       group_id: chamaId,
-      description: `${isLate ? 'Late' : 'On-time'} contribution commission — Cycle #${cycle.cycle_number}`
+      description: `Chama ${isLate ? 'late' : 'on-time'} commission — Cycle #${cycle.cycle_number}`
+    });
+    // Paired analytics row in financial_ledger
+    await supabase.from('financial_ledger').insert({
+      transaction_type: 'commission',
+      source_type: 'chama',
+      source_id: chamaId,
+      gross_amount: toApply,
+      commission_amount: commission,
+      net_amount: toApply - commission,
+      commission_rate: cycleCommissionRate,
+      reference_id: contributionId || null,
+      description: `Chama ${isLate ? 'late' : 'on-time'} commission — Cycle #${cycle.cycle_number}`
     });
   } else if (remaining > 0) {
     // No active cycle found — try to create payment record if we just need to allocate
@@ -589,12 +613,24 @@ async function settleDebts(
       description: `KES ${overpaymentNet.toFixed(2)} saved to wallet — auto-applied after next payout (no extra commission)`
     });
 
-    // Record commission earning
+    // Record commission earning (running company total)
     await supabase.from('company_earnings').insert({
-      source: 'chama_overpayment_commission',
+      source: 'COMMISSION',
       amount: overpaymentCommission,
       group_id: chamaId,
-      description: `Commission on overpayment — KES ${remaining.toFixed(2)} gross, KES ${overpaymentCommission.toFixed(2)} commission`
+      description: `Chama overpayment commission — KES ${remaining.toFixed(2)} gross, KES ${overpaymentCommission.toFixed(2)} commission`
+    });
+    // Paired analytics row in financial_ledger
+    await supabase.from('financial_ledger').insert({
+      transaction_type: 'commission',
+      source_type: 'chama',
+      source_id: chamaId,
+      gross_amount: remaining,
+      commission_amount: overpaymentCommission,
+      net_amount: overpaymentNet,
+      commission_rate: ONTIME_RATE,
+      reference_id: contributionId || null,
+      description: `Chama overpayment commission — wallet credit ${overpaymentNet.toFixed(2)}`
     });
 
     // Get current active cycle for reference
@@ -676,14 +712,16 @@ async function settleDebts(
       }).eq('id', chamaId);
     }
 
+    // Summary row only — commission is recorded separately in 'commission' rows above
+    // to keep the analytics dashboard's totals consistent (no double-counting).
     await supabase.from('financial_ledger').insert({
-      transaction_type: 'contribution',
+      transaction_type: 'contribution_summary',
       source_type: 'chama',
       source_id: chamaId,
       gross_amount: chamaGross,
-      commission_amount: chamaCommission,
+      commission_amount: 0,
       net_amount: chamaGross - chamaCommission,
-      commission_rate: chamaGross > 0 ? chamaCommission / chamaGross : ONTIME_RATE,
+      commission_rate: 0,
       reference_id: contributionId || null,
       description: `FIFO debt settlement. Debts cleared: ${periodsCleared}. Carry-forward: ${carryForward.toFixed(2)}. Penalty: ${allocations.filter(a => a.type === 'penalty_clearance').reduce((s, a) => s + a.amount, 0).toFixed(2)}`
     });
