@@ -352,13 +352,30 @@ serve(async (req) => {
         });
       }
 
-      // Send detailed payout confirmation SMS
+      // Send tailored payout confirmation SMS
       if (recipientPhone) {
-        const now = new Date();
-        const eatTime = new Date(now.getTime() + 3 * 60 * 60 * 1000); // UTC+3
-        const dateStr = eatTime.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' });
-        const timeStr = eatTime.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true });
-        const successMessage = `✅ Pamojanova Payout Confirmed!\nAmount: KES ${transactionAmount.toFixed(2)}\nRef: ${transactionId}\nFrom: ${sourceType} - ${sourceName}\nDate: ${dateStr} ${timeStr}\n\nSisi tuko pamoja, je wewe?`;
+        // Fetch remaining balance for non-chama sources (after atomic deduction)
+        let remainingBalance: number | null = null;
+        try {
+          if (withdrawal.mchango_id) {
+            const { data } = await supabaseAdmin.from('mchango').select('available_balance').eq('id', withdrawal.mchango_id).maybeSingle();
+            remainingBalance = Number(data?.available_balance ?? 0);
+          } else if (withdrawal.organization_id) {
+            const { data } = await supabaseAdmin.from('organizations').select('available_balance').eq('id', withdrawal.organization_id).maybeSingle();
+            remainingBalance = Number(data?.available_balance ?? 0);
+          } else if (withdrawal.welfare_id) {
+            const { data } = await supabaseAdmin.from('welfares').select('available_balance').eq('id', withdrawal.welfare_id).maybeSingle();
+            remainingBalance = Number(data?.available_balance ?? 0);
+          }
+        } catch (_e) {
+          remainingBalance = null;
+        }
+
+        const amountStr = `KES ${transactionAmount.toFixed(2)}`;
+        const balanceLine = (remainingBalance !== null && !withdrawal.chama_id)
+          ? `\nBalance: KES ${remainingBalance.toFixed(2)}`
+          : '';
+        const successMessage = `Pamojanova: Withdrawal of ${amountStr} from ${sourceType} "${sourceName}" successful. Ref: ${transactionId}.${balanceLine}`;
         await sendSMS(recipientPhone, successMessage);
       }
 
@@ -476,7 +493,7 @@ serve(async (req) => {
           .eq('id', withdrawal.id);
 
         if (recipientPhone) {
-          await sendSMS(recipientPhone, `❌ Your ${sourceType} "${sourceName}" payout of KES ${withdrawal.net_amount?.toFixed(2)} failed after multiple attempts. Error: ${resultDesc}. Please contact support.`);
+          await sendSMS(recipientPhone, `Pamojanova: Withdrawal of KES ${withdrawal.net_amount?.toFixed(2)} from ${sourceType} "${sourceName}" failed. Reason: ${resultDesc}. Please contact support.`);
         }
       } else {
         await supabaseAdmin
@@ -493,7 +510,7 @@ serve(async (req) => {
           .eq('id', withdrawal.id);
 
         if (recipientPhone) {
-          await sendSMS(recipientPhone, `⚠️ Your ${sourceType} "${sourceName}" payout could not be processed. We will retry automatically. If not received within 1 hour, contact support.`);
+          await sendSMS(recipientPhone, `Pamojanova: Withdrawal from ${sourceType} "${sourceName}" is delayed. We will retry automatically. If not received within 1 hour, contact support.`);
         }
       }
     }
