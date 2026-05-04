@@ -1,77 +1,45 @@
-## The Problem (confirmed via DB queries)
+## Goal
 
-Your dashboard shows **Chama Gross KES 3,066.30** but **Commission KES 35.80**. That's only ~1.17% — impossible when the rate is 5%.
+1. Reset the database to a clean testing state — keep only the single admin account (`declark07chacha@gmail.com`) and wipe everything else.
+2. Stop compressing KYC ID photos so they upload at full original quality (matching the user's complaint about compressed images on campaigns/orgs being unclear).
 
-Two distinct bugs are combining:
+---
 
-### Bug 1 — Payouts are being counted as gross revenue
-The `financial_ledger` has 3 chama **payout** rows (KES 190 + 95 + 2,375 = **2,660**) being summed into "gross". Payouts are *outflows* of money already collected — they must never be added to gross collected. Real chama gross from contributions = **KES 406.30**, commission **KES 35.80** (≈8.8%, which is correct given a penalty was charged on one row).
+## Part 1 — Database Wipe
 
-### Bug 2 — The stray .30 (and why fractional shillings appear)
-The ledger row of `gross_amount = 100.30` corresponds to a real M-Pesa payment of **KES 106** (receipt UD67RBWEG4). The settlement engine split it:
-- 100.30 logged as "cycle gross"
-- 5.70 held as carry-forward (excluded from gross)
-- 5.30 commission (5% of the full 106)
+**Preserve:** admin user `d8e34397-ba8c-4e33-b556-34965d4a269d` (auth.users row, profile, user_roles entry, their PIN/security questions so they can still log in), plus configuration tables (`fraud_config`, `platform_settings`).
 
-So the *real* gross was 106, but the ledger stored 100.30 because carry-forward was subtracted from the gross figure while commission was still computed on the full 106. The `gross_amount` column should always equal what the customer actually paid — never an internal accounting fragment.
+**Delete everything else** via a migration (TRUNCATE … CASCADE where safe, or DELETE with admin-preservation filter). Tables to clear:
 
-## The Fix
+- Groups & members: `chama`, `chama_members`, `chama_invite_codes`, `chama_messages`, `chama_member_debts`, `chama_member_removals`, `chama_cycle_deficits`, `chama_cycle_history`, `chama_overpayment_wallet`, `chama_rejoin_requests`, `contribution_cycles`, `contributions`, `member_cycle_payments`, `payout_skips`, `payouts`, `payout_approval_requests`, `member_trust_scores`
+- Welfare: `welfares`, `welfare_members`, `welfare_contributions`, `welfare_contribution_cycles`, `welfare_withdrawal_approvals`, `welfare_executive_changes`, `welfare_leave_requests`
+- Organizations: `organizations`, `organization_donations`
+- Campaigns: `mchango`, `mchango_donations`
+- Financial: `withdrawals`, `transactions`, `financial_ledger`, `company_earnings`, `platform_financial_summary`, `reconciliation_logs`, `settlement_locks`, `payment_methods`
+- Misc: `notifications`, `device_tokens`, `chat_messages`, `customer_callbacks`, `generated_documents`, `group_documents`, `fraud_events`, `audit_logs`, `rate_limit_attempts`, `otp_verifications`, `verification_requests`, `user_verification_requests`, `user_consents`, `user_risk_profiles`
+- All non-admin user data: delete from `auth.users` where id ≠ admin id (cascades via FKs to `profiles`, `user_roles`, `user_pins`, `totp_secrets`, `webauthn_credentials`, `security_questions`, `user_security_answers`).
 
-### 1. RevenueDashboard — exclude payouts from "Gross"
-File: `src/components/admin/RevenueDashboard.tsx`
+**Sequences**: reset `document_serial_seq` and any member-code sequences so test data starts at 1.
 
-In `fetchAllEntries` (lines 135–158) and the source-breakdown reducer (lines 257–273), filter out rows where `transaction_type = 'payout'` for **gross/commission/net** aggregation. Payouts are not revenue events; they should only be visible in the raw transactions table (filterable), never in the Gross/Commission KPIs or the per-source totals.
+**Storage buckets**: ask user if KYC/avatar/group-document storage objects should also be wiped (separate operation; not auto-included).
 
-Approach:
-- Add a constant `REVENUE_TX_TYPES = ['contribution', 'donation']` (i.e. inflow types).
-- Filter `entries` and `prevEntries` by `REVENUE_TX_TYPES` before computing `totalGross`, `totalCommission`, `totalNet`, `grossPct`, `commissionPct`, `netPct`, the timeseries, and the source breakdown.
-- Keep the raw transactions table showing all rows (so payouts are still auditable), but tag them visually so it's obvious they don't count toward gross.
-- Add a small "Payouts (outflow)" stat card so admins still see total payouts processed — clearly separated from revenue.
+## Part 2 — KYC Photo Quality Fix
 
-### 2. contributions-crud — store the real payment amount as gross
-File: `supabase/functions/contributions-crud/index.ts` (around line 695–727)
+File: `src/pages/KYCUpload.tsx`
 
-Currently:
-```ts
-const chamaGross = grossPaymentAmount - carryForward;  // produces 100.30
-```
+Currently both front and back ID photos are run through `compressImage()` from `src/utils/imageCompression.ts`, which lowers quality and resolution. ID photos need full clarity.
 
-Change to:
-```ts
-const chamaGross = grossPaymentAmount;  // the actual KES the user paid (e.g. 106)
-```
+Change: bypass `compressImage` entirely in `KYCUpload.tsx` — store the original `File` directly into `setFrontFile` / `setBackFile` and use the original blob for preview. Keep a sane file-size guard (e.g. reject > 10 MB) and convert HEIC if needed, but no quality reduction.
 
-The ledger's `gross_amount` MUST equal the real M-Pesa amount. Carry-forward is tracked separately on `chama_overpayment_wallet` and `member.carry_forward_credit` — it should not subtract from the recorded gross. Commission is already computed on the full payment, so this restores the invariant: **commission_amount = gross_amount × commission_rate**, always.
+Note: `AccountVerification.tsx` selfie uses Capacitor camera `quality: 80`. Bump to `quality: 100` so selfies are also uncompressed.
 
-Update the description to keep the carry-forward note for transparency:
-```
-FIFO debt settlement. Paid: KES 106. Cleared: 1 period. Carry-forward: 5.70. Penalty: 0.00
-```
+`OrganizationCreate.tsx` and `MchangoCreate.tsx` keep their existing compression (those are public-facing thumbnails — the user only flagged KYC).
 
-### 3. Backfill the existing bad row
-A one-time migration to correct the historical row:
-- Update `financial_ledger` row `abb80138...` from `gross_amount = 100.30` → `106.00`, `net_amount = 95.00` → `100.70`.
-- This brings your historical totals to whole shillings and matches reality.
+---
 
-### 4. Add an integrity check (defensive)
-A new validation trigger on `financial_ledger` INSERT/UPDATE: reject rows where `abs(gross_amount - commission_amount - net_amount) > 0.01` for `transaction_type IN ('contribution','donation')`. Prevents future drift.
+## Confirmations needed before I run the wipe
 
-## Result After Fix
+1. Wipe also clears Storage objects (KYC docs, group documents, mchango images)? Y/N
+2. Confirm the only admin to keep is `declark07chacha@gmail.com` (id `d8e34397…`)? Y/N
 
-For your current data the dashboard will show:
-- **Chama Gross: KES 412.00** (was 3,066.30) — real money collected
-- **Chama Commission: KES 35.80** — unchanged, correct at ~8.7% (one payment had a penalty)
-- **Chama Payouts (outflow): KES 2,660** — shown separately
-- No more fractional shillings.
-
-## Files Touched
-
-- `src/components/admin/RevenueDashboard.tsx` — filter payouts out of revenue aggregations, add payouts stat card
-- `supabase/functions/contributions-crud/index.ts` — record real payment as `gross_amount`
-- `supabase/migrations/<new>.sql` — backfill the one bad row + add validation trigger
-- No changes to commission logic, payment flow, or user-facing payment screens.
-
-## Out of Scope
-
-- Welfare and Mchango ledger sums look mathematically consistent — no changes there.
-- Payout entries themselves remain in the ledger for audit; only their classification in the dashboard changes.
+I'll proceed once you approve. The wipe is irreversible.
