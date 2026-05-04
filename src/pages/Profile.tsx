@@ -175,6 +175,9 @@ const Profile = () => {
                 <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm sm:text-base text-foreground">{profile.phone}</span>
               </div>
+              <p className="text-[11px] sm:text-xs text-muted-foreground italic">
+                Contact support to change these details.
+              </p>
             </div>
             <div className="space-y-1.5 sm:space-y-2">
               <Label className="text-xs sm:text-sm text-muted-foreground">ID Number</Label>
@@ -182,6 +185,9 @@ const Profile = () => {
                 <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm sm:text-base text-foreground">{profile.id_number}</span>
               </div>
+              <p className="text-[11px] sm:text-xs text-muted-foreground italic">
+                Contact support to change these details.
+              </p>
             </div>
           </CardContent>
         </Card>

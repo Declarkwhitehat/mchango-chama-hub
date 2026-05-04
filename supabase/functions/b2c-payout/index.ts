@@ -75,6 +75,44 @@ serve(async (req) => {
       });
     }
 
+    // ═══ CALLER AUTHORIZATION GUARD ═══
+    // Accept either:
+    //  (a) Service-role bearer token (internal callers like retry-failed-payouts), OR
+    //  (b) An authenticated admin user (has_role(uid, 'admin')).
+    const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    let callerUserId: string | null = null;
+    let isServiceRole = false;
+    let isAdmin = false;
+
+    if (serviceKey && bearer && bearer === serviceKey) {
+      isServiceRole = true;
+    } else {
+      const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(bearer);
+      if (!userErr && userData?.user) {
+        callerUserId = userData.user.id;
+        const { data: roleRow } = await supabaseAdmin
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', callerUserId)
+          .eq('role', 'admin')
+          .maybeSingle();
+        isAdmin = Boolean(roleRow);
+      }
+    }
+
+    if (!isServiceRole && !isAdmin) {
+      console.warn('[security] B2C payout denied — caller not authorized', {
+        caller_user_id: callerUserId,
+        withdrawal_id,
+        reason: callerUserId ? 'not_admin' : 'invalid_token',
+      });
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: admin or service role required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Validate withdrawal exists and is in approved or processing status
     const { data: withdrawal, error: withdrawalError } = await supabaseAdmin
       .from('withdrawals')
@@ -96,6 +134,22 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // ═══ APPROVAL GUARD ═══
+    // Withdrawal must have been explicitly approved by an admin (approved_by non-null).
+    // This blocks any payout where status was set without going through approval workflow.
+    if (!withdrawal.approved_by) {
+      console.warn('[security] B2C payout denied — withdrawal lacks approver', {
+        caller_user_id: callerUserId,
+        withdrawal_id,
+        status: withdrawal.status,
+        approved_by: withdrawal.approved_by,
+      });
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: withdrawal has not been approved by an admin' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Format phone number for M-Pesa (ensure 254 format)
