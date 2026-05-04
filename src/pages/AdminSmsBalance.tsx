@@ -155,8 +155,16 @@ export default function AdminSmsBalance() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              The balance is fetched only when you tap “Refresh now” to avoid unnecessary provider calls.
+              The balance is fetched only when you tap "Refresh now" to avoid unnecessary provider calls.
             </p>
+            {(data?.balance === null || data?.balance === undefined || data?.balance === "") && data?.raw !== undefined && (
+              <div className="rounded-lg border border-dashed p-3 bg-muted/30">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Provider raw response (balance field not detected)</p>
+                <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-all">
+                  {typeof data.raw === "string" ? data.raw : JSON.stringify(data.raw, null, 2)}
+                </pre>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
