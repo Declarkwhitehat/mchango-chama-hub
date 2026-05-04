@@ -18,7 +18,7 @@ import { KycGate } from "@/components/KycGate";
 const MchangoCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [kycStatus, setKycStatus] = useState<string | null>(null);
+  // KYC status is now handled by <KycGate /> below.
   const [imageFiles, setImageFiles] = useState<(File | null)[]>([null]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([""]);
   const [youtubeUrl, setYoutubeUrl] = useState("");
