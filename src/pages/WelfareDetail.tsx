@@ -326,6 +326,14 @@ const WelfareDetail = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            <WhatsAppLinkManager
+              entityId={welfare.id}
+              table="welfares"
+              currentLink={welfare.whatsapp_link}
+              isManager={isExecutive}
+              entityLabel="welfare"
+              onUpdate={fetchWelfare}
+            />
             {/* Active Cycle Status with unpaid tracking */}
             {isMember && (
               <WelfareCycleStatus
@@ -428,14 +436,6 @@ const WelfareDetail = () => {
           )}
 
           <TabsContent value="members" className="space-y-4">
-            <WhatsAppLinkManager
-              entityId={welfare.id}
-              table="welfares"
-              currentLink={welfare.whatsapp_link}
-              isManager={isExecutive}
-              entityLabel="welfare"
-              onUpdate={fetchWelfare}
-            />
             {/* Success Rate Summary */}
             <div className="grid grid-cols-2 gap-4">
               <Card>

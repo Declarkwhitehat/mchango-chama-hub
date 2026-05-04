@@ -372,6 +372,15 @@ const MchangoDetail = () => {
             </TabsList>
 
             <TabsContent value="details" className="space-y-6">
+              {/* WhatsApp Group */}
+              <WhatsAppLinkManager
+                entityId={campaign.id}
+                table="mchango"
+                currentLink={campaign.whatsapp_link}
+                isManager={isCreator}
+                entityLabel="campaign"
+                onUpdate={fetchCampaign}
+              />
               {/* Commission Display */}
               <CommissionDisplay 
                 totalCollected={allTimeCollected}
@@ -466,15 +475,6 @@ const MchangoDetail = () => {
                 </Card>
               )}
 
-              {/* WhatsApp Group */}
-              <WhatsAppLinkManager
-                entityId={campaign.id}
-                table="mchango"
-                currentLink={campaign.whatsapp_link}
-                isManager={isCreator}
-                entityLabel="campaign"
-                onUpdate={fetchCampaign}
-              />
             </TabsContent>
 
             <TabsContent value="withdrawals" className="space-y-6">
