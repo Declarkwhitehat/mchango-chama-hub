@@ -20,8 +20,7 @@ import {
   CheckCircle,
   Trash2,
   MessageSquareMore,
-  Wrench,
-  FlaskConical
+  Wrench
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -287,7 +286,6 @@ export function AdminSidebar() {
         {renderMenuGroup("Security", securityItems)}
         {renderMenuGroup("Support", supportItems)}
         {renderMenuGroup("System", systemItems)}
-        {renderMenuGroup("Testing", testingItems)}
       </SidebarContent>
 
       {/* Sidebar Footer with Back to App */}
