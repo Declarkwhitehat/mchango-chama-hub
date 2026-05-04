@@ -555,6 +555,50 @@ export const PaymentStatusManager = ({
         </div>
       </CardHeader>
       <CardContent>
+        {activeCycleEnd && (() => {
+          const diff = new Date(activeCycleEnd).getTime() - now;
+          if (diff <= 0) {
+            return (
+              <div className="mb-4 p-4 rounded-lg border border-muted bg-muted/40 text-center">
+                <p className="text-sm text-muted-foreground">Cycle deadline passed. Payments now count toward the next cycle.</p>
+              </div>
+            );
+          }
+          const totalSec = Math.floor(diff / 1000);
+          const days = Math.floor(totalSec / 86400);
+          const hours = Math.floor((totalSec % 86400) / 3600);
+          const mins = Math.floor((totalSec % 3600) / 60);
+          const secs = totalSec % 60;
+          const urgent = diff < 60 * 60 * 1000;
+          const warning = diff < 4 * 60 * 60 * 1000;
+          const styleCls = urgent
+            ? "border-destructive bg-destructive/10 text-destructive"
+            : warning
+              ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+              : "border-primary/30 bg-primary/5 text-primary";
+          return (
+            <div className={cn("mb-4 p-4 rounded-lg border", styleCls)}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 font-medium">
+                  <Clock className="h-4 w-4" />
+                  Time left for members to pay this cycle
+                </div>
+                <Badge variant="outline" className="text-xs">10:00 PM Cutoff</Badge>
+              </div>
+              <div className="flex items-center justify-center gap-2 font-bold text-2xl sm:text-3xl tabular-nums">
+                {days > 0 && (<><span>{String(days).padStart(2,'0')}<span className="text-xs font-normal ml-1">d</span></span><span>:</span></>)}
+                <span>{String(hours).padStart(2,'0')}<span className="text-xs font-normal ml-1">h</span></span>
+                <span>:</span>
+                <span>{String(mins).padStart(2,'0')}<span className="text-xs font-normal ml-1">m</span></span>
+                <span>:</span>
+                <span>{String(secs).padStart(2,'0')}<span className="text-xs font-normal ml-1">s</span></span>
+              </div>
+              <p className="text-xs text-center mt-2 opacity-80">
+                Unpaid members after the cutoff will be marked late and may incur penalties.
+              </p>
+            </div>
+          );
+        })()}
         <Tabs value={period} onValueChange={(v) => setPeriod(v as PeriodType)}>
           <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="today">Today</TabsTrigger>
