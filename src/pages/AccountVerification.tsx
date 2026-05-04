@@ -10,6 +10,8 @@ import { BadgeCheck, Camera, Loader2, CheckCircle2, Clock, XCircle, ShieldCheck 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { Capacitor } from "@capacitor/core";
+import { Camera as CapCamera, CameraResultType, CameraSource } from "@capacitor/camera";
 
 const AccountVerification = () => {
   const { user } = useAuth();
@@ -44,6 +46,39 @@ const AccountVerification = () => {
   const onFile = (f: File | null) => {
     setSelfie(f);
     setPreviewUrl(f ? URL.createObjectURL(f) : null);
+  };
+
+  const takeNativeSelfie = async () => {
+    try {
+      const photo = await CapCamera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+        direction: 'FRONT' as any,
+        saveToGallery: false,
+      });
+      const b64 = photo.base64String;
+      if (!b64) throw new Error("No image captured");
+      const mime = `image/${photo.format || 'jpeg'}`;
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const file = new File([bytes], `selfie.${photo.format || 'jpg'}`, { type: mime });
+      onFile(file);
+    } catch (e: any) {
+      if (e?.message && !/cancel/i.test(e.message)) {
+        toast({ title: "Camera error", description: e.message, variant: "destructive" });
+      }
+    }
+  };
+
+  const handleTakeSelfie = () => {
+    if (Capacitor.isNativePlatform()) {
+      takeNativeSelfie();
+    } else {
+      fileRef.current?.click();
+    }
   };
 
   const submit = async () => {
@@ -131,7 +166,7 @@ const AccountVerification = () => {
                 <input ref={fileRef} type="file" accept="image/*" capture="user" hidden
                   onChange={(e) => onFile(e.target.files?.[0] || null)} />
                 <div className="mt-2 flex items-center gap-3">
-                  <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} className="gap-2">
+                  <Button type="button" variant="outline" onClick={handleTakeSelfie} className="gap-2">
                     <Camera className="h-4 w-4" /> {selfie ? "Retake" : "Take selfie"}
                   </Button>
                   {previewUrl && <img src={previewUrl} alt="selfie preview" className="h-16 w-16 rounded-full object-cover border" />}
