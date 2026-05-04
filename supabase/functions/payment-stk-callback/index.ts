@@ -52,6 +52,37 @@ serve(async (req) => {
       console.log('Payment details:', { mpesaReceiptNumber, paidAmount });
     }
 
+    // ═══ Account Verification Fee STK Push ═══
+    {
+      const { data: verReq } = await supabaseClient
+        .from('user_verification_requests')
+        .select('*')
+        .eq('payment_reference', checkoutRequestId)
+        .maybeSingle();
+      if (verReq) {
+        if (status === 'completed' && verReq.payment_status !== 'paid') {
+          const grossAmount = paidAmount || verReq.fee_amount;
+          await supabaseClient.from('user_verification_requests').update({
+            payment_status: 'paid',
+            paid_at: new Date().toISOString(),
+            payment_reference: mpesaReceiptNumber || checkoutRequestId,
+          }).eq('id', verReq.id);
+          await supabaseClient.from('company_earnings').insert({
+            amount: grossAmount,
+            source: 'accountVerificationFee',
+            description: `Account verification fee from user ${verReq.user_id}`,
+            reference_id: verReq.id,
+          });
+        } else if (status === 'failed') {
+          await supabaseClient.from('user_verification_requests').update({
+            payment_status: 'failed',
+          }).eq('id', verReq.id);
+        }
+        return new Response(JSON.stringify({ success: true, message: 'Account verification payment processed' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     // First, check if this is a chama contribution
     const { data: contributions } = await supabaseClient
       .from('contributions')
