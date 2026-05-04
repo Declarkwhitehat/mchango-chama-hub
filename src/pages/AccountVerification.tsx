@@ -10,6 +10,8 @@ import { BadgeCheck, Camera, Loader2, CheckCircle2, Clock, XCircle, ShieldCheck 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { Capacitor } from "@capacitor/core";
+import { Camera as CapCamera, CameraResultType, CameraSource } from "@capacitor/camera";
 
 const AccountVerification = () => {
   const { user } = useAuth();
