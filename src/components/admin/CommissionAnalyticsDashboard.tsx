@@ -54,9 +54,11 @@ interface SummaryData {
   mchangoCommission: number;
   chamaCommission: number;
   orgCommission: number;
+  welfareCommission: number;
   mchangoGross: number;
   chamaGross: number;
   orgGross: number;
+  welfareGross: number;
   transactionCount: number;
 }
 
