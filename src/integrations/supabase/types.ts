@@ -3744,6 +3744,10 @@ export type Database = {
         Args: { p_chama_id: string }
         Returns: undefined
       }
+      reserve_signup_identity: {
+        Args: { p_email: string; p_id_number: string; p_phone: string }
+        Returns: Json
+      }
       update_chama_withdrawn: {
         Args: { p_amount: number; p_chama_id: string }
         Returns: undefined
