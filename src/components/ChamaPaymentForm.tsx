@@ -244,7 +244,8 @@ export const ChamaPaymentForm = ({
             });
             
             // Reset form
-            setAmount(contributionAmount.toString());
+            setAmount(requiredAmount.toString());
+            loadWalletCredit();
             setNotes("");
             setPaymentType("self");
             setTargetMemberId(currentMemberId);
