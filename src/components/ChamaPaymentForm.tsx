@@ -36,7 +36,14 @@ export const ChamaPaymentForm = ({
   const navigate = useNavigate();
   const [paymentType, setPaymentType] = useState<"self" | "other">("self");
   const [targetMemberId, setTargetMemberId] = useState(currentMemberId);
-  const [amount, setAmount] = useState(contributionAmount.toString());
+  const [walletCredit, setWalletCredit] = useState(0);
+  // Golden rule: Gross = Net Needed ÷ (1 - rate), rounded UP.
+  // Wallet credit is already net (commission was taken on the original deposit).
+  const netCycleTarget = contributionAmount * (1 - commissionRate);
+  const netStillNeeded = Math.max(0, netCycleTarget - walletCredit);
+  const requiredAmount =
+    netStillNeeded > 0 ? Math.ceil(netStillNeeded / (1 - commissionRate)) : 0;
+  const [amount, setAmount] = useState(requiredAmount.toString());
   const [notes, setNotes] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [members, setMembers] = useState<any[]>([]);
@@ -47,13 +54,34 @@ export const ChamaPaymentForm = ({
   useEffect(() => {
     loadMembers();
     loadUserPhone();
-  }, [chamaId]);
+    loadWalletCredit();
+  }, [chamaId, currentMemberId]);
+
+  useEffect(() => {
+    setAmount(requiredAmount.toString());
+  }, [requiredAmount]);
 
   useEffect(() => {
     if (paymentType === "self") {
       setTargetMemberId(currentMemberId);
     }
   }, [paymentType, currentMemberId]);
+
+  const loadWalletCredit = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chama_overpayment_wallet')
+        .select('amount')
+        .eq('chama_id', chamaId)
+        .eq('member_id', currentMemberId)
+        .eq('status', 'pending');
+      if (error) throw error;
+      const total = (data || []).reduce((s, e) => s + Number(e.amount || 0), 0);
+      setWalletCredit(total);
+    } catch (err) {
+      console.error('Error loading wallet credit:', err);
+    }
+  };
 
   const loadUserPhone = async () => {
     try {
@@ -119,10 +147,10 @@ export const ChamaPaymentForm = ({
       return;
     }
 
-    if (parseFloat(amount) < contributionAmount) {
+    if (parseFloat(amount) < requiredAmount) {
       toast({
-        title: "Amount Too Low",
-        description: `Minimum payment is KES ${contributionAmount.toLocaleString()}. You can pay more but not less.`,
+        title: "You'll under-pay",
+        description: `You must pay at least KES ${requiredAmount.toLocaleString()} so the chama receives the full net for this cycle. Paying less will leave the cycle short.`,
         variant: "destructive",
       });
       return;
@@ -216,7 +244,8 @@ export const ChamaPaymentForm = ({
             });
             
             // Reset form
-            setAmount(contributionAmount.toString());
+            setAmount(requiredAmount.toString());
+            loadWalletCredit();
             setNotes("");
             setPaymentType("self");
             setTargetMemberId(currentMemberId);
@@ -349,23 +378,26 @@ export const ChamaPaymentForm = ({
               id="amount"
               type="number"
               step="0.01"
-              min={contributionAmount}
+              min={requiredAmount}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder={`Minimum KES ${contributionAmount.toLocaleString()}`}
+              placeholder={`Pay KES ${requiredAmount.toLocaleString()}`}
               required
             />
             <p className="text-xs text-muted-foreground">
-              Minimum: KES {contributionAmount.toLocaleString()}
+              You should pay: <strong>KES {requiredAmount.toLocaleString()}</strong>
+              {walletCredit > 0 && (
+                <> (wallet credit of KES {walletCredit.toLocaleString()} already applied)</>
+              )}
             </p>
-            {parseFloat(amount) > contributionAmount && (
+            {parseFloat(amount) > requiredAmount && (
               <p className="text-xs text-green-600">
-                Overpayment of KES {(parseFloat(amount) - contributionAmount).toLocaleString()} will be credited to your next cycle
+                Overpayment of KES {(parseFloat(amount) - requiredAmount).toLocaleString()} will be credited to your next cycle
               </p>
             )}
-            {parseFloat(amount) > 0 && parseFloat(amount) < contributionAmount && (
+            {parseFloat(amount) > 0 && parseFloat(amount) < requiredAmount && (
               <p className="text-xs text-destructive font-medium">
-                ⚠️ Amount must be at least KES {contributionAmount.toLocaleString()}
+                ⚠️ You'll under-pay — pay at least KES {requiredAmount.toLocaleString()} so the chama receives the full net for this cycle.
               </p>
             )}
           </div>
