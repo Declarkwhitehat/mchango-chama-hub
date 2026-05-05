@@ -298,9 +298,12 @@ export function RevenueDashboard() {
     // Payouts are excluded — they are outflows, not revenue.
     entries.filter(isRevenueEntry).forEach(e => {
       if (!map[e.source_type]) map[e.source_type] = { gross: 0, commission: 0, count: 0 };
-      map[e.source_type].gross += Number(e.gross_amount);
+      // Only count gross from inflow rows; `commission` rows mirror gross already counted.
+      if (isGrossEntry(e)) {
+        map[e.source_type].gross += Number(e.gross_amount);
+        map[e.source_type].count += 1;
+      }
       map[e.source_type].commission += Number(e.commission_amount);
-      map[e.source_type].count += 1;
     });
 
     // Standalone earnings (NOT mirrored in ledger) get their own bucket
