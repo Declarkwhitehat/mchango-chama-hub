@@ -350,6 +350,36 @@ serve(async (req) => {
         }
       }
 
+      // Notify ALL other active chama members (push + in-app)
+      try {
+        const { data: allChamaMembers } = await supabaseClient
+          .from('chama_members')
+          .select('user_id')
+          .eq('chama_id', contribution.chama_id)
+          .eq('approval_status', 'approved')
+          .eq('status', 'active');
+
+        const beneficiaryName = beneficiaryProfile?.full_name || 'A member';
+        const excludeIds = new Set([member?.user_id].filter(Boolean));
+
+        const otherMemberIds = (allChamaMembers || [])
+          .map((m: any) => m.user_id)
+          .filter((id: string) => id && !excludeIds.has(id));
+
+        if (otherMemberIds.length > 0) {
+          await notifyManyUsers(supabaseClient, otherMemberIds, {
+            title: 'New Chama Contribution 💳',
+            message: `${beneficiaryName} contributed KES ${actualAmount.toLocaleString()} to "${chamaName}".`,
+            type: 'success',
+            category: 'chama',
+            relatedEntityId: contribution.chama_id,
+            relatedEntityType: 'chama',
+          });
+        }
+      } catch (notifyErr) {
+        console.warn('Failed to notify chama members:', notifyErr);
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
