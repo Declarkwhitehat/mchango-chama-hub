@@ -147,10 +147,10 @@ export const ChamaPaymentForm = ({
       return;
     }
 
-    if (parseFloat(amount) < contributionAmount) {
+    if (parseFloat(amount) < requiredAmount) {
       toast({
-        title: "Amount Too Low",
-        description: `Minimum payment is KES ${contributionAmount.toLocaleString()}. You can pay more but not less.`,
+        title: "You'll under-pay",
+        description: `You must pay at least KES ${requiredAmount.toLocaleString()} so the chama receives the full net for this cycle. Paying less will leave the cycle short.`,
         variant: "destructive",
       });
       return;
