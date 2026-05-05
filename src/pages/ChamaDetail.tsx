@@ -227,23 +227,11 @@ const ChamaDetail = () => {
         }
       }
 
-      // Total Collected = lifetime gross contributions allocated to cycles only.
-      // Pending overpayment wallet balances are excluded — they are not yet part of any cycle.
-      const grossCollected = Number(data.data.total_gross_collected) || 0;
-      try {
-        const { data: pendingWallet } = await supabase
-          .from('chama_overpayment_wallet')
-          .select('amount')
-          .eq('chama_id', data.data.id)
-          .eq('status', 'pending');
-        const pendingTotal = (pendingWallet || []).reduce(
-          (sum: number, r: any) => sum + Number(r.amount || 0),
-          0
-        );
-        setTotalContributions(Math.max(0, grossCollected - pendingTotal));
-      } catch {
-        setTotalContributions(Math.max(0, grossCollected));
-      }
+      // Total Collected = NET amount allocated to cycles (after commission), excluding overpayment wallet.
+      // Formula: available_balance + total_withdrawn = lifetime net cycle pool.
+      const availableBalance = Number(data.data.available_balance) || 0;
+      const totalWithdrawn = Number(data.data.total_withdrawn) || 0;
+      setTotalContributions(Math.max(0, availableBalance + totalWithdrawn));
 
       // Calculate whose turn it is and next turn dates - only for active chamas
       if (data.data.status === 'active') {
@@ -558,10 +546,11 @@ const ChamaDetail = () => {
 
             <div className="grid grid-cols-2 gap-4 pt-4">
               <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Total Collected</p>
+                <p className="text-sm text-muted-foreground mb-1">Total Collected (Net)</p>
                 <p className="text-2xl font-bold text-foreground">
                   KES {totalContributions.toLocaleString()}
                 </p>
+                <p className="text-[10px] text-muted-foreground mt-1">After 5% commission. Overpayment wallet shown separately.</p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Contribution</p>
@@ -656,12 +645,20 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Manager Tools */}
-        {isManager && (
-          <div className="space-y-3">
-            <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
-          </div>
-        )}
+        {/* Manager Tools — invite shown only when recruitment is needed */}
+        {isManager && (() => {
+          const hasOpenSeats = approvedMembers.length < (chama.max_members || 0);
+          const showInvite =
+            isPendingStatus ||
+            chama.accepting_rejoin_requests === true ||
+            (isActive && hasOpenSeats);
+          if (!showInvite) return null;
+          return (
+            <div className="space-y-3">
+              <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
+            </div>
+          );
+        })()}
 
         {/* Pending Join Requests - Visible to all members and admins */}
         {hasViewAccess && (

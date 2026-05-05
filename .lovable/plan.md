@@ -1,43 +1,47 @@
-## Issues identified
+## Problems
 
-Looking at the SMS you received and the dashboard:
+1. **Total Collected wrong.** Chama shows incorrect figure. Verified data:
+   - Gross contributions: 70 (40 + 30)
+   - Two cycle contributions of 20 each = 40 gross → 38 net (5% commission)
+   - Remainder (30 gross) → 28.50 net sat in overpayment wallet (pending)
+   - Correct "Total Collected" = **KES 38** (net, allocated to cycles, after commission)
+   - My previous fix used `gross − pendingWallet` which gave 41.5 (still wrong, mixes gross and net).
 
-1. **Wrong payout date in SMS for Member #3.** The current formula is `startDate + (position - 1) × cycleLength`, so for position 3 daily it produces "May 6" — the same as the first deadline. It ignores the grace period and the cycle boundary (each cycle ends at 10:00 PM Kenya time). Correct payout for Member #3 should land on cycle 3's end = **Friday, May 8, 2026, 10:00 PM EAT**.
+2. **Invite link visible after chama starts.** Manager invite manager renders for every active chama; should be hidden once started and re-shown only when needed (e.g., chama is `pending`, accepting rejoins, or a seat is open).
 
-2. **"7 Pending" / "Pending Payment" badges show during the grace period.** During the first 24-hour grace window nobody has missed anything yet, so showing 7 members as "pending" alongside the countdown is confusing. The countdown timer (1d 21h … to May 6, 10:00 PM EAT) is actually correct — only the labeling around it is wrong.
+3. **Web/native parity.** Native app loads the same remote URL via Capacitor (per memory), so any fix on the web propagates automatically — confirm no platform-conditional rendering blocks this view.
 
-3. **The unprofessional "dY %" garble** in the SMS — already addressed by the global SMS sanitizer in the previous turn; the reissued template below stays plain ASCII so it won't reappear.
+## Plan
 
-## Fixes
+### 1. Fix Total Collected formula (`src/pages/ChamaDetail.tsx`)
+Replace the current calculation with the net-cycle formula:
 
-### A. Correct payout-date math in `supabase/functions/chama-start/index.ts`
-- Anchor the projection to the first cycle's 10:00 PM Kenya cutoff (`graceDeadline`), not to `startDate`.
-- New formula: `payoutDate = graceDeadline + (memberIndex - 1) × cycleLength days`.
-- Format the date in EAT (`Africa/Nairobi`) and append " at 10:00 PM" so members see the exact moment, e.g. *"Friday, May 8, 2026 at 10:00 PM"*.
-- Clean wording (no emojis, no "before you" when it's 0):
+```
+totalCollected = available_balance + total_withdrawn
+```
 
-  ```
-  Pamojanova: "<chama>" has started. You are Member #<n> of <total>.
-  Grace period: first payment of KES <amount> is due by <Tue May 5, 10:00 PM EAT>.
-  Contribute <frequency>. Your payout: <Fri May 8, 2026 at 10:00 PM EAT>.
-  Members ahead of you: <n-1>.
-  ```
+This represents lifetime net amount that has actually entered cycle pools (paid out + still available), and naturally excludes pending overpayment wallet balances and commission. For the current chama: 38 + 0 = **KES 38**. ✓
 
-### B. Suppress "pending" noise during the grace period
+Relabel the card to "Total Collected (Net)" with a small helper note: "After 5% commission. Overpayment wallet shown separately." to remove ambiguity for members.
 
-`src/components/chama/PaymentStatusManager.tsx`
-- Compute `isGracePeriod` from `chamaStartDate` using the existing `getNextDay10PmKenyaDeadline` helper.
-- While in grace period:
-  - Replace the red "X Pending" badge with a neutral "X yet to pay (grace period)" badge.
-  - Replace the red "Pending Payment (n)" section header with "Yet to Pay — Grace Period".
-  - Hide the "Unpaid members after the cutoff will be marked late…" warning under the timer (no penalties apply yet).
+### 2. Hide invite link after chama starts (`src/pages/ChamaDetail.tsx`)
+Wrap `<ChamaInviteManager>` so it only renders when:
+- `chama.status === 'pending'` (recruiting), OR
+- `chama.accepting_rejoin_requests === true` (rejoin window open), OR
+- active member count `< max_members` AND manager explicitly opens it (collapsible "Invite new members" toggle, collapsed by default)
 
-`src/components/chama/DailyPaymentStatus.tsx` already hides the "missed cycles" alert and financial summary during grace; no change needed there.
+Default state for active chamas: invite hidden. Manager sees a small "Invite members" button that expands the manager only when there is genuine capacity.
 
-### C. Verify nothing else mislabels grace-period state
-- `daily-cycle-manager` `all-cycles` already returns `status: 'pending'` (not 'missed') while end_date is in the future — no change.
-- The countdown component is already correct; leave it untouched (the user confirmed "1d 21h 11m" lands on May 6, 10:00 PM EAT).
+### 3. Web/native parity confirmation
+- Verify no `Capacitor.isNativePlatform()` gates on the Total Collected card or invite section.
+- Bump version indicator (per memory standard) so the user can confirm the APK is loading the latest build.
 
-### D. Re-deploy `chama-start`
+### 4. Memory update
+Update `mem://financial/ledger-and-balance-standards` with the explicit rule:
+> "Total Collected" displayed to chama members = `available_balance + total_withdrawn` (net, post-commission, cycle-allocated). Never gross. Overpayment wallet is reported separately on the member's own dashboard.
 
-No DB schema or migration changes. No new memories required (existing SMS-sanitization and 22:00-EAT-deadline policies already cover this).
+## Files to change
+- `src/pages/ChamaDetail.tsx` — fix formula + relabel card + gate invite manager
+- `mem/financial/ledger-and-balance-standards.md` — codify Total Collected rule
+
+No backend/migration changes required.
