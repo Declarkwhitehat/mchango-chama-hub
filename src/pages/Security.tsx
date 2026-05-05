@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Key, Eye, EyeOff, Fingerprint, Trash2, Plus, Shield, CheckCircle, Lock } from "lucide-react";
+import { Key, Eye, EyeOff, Fingerprint, Trash2, Plus, Shield, CheckCircle, Lock, AlertTriangle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { TwoFactorSetup } from "@/components/TwoFactorSetup";
 import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 import { toast } from "sonner";
@@ -43,6 +45,54 @@ const Security = () => {
 
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [show2FAForPassword, setShow2FAForPassword] = useState(false);
+
+  // Self-account-deletion
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletePhrase, setDeletePhrase] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const DELETE_PHRASE = "DELETE MY ACCOUNT";
+
+  const handleDeleteMyAccount = async () => {
+    if (deletePhrase.trim() !== DELETE_PHRASE) {
+      toast.error(`Type "${DELETE_PHRASE}" exactly to confirm.`);
+      return;
+    }
+    if (!deletePassword) {
+      toast.error("Enter your password to confirm.");
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Not signed in"); return; }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-my-account`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ confirm_phrase: deletePhrase, password: deletePassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to delete account');
+        return;
+      }
+      toast.success('Your account has been deleted.');
+      setShowDeleteDialog(false);
+      await signOut();
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete account');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
