@@ -223,19 +223,39 @@ export const ChamaPaymentForm = ({
         
         // Poll for payment status
         const checkoutRequestId = stkResponse.CheckoutRequestID;
+        const startedAt = new Date(Date.now() - 5000).toISOString();
         let attempts = 0;
         const maxAttempts = 12; // Check for 60 seconds (every 5 seconds)
         
         const checkPaymentStatus = async () => {
           attempts++;
           
-          // Check contribution status
-          const { data: contributions } = await supabase
+          // 1) Check by checkout request id (STK callback path)
+          const { data: contributionByRef } = await supabase
             .from('contributions')
             .select('*')
             .eq('payment_reference', checkoutRequestId)
-            .single();
-          
+            .maybeSingle();
+
+          // 2) Fallback: C2B confirm path creates a fresh completed row and
+          //    deletes the pending STK row. Look for any completed contribution
+          //    for this member created after this attempt started.
+          let completedFallback: any = null;
+          if (!contributionByRef || contributionByRef.status !== 'completed') {
+            const { data: recent } = await supabase
+              .from('contributions')
+              .select('*')
+              .eq('chama_id', chamaId)
+              .eq('member_id', targetMemberId)
+              .eq('status', 'completed')
+              .gte('created_at', startedAt)
+              .order('created_at', { ascending: false })
+              .limit(1);
+            completedFallback = recent?.[0] || null;
+          }
+
+          const contributions = contributionByRef || completedFallback;
+
           if (contributions && contributions.status === 'completed') {
             setPaymentStatus("idle");
             toast({
