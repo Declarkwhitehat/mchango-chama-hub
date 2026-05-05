@@ -7,13 +7,13 @@ import { useLocation } from "react-router-dom";
  * Updates <title>, meta description, canonical link, and Open Graph tags
  * (og:title, og:description, og:url, og:image) on the fly for each route.
  *
- * Canonical URL always points to the primary domain: https://www.pamojanova.com
+ * Canonical URL always points to the primary domain: https://pamojanova.com
  *
  * Use it inside any page component:
  *   <SEO title="About | Pamojanova" description="..." />
  */
 
-const PRIMARY_ORIGIN = "https://www.pamojanova.com";
+const PRIMARY_ORIGIN = "https://pamojanova.com";
 const DEFAULT_OG_IMAGE = `${PRIMARY_ORIGIN}/app-icon-512.png`;
 
 interface SEOProps {
