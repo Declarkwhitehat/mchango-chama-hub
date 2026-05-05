@@ -227,9 +227,10 @@ const ChamaDetail = () => {
         }
       }
 
-      // Total Collected = available_balance (net pool balance after commission and withdrawals)
-      const chamaAvailableBalance = Number(data.data.available_balance) || 0;
-      setTotalContributions(Math.max(0, chamaAvailableBalance));
+      // Total Collected = total_gross_collected (lifetime gross amount contributed by all members)
+      // This figure must NOT shrink when funds are paid out — it reflects what was ever collected.
+      const grossCollected = Number(data.data.total_gross_collected) || 0;
+      setTotalContributions(Math.max(0, grossCollected));
 
       // Calculate whose turn it is and next turn dates - only for active chamas
       if (data.data.status === 'active') {
