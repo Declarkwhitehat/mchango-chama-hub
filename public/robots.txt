@@ -16,4 +16,4 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
-Sitemap: https://pamojanova.com/sitemap.xml
+Sitemap: https://www.pamojanova.com/sitemap.xml

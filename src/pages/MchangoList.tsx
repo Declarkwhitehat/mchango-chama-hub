@@ -14,7 +14,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { SEO } from "@/components/SEO";
-import { publicUrls } from "@/lib/publicUrl";
 
 const PAGE_SIZE = 20;
 
@@ -93,7 +92,7 @@ const MchangoList = () => {
   });
 
   const hasMore = mchangos.length >= (page + 1) * PAGE_SIZE;
-  const publicShareUrl = publicUrls.exploreMchango();
+  const publicShareUrl = `${window.location.origin}/explore/mchango`;
 
   const renderCard = (mchango: Mchango, isMine: boolean) => {
     const allTimeCollected = Number(mchango.total_gross_collected) || Number(mchango.current_amount);

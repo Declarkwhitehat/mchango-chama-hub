@@ -13,7 +13,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { SEO } from "@/components/SEO";
-import { publicUrls } from "@/lib/publicUrl";
 
 const PAGE_SIZE = 20;
 
@@ -76,7 +75,7 @@ const OrganizationList = () => {
   const otherOrganizations = filteredOrganizations.filter(org => org.created_by !== user?.id);
   const categories = [...new Set(organizations.map(org => org.category).filter(Boolean))];
   const hasMore = organizations.length >= (page + 1) * PAGE_SIZE;
-  const publicShareUrl = publicUrls.organizationsList();
+  const publicShareUrl = `${window.location.origin}/organizations`;
 
   const OrganizationCard = ({ org }: { org: Organization }) => (
     <Card className="cursor-pointer hover:shadow-lg transition-all duration-300 group overflow-hidden" onClick={() => navigate(`/organizations/${org.slug}`)}>
