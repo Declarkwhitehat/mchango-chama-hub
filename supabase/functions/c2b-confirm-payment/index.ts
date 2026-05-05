@@ -224,6 +224,38 @@ serve(async (req) => {
             relatedEntityType: 'chama',
           });
         }
+
+        // Notify ALL other active chama members (push + in-app)
+        try {
+          const { data: allChamaMembers } = await supabase
+            .from('chama_members')
+            .select('user_id, profiles(full_name)')
+            .eq('chama_id', chamaMemberData.chama_id)
+            .eq('approval_status', 'approved')
+            .eq('status', 'active');
+
+          const contributorName =
+            (chamaMemberData as any)?.profiles?.full_name ||
+            (allChamaMembers || []).find((m: any) => m.user_id === chamaMemberData?.user_id)?.profiles?.full_name ||
+            'A member';
+
+          const otherMemberIds = (allChamaMembers || [])
+            .map((m: any) => m.user_id)
+            .filter((id: string) => id && id !== chamaMemberData?.user_id);
+
+          if (otherMemberIds.length > 0) {
+            await notifyManyUsers(supabase, otherMemberIds, {
+              title: 'New Chama Contribution 💳',
+              message: `${contributorName} contributed KES ${grossAmount.toLocaleString()} to "${chamaData.name}".`,
+              type: 'success',
+              category: 'chama',
+              relatedEntityId: chamaMemberData.chama_id,
+              relatedEntityType: 'chama',
+            });
+          }
+        } catch (notifyErr) {
+          console.warn('Failed to notify chama members:', notifyErr);
+        }
       }
 
       // ============================================
