@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://www.pamojanova.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://www.pamojanova.com/about</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://www.pamojanova.com/chama</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://www.pamojanova.com/mchango</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://www.pamojanova.com/welfare</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://www.pamojanova.com/mchango/explore</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
-  <url><loc>https://www.pamojanova.com/organizations</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://www.pamojanova.com/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://www.pamojanova.com/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://pamojanova.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://pamojanova.com/about</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://pamojanova.com/chama</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://pamojanova.com/mchango</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://pamojanova.com/welfare</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://pamojanova.com/mchango/explore</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://pamojanova.com/organizations</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://pamojanova.com/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://pamojanova.com/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>
