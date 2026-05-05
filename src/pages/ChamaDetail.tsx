@@ -227,10 +227,23 @@ const ChamaDetail = () => {
         }
       }
 
-      // Total Collected = total_gross_collected (lifetime gross amount contributed by all members)
-      // This figure must NOT shrink when funds are paid out — it reflects what was ever collected.
+      // Total Collected = lifetime gross contributions allocated to cycles only.
+      // Pending overpayment wallet balances are excluded — they are not yet part of any cycle.
       const grossCollected = Number(data.data.total_gross_collected) || 0;
-      setTotalContributions(Math.max(0, grossCollected));
+      try {
+        const { data: pendingWallet } = await supabase
+          .from('chama_overpayment_wallet')
+          .select('amount')
+          .eq('chama_id', data.data.id)
+          .eq('status', 'pending');
+        const pendingTotal = (pendingWallet || []).reduce(
+          (sum: number, r: any) => sum + Number(r.amount || 0),
+          0
+        );
+        setTotalContributions(Math.max(0, grossCollected - pendingTotal));
+      } catch {
+        setTotalContributions(Math.max(0, grossCollected));
+      }
 
       // Calculate whose turn it is and next turn dates - only for active chamas
       if (data.data.status === 'active') {
@@ -804,7 +817,7 @@ const ChamaDetail = () => {
 
         {/* Overpayment Wallet - visible to approved members */}
         {isMember && isActive && (
-          <OverpaymentWallet chamaId={chama.id} memberId={currentUserMembership.id} />
+          <OverpaymentWallet chamaId={chama.id} memberId={currentUserMembership.id} contributionAmount={Number(chama.contribution_amount) || 0} />
         )}
 
         {/* Payment Form - Only visible to approved members when chama is active */}

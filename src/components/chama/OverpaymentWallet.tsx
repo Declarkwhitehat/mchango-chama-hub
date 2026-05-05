@@ -16,9 +16,10 @@ interface WalletEntry {
 interface OverpaymentWalletProps {
   chamaId: string;
   memberId: string;
+  contributionAmount?: number;
 }
 
-export function OverpaymentWallet({ chamaId, memberId }: OverpaymentWalletProps) {
+export function OverpaymentWallet({ chamaId, memberId, contributionAmount }: OverpaymentWalletProps) {
   const [entries, setEntries] = useState<WalletEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -67,9 +68,29 @@ export function OverpaymentWallet({ chamaId, memberId }: OverpaymentWalletProps)
       </CardHeader>
       <CardContent className="space-y-2">
         {totalPending > 0 && (
-          <p className="text-xs text-muted-foreground">
-            Commission already deducted. This balance will be automatically applied to your next cycle after payout — no extra charges.
-          </p>
+          <>
+            <p className="text-xs text-muted-foreground">
+              Commission already deducted. This balance will be automatically applied to your next cycle after payout — no extra charges.
+            </p>
+            {contributionAmount && contributionAmount > 0 && (
+              <div className="rounded-md bg-blue-100/60 dark:bg-blue-900/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-200">
+                <div className="flex justify-between">
+                  <span>Next cycle contribution</span>
+                  <span className="font-semibold">KES {contributionAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Covered from wallet</span>
+                  <span className="font-semibold">- KES {Math.min(totalPending, contributionAmount).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between border-t border-blue-300/50 dark:border-blue-700/50 mt-1 pt-1">
+                  <span>You will pay next cycle</span>
+                  <span className="font-bold">
+                    KES {Math.max(0, contributionAmount - totalPending).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {pendingEntries.map((entry) => (
