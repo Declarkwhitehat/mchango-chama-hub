@@ -234,7 +234,7 @@ export function RevenueDashboard() {
     const commissionRevenue = revenueEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
     const feesRevenue = standaloneEarningsSum(earnings);
     const totalRevenue = commissionRevenue + feesRevenue;
-    const totalGross = revenueEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
+    const totalGross = revenueEntries.filter(isGrossEntry).reduce((s, e) => s + Number(e.gross_amount), 0);
     const totalPayouts = payoutEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
     const standaloneEarningsCount = earnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
     const count = revenueEntries.length + standaloneEarningsCount;
