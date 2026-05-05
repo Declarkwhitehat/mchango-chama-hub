@@ -645,12 +645,20 @@ const ChamaDetail = () => {
           />
         )}
 
-        {/* Manager Tools */}
-        {isManager && (
-          <div className="space-y-3">
-            <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
-          </div>
-        )}
+        {/* Manager Tools — invite shown only when recruitment is needed */}
+        {isManager && (() => {
+          const hasOpenSeats = approvedMembers.length < (chama.max_members || 0);
+          const showInvite =
+            isPendingStatus ||
+            chama.accepting_rejoin_requests === true ||
+            (isActive && hasOpenSeats);
+          if (!showInvite) return null;
+          return (
+            <div className="space-y-3">
+              <ChamaInviteManager chamaId={chama.id} chamaSlug={chama.slug} isManager={true} />
+            </div>
+          );
+        })()}
 
         {/* Pending Join Requests - Visible to all members and admins */}
         {hasViewAccess && (
