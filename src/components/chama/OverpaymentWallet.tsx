@@ -16,9 +16,10 @@ interface WalletEntry {
 interface OverpaymentWalletProps {
   chamaId: string;
   memberId: string;
+  contributionAmount?: number;
 }
 
-export function OverpaymentWallet({ chamaId, memberId }: OverpaymentWalletProps) {
+export function OverpaymentWallet({ chamaId, memberId, contributionAmount }: OverpaymentWalletProps) {
   const [entries, setEntries] = useState<WalletEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
