@@ -377,23 +377,26 @@ export const ChamaPaymentForm = ({
               id="amount"
               type="number"
               step="0.01"
-              min={contributionAmount}
+              min={requiredAmount}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder={`Minimum KES ${contributionAmount.toLocaleString()}`}
+              placeholder={`Pay KES ${requiredAmount.toLocaleString()}`}
               required
             />
             <p className="text-xs text-muted-foreground">
-              Minimum: KES {contributionAmount.toLocaleString()}
+              You should pay: <strong>KES {requiredAmount.toLocaleString()}</strong>
+              {walletCredit > 0 && (
+                <> (wallet credit of KES {walletCredit.toLocaleString()} already applied)</>
+              )}
             </p>
-            {parseFloat(amount) > contributionAmount && (
+            {parseFloat(amount) > requiredAmount && (
               <p className="text-xs text-green-600">
-                Overpayment of KES {(parseFloat(amount) - contributionAmount).toLocaleString()} will be credited to your next cycle
+                Overpayment of KES {(parseFloat(amount) - requiredAmount).toLocaleString()} will be credited to your next cycle
               </p>
             )}
-            {parseFloat(amount) > 0 && parseFloat(amount) < contributionAmount && (
+            {parseFloat(amount) > 0 && parseFloat(amount) < requiredAmount && (
               <p className="text-xs text-destructive font-medium">
-                ⚠️ Amount must be at least KES {contributionAmount.toLocaleString()}
+                ⚠️ You'll under-pay — pay at least KES {requiredAmount.toLocaleString()} so the chama receives the full net for this cycle.
               </p>
             )}
           </div>
