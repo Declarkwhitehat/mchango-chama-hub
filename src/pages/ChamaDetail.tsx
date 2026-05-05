@@ -227,23 +227,11 @@ const ChamaDetail = () => {
         }
       }
 
-      // Total Collected = lifetime gross contributions allocated to cycles only.
-      // Pending overpayment wallet balances are excluded — they are not yet part of any cycle.
-      const grossCollected = Number(data.data.total_gross_collected) || 0;
-      try {
-        const { data: pendingWallet } = await supabase
-          .from('chama_overpayment_wallet')
-          .select('amount')
-          .eq('chama_id', data.data.id)
-          .eq('status', 'pending');
-        const pendingTotal = (pendingWallet || []).reduce(
-          (sum: number, r: any) => sum + Number(r.amount || 0),
-          0
-        );
-        setTotalContributions(Math.max(0, grossCollected - pendingTotal));
-      } catch {
-        setTotalContributions(Math.max(0, grossCollected));
-      }
+      // Total Collected = NET amount allocated to cycles (after commission), excluding overpayment wallet.
+      // Formula: available_balance + total_withdrawn = lifetime net cycle pool.
+      const availableBalance = Number(data.data.available_balance) || 0;
+      const totalWithdrawn = Number(data.data.total_withdrawn) || 0;
+      setTotalContributions(Math.max(0, availableBalance + totalWithdrawn));
 
       // Calculate whose turn it is and next turn dates - only for active chamas
       if (data.data.status === 'active') {
