@@ -546,10 +546,11 @@ const ChamaDetail = () => {
 
             <div className="grid grid-cols-2 gap-4 pt-4">
               <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Total Collected</p>
+                <p className="text-sm text-muted-foreground mb-1">Total Collected (Net)</p>
                 <p className="text-2xl font-bold text-foreground">
                   KES {totalContributions.toLocaleString()}
                 </p>
+                <p className="text-[10px] text-muted-foreground mt-1">After 5% commission. Overpayment wallet shown separately.</p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Contribution</p>
