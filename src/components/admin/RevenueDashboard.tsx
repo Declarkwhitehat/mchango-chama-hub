@@ -243,7 +243,7 @@ export function RevenueDashboard() {
     const prevCommissionRevenue = prevRevenueEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
     const prevFeesRevenue = standaloneEarningsSum(prevEarnings);
     const prevRevenue = prevCommissionRevenue + prevFeesRevenue;
-    const prevGross = prevRevenueEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
+    const prevGross = prevRevenueEntries.filter(isGrossEntry).reduce((s, e) => s + Number(e.gross_amount), 0);
     const prevCount = prevRevenueEntries.length + prevEarnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
     const prevAvg = prevCount > 0 ? prevRevenue / prevCount : 0;
 
