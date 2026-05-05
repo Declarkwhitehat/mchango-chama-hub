@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Key, Eye, EyeOff, Fingerprint, Trash2, Plus, Shield, CheckCircle, Lock } from "lucide-react";
+import { Key, Eye, EyeOff, Fingerprint, Trash2, Plus, Shield, CheckCircle, Lock, AlertTriangle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { TwoFactorSetup } from "@/components/TwoFactorSetup";
 import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 import { toast } from "sonner";
@@ -43,6 +45,54 @@ const Security = () => {
 
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [show2FAForPassword, setShow2FAForPassword] = useState(false);
+
+  // Self-account-deletion
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletePhrase, setDeletePhrase] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const DELETE_PHRASE = "DELETE MY ACCOUNT";
+
+  const handleDeleteMyAccount = async () => {
+    if (deletePhrase.trim() !== DELETE_PHRASE) {
+      toast.error(`Type "${DELETE_PHRASE}" exactly to confirm.`);
+      return;
+    }
+    if (!deletePassword) {
+      toast.error("Enter your password to confirm.");
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Not signed in"); return; }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-my-account`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ confirm_phrase: deletePhrase, password: deletePassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to delete account');
+        return;
+      }
+      toast.success('Your account has been deleted.');
+      setShowDeleteDialog(false);
+      await signOut();
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete account');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -371,7 +421,89 @@ const Security = () => {
 
           </CardContent>
         </Card>
+
+        {/* Danger Zone — Delete My Account */}
+        <Card className="border-destructive/40">
+          <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
+            <CardTitle className="text-lg sm:text-xl flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              Permanently delete your account and personal data. This cannot be undone by you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-3">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              You will be signed out and lose access to all your groups, contributions and history.
+              Pending withdrawals must complete first; managers must transfer leadership.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full text-destructive border-destructive hover:bg-destructive/10"
+              onClick={() => { setDeletePhrase(""); setDeletePassword(""); setShowDeleteDialog(true); }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete My Account
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Delete Account Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={(o) => !isDeleting && setShowDeleteDialog(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action is permanent. To confirm, type <strong>{DELETE_PHRASE}</strong> below and enter your password.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Confirmation phrase</Label>
+              <Input
+                value={deletePhrase}
+                onChange={(e) => setDeletePhrase(e.target.value)}
+                placeholder={DELETE_PHRASE}
+                disabled={isDeleting}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Password</Label>
+              <div className="relative">
+                <Input
+                  type={showDeletePassword ? "text" : "password"}
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Your password"
+                  className="pr-10"
+                  disabled={isDeleting}
+                />
+                <Button
+                  type="button" variant="ghost" size="icon"
+                  className="absolute right-0 top-0 h-full px-2 hover:bg-transparent"
+                  onClick={() => setShowDeletePassword(!showDeletePassword)}
+                  tabIndex={-1}
+                >
+                  {showDeletePassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDeleteMyAccount(); }}
+              disabled={isDeleting || deletePhrase.trim() !== DELETE_PHRASE || !deletePassword}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {/* Delete WebAuthn Credential Confirmation */}
       <AlertDialog open={!!credentialToDelete} onOpenChange={() => setCredentialToDelete(null)}>

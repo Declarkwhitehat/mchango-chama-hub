@@ -1,47 +1,66 @@
-## Problems
+# Play Store Hardening Plan
 
-1. **Total Collected wrong.** Chama shows incorrect figure. Verified data:
-   - Gross contributions: 70 (40 + 30)
-   - Two cycle contributions of 20 each = 40 gross → 38 net (5% commission)
-   - Remainder (30 gross) → 28.50 net sat in overpayment wallet (pending)
-   - Correct "Total Collected" = **KES 38** (net, allocated to cycles, after commission)
-   - My previous fix used `gross − pendingWallet` which gave 41.5 (still wrong, mixes gross and net).
+## 1. Capacitor config (`capacitor.config.ts`)
+- Remove `cleartext: true` from `server`. Keep `server.url = 'https://pamojanova.com'`.
+- Remove `android.allowMixedContent: true` (default = false). Cleartext HTTP will now be blocked, which is what Play Store expects since the server is HTTPS.
 
-2. **Invite link visible after chama starts.** Manager invite manager renders for every active chama; should be hidden once started and re-shown only when needed (e.g., chama is `pending`, accepting rejoins, or a seat is open).
+## 2. Android Gradle / SDK versions
+The committed `android/` folder is regenerated every CI run (`rm -rf android && npx cap add android`), so editing `android/app/build.gradle` directly will not survive a build. We will:
+- Add a **patch step** in `.github/workflows/build-apk.yml` (after `npx cap sync android`, before `gradlew assembleDebug`) that uses `sed` to set in `android/app/build.gradle`:
+  - `minSdkVersion 24`
+  - `targetSdkVersion 34`
+  - `compileSdkVersion 34`
+  - `versionCode 1`
+  - `versionName "1.0.0"`
+- Same patch step writes `android/variables.gradle` overrides for `minSdkVersion`, `compileSdkVersion`, `targetSdkVersion` (Capacitor reads these).
+- For local/native devs, also update the committed `android/app/build.gradle` stub and `android/app/src/main/AndroidManifest.xml` is left untouched (no cleartext flag there).
 
-3. **Web/native parity.** Native app loads the same remote URL via Capacitor (per memory), so any fix on the web propagates automatically — confirm no platform-conditional rendering blocks this view.
+## 3. `package.json`
+- Bump `"version"` from `0.0.0` → `"1.0.0"`.
 
-## Plan
+## 4. Delete My Account (user-initiated)
+Adds a self-service deletion flow distinct from the existing admin-only `admin-delete-user` function.
 
-### 1. Fix Total Collected formula (`src/pages/ChamaDetail.tsx`)
-Replace the current calculation with the net-cycle formula:
+**New edge function `delete-my-account`** (`verify_jwt = false`, validated via Bearer token like other functions):
+- Requires the authenticated user.
+- Requires body `{ confirm_phrase: "DELETE MY ACCOUNT", password }`.
+- Re-verifies the user's password via `signInWithPassword` against their email.
+- Blocks deletion if user has:
+  - any active chama membership with unpaid current cycle,
+  - any pending withdrawal,
+  - any unsettled welfare obligations,
+  - admin/super_admin role.
+- On success: soft-deletes profile (`deleted_at`, `deletion_reason = 'user_self_deletion'`), bans auth user (`ban_duration: '876000h'`), writes audit log row, returns success.
 
+**UI** — new section at the bottom of `src/pages/Security.tsx` (preferred) inside a destructive-styled card:
+- Button "Delete My Account" → opens `AlertDialog`.
+- Dialog shows warning about irreversibility, 45-day grace, what gets removed.
+- Inputs: password + type-to-confirm phrase `DELETE MY ACCOUNT`.
+- "Delete Permanently" button disabled until both filled and phrase matches.
+- On confirmation: invokes the edge function; on success calls `signOut()` and navigates to `/`.
+
+## 5. Privacy Policy publicly accessible + linked
+- `/privacy` is **already** an unauthenticated route in `src/App.tsx` — verified, no change needed there.
+- `src/pages/Auth.tsx`: add a small footer link under both the **Login** and **Sign up** tabs (and beside the existing Terms checkbox in signup): "By continuing you agree to our [Terms](/terms) and [Privacy Policy](/privacy)." Use `<Link>` from `react-router-dom`.
+- `src/pages/ForgotPassword.tsx` + `src/pages/ResetPassword.tsx`: add the same single-line link in the footer for consistency.
+
+## 6. Native auto-update assurance
+Server URL stays `https://pamojanova.com`, so any web deploy is instantly picked up by the installed APK on next launch — confirmed by current Capacitor config strategy. No code change needed; documented for the user.
+
+## Files touched
 ```
-totalCollected = available_balance + total_withdrawn
+capacitor.config.ts                          (cleartext + allowMixedContent)
+android/app/build.gradle                     (stub for local dev)
+package.json                                 (version 1.0.0)
+.github/workflows/build-apk.yml              (sed patches for SDK + version*)
+src/pages/Security.tsx                       (Delete My Account section)
+src/pages/Auth.tsx                           (Privacy/Terms links)
+src/pages/ForgotPassword.tsx                 (Privacy link)
+src/pages/ResetPassword.tsx                  (Privacy link)
+supabase/functions/delete-my-account/index.ts  (NEW)
+supabase/config.toml                         (register new function, verify_jwt=false)
 ```
 
-This represents lifetime net amount that has actually entered cycle pools (paid out + still available), and naturally excludes pending overpayment wallet balances and commission. For the current chama: 38 + 0 = **KES 38**. ✓
-
-Relabel the card to "Total Collected (Net)" with a small helper note: "After 5% commission. Overpayment wallet shown separately." to remove ambiguity for members.
-
-### 2. Hide invite link after chama starts (`src/pages/ChamaDetail.tsx`)
-Wrap `<ChamaInviteManager>` so it only renders when:
-- `chama.status === 'pending'` (recruiting), OR
-- `chama.accepting_rejoin_requests === true` (rejoin window open), OR
-- active member count `< max_members` AND manager explicitly opens it (collapsible "Invite new members" toggle, collapsed by default)
-
-Default state for active chamas: invite hidden. Manager sees a small "Invite members" button that expands the manager only when there is genuine capacity.
-
-### 3. Web/native parity confirmation
-- Verify no `Capacitor.isNativePlatform()` gates on the Total Collected card or invite section.
-- Bump version indicator (per memory standard) so the user can confirm the APK is loading the latest build.
-
-### 4. Memory update
-Update `mem://financial/ledger-and-balance-standards` with the explicit rule:
-> "Total Collected" displayed to chama members = `available_balance + total_withdrawn` (net, post-commission, cycle-allocated). Never gross. Overpayment wallet is reported separately on the member's own dashboard.
-
-## Files to change
-- `src/pages/ChamaDetail.tsx` — fix formula + relabel card + gate invite manager
-- `mem/financial/ledger-and-balance-standards.md` — codify Total Collected rule
-
-No backend/migration changes required.
+## Memory updates
+- New memory `mem://security/self-account-deletion-flow` describing password+phrase confirmation, soft-delete + auth ban, blocking conditions.
+- Update `mem://architecture/pwa-native-distribution-strategy`: cleartext + mixed content disabled for Play Store readiness; SDK matrix min24/target34/compile34; v1.0.0 (versionCode 1).

@@ -6,7 +6,6 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     url: 'https://pamojanova.com',
-    cleartext: true,
   },
   plugins: {
     Camera: {
@@ -22,7 +21,7 @@ const config: CapacitorConfig = {
     },
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
   },
 };
 

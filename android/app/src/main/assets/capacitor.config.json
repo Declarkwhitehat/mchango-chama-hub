@@ -3,8 +3,7 @@
 	"appName": "Pamoja",
 	"webDir": "dist",
 	"server": {
-		"url": "https://pamojanova.com",
-		"cleartext": true
+		"url": "https://pamojanova.com"
 	},
 	"plugins": {
 		"Camera": {
@@ -24,6 +23,6 @@
 		}
 	},
 	"android": {
-		"allowMixedContent": true
+		"allowMixedContent": false
 	}
 }

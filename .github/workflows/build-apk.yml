@@ -47,6 +47,24 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Patch Android SDK and version (Play Store ready)
+        run: |
+          set -e
+          # variables.gradle: SDK matrix
+          if [ -f android/variables.gradle ]; then
+            sed -i 's/minSdkVersion = [0-9]\+/minSdkVersion = 24/' android/variables.gradle
+            sed -i 's/compileSdkVersion = [0-9]\+/compileSdkVersion = 34/' android/variables.gradle
+            sed -i 's/targetSdkVersion = [0-9]\+/targetSdkVersion = 34/' android/variables.gradle
+          fi
+          # app/build.gradle: versionCode + versionName
+          sed -i 's/versionCode [0-9]\+/versionCode 1/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "1.0.0"/' android/app/build.gradle
+          echo "--- variables.gradle ---"
+          cat android/variables.gradle || true
+          echo "--- app/build.gradle ---"
+          grep -E "minSdk|targetSdk|compileSdk|versionCode|versionName" android/app/build.gradle || true
+
+
       - name: Place google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
