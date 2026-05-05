@@ -71,26 +71,36 @@ export function OverpaymentWallet({ chamaId, memberId, contributionAmount }: Ove
         {totalPending > 0 && (
           <>
             <p className="text-xs text-muted-foreground">
-              This is your <strong>net</strong> credit — commission was already deducted when the overpayment was received. It will be applied automatically to your next cycle. The remaining amount you still pay will be charged the standard commission like any normal contribution.
+              Your wallet credit is <strong>net</strong> (commission was already taken when the overpayment was received). Any new top-up you pay to complete the next cycle is a fresh deposit, so the standard {Math.round(CHAMA_DEFAULT_COMMISSION_RATE * 100)}% commission applies to it.
             </p>
-            {contributionAmount && contributionAmount > 0 && (
-              <div className="rounded-md bg-blue-100/60 dark:bg-blue-900/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-200">
-                <div className="flex justify-between">
-                  <span>Next cycle contribution (gross)</span>
-                  <span className="font-semibold">KES {contributionAmount.toLocaleString()}</span>
+            {contributionAmount && contributionAmount > 0 && (() => {
+              const rate = CHAMA_DEFAULT_COMMISSION_RATE;
+              const netNeeded = contributionAmount * (1 - rate);
+              const walletApplied = Math.min(totalPending, netNeeded);
+              const remainingNetNeeded = Math.max(0, netNeeded - walletApplied);
+              const topUpGross = remainingNetNeeded / (1 - rate);
+              const topUpCommission = topUpGross * rate;
+              return (
+                <div className="rounded-md bg-blue-100/60 dark:bg-blue-900/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-200 space-y-0.5">
+                  <div className="flex justify-between">
+                    <span>Next cycle requires (net)</span>
+                    <span className="font-semibold">KES {netNeeded.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Wallet credit applied (net)</span>
+                    <span className="font-semibold">- KES {walletApplied.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Top-up commission ({Math.round(rate * 100)}%)</span>
+                    <span className="font-semibold">KES {topUpCommission.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-blue-300/50 dark:border-blue-700/50 mt-1 pt-1">
+                    <span>You pay (gross top-up)</span>
+                    <span className="font-bold">KES {topUpGross.toFixed(2)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>Covered from wallet (net credit)</span>
-                  <span className="font-semibold">- KES {Math.min(totalPending, contributionAmount).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between border-t border-blue-300/50 dark:border-blue-700/50 mt-1 pt-1">
-                  <span>You still pay (commission applies)</span>
-                  <span className="font-bold">
-                    KES {Math.max(0, contributionAmount - totalPending).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
 
