@@ -237,7 +237,7 @@ export function RevenueDashboard() {
     const totalGross = revenueEntries.filter(isGrossEntry).reduce((s, e) => s + Number(e.gross_amount), 0);
     const totalPayouts = payoutEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
     const standaloneEarningsCount = earnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
-    const count = revenueEntries.length + standaloneEarningsCount;
+    const count = revenueEntries.filter(isGrossEntry).length + standaloneEarningsCount;
     const avgCommission = count > 0 ? totalRevenue / count : 0;
 
     const prevCommissionRevenue = prevRevenueEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
