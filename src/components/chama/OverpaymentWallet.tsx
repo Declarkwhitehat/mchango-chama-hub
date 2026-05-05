@@ -70,20 +70,20 @@ export function OverpaymentWallet({ chamaId, memberId, contributionAmount }: Ove
         {totalPending > 0 && (
           <>
             <p className="text-xs text-muted-foreground">
-              Commission already deducted. This balance will be automatically applied to your next cycle after payout — no extra charges.
+              This is your <strong>net</strong> credit — commission was already deducted when the overpayment was received. It will be applied automatically to your next cycle. The remaining amount you still pay will be charged the standard commission like any normal contribution.
             </p>
             {contributionAmount && contributionAmount > 0 && (
               <div className="rounded-md bg-blue-100/60 dark:bg-blue-900/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-200">
                 <div className="flex justify-between">
-                  <span>Next cycle contribution</span>
+                  <span>Next cycle contribution (gross)</span>
                   <span className="font-semibold">KES {contributionAmount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Covered from wallet</span>
+                  <span>Covered from wallet (net credit)</span>
                   <span className="font-semibold">- KES {Math.min(totalPending, contributionAmount).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between border-t border-blue-300/50 dark:border-blue-700/50 mt-1 pt-1">
-                  <span>You will pay next cycle</span>
+                  <span>You still pay (commission applies)</span>
                   <span className="font-bold">
                     KES {Math.max(0, contributionAmount - totalPending).toLocaleString()}
                   </span>
