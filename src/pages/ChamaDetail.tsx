@@ -647,11 +647,11 @@ const ChamaDetail = () => {
 
         {/* Manager Tools — invite shown only when recruitment is needed */}
         {isManager && (() => {
-          const hasOpenSeats = approvedMembers.length < (chama.max_members || 0);
+          // Once a chama has started (active/cycle_complete/completed), hide the invite link.
+          // Only show it before start, or when managers explicitly open rejoin requests.
           const showInvite =
             isPendingStatus ||
-            chama.accepting_rejoin_requests === true ||
-            (isActive && hasOpenSeats);
+            chama.accepting_rejoin_requests === true;
           if (!showInvite) return null;
           return (
             <div className="space-y-3">
