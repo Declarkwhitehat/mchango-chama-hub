@@ -80,6 +80,17 @@ const REVENUE_TX_TYPES = new Set([
 const isRevenueEntry = (e: { transaction_type?: string | null }) =>
   REVENUE_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
 
+// Gross-bearing tx types: rows that represent the actual money inflow.
+// `commission` rows mirror the gross of an already-counted contribution/donation
+// and only carry the commission slice — including their gross would double-count.
+const GROSS_TX_TYPES = new Set([
+  "contribution",
+  "contribution_summary",
+  "donation",
+]);
+const isGrossEntry = (e: { transaction_type?: string | null }) =>
+  GROSS_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
+
 // Map company_earnings.source → dashboard breakdown bucket key.
 // Lookups are case-insensitive (see earningsBucketFor) so historical
 // camelCase sources like 'accountVerificationFee' map correctly.
