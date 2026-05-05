@@ -191,3 +191,7 @@ verify_jwt = false
 
 [functions.process-email-queue]
 verify_jwt = true
+
+[functions.delete-my-account]
+verify_jwt = false
+
