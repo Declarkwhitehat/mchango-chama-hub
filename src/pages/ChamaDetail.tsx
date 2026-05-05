@@ -817,7 +817,7 @@ const ChamaDetail = () => {
 
         {/* Overpayment Wallet - visible to approved members */}
         {isMember && isActive && (
-          <OverpaymentWallet chamaId={chama.id} memberId={currentUserMembership.id} />
+          <OverpaymentWallet chamaId={chama.id} memberId={currentUserMembership.id} contributionAmount={Number(chama.contribution_amount) || 0} />
         )}
 
         {/* Payment Form - Only visible to approved members when chama is active */}
