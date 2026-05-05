@@ -80,6 +80,17 @@ const REVENUE_TX_TYPES = new Set([
 const isRevenueEntry = (e: { transaction_type?: string | null }) =>
   REVENUE_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
 
+// Gross-bearing tx types: rows that represent the actual money inflow.
+// `commission` rows mirror the gross of an already-counted contribution/donation
+// and only carry the commission slice — including their gross would double-count.
+const GROSS_TX_TYPES = new Set([
+  "contribution",
+  "contribution_summary",
+  "donation",
+]);
+const isGrossEntry = (e: { transaction_type?: string | null }) =>
+  GROSS_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
+
 // Map company_earnings.source → dashboard breakdown bucket key.
 // Lookups are case-insensitive (see earningsBucketFor) so historical
 // camelCase sources like 'accountVerificationFee' map correctly.
@@ -223,17 +234,17 @@ export function RevenueDashboard() {
     const commissionRevenue = revenueEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
     const feesRevenue = standaloneEarningsSum(earnings);
     const totalRevenue = commissionRevenue + feesRevenue;
-    const totalGross = revenueEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
+    const totalGross = revenueEntries.filter(isGrossEntry).reduce((s, e) => s + Number(e.gross_amount), 0);
     const totalPayouts = payoutEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
     const standaloneEarningsCount = earnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
-    const count = revenueEntries.length + standaloneEarningsCount;
+    const count = revenueEntries.filter(isGrossEntry).length + standaloneEarningsCount;
     const avgCommission = count > 0 ? totalRevenue / count : 0;
 
     const prevCommissionRevenue = prevRevenueEntries.reduce((s, e) => s + Number(e.commission_amount), 0);
     const prevFeesRevenue = standaloneEarningsSum(prevEarnings);
     const prevRevenue = prevCommissionRevenue + prevFeesRevenue;
-    const prevGross = prevRevenueEntries.reduce((s, e) => s + Number(e.gross_amount), 0);
-    const prevCount = prevRevenueEntries.length + prevEarnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
+    const prevGross = prevRevenueEntries.filter(isGrossEntry).reduce((s, e) => s + Number(e.gross_amount), 0);
+    const prevCount = prevRevenueEntries.filter(isGrossEntry).length + prevEarnings.filter(e => !LEDGER_DUPLICATED_EARNINGS.has(e.source)).length;
     const prevAvg = prevCount > 0 ? prevRevenue / prevCount : 0;
 
     const pctChange = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev) * 100;
@@ -287,9 +298,12 @@ export function RevenueDashboard() {
     // Payouts are excluded — they are outflows, not revenue.
     entries.filter(isRevenueEntry).forEach(e => {
       if (!map[e.source_type]) map[e.source_type] = { gross: 0, commission: 0, count: 0 };
-      map[e.source_type].gross += Number(e.gross_amount);
+      // Only count gross from inflow rows; `commission` rows mirror gross already counted.
+      if (isGrossEntry(e)) {
+        map[e.source_type].gross += Number(e.gross_amount);
+        map[e.source_type].count += 1;
+      }
       map[e.source_type].commission += Number(e.commission_amount);
-      map[e.source_type].count += 1;
     });
 
     // Standalone earnings (NOT mirrored in ledger) get their own bucket
