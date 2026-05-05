@@ -421,7 +421,89 @@ const Security = () => {
 
           </CardContent>
         </Card>
+
+        {/* Danger Zone — Delete My Account */}
+        <Card className="border-destructive/40">
+          <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
+            <CardTitle className="text-lg sm:text-xl flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              Permanently delete your account and personal data. This cannot be undone by you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-3">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              You will be signed out and lose access to all your groups, contributions and history.
+              Pending withdrawals must complete first; managers must transfer leadership.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full text-destructive border-destructive hover:bg-destructive/10"
+              onClick={() => { setDeletePhrase(""); setDeletePassword(""); setShowDeleteDialog(true); }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete My Account
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Delete Account Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={(o) => !isDeleting && setShowDeleteDialog(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action is permanent. To confirm, type <strong>{DELETE_PHRASE}</strong> below and enter your password.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Confirmation phrase</Label>
+              <Input
+                value={deletePhrase}
+                onChange={(e) => setDeletePhrase(e.target.value)}
+                placeholder={DELETE_PHRASE}
+                disabled={isDeleting}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Password</Label>
+              <div className="relative">
+                <Input
+                  type={showDeletePassword ? "text" : "password"}
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Your password"
+                  className="pr-10"
+                  disabled={isDeleting}
+                />
+                <Button
+                  type="button" variant="ghost" size="icon"
+                  className="absolute right-0 top-0 h-full px-2 hover:bg-transparent"
+                  onClick={() => setShowDeletePassword(!showDeletePassword)}
+                  tabIndex={-1}
+                >
+                  {showDeletePassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDeleteMyAccount(); }}
+              disabled={isDeleting || deletePhrase.trim() !== DELETE_PHRASE || !deletePassword}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {/* Delete WebAuthn Credential Confirmation */}
       <AlertDialog open={!!credentialToDelete} onOpenChange={() => setCredentialToDelete(null)}>
