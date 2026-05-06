@@ -3666,8 +3666,11 @@ export type Database = {
       }
       cleanup_expired_documents: { Args: never; Returns: undefined }
       cleanup_expired_otps: { Args: never; Returns: undefined }
+      cleanup_failed_transactions: { Args: never; Returns: undefined }
       cleanup_old_chat_messages: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
+      compute_trust_scores: { Args: never; Returns: undefined }
+      financial_reconciliation: { Args: never; Returns: Json }
       generate_group_invite_code: { Args: never; Returns: string }
       generate_invite_code: { Args: never; Returns: string }
       generate_mchango_code: { Args: never; Returns: string }
