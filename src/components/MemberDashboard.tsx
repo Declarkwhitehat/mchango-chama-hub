@@ -41,23 +41,23 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { if (!isBackgroundRefetch) setIsLoading(false); return; }
 
-      const { data, error } = await supabase.functions.invoke('member-dashboard', {
-        body: { chama_id: chamaId }
-      });
+      const { data, error } = await supabase.rpc('get_member_dashboard', { p_chama_id: chamaId });
 
-      if (error) {
+      const payload: any = data;
+      const errMsg = error?.message || payload?.error;
+      if (errMsg) {
         if (!isBackgroundRefetch) {
-          if (error.message?.includes('Pending approval')) {
+          if (String(errMsg).includes('Pending approval')) {
             toast({ title: "Pending Approval", description: "Your membership is awaiting manager approval." });
-          } else if (error.message?.includes('Not a member')) {
+          } else if (String(errMsg).includes('Not a member')) {
             toast({ title: "Not a Member", description: "You need to join this chama to view the dashboard", variant: "destructive" });
           } else {
-            toast({ title: "Error Loading Dashboard", description: error.message || "Failed to load dashboard data", variant: "destructive" });
+            toast({ title: "Error Loading Dashboard", description: errMsg || "Failed to load dashboard data", variant: "destructive" });
           }
           setDashboardData(null);
         }
       } else {
-        setDashboardData(data?.data || data);
+        setDashboardData(payload?.data || payload);
       }
     } catch (error: any) {
       if (!isBackgroundRefetch) {
