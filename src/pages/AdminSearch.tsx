@@ -51,12 +51,14 @@ export default function AdminSearch() {
     setSelectedUserId(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-search', {
-        body: { query: query.trim(), type }
+      const { data, error } = await supabase.rpc('admin_search', {
+        p_query: query.trim(), p_type: type
       });
       if (error) throw error;
+      const payload: any = data;
+      if (payload?.error) throw new Error(payload.error);
 
-      const results = data?.data;
+      const results = payload?.data;
       if (!results) throw new Error('No data returned');
 
       // If exactly one user found, auto-load activity
@@ -89,12 +91,12 @@ export default function AdminSearch() {
     setActivityLoading(true);
     setSelectedUserId(userId);
     try {
-      const { data, error } = await supabase.functions.invoke('admin-member-activity', {
-        body: { user_id: userId }
-      });
+      const { data, error } = await supabase.rpc('get_admin_member_activity', { p_user_id: userId });
       if (error) throw error;
-      if (data?.data) {
-        setActivity(data.data);
+      const payload: any = data;
+      if (payload?.error) throw new Error(payload.error);
+      if (payload?.data) {
+        setActivity(payload.data);
       }
     } catch (error: any) {
       console.error('Activity error:', error);

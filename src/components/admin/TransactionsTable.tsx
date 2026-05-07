@@ -44,11 +44,13 @@ export const TransactionsTable = () => {
 
   const fetchTransactions = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke("admin-transactions", {
-        body: { limit: 200 },
+      const { data, error } = await supabase.rpc("get_admin_transactions", {
+        p_search: "", p_limit: 200,
       });
       if (error) throw error;
-      setTransactions(data?.transactions || []);
+      const payload: any = data;
+      if (payload?.error) throw new Error(payload.error);
+      setTransactions(payload?.transactions || []);
     } catch (error: any) {
       console.error("Error fetching transactions:", error);
       toast({
