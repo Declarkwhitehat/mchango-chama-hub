@@ -3612,6 +3612,10 @@ export type Database = {
     }
     Functions: {
       admin_clear_payout_default: { Args: { p_user_id: string }; Returns: Json }
+      admin_search: {
+        Args: { p_query: string; p_type?: string }
+        Returns: Json
+      }
       calculate_available_loan_pool: {
         Args: { p_group_id: string }
         Returns: number
@@ -3698,6 +3702,12 @@ export type Database = {
         Returns: string
       }
       generate_welfare_paybill_account_id: { Args: never; Returns: string }
+      get_admin_member_activity: { Args: { p_user_id: string }; Returns: Json }
+      get_admin_transactions: {
+        Args: { p_limit?: number; p_search?: string }
+        Returns: Json
+      }
+      get_member_dashboard: { Args: { p_chama_id: string }; Returns: Json }
       get_member_payout_position: {
         Args: { p_member_id: string }
         Returns: {
