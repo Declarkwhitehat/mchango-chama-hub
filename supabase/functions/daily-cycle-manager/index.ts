@@ -405,6 +405,8 @@ Deno.serve(async (req) => {
         const now = new Date();
         const endDate = new Date(cycle.end_date);
         const isPastDue = now > endDate;
+        const cycleAge = Date.now() - new Date(cycle.created_at).getTime();
+        const isStillNew = cycleAge < 23 * 60 * 60 * 1000;
 
         return {
           id: cycle.id,
@@ -428,10 +430,10 @@ Deno.serve(async (req) => {
           } : null,
           commission_rate: isPastDue && !(payment?.fully_paid) ? 0.10 : 0.05,
           commission_label: isPastDue && !(payment?.fully_paid) ? '10% (late)' : '5% (on-time)',
-          status: payment?.fully_paid 
+          status: payment?.fully_paid
             ? (payment.is_late_payment ? 'late' : 'paid')
-            : isPastDue 
-              ? 'missed' 
+            : (isPastDue && !isStillNew)
+              ? 'missed'
               : 'pending' as const
         };
       });

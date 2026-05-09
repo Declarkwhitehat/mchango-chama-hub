@@ -69,7 +69,7 @@ function calculateNextCycleDates(
   switch (frequency) {
     case 'daily':
       // End today at 10 PM Kenya time (19:00 UTC)
-      endDate.setHours(22, 0, 0, 0);
+      endDate.setUTCHours(19, 0, 0, 0);
       break;
     case 'weekly':
       endDate.setDate(endDate.getDate() + 6);
