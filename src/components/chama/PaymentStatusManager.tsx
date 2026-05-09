@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check, X, Clock, Users, Download, Loader2, FileText } from "lucide-react";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { notifyDownloadComplete } from "@/lib/nativeDownloadNotification";
+import { notifyDownloadComplete, savePdfNative } from "@/lib/nativeDownloadNotification";
 import { jsPDF } from "jspdf";
 import { toast } from "sonner";
 import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
@@ -117,12 +117,13 @@ export const PaymentStatusManager = ({
         `)
         .eq("chama_id", chamaId)
         .eq("status", "active")
+        .eq("approval_status", "approved")
         .order("order_index", { ascending: true });
 
       if (membersError) throw membersError;
 
-      // Fetch contributions for the last month
-      const startDate = startOfMonth(new Date());
+      // Fetch contributions for the last 7 days (covers week-view across month boundary)
+      const startDate = subDays(new Date(), 7);
       const { data: contributionsData, error: contributionsError } = await supabase
         .from("contributions")
         .select("id, member_id, amount, contribution_date, status, payment_reference")
@@ -259,7 +260,7 @@ export const PaymentStatusManager = ({
     // Also check if member_cycle_payments marks them as paid for any cycle in range
     if (p !== "today") {
       const memberCyclePayment = cyclePayments.find(
-        (cp) => cp.member_id === memberId && cp.is_paid
+        (cp) => cp.member_id === memberId && cp.is_paid && cp.cycle_id === activeCycleId
       );
       if (memberCyclePayment && totalPaid < contributionAmount) {
         return {
@@ -339,8 +340,11 @@ export const PaymentStatusManager = ({
       doc.setFont("helvetica", "normal");
       yPos += 12;
 
-      // Summary
-      const totalCollected = periodContributions.reduce((sum, c) => sum + c.amount, 0);
+      // Summary — sum from per-member status to match table amounts exactly
+      const totalCollected = paidMembersForPdf.reduce(
+        (sum, m) => sum + getMemberPaymentStatus(m.id, pdfPeriod).amount,
+        0,
+      );
       
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
@@ -476,7 +480,7 @@ export const PaymentStatusManager = ({
 
       const pdfBlob = doc.output('blob');
       const fileName = `${chamaName.replace(/[^a-zA-Z0-9]/g, "_")}_payments_${pdfPeriod}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
-      doc.save(fileName);
+      await savePdfNative(pdfBlob, fileName);
       notifyDownloadComplete(fileName);
 
       // Upload to storage in background

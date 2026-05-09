@@ -551,7 +551,7 @@ serve(async (req) => {
         await supabase.functions.invoke('send-transactional-sms', {
           body: {
             phone: phoneNumber,
-            message: `Thank you ${firstName}! Your donation of KSh ${grossAmount} to "${mchangoData.title}" was received. Commission: KSh ${commissionAmount.toFixed(2)} (15%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
+            message: `Thank you ${firstName}! Your donation of KSh ${grossAmount} to "${mchangoData.title}" was received. Commission: KSh ${commissionAmount.toFixed(2)} (${(commissionRate * 100).toFixed(0)}%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
           },
         });
       } catch (smsError) {

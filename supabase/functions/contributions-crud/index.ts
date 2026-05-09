@@ -654,15 +654,10 @@ async function settleDebts(
       description: `Overpayment of KES ${remaining.toFixed(2)} → commission KES ${overpaymentCommission.toFixed(2)} deducted → KES ${overpaymentNet.toFixed(2)} stored in wallet`
     });
 
-    // Also update carry_forward_credit on member for backward compatibility
-    const { data: memberData } = await supabase
-      .from('chama_members')
-      .select('carry_forward_credit')
-      .eq('id', memberId)
-      .single();
-
+    // NOTE: chama_overpayment_wallet is the single source of truth for overpayments.
+    // Do NOT also update chama_members.carry_forward_credit — that would double-credit
+    // the member when the next cycle starts.
     await supabase.from('chama_members').update({
-      carry_forward_credit: (memberData?.carry_forward_credit || 0) + overpaymentNet,
       last_payment_date: new Date().toISOString()
     }).eq('id', memberId);
 
