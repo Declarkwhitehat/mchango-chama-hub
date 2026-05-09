@@ -313,7 +313,7 @@ Deno.serve(async (req) => {
 
     let chamaQuery = supabase
       .from('chama')
-      .select('id, name, contribution_amount, commission_rate, contribution_frequency, current_cycle_round, created_at, every_n_days_count, monthly_contribution_day, monthly_contribution_day_2')
+      .select('id, name, contribution_amount, commission_rate, contribution_frequency, current_cycle_round, start_date, created_at, every_n_days_count, monthly_contribution_day, monthly_contribution_day_2')
       .eq('status', 'active');
 
     if (singleChamaId) {
@@ -337,6 +337,14 @@ Deno.serve(async (req) => {
     let errors = 0;
 
     for (const chama of chamas || []) {
+      // ========== GRACE PERIOD: skip chamas in their first 24h ==========
+      const chamaStart = new Date(chama.start_date || chama.created_at);
+      const graceEnds = new Date(chamaStart.getTime() + 24 * 60 * 60 * 1000);
+      if (new Date() < graceEnds) {
+        console.log(`[GRACE] Skipping ${chama.name} — still in 24h grace period`);
+        continue;
+      }
+
       const now = new Date().toISOString();
       
       // ========== GAP RECOVERY: Create missing cycles ==========
@@ -394,6 +402,10 @@ Deno.serve(async (req) => {
               nextStart.setHours(0, 0, 0, 0);
               
               if (nextStart > today) break;
+
+              // Never create a gap cycle for a date that's less than 23 hours old
+              const gapAge = Date.now() - new Date(nextStart).getTime();
+              if (gapAge < 23 * 60 * 60 * 1000) break;
 
               const nextEnd = new Date(nextStart);
               switch (chama.contribution_frequency) {
@@ -579,6 +591,13 @@ Deno.serve(async (req) => {
       console.log(`[CATCH-UP] Processing ${pendingCycles.length} overdue cycle(s) for ${chama.name}`);
 
       for (const cycle of pendingCycles) {
+        // ========== NEW CYCLE GRACE: skip cycles created less than 23h ago ==========
+        const cycleAge = Date.now() - new Date(cycle.created_at).getTime();
+        if (cycleAge < 23 * 60 * 60 * 1000) {
+          console.log(`[SKIP] Cycle ${cycle.id} too new (${(cycleAge / 3600000).toFixed(1)}h), skipping`);
+          continue;
+        }
+
         console.log(`  Processing cycle #${cycle.cycle_number} (${cycle.start_date} - ${cycle.end_date})`);
 
         // ========== ROW-LEVEL LOCK: Claim cycle for processing ==========
