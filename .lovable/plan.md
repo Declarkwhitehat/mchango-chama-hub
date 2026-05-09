@@ -1,61 +1,43 @@
-## Convert 11 Edge Functions → RPC / direct PostgREST / DB trigger
+# Chama System Bug Fixes (13 fixes)
 
-This is a large refactor (~5,075 lines of edge code across 11 functions, plus 5+ frontend files). I want to flag three blockers and confirm scope before I start.
+Apply the exact code changes you specified, scoped to the named files/functions.
 
-### Blockers / things I cannot do exactly as written
+## Files to edit
 
-1. `capture-login-ip` **cannot become a trigger on** `auth.users`**.**
-  - Project rule (memory: "Avoid Modifying Supabase-Reserved Schemas"): no triggers on `auth.*`.
-  - Even if allowed, Postgres triggers do not see the HTTP client IP — that is only available at the API/edge layer. A DB trigger physically cannot record the real client IP.
-  - **Proposal:** keep `capture-login-ip` as an Edge Function (it's the only way to capture IP), OR drop it entirely and rely on `last_login_ip` being set elsewhere. Tell me which.
-2. `contributions-crud` **(1,320 lines) and** `withdrawals-crud` **(1,536 lines) are mostly write/payment paths**, not reads. Looking at them, the "read paths" are a small fraction. I need to audit each handler to separate read vs. write before porting. A clean conversion of just the reads is realistic; touching the writes is out of scope per your instructions.
-  - **Proposal:** I'll inventory each function's actions, port only the pure-SELECT actions to direct `supabase.from(...)` with RLS, and leave every write/payment action as-is. I'll do this audit in the implementation pass and report the exact list before deleting anything.
-3. `member-dashboard` **(321 lines) and** `chama-reports` **(797 lines)** do heavy multi-table aggregation in TypeScript. Porting line-by-line to plpgsql while *exactly* preserving the JSON shape is doable but error-prone. I'll mirror the JSON keys 1:1 and add a regression check (call both old + new in parallel for one render and diff) before deleting the edge function. OK?
+### `src/components/chama/PaymentStatusManager.tsx`
+- **FIX 1**: In `getMemberPaymentStatus()`, add `&& cp.cycle_id === activeCycleId` to the `p !== "today"` fallback `cyclePayments.find(...)`.
+- **FIX 2**: In `generatePDF()`, replace `totalCollected` calc to sum from `paidMembersForPdf.reduce((sum, m) => sum + getMemberPaymentStatus(m.id, pdfPeriod).amount, 0)`.
+- **FIX 11**: In `fetchData()`, add `.eq("approval_status", "approved")` to members query.
+- **FIX 12**: In `fetchData()`, change contributions start date from `startOfMonth(new Date())` to `subDays(new Date(), 7)`. Import `subDays` from `date-fns`.
+- **FIX 13**: In `generatePDF()`, replace `doc.save(fileName)` with `await savePdfNative(pdfBlob, fileName)` (import helper as used elsewhere in the app; verify import path during impl).
 
-### What I will do (assuming you confirm above)
+### `supabase/functions/cycle-auto-create/index.ts`
+- **FIX 3a**: In `calculateNextCycleDates()` daily case, replace `endDate.setHours(22, 0, 0, 0)` with `endDate.setUTCHours(19, 0, 0, 0)`.
 
-**Migration 1 — RPC functions (SECURITY DEFINER, search_path=public):**
+### `supabase/functions/daily-cycle-manager/index.ts`
+- **FIX 3b**: Replace any `setHours(22,0,0,0)` with `setUTCHours(19,0,0,0)`.
+- **FIX 7**: In `all-cycles` action, compute `cycleAge`/`isStillNew` and gate `missed` on `!isStillNew` per the snippet.
 
-- `public.get_member_dashboard(p_member_id uuid, p_chama_id uuid) returns jsonb` — port of `member-dashboard/index.ts`. Auth check: `auth.uid()` must equal the member's `user_id` OR be a chama manager OR have `has_role(auth.uid(),'admin')`.
-- `public.get_chama_report(p_chama_id uuid) returns jsonb` — port of `chama-reports/index.ts`. Auth: chama manager or admin.
-- `public.admin_search(p_query text, p_type text default null, p_limit int default 50) returns jsonb` — internal admin check `IF NOT has_role(auth.uid(),'admin') THEN RAISE EXCEPTION ...`.
-- `public.admin_transactions(p_filters jsonb default '{}', p_limit int default 100, p_offset int default 0) returns jsonb` — same admin guard.
-- `public.admin_member_activity(p_user_id uuid) returns jsonb` — same admin guard.
+### `supabase/functions/daily-payout-cron/index.ts`
+- **FIX 4**: At top of main cycle-processing loop, skip cycle if `created_at` < 23h old.
+- **FIX 5**: At top of `for (const chama of chamas)` loop, skip if within 24h grace period from `start_date || created_at`. Ensure those columns are SELECTed.
+- **FIX 6**: Inside Gap Recovery `while` loop, before inserting each gap cycle, `break` if `nextStart` is < 23h old.
 
-**Migration 2 — Reschedule/cleanup (none — these are user-invoked, no cron).**
+### `supabase/functions/c2b-confirm-payment/index.ts`
+- **FIX 8**: Replace hardcoded `(15%)` SMS string with `(${(commissionRate * 100).toFixed(0)}%)`.
 
-**Frontend changes:**
+### `supabase/functions/payment-stk-callback/index.ts`
+- **FIX 9**: Move the `notifyManyUsers` broadcast call inside the `if (status === 'completed')` block.
 
-- `MemberDashboard.tsx`, `AdminSearch.tsx`, `TransactionsTable.tsx`, `WithdrawalsManagement.tsx`, `PaymentAllocationPreview.tsx`, plus any caller of `payment-methods` / `payment-config`: replace `supabase.functions.invoke('x', …)` with `supabase.rpc('y', …)` or `supabase.from('table').select(…)`.
-- `payment-methods` reads → `supabase.from('payment_methods').select('*').eq('user_id', user.id)` (RLS already restricts to owner).
-- `payment-config` reads → `supabase.from('payment_config').select('*')` (verify RLS allows public/auth read; if not, leave as edge function).
+### `supabase/functions/contributions-crud/index.ts`
+- **FIX 10**: In `settleDebts()`, remove the `carry_forward_credit` update so `chama_overpayment_wallet` is sole source of truth.
 
-**Edge function deletions (after frontend cutover + smoke check):**
+## Verification
+- Open each file beforehand to confirm exact context (function signatures, surrounding code) so search/replace lands cleanly.
+- After edits, deploy the touched edge functions: `cycle-auto-create`, `daily-cycle-manager`, `daily-payout-cron`, `c2b-confirm-payment`, `payment-stk-callback`, `contributions-crud`.
+- No DB migrations, no schema changes, no UI/business-logic changes beyond what's listed.
 
-- `member-dashboard`, `chama-reports`, `admin-search`, `admin-transactions`, `admin-member-activity`, `payment-methods`, `payment-config` — fully delete.
-- `contributions-crud`, `transactions-crud`, `withdrawals-crud` — KEEP, only remove the read handlers. (I'll list which.)
-- `capture-login-ip` — keep (see blocker #1) unless you tell me to drop it.
-
-### What I need from you before I start
-
-1. Confirm `capture-login-ip` decision: keep as edge function, or drop entirely?
-2. Confirm OK to leave write/payment handlers in `contributions-crud` / `withdrawals-crud` / `transactions-crud` untouched, only converting reads?
-3. Confirm OK with the regression-check approach for `member-dashboard` and `chama-reports` (i.e., I'll port them, but if any consumer relies on a subtle field shape I may need to iterate)?
-
-Once you answer, I'll do the audit + implementation in one pass.   Question 1 — capture-login-ip
-
-Keep it as an Edge Function. It records real client IPs for your fraud monitoring system which you just enhanced. Losing IP data would weaken your fraud detection. The cost of one Edge Function that only fires on login is negligible compared to the security value.
-
-Question 2 — contributions-crud, withdrawals-crud, transactions-crud
-
-Yes confirm only convert the read paths. Never touch the write and payment paths. Those handle real money and must stay exactly as they are.
-
-Question 3 — Regression check for member-dashboard and chama-reports
-
-Yes confirm the regression check approach. Running old and new in parallel and diffing the output before deleting the old function is exactly the right way to do this safely. This is good engineering practice.
-
-One additional instruction to add
-
-Before approving send Lovable this clarification alongside your answers:
-
-Confirmed on all three points. Keep capture-login-ip as an Edge Function. Only convert read paths in contributions-crud, withdrawals-crud and transactions-crud leaving all write and payment handlers completely untouched. Proceed with the regression check approach for member-dashboard and chama-reports. One additional requirement: do not delete any Edge Function until the frontend has been fully updated to use the new RPC or direct query AND you have confirmed the data returned matches exactly. Delete only after successful smoke check, not before
+## Notes / Risks
+- For FIX 13, I'll match the existing `savePdfNative` helper pattern used by other PDF downloads (e.g. `ContributionsPDFDownload.tsx`) — same import path and blob-construction style.
+- FIX 5 reads `chama.start_date`; if it's null the fallback to `created_at` per your snippet is preserved.
+- All financial logic (commission %, settlement order, payout amounts) remains untouched; only timing/filter/display bugs are fixed.
