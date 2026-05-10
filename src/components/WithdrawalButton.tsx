@@ -243,6 +243,17 @@ export const WithdrawalButton = ({
           organization_id: organizationId,
           amount: withdrawAmount,
           notes: notes.trim() ? notes.trim() : undefined,
+          // M-PESA B2C fee for org/mchango (chama payouts handled by daily-payout-cron)
+          ...(!chamaId && (mchangoId || organizationId)
+            ? (() => {
+                const f = getMpesaTransactionFee(withdrawAmount);
+                return {
+                  transaction_fee: f.transactionFee,
+                  safaricom_cost: f.safaricomCost,
+                  company_revenue: f.companyRevenue,
+                };
+              })()
+            : {}),
         }),
       });
 
