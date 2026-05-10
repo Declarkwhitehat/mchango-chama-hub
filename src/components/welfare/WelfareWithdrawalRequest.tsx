@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Loader2, Send, CheckCircle2 } from "lucide-react";
+import { getMpesaTransactionFee } from "@/utils/mpesaTransactionFee";
 
 interface Props {
   welfareId: string;
@@ -70,6 +71,9 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
 
     setLoading(true);
     try {
+      const fee = getMpesaTransactionFee(numAmount);
+      const netAmount = numAmount - fee.transactionFee;
+      if (netAmount <= 0) { toast.error("Amount too small after M-PESA fee"); setLoading(false); return; }
       const { data, error } = await supabase
         .from('withdrawals')
         .insert({
@@ -77,7 +81,10 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
           requested_by: user.id,
           amount: numAmount,
           commission_amount: 0,
-          net_amount: numAmount,
+          net_amount: netAmount,
+          transaction_fee: fee.transactionFee,
+          safaricom_cost: fee.safaricomCost,
+          company_revenue: fee.companyRevenue,
           status: 'pending_approval',
           notes: `Category: ${category}. ${reason}. Recipient: ${resolvedRecipient.phone} (Member ID: ${resolvedRecipient.memberId}, Name: ${resolvedRecipient.name})`,
         })
