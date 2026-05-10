@@ -3416,6 +3416,7 @@ export type Database = {
           b2c_error_details: Json | null
           chama_id: string | null
           commission_amount: number
+          company_revenue: number
           completed_at: string | null
           cooling_off_until: string | null
           created_at: string
@@ -3436,7 +3437,9 @@ export type Database = {
           requested_by: string
           reviewed_at: string | null
           reviewed_by: string | null
+          safaricom_cost: number
           status: string
+          transaction_fee: number
           updated_at: string
           welfare_id: string | null
         }
@@ -3446,6 +3449,7 @@ export type Database = {
           b2c_error_details?: Json | null
           chama_id?: string | null
           commission_amount?: number
+          company_revenue?: number
           completed_at?: string | null
           cooling_off_until?: string | null
           created_at?: string
@@ -3466,7 +3470,9 @@ export type Database = {
           requested_by: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          safaricom_cost?: number
           status?: string
+          transaction_fee?: number
           updated_at?: string
           welfare_id?: string | null
         }
@@ -3476,6 +3482,7 @@ export type Database = {
           b2c_error_details?: Json | null
           chama_id?: string | null
           commission_amount?: number
+          company_revenue?: number
           completed_at?: string | null
           cooling_off_until?: string | null
           created_at?: string
@@ -3496,7 +3503,9 @@ export type Database = {
           requested_by?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          safaricom_cost?: number
           status?: string
+          transaction_fee?: number
           updated_at?: string
           welfare_id?: string | null
         }
