@@ -16,6 +16,7 @@ import { PAYMENT_METHOD_LIMITS, type PaymentMethodType } from "@/utils/paymentLi
 import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 import { PinEntryDialog } from "@/components/PinEntryDialog";
 import { usePlatformMinimums } from "@/hooks/usePlatformMinimums";
+import { getMpesaTransactionFee } from "@/utils/mpesaTransactionFee";
 
 interface WithdrawalButtonProps {
   chamaId?: string;
@@ -242,6 +243,17 @@ export const WithdrawalButton = ({
           organization_id: organizationId,
           amount: withdrawAmount,
           notes: notes.trim() ? notes.trim() : undefined,
+          // M-PESA B2C fee for org/mchango (chama payouts handled by daily-payout-cron)
+          ...(!chamaId && (mchangoId || organizationId)
+            ? (() => {
+                const f = getMpesaTransactionFee(withdrawAmount);
+                return {
+                  transaction_fee: f.transactionFee,
+                  safaricom_cost: f.safaricomCost,
+                  company_revenue: f.companyRevenue,
+                };
+              })()
+            : {}),
         }),
       });
 
@@ -464,34 +476,59 @@ export const WithdrawalButton = ({
                 {customAmount && Number(customAmount) > totalAvailable && (
                   <p className="text-xs text-destructive">Amount exceeds available balance</p>
                 )}
-                <Card className="bg-primary/5 border-primary/20">
-                  <CardContent className="pt-4">
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>You'll Receive</span>
-                      <span className="text-primary">
-                        KES {(Number(customAmount) || 0).toLocaleString()}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Commission was already deducted when payments were received
-                    </p>
-                  </CardContent>
-                </Card>
+                {(() => {
+                  const amt = Number(customAmount) || 0;
+                  const fee = getMpesaTransactionFee(amt);
+                  return (
+                    <Card className="bg-primary/5 border-primary/20">
+                      <CardContent className="pt-4 space-y-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Transaction Fee (M-PESA)</span>
+                          <span>KES {fee.transactionFee.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-lg font-bold pt-1">
+                          <span>You'll Receive</span>
+                          <span className="text-primary">
+                            KES {Math.max(0, amt - fee.transactionFee).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Commission was already deducted when payments were received
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
               </div>
             ) : (
-              <Card className="bg-primary/5 border-primary/20">
-                <CardContent className="pt-4">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>You'll Receive</span>
-                    <span className="text-primary">
-                      KES {withdrawAmount.toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Full balance withdrawal • Commission was already deducted when payments were received
-                  </p>
-                </CardContent>
-              </Card>
+              (() => {
+                const isFeeBearing = !chamaId && (mchangoId || organizationId);
+                const fee = isFeeBearing
+                  ? getMpesaTransactionFee(withdrawAmount)
+                  : { transactionFee: 0, safaricomCost: 0, companyRevenue: 0 };
+                const recipient = withdrawAmount - fee.transactionFee;
+                return (
+                  <Card className="bg-primary/5 border-primary/20">
+                    <CardContent className="pt-4 space-y-1">
+                      {isFeeBearing && (
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Transaction Fee (M-PESA)</span>
+                          <span>KES {fee.transactionFee.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-lg font-bold pt-1">
+                        <span>You'll Receive</span>
+                        <span className="text-primary">
+                          KES {Math.max(0, recipient).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Full balance withdrawal • Commission was already deducted when payments were received
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })()
             )}
 
             <div className="space-y-2">

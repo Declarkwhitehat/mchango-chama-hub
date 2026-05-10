@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Loader2, Send, CheckCircle2 } from "lucide-react";
+import { getMpesaTransactionFee } from "@/utils/mpesaTransactionFee";
 
 interface Props {
   welfareId: string;
@@ -70,6 +71,9 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
 
     setLoading(true);
     try {
+      const fee = getMpesaTransactionFee(numAmount);
+      const netAmount = numAmount - fee.transactionFee;
+      if (netAmount <= 0) { toast.error("Amount too small after M-PESA fee"); setLoading(false); return; }
       const { data, error } = await supabase
         .from('withdrawals')
         .insert({
@@ -77,7 +81,10 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
           requested_by: user.id,
           amount: numAmount,
           commission_amount: 0,
-          net_amount: numAmount,
+          net_amount: netAmount,
+          transaction_fee: fee.transactionFee,
+          safaricom_cost: fee.safaricomCost,
+          company_revenue: fee.companyRevenue,
           status: 'pending_approval',
           notes: `Category: ${category}. ${reason}. Recipient: ${resolvedRecipient.phone} (Member ID: ${resolvedRecipient.memberId}, Name: ${resolvedRecipient.name})`,
         })
@@ -195,6 +202,23 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
           <Label>Additional Notes</Label>
           <Textarea placeholder="Provide details..." value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
         </div>
+
+        {Number(amount) > 0 && (() => {
+          const f = getMpesaTransactionFee(Number(amount));
+          const recipientGets = Math.max(0, Number(amount) - f.transactionFee);
+          return (
+            <div className="rounded-md border p-3 space-y-1 bg-muted/30">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Transaction Fee (M-PESA)</span>
+                <span>KES {f.transactionFee.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold">
+                <span>Recipient will receive</span>
+                <span className="text-primary">KES {recipientGets.toLocaleString()}</span>
+              </div>
+            </div>
+          );
+        })()}
 
         <Button onClick={handleRequest} disabled={loading || !resolvedRecipient} className="w-full">
           {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { getSameDay10PmKenyaCutoff } from '../_shared/chamaDeadlines.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { getMpesaTransactionFee } from '../_shared/mpesaTransactionFee.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -961,6 +962,13 @@ Deno.serve(async (req) => {
               
               const withdrawalStatus = canAutoApprove ? 'approved' : 'pending';
 
+              // M-PESA B2C transaction fee — deducted from the recipient's payout.
+              const isMpesaPayout = (paymentMethod?.method_type ?? 'mpesa') === 'mpesa';
+              const feeBreakdown = isMpesaPayout
+                ? getMpesaTransactionFee(payoutAmount)
+                : { transactionFee: 0, safaricomCost: 0, companyRevenue: 0 };
+              const recipientAmount = payoutAmount - feeBreakdown.transactionFee;
+
               const { data: newWithdrawal, error: withdrawalError } = await supabase
                 .from('withdrawals')
                 .insert({
@@ -969,7 +977,10 @@ Deno.serve(async (req) => {
                   requested_by: actualBeneficiary.user_id,
                   amount: collectedAmount,
                   commission_amount: totalCommission,
-                  net_amount: payoutAmount,
+                  net_amount: recipientAmount,
+                  transaction_fee: feeBreakdown.transactionFee,
+                  safaricom_cost: feeBreakdown.safaricomCost,
+                  company_revenue: feeBreakdown.companyRevenue,
                   status: withdrawalStatus,
                   payment_method_id: paymentMethod?.id,
                   payment_method_type: paymentMethod?.method_type,
@@ -999,7 +1010,7 @@ Deno.serve(async (req) => {
                   source_id: chama.id,
                   gross_amount: collectedAmount,
                   commission_amount: totalCommission,
-                  net_amount: payoutAmount,
+                  net_amount: recipientAmount,
                   commission_rate: collectedAmount > 0 ? totalCommission / collectedAmount : 0.05,
                   reference_id: newWithdrawal.id,
                   description: `Cycle #${cycle.cycle_number} ${payoutType} payout to ${actualBeneficiary.member_code}. ${paidCount}/${totalMembers} paid.`
@@ -1016,7 +1027,7 @@ Deno.serve(async (req) => {
                     beneficiary: actualBeneficiary.member_code,
                     gross: collectedAmount,
                     commission: totalCommission,
-                    net: payoutAmount,
+                    net: recipientAmount,
                     payout_type: payoutType,
                     was_redirected: wasSkipped
                   }
@@ -1026,7 +1037,7 @@ Deno.serve(async (req) => {
                   const beneficiaryPhone = actualBeneficiary.profiles?.phone || paymentMethod.phone_number;
                   if (beneficiaryPhone) {
                     await sendSMS(beneficiaryPhone, 
-                      `💰 Your chama "${chama.name}" payout of KES ${payoutAmount.toFixed(2)} is being processed. You should receive it within 2 minutes.`
+                      `💰 Your chama "${chama.name}" payout of KES ${recipientAmount.toFixed(2)} is being processed. You should receive it within 2 minutes.`
                     );
                   }
 
@@ -1040,7 +1051,7 @@ Deno.serve(async (req) => {
                       body: JSON.stringify({
                         withdrawal_id: newWithdrawal.id,
                         phone_number: paymentMethod.phone_number,
-                        amount: payoutAmount
+                        amount: recipientAmount
                       })
                     });
 

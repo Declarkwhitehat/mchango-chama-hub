@@ -20,6 +20,7 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, end
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
+import { MpesaFeeSummary } from "./MpesaFeeSummary";
 
 type PeriodPreset = "today" | "week" | "month" | "year" | "custom";
 type SourceFilter = "all" | "chama" | "mchango" | "organization" | "welfare";
@@ -570,6 +571,9 @@ export function RevenueDashboard() {
           </Card>
         ))}
       </div>
+
+      {/* M-PESA Transaction Fee Summary */}
+      <MpesaFeeSummary />
 
       {/* Revenue Trend Chart */}
       <Card>
