@@ -522,9 +522,12 @@ const AdminChamaDetail = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
-                        <TableHead>Amount</TableHead>
+                        <TableHead>Requested</TableHead>
                         <TableHead>Commission</TableHead>
-                        <TableHead>Net Amount</TableHead>
+                        <TableHead>Transaction Fee</TableHead>
+                        <TableHead>Safaricom Cost</TableHead>
+                        <TableHead>Company Revenue</TableHead>
+                        <TableHead>Sent via M-PESA</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -534,6 +537,9 @@ const AdminChamaDetail = () => {
                           <TableCell>{format(new Date(w.requested_at), "MMM d, yyyy HH:mm")}</TableCell>
                           <TableCell className="font-medium">KES {Number(w.amount).toLocaleString()}</TableCell>
                           <TableCell>KES {Number(w.commission_amount).toLocaleString()}</TableCell>
+                          <TableCell>KES {Number(w.transaction_fee || 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-muted-foreground">KES {Number(w.safaricom_cost || 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-muted-foreground">KES {Number(w.company_revenue || 0).toLocaleString()}</TableCell>
                           <TableCell className="font-medium text-green-600">KES {Number(w.net_amount).toLocaleString()}</TableCell>
                           <TableCell>
                             <Badge variant={
