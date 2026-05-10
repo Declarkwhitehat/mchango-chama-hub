@@ -203,6 +203,23 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
           <Textarea placeholder="Provide details..." value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
         </div>
 
+        {Number(amount) > 0 && (() => {
+          const f = getMpesaTransactionFee(Number(amount));
+          const recipientGets = Math.max(0, Number(amount) - f.transactionFee);
+          return (
+            <div className="rounded-md border p-3 space-y-1 bg-muted/30">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Transaction Fee (M-PESA)</span>
+                <span>KES {f.transactionFee.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold">
+                <span>Recipient will receive</span>
+                <span className="text-primary">KES {recipientGets.toLocaleString()}</span>
+              </div>
+            </div>
+          );
+        })()}
+
         <Button onClick={handleRequest} disabled={loading || !resolvedRecipient} className="w-full">
           {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
           Submit for Approval
