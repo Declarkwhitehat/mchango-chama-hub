@@ -962,6 +962,13 @@ Deno.serve(async (req) => {
               
               const withdrawalStatus = canAutoApprove ? 'approved' : 'pending';
 
+              // M-PESA B2C transaction fee — deducted from the recipient's payout.
+              const isMpesaPayout = (paymentMethod?.method_type ?? 'mpesa') === 'mpesa';
+              const feeBreakdown = isMpesaPayout
+                ? getMpesaTransactionFee(payoutAmount)
+                : { transactionFee: 0, safaricomCost: 0, companyRevenue: 0 };
+              const recipientAmount = payoutAmount - feeBreakdown.transactionFee;
+
               const { data: newWithdrawal, error: withdrawalError } = await supabase
                 .from('withdrawals')
                 .insert({
@@ -970,7 +977,10 @@ Deno.serve(async (req) => {
                   requested_by: actualBeneficiary.user_id,
                   amount: collectedAmount,
                   commission_amount: totalCommission,
-                  net_amount: payoutAmount,
+                  net_amount: recipientAmount,
+                  transaction_fee: feeBreakdown.transactionFee,
+                  safaricom_cost: feeBreakdown.safaricomCost,
+                  company_revenue: feeBreakdown.companyRevenue,
                   status: withdrawalStatus,
                   payment_method_id: paymentMethod?.id,
                   payment_method_type: paymentMethod?.method_type,
