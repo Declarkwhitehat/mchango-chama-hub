@@ -1010,7 +1010,7 @@ Deno.serve(async (req) => {
                   source_id: chama.id,
                   gross_amount: collectedAmount,
                   commission_amount: totalCommission,
-                  net_amount: payoutAmount,
+                  net_amount: recipientAmount,
                   commission_rate: collectedAmount > 0 ? totalCommission / collectedAmount : 0.05,
                   reference_id: newWithdrawal.id,
                   description: `Cycle #${cycle.cycle_number} ${payoutType} payout to ${actualBeneficiary.member_code}. ${paidCount}/${totalMembers} paid.`
@@ -1027,7 +1027,7 @@ Deno.serve(async (req) => {
                     beneficiary: actualBeneficiary.member_code,
                     gross: collectedAmount,
                     commission: totalCommission,
-                    net: payoutAmount,
+                    net: recipientAmount,
                     payout_type: payoutType,
                     was_redirected: wasSkipped
                   }
@@ -1037,7 +1037,7 @@ Deno.serve(async (req) => {
                   const beneficiaryPhone = actualBeneficiary.profiles?.phone || paymentMethod.phone_number;
                   if (beneficiaryPhone) {
                     await sendSMS(beneficiaryPhone, 
-                      `💰 Your chama "${chama.name}" payout of KES ${payoutAmount.toFixed(2)} is being processed. You should receive it within 2 minutes.`
+                      `💰 Your chama "${chama.name}" payout of KES ${recipientAmount.toFixed(2)} is being processed. You should receive it within 2 minutes.`
                     );
                   }
 
@@ -1051,7 +1051,7 @@ Deno.serve(async (req) => {
                       body: JSON.stringify({
                         withdrawal_id: newWithdrawal.id,
                         phone_number: paymentMethod.phone_number,
-                        amount: payoutAmount
+                        amount: recipientAmount
                       })
                     });
 
