@@ -1,43 +1,72 @@
-# Chama System Bug Fixes (13 fixes)
+## M-PESA B2C Transaction Fee — Implementation Plan
 
-Apply the exact code changes you specified, scoped to the named files/functions.
+Add tiered M-PESA B2C fee to all outgoing payouts. Fee is deducted from requested amount; recipient receives `amount - fee`. Stored on each `withdrawals` row and surfaced in admin views.
 
-## Files to edit
+### Fee Tiers
 
-### `src/components/chama/PaymentStatusManager.tsx`
-- **FIX 1**: In `getMemberPaymentStatus()`, add `&& cp.cycle_id === activeCycleId` to the `p !== "today"` fallback `cyclePayments.find(...)`.
-- **FIX 2**: In `generatePDF()`, replace `totalCollected` calc to sum from `paidMembersForPdf.reduce((sum, m) => sum + getMemberPaymentStatus(m.id, pdfPeriod).amount, 0)`.
-- **FIX 11**: In `fetchData()`, add `.eq("approval_status", "approved")` to members query.
-- **FIX 12**: In `fetchData()`, change contributions start date from `startOfMonth(new Date())` to `subDays(new Date(), 7)`. Import `subDays` from `date-fns`.
-- **FIX 13**: In `generatePDF()`, replace `doc.save(fileName)` with `await savePdfNative(pdfBlob, fileName)` (import helper as used elsewhere in the app; verify import path during impl).
+```text
+≤ 100      → 0 / 0 / 0
+≤ 1,500    → 15 / 5 / 10
+≤ 5,000    → 27 / 9 / 18
+≤ 20,000   → 33 / 11 / 22
+> 20,000   → 39 / 13 / 26
+(transactionFee / safaricomCost / companyRevenue)
+```
 
-### `supabase/functions/cycle-auto-create/index.ts`
-- **FIX 3a**: In `calculateNextCycleDates()` daily case, replace `endDate.setHours(22, 0, 0, 0)` with `endDate.setUTCHours(19, 0, 0, 0)`.
+### 1. Shared Fee Utilities
+- Create `supabase/functions/_shared/mpesaTransactionFee.ts` (Deno).
+- Create `src/utils/mpesaTransactionFee.ts` (frontend mirror).
 
-### `supabase/functions/daily-cycle-manager/index.ts`
-- **FIX 3b**: Replace any `setHours(22,0,0,0)` with `setUTCHours(19,0,0,0)`.
-- **FIX 7**: In `all-cycles` action, compute `cycleAge`/`isStillNew` and gate `missed` on `!isStillNew` per the snippet.
+### 2. Database Migration
+Add to `withdrawals` table (idempotent `ADD COLUMN IF NOT EXISTS`):
+- `transaction_fee numeric default 0`
+- `safaricom_cost numeric default 0`
+- `company_revenue numeric default 0`
 
-### `supabase/functions/daily-payout-cron/index.ts`
-- **FIX 4**: At top of main cycle-processing loop, skip cycle if `created_at` < 23h old.
-- **FIX 5**: At top of `for (const chama of chamas)` loop, skip if within 24h grace period from `start_date || created_at`. Ensure those columns are SELECTed.
-- **FIX 6**: Inside Gap Recovery `while` loop, before inserting each gap cycle, `break` if `nextStart` is < 23h old.
+### 3. Edge Function: `withdrawals-crud`
+On insert (Organization + Mchango withdrawals):
+- Compute fee from requested `amount`
+- `net_amount = amount - transactionFee`
+- Persist `transaction_fee`, `safaricom_cost`, `company_revenue`
+- `b2c-payout` continues to use `net_amount` unchanged
 
-### `supabase/functions/c2b-confirm-payment/index.ts`
-- **FIX 8**: Replace hardcoded `(15%)` SMS string with `(${(commissionRate * 100).toFixed(0)}%)`.
+### 4. `WelfareWithdrawalRequest.tsx`
+- Import frontend fee util; recompute as user types amount
+- Show breakdown card: Transaction Fee + Recipient Receives
+- On insert into `withdrawals`: store fee fields and `net_amount = numAmount - transactionFee`
+- `welfare-cooling-off-payout` already forwards `net_amount` — no change
 
-### `supabase/functions/payment-stk-callback/index.ts`
-- **FIX 9**: Move the `notifyManyUsers` broadcast call inside the `if (status === 'completed')` block.
+### 5. `WithdrawalButton.tsx`
+- For `organizationId` / `mchangoId` flows only:
+  - Compute fee live; replace "You'll Receive" card with Fee + Net display
+  - Include `transaction_fee`, `safaricom_cost`, `company_revenue` in body to `withdrawals-crud`
+- Chama withdrawals via this button: leave untouched (chama payouts go through cron).
 
-### `supabase/functions/contributions-crud/index.ts`
-- **FIX 10**: In `settleDebts()`, remove the `carry_forward_credit` update so `chama_overpayment_wallet` is sole source of truth.
+### 6. Edge Function: `daily-payout-cron` (Chama auto payouts)
+At payout time:
+- Compute fee on `payoutAmount`
+- Send `payoutAmount - transactionFee` to `b2c-payout`
+- Update the corresponding `withdrawals` row with fee fields and corrected `net_amount`
 
-## Verification
-- Open each file beforehand to confirm exact context (function signatures, surrounding code) so search/replace lands cleanly.
-- After edits, deploy the touched edge functions: `cycle-auto-create`, `daily-cycle-manager`, `daily-payout-cron`, `c2b-confirm-payment`, `payment-stk-callback`, `contributions-crud`.
-- No DB migrations, no schema changes, no UI/business-logic changes beyond what's listed.
+### 7. Admin UI
 
-## Notes / Risks
-- For FIX 13, I'll match the existing `savePdfNative` helper pattern used by other PDF downloads (e.g. `ContributionsPDFDownload.tsx`) — same import path and blob-construction style.
-- FIX 5 reads `chama.start_date`; if it's null the fallback to `created_at` per your snippet is preserved.
-- All financial logic (commission %, settlement order, payout amounts) remains untouched; only timing/filter/display bugs are fixed.
+Per-row columns in withdrawals tables of:
+- `AdminOrganizationDetail.tsx`
+- `AdminCampaignDetail.tsx`
+- `AdminChamaDetail.tsx`
+- `AdminWelfares.tsx` (welfare withdrawal listing)
+
+Columns: Requested · Transaction Fee · Safaricom Cost · Company Revenue · Sent via M-PESA (`net_amount`).
+
+Summary cards on revenue/analytics pages (`AdminRevenue` / `AdminCommissionAnalytics`):
+- Total Transaction Fees Collected
+- Total Safaricom Costs
+- Total Company Revenue from Fees
+- Filter by source: Chama Payout | Org Withdrawal | Campaign Withdrawal | Welfare Disbursement (derived from which FK is set on withdrawals row)
+
+### Out of Scope
+- No changes to `b2c-payout`, `welfare-cooling-off-payout`, `payout-approval`, `retry-failed-payouts`, `contributions-crud`, `c2b-confirm-payment` payout paths — they already consume `net_amount`.
+- No changes to chama commission logic.
+
+### Deploy
+Redeploy: `withdrawals-crud`, `daily-payout-cron`.
