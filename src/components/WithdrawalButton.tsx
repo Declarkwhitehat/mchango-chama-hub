@@ -16,6 +16,7 @@ import { PAYMENT_METHOD_LIMITS, type PaymentMethodType } from "@/utils/paymentLi
 import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 import { PinEntryDialog } from "@/components/PinEntryDialog";
 import { usePlatformMinimums } from "@/hooks/usePlatformMinimums";
+import { getMpesaTransactionFee } from "@/utils/mpesaTransactionFee";
 
 interface WithdrawalButtonProps {
   chamaId?: string;
