@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { createNotification, NotificationTemplates } from "../_shared/notifications.ts";
+import { getMpesaTransactionFee } from "../_shared/mpesaTransactionFee.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -147,10 +148,21 @@ serve(async (req) => {
 
       const dailyLimit = TRANSACTION_LIMITS[defaultPaymentMethod.method_type];
 
-      // Commission is already deducted at payment time, so withdrawal is full amount
-      // No commission deduction needed here - user receives full withdrawal amount
+      // Commission is already deducted at payment time, so withdrawal is full amount.
+      // M-PESA B2C transaction fee is deducted from the amount the recipient receives,
+      // and is applied for Organization and Mchango (Campaign) withdrawals routed
+      // through this endpoint. Chama payouts go through daily-payout-cron, which
+      // applies the same fee separately.
       const commissionAmount = 0;
-      const netAmount = amount;
+      const applyB2cFee = !chama_id && (mchango_id || organization_id) &&
+        defaultPaymentMethod.method_type === 'mpesa';
+      const feeBreakdown = applyB2cFee
+        ? getMpesaTransactionFee(amount)
+        : { transactionFee: 0, safaricomCost: 0, companyRevenue: 0 };
+      const transactionFee = feeBreakdown.transactionFee;
+      const safaricomCost = feeBreakdown.safaricomCost;
+      const companyRevenue = feeBreakdown.companyRevenue;
+      const netAmount = amount - transactionFee;
 
       // Check if net withdrawal amount exceeds single transaction limit
       if (netAmount > dailyLimit) {
@@ -478,6 +490,9 @@ serve(async (req) => {
           amount,
           commission_amount: commissionAmount,
           net_amount: netAmount,
+          transaction_fee: transactionFee,
+          safaricom_cost: safaricomCost,
+          company_revenue: companyRevenue,
           payment_method_id: defaultPaymentMethod.id,
           payment_method_type: defaultPaymentMethod.method_type,
           status: initialStatus,
