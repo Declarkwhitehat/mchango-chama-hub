@@ -137,17 +137,19 @@ serve(async (req) => {
     }
 
     // ═══ APPROVAL GUARD ═══
-    // Withdrawal must have been explicitly approved by an admin (approved_by non-null).
-    // This blocks any payout where status was set without going through approval workflow.
-    if (!withdrawal.approved_by) {
-      console.warn('[security] B2C payout denied — withdrawal lacks approver', {
+    // Service-role callers (daily-payout-cron, retry-failed-payouts,
+    // welfare-cooling-off-payout) are pre-authorized — they only invoke this
+    // after their own approval/cycle logic has run.
+    // Admin-triggered calls must point at a withdrawal that went through the
+    // review workflow, evidenced by reviewed_at being set.
+    if (!isServiceRole && !withdrawal.reviewed_at) {
+      console.warn('[security] B2C payout denied — withdrawal not reviewed', {
         caller_user_id: callerUserId,
         withdrawal_id,
         status: withdrawal.status,
-        approved_by: withdrawal.approved_by,
       });
       return new Response(
-        JSON.stringify({ error: 'Forbidden: withdrawal has not been approved by an admin' }),
+        JSON.stringify({ error: 'Forbidden: withdrawal has not been approved' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
