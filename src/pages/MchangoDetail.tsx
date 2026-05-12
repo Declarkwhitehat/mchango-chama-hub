@@ -79,6 +79,26 @@ const MchangoDetail = () => {
     fetchCampaign();
   }, [id, user?.id]);
 
+  // Realtime: refresh campaign totals the moment a donation lands
+  // (mchango row is updated by the C2B/STK callback after payment).
+  useEffect(() => {
+    if (!campaign?.id) return;
+    const channel = supabase
+      .channel(`mchango-detail-${campaign.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'mchango', filter: `id=eq.${campaign.id}` },
+        () => { fetchCampaign(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'mchango_donations', filter: `mchango_id=eq.${campaign.id}` },
+        () => { fetchCampaign(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [campaign?.id]);
+
   useEffect(() => {
     setActiveTab(getStoredTab(tabStorageKey, "details"));
   }, [tabStorageKey]);
