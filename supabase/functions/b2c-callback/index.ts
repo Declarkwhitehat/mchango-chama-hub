@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
+import { createNotification, NotificationTemplates, notifyManyUsers, notifyAllAdmins } from "../_shared/notifications.ts";
 import { getCallbackClientIP, isSafaricomCallbackIP } from "../_shared/safaricomIp.ts";
 
 const corsHeaders = {
