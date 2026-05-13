@@ -257,6 +257,18 @@ serve(async (req) => {
         throw error;
       }
 
+      // Notify creator (in-app + push)
+      try {
+        await createNotification(supabaseClient, {
+          userId: user.id,
+          ...NotificationTemplates.campaignCreated(data.title, data.target_amount),
+          relatedEntityId: data.id,
+          relatedEntityType: 'mchango',
+        });
+      } catch (notifErr) {
+        console.warn('mchango-crud: notification failed (non-fatal):', notifErr);
+      }
+
       return new Response(JSON.stringify({ data }), {
         status: 201,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
