@@ -548,6 +548,28 @@ serve(async (req) => {
         relatedEntityType: 'withdrawal',
       });
 
+      // Admin alert for large withdrawals (threshold from platform_settings, default 50,000)
+      try {
+        const { data: thresholdSetting } = await supabaseAdmin
+          .from('platform_settings')
+          .select('setting_value')
+          .eq('setting_key', 'admin_large_withdrawal_threshold')
+          .maybeSingle();
+        const threshold = Number((thresholdSetting?.setting_value as any)?.amount ?? 50000);
+        if (Number(amount) >= threshold) {
+          const { data: requesterProfile } = await supabaseAdmin
+            .from('profiles').select('full_name, phone').eq('id', user.id).maybeSingle();
+          const requesterLabel = requesterProfile?.full_name || requesterProfile?.phone || 'a user';
+          await notifyAllAdmins(supabaseAdmin, {
+            ...NotificationTemplates.adminLargeWithdrawal(amount, entityName, requesterLabel),
+            relatedEntityId: withdrawal.id,
+            relatedEntityType: 'withdrawal',
+          });
+        }
+      } catch (adminAlertErr) {
+        console.warn('Large-withdrawal admin alert failed (non-fatal):', adminAlertErr);
+      }
+
       // Notify all donors with accounts when a campaign withdrawal is made
       if (mchango_id) {
         try {
