@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import { createNotification, NotificationTemplates } from "../_shared/notifications.ts";
+import { createNotification, NotificationTemplates, notifyAllAdmins } from "../_shared/notifications.ts";
 import { getMpesaTransactionFee } from "../_shared/mpesaTransactionFee.ts";
 
 const corsHeaders = {
