@@ -403,7 +403,7 @@ serve(async (req) => {
             ...NotificationTemplates.withdrawalCompletedDetailed(
               transactionAmount || withdrawal.net_amount || withdrawal.amount,
               recipientPhone,
-              mpesaReceiptNumber,
+              transactionId || null,
             ),
             relatedEntityId: withdrawal.id,
             relatedEntityType: 'withdrawal',
