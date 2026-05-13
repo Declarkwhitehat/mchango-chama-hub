@@ -70,7 +70,7 @@ export const MpesaFeeSummary = () => {
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <div>
           <CardTitle className="text-base">M-PESA B2C Transaction Fees</CardTitle>
-          <CardDescription>Recipient-paid fees on completed payouts</CardDescription>
+          <CardDescription>Recipient-paid fees on completed payouts. Company Revenue is included in Total Revenue above.</CardDescription>
         </div>
         <Select value={source} onValueChange={(v) => setSource(v as Source)}>
           <SelectTrigger className="w-[200px] h-8 text-xs">
