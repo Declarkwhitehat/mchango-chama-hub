@@ -13,6 +13,17 @@ interface CreateNotificationParams {
   relatedEntityType?: string;
 }
 
+// ─── Formatting helpers ───────────────────────────────────────────────────────
+const fmtKES = (n: number | null | undefined) =>
+  `KES ${Number(n || 0).toLocaleString('en-KE')}`;
+
+const maskPhone = (phone?: string | null) => {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length < 6) return digits;
+  return `${digits.slice(0, 4)}***${digits.slice(-3)}`;
+};
+
 /**
  * Sends a push notification banner via FCM to all devices for a user.
  * Non-blocking — never throws or crashes the caller.
