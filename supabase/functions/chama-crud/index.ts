@@ -563,6 +563,18 @@ serve(async (req) => {
       // Creator is automatically added as manager via trigger
       console.log('Chama created successfully:', data.id);
 
+      // Notify creator (in-app + push)
+      try {
+        await createNotification(supabaseAdmin, {
+          userId: user.id,
+          ...NotificationTemplates.chamaCreated(data.name, data.group_code),
+          relatedEntityId: data.id,
+          relatedEntityType: 'chama',
+        });
+      } catch (notifErr) {
+        console.warn('chama-crud: notification failed (non-fatal):', notifErr);
+      }
+
       return new Response(JSON.stringify({ data }), {
         status: 201,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
