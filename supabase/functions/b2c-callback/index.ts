@@ -400,7 +400,11 @@ serve(async (req) => {
         if (withdrawal.requested_by) {
           await createNotification(supabaseAdmin, {
             userId: withdrawal.requested_by,
-            ...NotificationTemplates.withdrawalCompleted(transactionAmount || withdrawal.net_amount || withdrawal.amount),
+            ...NotificationTemplates.withdrawalCompletedDetailed(
+              transactionAmount || withdrawal.net_amount || withdrawal.amount,
+              recipientPhone,
+              mpesaReceiptNumber,
+            ),
             relatedEntityId: withdrawal.id,
             relatedEntityType: 'withdrawal',
           });
