@@ -121,122 +121,204 @@ export async function notifyManyUsers(
   );
 }
 
-// ─── Notification Templates ───────────────────────────────────────────────────
+// ─── Admin fan-out ────────────────────────────────────────────────────────────
+let _adminCache: { ids: string[]; at: number } | null = null;
+const ADMIN_CACHE_MS = 60_000;
+
+async function getAdminUserIds(adminClient: AnySupabaseClient): Promise<string[]> {
+  const now = Date.now();
+  if (_adminCache && now - _adminCache.at < ADMIN_CACHE_MS) return _adminCache.ids;
+  try {
+    const { data } = await adminClient
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'admin');
+    const ids = Array.from(new Set((data || []).map((r: any) => r.user_id).filter(Boolean)));
+    _adminCache = { ids, at: now };
+    return ids;
+  } catch (err) {
+    console.warn('[notifyAllAdmins] failed to fetch admins:', err);
+    return [];
+  }
+}
+
+export async function notifyAllAdmins(
+  adminClient: AnySupabaseClient,
+  notification: Omit<CreateNotificationParams, 'userId'>,
+) {
+  const ids = await getAdminUserIds(adminClient);
+  if (ids.length === 0) return;
+  await notifyManyUsers(adminClient, ids, notification);
+}
+
+// ─── Notification Templates (short, professional, no emoji) ───────────────────
+// Style: Title <= 40 chars, message <= 160 chars (single SMS segment).
+// Format: <Action>. <amount/entity>. <key fact>.
 
 export const NotificationTemplates = {
   // ── Withdrawals ──
   withdrawalRequested: (amount: number, entityName: string) => ({
-    title: 'Withdrawal Request Submitted',
-    message: `Your withdrawal request of KES ${amount.toLocaleString()} from "${entityName}" is being processed.`,
+    title: 'Withdrawal submitted',
+    message: `${fmtKES(amount)} from "${entityName}" is being processed.`,
     type: 'info' as const,
     category: 'withdrawal' as const,
   }),
 
   withdrawalApproved: (amount: number) => ({
-    title: 'Withdrawal Approved! 💰',
-    message: `Your withdrawal of KES ${amount.toLocaleString()} has been approved and is being processed.`,
+    title: 'Withdrawal approved',
+    message: `${fmtKES(amount)} approved. Sending to your M-Pesa now.`,
     type: 'success' as const,
     category: 'withdrawal' as const,
   }),
 
   withdrawalCompleted: (amount: number) => ({
-    title: 'Withdrawal Complete ✅',
-    message: `KES ${amount.toLocaleString()} has been sent to your M-Pesa.`,
+    title: 'Withdrawal sent',
+    message: `${fmtKES(amount)} delivered to your M-Pesa.`,
+    type: 'success' as const,
+    category: 'withdrawal' as const,
+  }),
+
+  withdrawalCompletedDetailed: (amount: number, phone: string | null | undefined, mpesaRef?: string | null) => ({
+    title: 'Withdrawal sent',
+    message: `${fmtKES(amount)} sent to ${maskPhone(phone) || 'your M-Pesa'}.${mpesaRef ? ` Ref ${mpesaRef}.` : ''}`,
     type: 'success' as const,
     category: 'withdrawal' as const,
   }),
 
   withdrawalRejected: (amount: number, reason?: string) => ({
-    title: 'Withdrawal Rejected ❌',
-    message: `Your withdrawal request of KES ${amount.toLocaleString()} was rejected.${reason ? ` Reason: ${reason}` : ''}`,
+    title: 'Withdrawal rejected',
+    message: `${fmtKES(amount)} request rejected.${reason ? ` Reason: ${reason}.` : ''}`,
+    type: 'error' as const,
+    category: 'withdrawal' as const,
+  }),
+
+  withdrawalFailed: (amount: number, reason?: string) => ({
+    title: 'Withdrawal failed',
+    message: `${fmtKES(amount)} did not go through.${reason ? ` Reason: ${reason}.` : ''} Contact support.`,
     type: 'error' as const,
     category: 'withdrawal' as const,
   }),
 
   // ── Payments ──
   paymentReceived: (amount: number, chamaName: string) => ({
-    title: 'Payment Received! 💳',
-    message: `Your payment of KES ${amount.toLocaleString()} to "${chamaName}" was successful.`,
+    title: 'Payment successful',
+    message: `${fmtKES(amount)} paid to "${chamaName}".`,
     type: 'success' as const,
     category: 'payment' as const,
   }),
 
   paymentConfirmed: (amount: number, mpesaRef: string) => ({
-    title: 'Payment Confirmed! ✅',
-    message: `KES ${amount.toLocaleString()} received. M-Pesa ref: ${mpesaRef}.`,
+    title: 'Payment confirmed',
+    message: `${fmtKES(amount)} received. M-Pesa ref ${mpesaRef}.`,
     type: 'success' as const,
     category: 'payment' as const,
   }),
 
   paymentFailed: (amount: number) => ({
-    title: 'Payment Failed ❌',
-    message: `Your payment of KES ${amount.toLocaleString()} was not completed. Please try again.`,
+    title: 'Payment failed',
+    message: `${fmtKES(amount)} did not complete. Try again.`,
     type: 'error' as const,
     category: 'payment' as const,
   }),
 
   // ── Reminders ──
   paymentReminder: (amount: number, chamaName: string, dueTime: string) => ({
-    title: 'Payment Reminder ⏰',
-    message: `Reminder: Pay KES ${amount.toLocaleString()} to "${chamaName}" before ${dueTime} today.`,
+    title: 'Payment due',
+    message: `Pay ${fmtKES(amount)} to "${chamaName}" before ${dueTime} today.`,
     type: 'warning' as const,
     category: 'reminder' as const,
   }),
 
   latePaymentWarning: (amount: number, chamaName: string) => ({
-    title: 'Late Payment Warning ⚠️',
-    message: `You have a missed payment of KES ${amount.toLocaleString()} in "${chamaName}". Please pay immediately.`,
+    title: 'Missed payment',
+    message: `${fmtKES(amount)} overdue in "${chamaName}". Pay now to avoid removal.`,
     type: 'warning' as const,
     category: 'reminder' as const,
   }),
 
   welfarePaymentDue: (amount: number, welfareName: string) => ({
-    title: 'Welfare Contribution Due 🤝',
-    message: `Your welfare contribution of KES ${amount.toLocaleString()} to "${welfareName}" is due today.`,
+    title: 'Welfare contribution due',
+    message: `${fmtKES(amount)} due to "${welfareName}" today.`,
     type: 'warning' as const,
     category: 'welfare' as const,
   }),
 
   // ── Payouts ──
   payoutReceived: (amount: number, chamaName: string) => ({
-    title: 'Payout Received! 🎉',
-    message: `You received a payout of KES ${amount.toLocaleString()} from "${chamaName}". Check your M-Pesa!`,
+    title: 'Payout received',
+    message: `${fmtKES(amount)} from "${chamaName}" sent to your M-Pesa.`,
     type: 'success' as const,
     category: 'payment' as const,
   }),
 
   payoutDay: (amount: number, chamaName: string) => ({
-    title: "It's Your Payout Day! 🎉",
-    message: `Today is your payout day for "${chamaName}". KES ${amount.toLocaleString()} is being sent to your M-Pesa.`,
+    title: 'Your payout day',
+    message: `${fmtKES(amount)} from "${chamaName}" is being sent to your M-Pesa.`,
     type: 'success' as const,
     category: 'payment' as const,
   }),
 
   // ── Campaigns / Donations ──
   donationReceived: (amount: number, campaignName: string, donorName: string) => ({
-    title: 'New Donation Received! 💝',
-    message: `${donorName} donated KES ${amount.toLocaleString()} to your campaign "${campaignName}".`,
+    title: 'New donation',
+    message: `${donorName} donated ${fmtKES(amount)} to "${campaignName}".`,
+    type: 'success' as const,
+    category: 'campaign' as const,
+  }),
+
+  donationSent: (amount: number, campaignName: string, mpesaRef?: string | null) => ({
+    title: 'Donation sent',
+    message: `${fmtKES(amount)} donated to "${campaignName}".${mpesaRef ? ` Ref ${mpesaRef}.` : ''} Thank you.`,
     type: 'success' as const,
     category: 'campaign' as const,
   }),
 
   campaignWithdrawal: (campaignName: string, amount: number) => ({
-    title: 'Campaign Withdrawal Notice 📢',
-    message: `The campaign "${campaignName}" has withdrawn KES ${amount.toLocaleString()}. Contact support if suspicious.`,
+    title: 'Campaign withdrawal',
+    message: `"${campaignName}" withdrew ${fmtKES(amount)}. Contact support if suspicious.`,
     type: 'info' as const,
     category: 'campaign' as const,
   }),
 
-  // ── Chama ──
+  // ── Entity creation ──
+  chamaCreated: (name: string, code?: string | null) => ({
+    title: 'Chama created',
+    message: `"${name}" is live.${code ? ` Code ${code}. Share to invite members.` : ' Share the invite link to add members.'}`,
+    type: 'success' as const,
+    category: 'chama' as const,
+  }),
+
+  welfareCreated: (name: string, code?: string | null) => ({
+    title: 'Welfare created',
+    message: `"${name}" is live.${code ? ` Code ${code}. Share to invite members.` : ' Share the invite link to add members.'}`,
+    type: 'success' as const,
+    category: 'welfare' as const,
+  }),
+
+  campaignCreated: (name: string, target?: number | null) => ({
+    title: 'Campaign created',
+    message: `"${name}" is live${target ? `. Target ${fmtKES(target)}` : ''}. Share the link to start receiving donations.`,
+    type: 'success' as const,
+    category: 'campaign' as const,
+  }),
+
+  organizationCreated: (name: string) => ({
+    title: 'Organization created',
+    message: `"${name}" is live. Share the link to start receiving donations.`,
+    type: 'success' as const,
+    category: 'organization' as const,
+  }),
+
+  // ── Chama membership ──
   chamaJoinApproved: (chamaName: string) => ({
-    title: 'Join Request Approved ✅',
-    message: `You have been approved to join "${chamaName}". Welcome!`,
+    title: 'Join request approved',
+    message: `You have been approved to join "${chamaName}".`,
     type: 'success' as const,
     category: 'chama' as const,
   }),
 
   chamaJoinRejected: (chamaName: string) => ({
-    title: 'Join Request Rejected',
+    title: 'Join request rejected',
     message: `Your request to join "${chamaName}" was not approved.`,
     type: 'error' as const,
     category: 'chama' as const,
@@ -244,38 +326,60 @@ export const NotificationTemplates = {
 
   // ── Verification / KYC ──
   verificationRequested: (entityType: string, entityName: string) => ({
-    title: 'Verification Request Submitted',
-    message: `Your verification request for ${entityType} "${entityName}" has been submitted and is pending review.`,
+    title: 'Verification submitted',
+    message: `Verification for ${entityType} "${entityName}" submitted. Review within 24h.`,
     type: 'info' as const,
     category: 'verification' as const,
   }),
 
   verificationApproved: (entityType: string, entityName: string) => ({
-    title: 'Verification Approved! ✓',
-    message: `Congratulations! Your ${entityType} "${entityName}" has been verified.`,
+    title: 'Verification approved',
+    message: `${entityType} "${entityName}" is now verified.`,
     type: 'success' as const,
     category: 'verification' as const,
   }),
 
   verificationRejected: (entityType: string, entityName: string, reason?: string) => ({
-    title: 'Verification Request Rejected',
-    message: `Your verification request for ${entityType} "${entityName}" was not approved.${reason ? ` Reason: ${reason}` : ''}`,
+    title: 'Verification rejected',
+    message: `${entityType} "${entityName}" was not verified.${reason ? ` Reason: ${reason}.` : ''}`,
     type: 'error' as const,
     category: 'verification' as const,
   }),
 
   kycApproved: () => ({
-    title: 'KYC Approved! ✓',
-    message: 'Your identity verification has been approved. You can now create Chamas, Campaigns, and Organizations.',
+    title: 'Identity verified',
+    message: 'Your identity is verified. You can now create Chamas, Campaigns, and Organizations.',
     type: 'success' as const,
     category: 'verification' as const,
   }),
 
   kycRejected: (reason?: string) => ({
-    title: 'KYC Verification Rejected',
-    message: `Your identity verification was not approved.${reason ? ` Reason: ${reason}` : ' Please resubmit with valid documents.'}`,
+    title: 'Identity not verified',
+    message: `Your identity verification was not approved.${reason ? ` Reason: ${reason}.` : ' Please resubmit valid documents.'}`,
     type: 'error' as const,
     category: 'verification' as const,
   }),
+
+  // ── Admin-only alerts ──
+  adminPayoutFailed: (amount: number, recipient: string | null | undefined, reason: string) => ({
+    title: 'Admin: payout failed',
+    message: `B2C ${fmtKES(amount)} to ${maskPhone(recipient) || 'recipient'} failed. Reason: ${reason}.`,
+    type: 'error' as const,
+    category: 'withdrawal' as const,
+  }),
+
+  adminLargeWithdrawal: (amount: number, entityName: string, requester: string) => ({
+    title: 'Admin: large withdrawal',
+    message: `${fmtKES(amount)} requested from "${entityName}" by ${requester}. Review.`,
+    type: 'warning' as const,
+    category: 'withdrawal' as const,
+  }),
+
+  adminVerificationPending: (entityType: string, entityName: string, requestedBy: string) => ({
+    title: 'Admin: verification pending',
+    message: `${entityType} "${entityName}" submitted by ${requestedBy}. Review.`,
+    type: 'info' as const,
+    category: 'verification' as const,
+  }),
 };
-        
+
