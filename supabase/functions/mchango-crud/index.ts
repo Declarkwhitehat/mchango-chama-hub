@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createNotification, NotificationTemplates } from "../_shared/notifications.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -254,6 +255,18 @@ serve(async (req) => {
       if (error) {
         console.error('Error creating mchango:', error);
         throw error;
+      }
+
+      // Notify creator (in-app + push)
+      try {
+        await createNotification(supabaseClient, {
+          userId: user.id,
+          ...NotificationTemplates.campaignCreated(data.title, data.target_amount),
+          relatedEntityId: data.id,
+          relatedEntityType: 'mchango',
+        });
+      } catch (notifErr) {
+        console.warn('mchango-crud: notification failed (non-fatal):', notifErr);
       }
 
       return new Response(JSON.stringify({ data }), {

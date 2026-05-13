@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
+import { createNotification, NotificationTemplates } from "../_shared/notifications.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -133,6 +134,18 @@ serve(async (req) => {
         .single();
 
       if (error) throw error;
+
+      // Notify creator (in-app + push)
+      try {
+        await createNotification(supabaseAdmin, {
+          userId: userData.user.id,
+          ...NotificationTemplates.welfareCreated(data.name, data.group_code),
+          relatedEntityId: data.id,
+          relatedEntityType: 'welfare',
+        });
+      } catch (notifErr) {
+        console.warn('welfare-crud: notification failed (non-fatal):', notifErr);
+      }
 
       return new Response(JSON.stringify({ data }), {
         status: 201,

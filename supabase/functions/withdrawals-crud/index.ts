@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import { createNotification, NotificationTemplates } from "../_shared/notifications.ts";
+import { createNotification, NotificationTemplates, notifyAllAdmins } from "../_shared/notifications.ts";
 import { getMpesaTransactionFee } from "../_shared/mpesaTransactionFee.ts";
 
 const corsHeaders = {
@@ -547,6 +547,28 @@ serve(async (req) => {
         relatedEntityId: withdrawal.id,
         relatedEntityType: 'withdrawal',
       });
+
+      // Admin alert for large withdrawals (threshold from platform_settings, default 50,000)
+      try {
+        const { data: thresholdSetting } = await supabaseAdmin
+          .from('platform_settings')
+          .select('setting_value')
+          .eq('setting_key', 'admin_large_withdrawal_threshold')
+          .maybeSingle();
+        const threshold = Number((thresholdSetting?.setting_value as any)?.amount ?? 50000);
+        if (Number(amount) >= threshold) {
+          const { data: requesterProfile } = await supabaseAdmin
+            .from('profiles').select('full_name, phone').eq('id', user.id).maybeSingle();
+          const requesterLabel = requesterProfile?.full_name || requesterProfile?.phone || 'a user';
+          await notifyAllAdmins(supabaseAdmin, {
+            ...NotificationTemplates.adminLargeWithdrawal(amount, entityName, requesterLabel),
+            relatedEntityId: withdrawal.id,
+            relatedEntityType: 'withdrawal',
+          });
+        }
+      } catch (adminAlertErr) {
+        console.warn('Large-withdrawal admin alert failed (non-fatal):', adminAlertErr);
+      }
 
       // Notify all donors with accounts when a campaign withdrawal is made
       if (mchango_id) {

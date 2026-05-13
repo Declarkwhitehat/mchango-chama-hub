@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
+import { createNotification, NotificationTemplates, notifyManyUsers, notifyAllAdmins } from "../_shared/notifications.ts";
 import { getCallbackClientIP, isSafaricomCallbackIP } from "../_shared/safaricomIp.ts";
 
 const corsHeaders = {
@@ -400,7 +400,11 @@ serve(async (req) => {
         if (withdrawal.requested_by) {
           await createNotification(supabaseAdmin, {
             userId: withdrawal.requested_by,
-            ...NotificationTemplates.withdrawalCompleted(transactionAmount || withdrawal.net_amount || withdrawal.amount),
+            ...NotificationTemplates.withdrawalCompletedDetailed(
+              transactionAmount || withdrawal.net_amount || withdrawal.amount,
+              recipientPhone,
+              transactionId || null,
+            ),
             relatedEntityId: withdrawal.id,
             relatedEntityType: 'withdrawal',
           });
@@ -510,6 +514,26 @@ serve(async (req) => {
 
         if (recipientPhone) {
           await sendSMS(recipientPhone, `Pamojanova: Withdrawal of KES ${withdrawal.net_amount?.toFixed(2)} from ${sourceType} "${sourceName}" failed. Reason: ${resultDesc}. Please contact support.`);
+        }
+
+        // Notify requester (in-app + push) and all admins
+        try {
+          const failAmount = withdrawal.net_amount || withdrawal.amount;
+          if (withdrawal.requested_by) {
+            await createNotification(supabaseAdmin, {
+              userId: withdrawal.requested_by,
+              ...NotificationTemplates.withdrawalFailed(failAmount, resultDesc),
+              relatedEntityId: withdrawal.id,
+              relatedEntityType: 'withdrawal',
+            });
+          }
+          await notifyAllAdmins(supabaseAdmin, {
+            ...NotificationTemplates.adminPayoutFailed(failAmount, recipientPhone, resultDesc),
+            relatedEntityId: withdrawal.id,
+            relatedEntityType: 'withdrawal',
+          });
+        } catch (notifErr) {
+          console.warn('b2c-callback: failure notifications failed (non-fatal):', notifErr);
         }
       } else {
         await supabaseAdmin

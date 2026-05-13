@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { getPlatformMinimums } from "../_shared/getPlatformMinimums.ts";
+import { createNotification, NotificationTemplates } from "../_shared/notifications.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -561,6 +562,18 @@ serve(async (req) => {
 
       // Creator is automatically added as manager via trigger
       console.log('Chama created successfully:', data.id);
+
+      // Notify creator (in-app + push)
+      try {
+        await createNotification(supabaseAdmin, {
+          userId: user.id,
+          ...NotificationTemplates.chamaCreated(data.name, data.group_code),
+          relatedEntityId: data.id,
+          relatedEntityType: 'chama',
+        });
+      } catch (notifErr) {
+        console.warn('chama-crud: notification failed (non-fatal):', notifErr);
+      }
 
       return new Response(JSON.stringify({ data }), {
         status: 201,

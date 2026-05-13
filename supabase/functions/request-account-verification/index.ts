@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createNotification, notifyAllAdmins, NotificationTemplates } from "../_shared/notifications.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,6 +82,32 @@ serve(async (req) => {
     await supabase.from('user_verification_requests').update({
       payment_reference: checkoutId,
     }).eq('id', reqId);
+
+    // Fire-and-forget notifications: confirm to user + alert admins
+    try {
+      const { data: profileInfo } = await supabase
+        .from('profiles')
+        .select('full_name, phone')
+        .eq('id', user.id)
+        .maybeSingle();
+      const requesterLabel = profileInfo?.full_name || profileInfo?.phone || 'a user';
+
+      await Promise.allSettled([
+        createNotification(supabase, {
+          userId: user.id,
+          ...NotificationTemplates.verificationRequested('account', requesterLabel),
+          relatedEntityId: reqId,
+          relatedEntityType: 'user_verification_request',
+        }),
+        notifyAllAdmins(supabase, {
+          ...NotificationTemplates.adminVerificationPending('account', requesterLabel, requesterLabel),
+          relatedEntityId: reqId,
+          relatedEntityType: 'user_verification_request',
+        }),
+      ]);
+    } catch (notifErr) {
+      console.warn('request-account-verification: notifications failed (non-fatal):', notifErr);
+    }
 
     return new Response(JSON.stringify({ success: true, request_id: reqId, checkout_request_id: checkoutId }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
