@@ -352,6 +352,28 @@ serve(async (req) => {
         });
       }
 
+      // Record M-PESA B2C transaction-fee markup (recipient-paid fee minus Safaricom cost)
+      // so it rolls into the unified company revenue total. Idempotent via reference_id check.
+      const b2cRevenue = Number(withdrawal.company_revenue || 0);
+      if (b2cRevenue > 0) {
+        const groupId = withdrawal.chama_id || withdrawal.organization_id || withdrawal.mchango_id || withdrawal.welfare_id || null;
+        const { data: existingFeeRow } = await supabaseAdmin
+          .from('company_earnings')
+          .select('id')
+          .eq('reference_id', withdrawal.id)
+          .eq('source', 'mpesa_b2c_revenue')
+          .maybeSingle();
+        if (!existingFeeRow) {
+          await supabaseAdmin.from('company_earnings').insert({
+            amount: b2cRevenue,
+            source: 'mpesa_b2c_revenue',
+            description: `B2C transaction-fee markup — withdrawal ${withdrawal.id}`,
+            group_id: groupId,
+            reference_id: withdrawal.id,
+          });
+        }
+      }
+
       // Send tailored payout confirmation SMS
       if (recipientPhone) {
         // Only campaigns (mchango) include remaining balance

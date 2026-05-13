@@ -1,65 +1,62 @@
-## Problem
+## Goal
 
-`supabase/functions/b2c-payout/index.ts` rejects every payout with `403 "Forbidden: withdrawal has not been approved by an admin"` because it checks `withdrawal.approved_by`, a column that does not exist on the `withdrawals` table. The real schema uses `reviewed_by` / `reviewed_at`, and chama auto-payouts have no human reviewer at all (they are approved implicitly by the service-role cron when a cycle completes).
+Make the admin **Total Revenue** KPI a single source of truth that includes:
 
-Result: 100% of B2C payouts (chama cycle payouts, welfare disbursements, org/mchango withdrawals) fail at the gateway. Confirmed on withdrawals `4fa3643d…` (chama, status=failed) and `f9ac326a…` (welfare, stuck processing).
+1. Commission revenue (chama / mchango / organization / welfare contributions) — already counted ✅
+2. **M-PESA B2C company revenue** (the markup over Safaricom cost on every payout) — currently missing ❌
+3. **Account verification fees** — already counted ✅
+4. **Campaign / Welfare / Organization verification fees** — inserted but bucketed as "Other" ❌
 
-## Fix (single file, no money moved)
+Today the B2C revenue only appears in the small `MpesaFeeSummary` widget and group-verification fees show up under "Other". After this change, all four streams roll up into the same `kpis.totalRevenue` and into a clearly-labeled source breakdown row.
 
-Edit `supabase/functions/b2c-payout/index.ts`, lines ~139–153.
+## Changes
 
-Replace the broken `approved_by` block with a schema-correct guard that preserves the original intent — block payouts that never went through an approval path — using fields that actually exist:
+### 1. Insert B2C company revenue into `company_earnings` on payout completion
+
+File: `supabase/functions/b2c-callback/index.ts`
+
+Right after the withdrawal is atomically marked `completed` (around line 320), insert:
 
 ```ts
-// ═══ APPROVAL GUARD ═══
-// Service-role callers (daily-payout-cron, retry-failed-payouts,
-// welfare-cooling-off-payout) are pre-authorized — they only invoke this
-// after their own approval/cycle logic has run.
-// Admin-triggered calls must point at a withdrawal that went through the
-// review workflow, evidenced by reviewed_at being set.
-if (!isServiceRole && !withdrawal.reviewed_at) {
-  console.warn('[security] B2C payout denied — withdrawal not reviewed', {
-    caller_user_id: callerUserId,
-    withdrawal_id,
-    status: withdrawal.status,
+if (Number(withdrawal.company_revenue || 0) > 0) {
+  await supabaseAdmin.from('company_earnings').insert({
+    amount: Number(withdrawal.company_revenue),
+    source: 'mpesa_b2c_revenue',
+    description: `B2C payout markup — withdrawal ${withdrawal.id}`,
+    group_id: withdrawal.chama_id || withdrawal.organization_id || withdrawal.mchango_id || withdrawal.welfare_id || null,
+    reference_id: withdrawal.id,           // for idempotency / drill-down
   });
-  return new Response(
-    JSON.stringify({ error: 'Forbidden: withdrawal has not been approved' }),
-    { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
 }
 ```
 
-The existing checks above this block remain unchanged and continue to enforce:
-1. Caller is service-role OR an admin (lines 104–114).
-2. Withdrawal status is `approved`, `pending_retry`, or `processing` (line 132).
+Idempotency: the callback already early-returns when `status === 'completed'`, so this insert runs at most once per withdrawal. We additionally guard with a `select` on `reference_id` before inserting to handle any retries safely.
 
-Combined, this restores the original security intent without the schema bug.
+### 2. Backfill historical B2C revenue (one-time)
 
-## Repair stuck rows (no payout sent)
+For every `withdrawals` row where `status='completed'` and `company_revenue > 0` and no matching `company_earnings.reference_id` exists, insert the same row as above. Single SQL `INSERT … SELECT … WHERE NOT EXISTS`.
 
-After redeploying, mark the two stuck rows as retryable so the existing retry/cron picks them up on the next normal cycle. **No B2C call is issued by this plan**; the user said "don't send any money".
+### 3. Recognize all fee sources in the dashboard breakdown
 
-Migration:
-```sql
-UPDATE withdrawals
-SET status = 'pending_retry',
-    b2c_error_details = NULL,
-    notes = COALESCE(notes,'') || E'\n[SYSTEM] Reset after b2c-payout approval-guard fix'
-WHERE id IN (
-  '4fa3643d-3ba1-4bba-8fd6-f9f11d0f681a',
-  'f9ac326a-d8e7-4b8f-9ae4-abe8511bce17'
-);
-```
+File: `src/components/admin/RevenueDashboard.tsx`
 
-The user/admin can then trigger payout manually when ready. Nothing in this plan invokes `b2c-payout`.
+- Add buckets:
+  - `mpesa_b2c_revenue` → label "M-PESA B2C Revenue", own color
+  - `verification_fee` already exists; expand `EARNINGS_SOURCE_TO_BUCKET` to include `verificationfee` (group verification source) so it stops falling into "Other"
+- Order the source-breakdown table so the four revenue streams (chama / mchango / organization / welfare commission, B2C revenue, verification fees) are always visible.
+- No changes needed to `kpis.totalRevenue` math — it already sums `company_earnings` via `standaloneEarningsSum`, so the new rows flow in automatically.
 
-## Deploy
+### 4. Keep the `MpesaFeeSummary` card
 
-Redeploy `b2c-payout` only.
+Leave the existing fee-detail card in place; it remains useful for splitting Safaricom cost vs. company revenue. Add a one-line note: "Company Revenue is included in Total Revenue above."
 
 ## Out of scope
 
-- No changes to `b2c-payout` business logic, fee handling, callback, or M-Pesa request payload.
-- No changes to retry-failed-payouts, daily-payout-cron, or welfare-cooling-off-payout.
-- No money sent.
+- No changes to fee calculation, B2C request payload, or commission rates.
+- No changes to existing `company_earnings` rows other than the historical B2C backfill.
+- No new tables; we reuse `company_earnings` as the canonical revenue ledger.
+
+## Verification
+
+- Trigger one completed B2C payout (or run backfill on existing completed withdrawals) and confirm a `company_earnings` row appears with `source='mpesa_b2c_revenue'`.
+- On the admin Revenue page, confirm Total Revenue increases by the B2C company-revenue sum and a "M-PESA B2C Revenue" row appears in the source breakdown.
+- Submit a group verification request → confirm it now appears under "Verification Fees" instead of "Other".
