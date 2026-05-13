@@ -135,6 +135,18 @@ serve(async (req) => {
 
       if (error) throw error;
 
+      // Notify creator (in-app + push)
+      try {
+        await createNotification(supabaseAdmin, {
+          userId: userData.user.id,
+          ...NotificationTemplates.welfareCreated(data.name, data.group_code),
+          relatedEntityId: data.id,
+          relatedEntityType: 'welfare',
+        });
+      } catch (notifErr) {
+        console.warn('welfare-crud: notification failed (non-fatal):', notifErr);
+      }
+
       return new Response(JSON.stringify({ data }), {
         status: 201,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
