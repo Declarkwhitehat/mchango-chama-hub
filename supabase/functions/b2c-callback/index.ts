@@ -515,6 +515,26 @@ serve(async (req) => {
         if (recipientPhone) {
           await sendSMS(recipientPhone, `Pamojanova: Withdrawal of KES ${withdrawal.net_amount?.toFixed(2)} from ${sourceType} "${sourceName}" failed. Reason: ${resultDesc}. Please contact support.`);
         }
+
+        // Notify requester (in-app + push) and all admins
+        try {
+          const failAmount = withdrawal.net_amount || withdrawal.amount;
+          if (withdrawal.requested_by) {
+            await createNotification(supabaseAdmin, {
+              userId: withdrawal.requested_by,
+              ...NotificationTemplates.withdrawalFailed(failAmount, resultDesc),
+              relatedEntityId: withdrawal.id,
+              relatedEntityType: 'withdrawal',
+            });
+          }
+          await notifyAllAdmins(supabaseAdmin, {
+            ...NotificationTemplates.adminPayoutFailed(failAmount, recipientPhone, resultDesc),
+            relatedEntityId: withdrawal.id,
+            relatedEntityType: 'withdrawal',
+          });
+        } catch (notifErr) {
+          console.warn('b2c-callback: failure notifications failed (non-fatal):', notifErr);
+        }
       } else {
         await supabaseAdmin
           .from('withdrawals')
