@@ -83,6 +83,32 @@ serve(async (req) => {
       payment_reference: checkoutId,
     }).eq('id', reqId);
 
+    // Fire-and-forget notifications: confirm to user + alert admins
+    try {
+      const { data: profileInfo } = await supabase
+        .from('profiles')
+        .select('full_name, phone')
+        .eq('id', user.id)
+        .maybeSingle();
+      const requesterLabel = profileInfo?.full_name || profileInfo?.phone || 'a user';
+
+      await Promise.allSettled([
+        createNotification(supabase, {
+          userId: user.id,
+          ...NotificationTemplates.verificationRequested('account', requesterLabel),
+          relatedEntityId: reqId,
+          relatedEntityType: 'user_verification_request',
+        }),
+        notifyAllAdmins(supabase, {
+          ...NotificationTemplates.adminVerificationPending('account', requesterLabel, requesterLabel),
+          relatedEntityId: reqId,
+          relatedEntityType: 'user_verification_request',
+        }),
+      ]);
+    } catch (notifErr) {
+      console.warn('request-account-verification: notifications failed (non-fatal):', notifErr);
+    }
+
     return new Response(JSON.stringify({ success: true, request_id: reqId, checkout_request_id: checkoutId }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
