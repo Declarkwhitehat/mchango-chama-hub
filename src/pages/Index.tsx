@@ -445,6 +445,8 @@ const Index = () => {
         </Collapsible>
       </section>
 
+      </main>
+
       {/* Footer */}
       <footer className="bg-card border-t border-border py-6 sm:py-8">
         <div className="container mx-auto px-4 sm:px-6">
