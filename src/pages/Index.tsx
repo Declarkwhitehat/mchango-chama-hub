@@ -46,9 +46,15 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-[calc(var(--bottom-nav-offset)+24px)]">
+      <SEO
+        title="Pamojanova — Chama, Mchango & Welfare Platform Kenya"
+        description="Kenya's trusted platform for online Chamas, Mchango campaigns, welfare groups & organizations. Secure M-Pesa contributions & rotating savings."
+        path="/"
+      />
       {/* Header */}
       <Header />
-      
+
+      <main>
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-20 md:pt-24 lg:pt-32">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-background z-0" />
