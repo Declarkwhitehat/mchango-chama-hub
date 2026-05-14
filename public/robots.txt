@@ -1,14 +1,24 @@
 User-agent: *
 Allow: /
 Disallow: /auth
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /pin-setup
+Disallow: /kyc-upload
+Disallow: /admin
+Disallow: /profile
+Disallow: /security
+Disallow: /activity
 
 User-agent: Googlebot
 Allow: /
 Disallow: /auth
+Disallow: /admin
 
 User-agent: Bingbot
 Allow: /
 Disallow: /auth
+Disallow: /admin
 
 User-agent: Twitterbot
 Allow: /
@@ -16,4 +26,4 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
-Sitemap: https://www.pamojanova.com/sitemap.xml
+Sitemap: https://pamojanova.com/sitemap.xml

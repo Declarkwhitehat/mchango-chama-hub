@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Header } from "@/components/Header";
 import Footer from "@/components/Footer";
+import SEO from "@/components/SEO";
 import { Users, TrendingUp, Heart, Shield, Building2, ChevronDown, User, Home, ShieldCheck, Smartphone } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -45,9 +46,15 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-[calc(var(--bottom-nav-offset)+24px)]">
+      <SEO
+        title="Pamojanova — Chama, Mchango & Welfare Platform Kenya"
+        description="Kenya's trusted platform for online Chamas, Mchango campaigns, welfare groups & organizations. Secure M-Pesa contributions & rotating savings."
+        path="/"
+      />
       {/* Header */}
       <Header />
-      
+
+      <main>
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-20 md:pt-24 lg:pt-32">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-background z-0" />
@@ -437,6 +444,8 @@ const Index = () => {
           </CollapsibleContent>
         </Collapsible>
       </section>
+
+      </main>
 
       {/* Footer */}
       <footer className="bg-card border-t border-border py-6 sm:py-8">

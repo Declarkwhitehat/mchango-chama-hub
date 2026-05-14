@@ -1,0 +1,17 @@
+# Pamojanova
+
+> Kenya's trusted digital platform for online Chama groups, Mchango campaigns, welfare groups and organizations. Powered by M-Pesa.
+
+Pamojanova helps Kenyans pool money safely: rotating-savings Chamas, fundraising Mchango campaigns, welfare-group contributions, and verified organization donations. Every transaction is tracked, transparent, and integrated with Safaricom Paybill 4015351.
+
+## Pages
+
+- [Home](/): Platform overview and quick access to all features.
+- [About](/about): Mission, leadership, and how Pamojanova works.
+- [Browse Chamas](/chama): Public list of active Chama savings groups.
+- [Browse Mchango Campaigns](/mchango): Live fundraising campaigns accepting donations.
+- [Explore Mchango](/mchango/explore): Discover trending and verified campaigns.
+- [Welfare Groups](/welfare): Welfare groups for shared community support funds.
+- [Organizations](/organizations): Verified NGOs, churches, and institutions accepting donations.
+- [Terms](/terms): Terms and conditions of service.
+- [Privacy](/privacy): Privacy policy and data handling.

@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { GroupDocuments } from "@/components/GroupDocuments";
 import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 import { publicUrls } from "@/lib/publicUrl";
+import SEO from "@/components/SEO";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
@@ -138,6 +139,12 @@ const OrganizationDetail = () => {
 
   return (
     <Layout showBackButton>
+      <SEO
+        title={`${organization.name} — Organization`}
+        description={(organization.description || `Support ${organization.name} on Pamojanova.`).slice(0, 160)}
+        path={`/organizations/${organization.slug || organization.id}`}
+        image={(organization as any).cover_image_url || (organization as any).logo_url}
+      />
       <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
         {/* Hero Section */}
         <Card className="overflow-hidden">

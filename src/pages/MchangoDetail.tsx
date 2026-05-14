@@ -26,6 +26,7 @@ import { GroupDocuments } from "@/components/GroupDocuments";
 import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 import { publicUrls } from "@/lib/publicUrl";
 import { renderTextWithLinks } from "@/utils/linkify";
+import SEO from "@/components/SEO";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
@@ -196,6 +197,12 @@ const MchangoDetail = () => {
 
   return (
     <Layout showBackButton>
+        <SEO
+          title={`${campaign.title} — Mchango Campaign`}
+          description={(campaign.description || `Support ${campaign.title} on Pamojanova.`).slice(0, 160)}
+          path={`/mchango/${campaign.slug}`}
+          image={campaign.image_url}
+        />
         <div className="container px-4 py-6 max-w-6xl mx-auto space-y-6">
           {/* Account creation banner for non-logged-in users */}
           {!user && (

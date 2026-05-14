@@ -25,6 +25,7 @@ import { WelfareLeaveRequests } from "@/components/welfare/WelfareLeaveRequests"
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
 import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
+import SEO from "@/components/SEO";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
@@ -171,6 +172,11 @@ const WelfareDetail = () => {
 
   return (
     <Layout>
+      <SEO
+        title={`${welfare.name} — Welfare Group`}
+        description={(welfare.description || `${welfare.name} welfare group on Pamojanova.`).slice(0, 160)}
+        path={`/welfare/${(welfare as any).slug || welfare.id}`}
+      />
       <div className="container px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-6">
