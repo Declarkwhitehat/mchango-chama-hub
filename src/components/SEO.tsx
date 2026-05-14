@@ -13,7 +13,7 @@ import { useLocation } from "react-router-dom";
  *   <SEO title="About | Pamojanova" description="..." />
  */
 
-const PRIMARY_ORIGIN = "https://www.pamojanova.com";
+const PRIMARY_ORIGIN = "https://pamojanova.com";
 const DEFAULT_OG_IMAGE = `${PRIMARY_ORIGIN}/app-icon-512.png`;
 
 interface SEOProps {
