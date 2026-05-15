@@ -256,18 +256,29 @@ Deno.serve(async (req) => {
 
     console.log(`Created cycle ${nextCycleNumber} for chama ${chama.name}, beneficiary: ${beneficiary.member_code}`);
 
-    // Create payment records for all members, applying carry-forward credits
-    // IMPORTANT: carry_forward_credit is ALREADY net of commission (deducted at overpayment deposit time)
-    // Do NOT charge commission again — this would be double-charging
-    // Compare wallet credit (NET) against NET cycle cost, not gross contribution_amount
+    // Create payment records for all members, applying overpayment wallet credits.
+    // SOURCE OF TRUTH: chama_overpayment_wallet (status='pending'). Wallet entries are
+    // already NET of the 5% commission (deducted at deposit time in contributions-crud).
+    // Do NOT charge commission again — that would be double-charging.
     const ONTIME_RATE = chama.commission_rate || 0.05;
     const netCycleCost = chama.contribution_amount * (1 - ONTIME_RATE); // e.g. 100 * 0.95 = 95
     let totalNetCreditApplied = 0;
 
+    // Fetch all pending wallet entries for this chama, group by member
+    const { data: pendingWalletRows } = await supabase
+      .from('chama_overpayment_wallet')
+      .select('id, member_id, amount, created_at')
+      .eq('chama_id', chamaId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+
+    const walletByMember = new Map<string, number>();
+    for (const row of pendingWalletRows || []) {
+      walletByMember.set(row.member_id, (walletByMember.get(row.member_id) || 0) + Number(row.amount));
+    }
+
     const paymentRecords = members.map(member => {
-      const carryForward = member.carry_forward_credit || 0;
-      const nextCycleCredit = member.next_cycle_credit || 0;
-      const totalCredit = carryForward + nextCycleCredit;
+      const totalCredit = walletByMember.get(member.id) || 0;
       // Credit is already net — compare against net cycle cost (95), not gross (100)
       const creditToUse = Math.min(totalCredit, netCycleCost);
       const isFullyPaid = creditToUse >= netCycleCost;
