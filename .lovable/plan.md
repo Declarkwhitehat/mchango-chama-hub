@@ -1,81 +1,45 @@
-## Goal
+## The bug
 
-Make every important event in the app trigger a **short, professional, direct** notification (in-app + push + SMS) — no emojis, no fluff, no generic "Welcome!" tone. Cover both transactional events for the user and critical alerts for admins.
+When a member overpays a chama cycle, `contributions-crud` correctly:
+- Deducts the 5% commission on the overpayment
+- Stores the net credit in `chama_overpayment_wallet` (status `pending`)
+- **Intentionally does NOT** write to `chama_members.carry_forward_credit` / `next_cycle_credit` (to avoid double-crediting — there's an explicit comment about this being the "single source of truth")
 
-The current `NotificationTemplates` are wordy and emoji-heavy ("Withdrawal Approved! 💰", "Welcome!", "Check your M-Pesa!"), several key events fire no notification at all (creating a chama / welfare / organization / campaign), and admins are never alerted to failed payouts or pending verifications.
+But when the next cycle is created, both `cycle-auto-create` and `daily-cycle-manager` read the credit from the **wrong place**:
 
-## Style rules (applied everywhere)
+```ts
+const totalCredit = (member.carry_forward_credit || 0) + (member.next_cycle_credit || 0);
+```
 
-- Brand prefix on every SMS: `Pamojanova:` then a single sentence.
-- No emojis anywhere (matches existing SMS Sanitization Policy and keeps in-app titles consistent).
-- Format: `<Action> — <amount/entity> — <key fact>`. Examples:
-  - `Withdrawal sent. KES 5,000 to 0712***456. Ref QFX12ABC.`
-  - `Chama "Bidii" created. Code BID12. Share with members to invite.`
-  - `Verification submitted for campaign "Build School". Admin will review within 24h.`
-- Titles ≤ 40 chars, messages ≤ 160 chars (single SMS segment).
-- Always include the M-Pesa receipt / amount / entity name when relevant.
+Those columns are always 0, so `creditToUse` is 0, the new cycle's payment record is created with the full amount due, and the wallet entry stays `pending` forever.
 
-## Changes
+## The fix
 
-### 1. Rewrite `supabase/functions/_shared/notifications.ts`
+In both `cycle-auto-create` and `daily-cycle-manager`, read each member's available credit from `chama_overpayment_wallet` (sum of `pending` entries) instead of the member columns.
 
-Replace every entry in `NotificationTemplates` with a tight, emoji-free version. Add the missing transactional templates:
+### Steps
 
-- `chamaCreated(name, code)`
-- `welfareCreated(name, code)`
-- `organizationCreated(name)`
-- `campaignCreated(name, targetAmount)`
-- `withdrawalCompletedDetailed(amount, phoneMasked, mpesaRef)` (replaces the current vague "Check your M-Pesa")
-- `donationSent(amount, campaignName, mpesaRef)` — confirmation to the donor
-- Admin-only:
-  - `adminPayoutFailed(amount, recipient, reason)`
-  - `adminLargeWithdrawal(amount, entityName, threshold)`
-  - `adminVerificationPending(entityType, entityName, requestedBy)`
+1. **`supabase/functions/cycle-auto-create/index.ts`**
+   - Before building `paymentRecords`, fetch all `chama_overpayment_wallet` rows for this chama with `status='pending'`, grouped by `member_id`, ordered by `created_at` (FIFO).
+   - Replace `totalCredit = carry_forward_credit + next_cycle_credit` with `totalCredit = sum(pending wallet entries for this member)`.
+   - Keep the existing logic that compares against `netCycleCost`, builds `payment_allocations`, and marks wallet entries `applied` / partially consumed.
+   - Remove the now-dead `chama_members.update({ carry_forward_credit, next_cycle_credit: 0 })` write (those columns aren't being maintained anymore).
 
-### 2. Wire missing trigger points
+2. **`supabase/functions/daily-cycle-manager/index.ts`**
+   - Same change: source credit from `chama_overpayment_wallet` instead of member columns; remove the stale member-column write.
 
-| Event | File to edit | Notify |
-|---|---|---|
-| Chama created | `supabase/functions/chamas-crud/index.ts` | Creator (in-app + push + SMS) |
-| Welfare created | `supabase/functions/welfares-crud/index.ts` | Creator |
-| Organization created | `supabase/functions/organizations-crud/index.ts` | Creator |
-| Campaign created | `supabase/functions/mchango-crud/index.ts` | Creator |
-| Verification submitted | `supabase/functions/request-account-verification/index.ts` + `src/components/VerificationRequestButton.tsx` | User (confirmation) + **all admins** |
-| B2C payout failed | `supabase/functions/b2c-callback/index.ts` (existing failure branch around line 320) | **All admins** + requester |
-| Large withdrawal approved | `supabase/functions/withdrawals-crud/index.ts` (status → approved) | **All admins** when `gross_amount ≥ 50,000` |
+3. **Backfill the user's stuck cycle**
+   - Find the affected chama's currently-active cycle.
+   - For each member with a `pending` wallet entry, apply it to their `member_cycle_payments` row for that cycle (mirror the same logic the new code will run on cycle creation), bump `chama.available_balance`, and mark the wallet entries `applied`.
+   - Run as a one-off SQL via the insert/migration tool after the user confirms which chama.
 
-### 3. Admin fan-out helper
+4. **Verification**
+   - Deploy the two edge functions.
+   - Confirm via `chama_overpayment_wallet` that the user's pending entry flips to `applied` and the new cycle's `member_cycle_payments` row shows `is_paid=true` (or reduced `amount_remaining`).
 
-Add `notifyAllAdmins(adminClient, notification)` to `_shared/notifications.ts`:
-- Fetches `user_id`s from `user_roles` where `role = 'admin'`
-- Calls `notifyManyUsers(...)` (already exists)
-- Caches the admin list for 60 s in module memory to avoid hammering the DB
+### Out of scope
+- No schema changes. No UI changes. The `OverpaymentWallet` component already reads from the right table.
+- Not touching `contributions-crud` — its overpayment logic is correct.
 
-### 4. SMS for the most critical user events only
-
-Send SMS (via existing `sendSMS` in `_shared/sms.ts`) for:
-- Withdrawal completed
-- Payment confirmed
-- Payout received (chama / welfare disbursement)
-- Donation sent (to the donor)
-- Verification approved/rejected
-
-Skip SMS for chama/welfare/organization/campaign creation — push + in-app only (saves cost; users see it instantly in the app).
-
-### 5. Admin threshold setting
-
-Read the "large withdrawal" threshold from `platform_settings.setting_key = 'admin_large_withdrawal_threshold'` (default `50000`). One small migration adds the row.
-
-## Out of scope
-
-- No new tables (reuses `notifications`, `device_tokens`, `user_roles`).
-- No email — only in-app + push + SMS.
-- No changes to the user notification UI / bell — existing realtime subscription already renders new rows.
-- No changes to verification fee / payout business logic.
-
-## Verification
-
-- Create a chama → creator gets a push + in-app card "Chama created. Code XXX12. Share to invite."
-- Submit a verification request → admins receive "Verification pending: campaign Build School (User Jane Doe)."
-- Trigger a B2C failure (or simulate one) → admins receive "Payout failed: KES 1,000 to 0712***456. Reason: …".
-- Successful B2C → recipient SMS reads `Pamojanova: Withdrawal sent. KES X to 07XX***XXX. Ref QFX…`.
+### Question before I implement
+Do you want me to also backfill your existing stuck chama (step 3) in the same change, or just fix the code so it works for the next cycle going forward?
