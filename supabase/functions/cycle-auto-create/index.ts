@@ -322,52 +322,30 @@ Deno.serve(async (req) => {
       console.error('Error creating payment records:', paymentError);
     }
 
-    // Reset carry-forward credits and sync overpayment wallet entries
-    for (const member of members) {
-      const totalCredit = (member.carry_forward_credit || 0) + (member.next_cycle_credit || 0);
-      
-      if (totalCredit > 0) {
-        const creditUsed = Math.min(totalCredit, netCycleCost);
-        const remainingCredit = Math.max(0, totalCredit - creditUsed);
-        
-        await supabase
-          .from('chama_members')
-          .update({
-            carry_forward_credit: remainingCredit,
-            next_cycle_credit: 0
-          })
-          .eq('id', member.id);
+    // Sync overpayment wallet entries — mark as applied/partially consumed (FIFO)
+    for (const [memberId, totalCredit] of walletByMember.entries()) {
+      if (totalCredit <= 0) continue;
+      const creditUsed = Math.min(totalCredit, netCycleCost);
+      let walletCreditToConsume = creditUsed;
 
-        // Sync overpayment wallet entries — mark as applied/partially consumed
-        let walletCreditToConsume = creditUsed;
-        const { data: walletEntries } = await supabase
-          .from('chama_overpayment_wallet')
-          .select('id, amount')
-          .eq('chama_id', chamaId)
-          .eq('member_id', member.id)
-          .eq('status', 'pending')
-          .order('created_at', { ascending: true });
+      const memberEntries = (pendingWalletRows || []).filter(r => r.member_id === memberId);
+      for (const entry of memberEntries) {
+        if (walletCreditToConsume <= 0) break;
+        const consumeFromEntry = Math.min(Number(entry.amount), walletCreditToConsume);
+        const walletRemainder = Number(entry.amount) - consumeFromEntry;
+        walletCreditToConsume -= consumeFromEntry;
 
-        if (walletEntries) {
-          for (const entry of walletEntries) {
-            if (walletCreditToConsume <= 0) break;
-            const consumeFromEntry = Math.min(entry.amount, walletCreditToConsume);
-            const walletRemainder = entry.amount - consumeFromEntry;
-            walletCreditToConsume -= consumeFromEntry;
-
-            if (walletRemainder <= 0) {
-              await supabase.from('chama_overpayment_wallet').update({
-                status: 'applied',
-                applied_to_cycle_id: newCycle.id,
-                applied_at: new Date().toISOString()
-              }).eq('id', entry.id);
-            } else {
-              await supabase.from('chama_overpayment_wallet').update({
-                amount: walletRemainder,
-                description: `Partially applied: KES ${consumeFromEntry.toFixed(2)} to Cycle #${nextCycleNumber}. KES ${walletRemainder.toFixed(2)} remaining.`
-              }).eq('id', entry.id);
-            }
-          }
+        if (walletRemainder <= 0.0001) {
+          await supabase.from('chama_overpayment_wallet').update({
+            status: 'applied',
+            applied_to_cycle_id: newCycle.id,
+            applied_at: new Date().toISOString()
+          }).eq('id', entry.id);
+        } else {
+          await supabase.from('chama_overpayment_wallet').update({
+            amount: walletRemainder,
+            description: `Partially applied: KES ${consumeFromEntry.toFixed(2)} to Cycle #${nextCycleNumber}. KES ${walletRemainder.toFixed(2)} remaining.`
+          }).eq('id', entry.id);
         }
       }
     }
