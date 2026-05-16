@@ -1,45 +1,56 @@
 ## The bug
 
-When a member overpays a chama cycle, `contributions-crud` correctly:
-- Deducts the 5% commission on the overpayment
-- Stores the net credit in `chama_overpayment_wallet` (status `pending`)
-- **Intentionally does NOT** write to `chama_members.carry_forward_credit` / `next_cycle_credit` (to avoid double-crediting — there's an explicit comment about this being the "single source of truth")
+When a user withdraws KES 930 from a campaign, Safaricom B2C charges a 15 KES fee, so the recipient receives 915. The current code deducts **what the recipient received (915)** from the entity's `available_balance` instead of **what was approved to leave (930)**.
 
-But when the next cycle is created, both `cycle-auto-create` and `daily-cycle-manager` read the credit from the **wrong place**:
+That leaves the 15 KES B2C fee permanently stuck in the balance. Your campaign shows KES 44.76 instead of the correct ~29.76.
 
-```ts
-const totalCredit = (member.carry_forward_credit || 0) + (member.next_cycle_credit || 0);
+### Root cause
+
+**`process_withdrawal_completion()` SQL function** (used by `b2c-callback`):
+```sql
+v_effective_amount := COALESCE(NULLIF(p_transaction_amount, 0), v_withdrawal.net_amount, v_withdrawal.amount);
+-- p_transaction_amount = M-Pesa "TransactionAmount" = 915 (recipient amount)
+-- net_amount column = amount - transaction_fee = 915
+-- Then: available_balance := available_balance - 915  ← WRONG, should be 930
 ```
 
-Those columns are always 0, so `creditToUse` is 0, the new cycle's payment record is created with the full amount due, and the wallet entry stays `pending` forever.
+**`withdrawals-crud` manual completion path** (`isManualCompletion` block, lines 1388–1424): same mistake — uses `Number(existingWithdrawal.net_amount)` instead of `amount`.
+
+### Why other entities are affected
+
+Same `process_withdrawal_completion()` runs for chama, mchango, and organization withdrawals. **Welfare is unaffected** — it deducts `withdrawal.amount` (the gross) at the cooling-off approval step, before B2C runs.
+
+The `withdrawals.amount` column is the source of truth for what should leave the entity (gross outflow including the Safaricom fee). `net_amount` represents only what the recipient receives.
 
 ## The fix
 
-In both `cycle-auto-create` and `daily-cycle-manager`, read each member's available credit from `chama_overpayment_wallet` (sum of `pending` entries) instead of the member columns.
+### 1. Patch `process_withdrawal_completion` (DB migration)
+Change effective amount to always use `v_withdrawal.amount`. Drop the `p_transaction_amount` / `net_amount` fallbacks for the deduction. Keep `p_mpesa_receipt` / `p_transaction_amount` parameters (still needed for the receipt-dedup check and for callers), just don't use them to compute the deduction.
 
-### Steps
+```sql
+v_effective_amount := v_withdrawal.amount;
+```
 
-1. **`supabase/functions/cycle-auto-create/index.ts`**
-   - Before building `paymentRecords`, fetch all `chama_overpayment_wallet` rows for this chama with `status='pending'`, grouped by `member_id`, ordered by `created_at` (FIFO).
-   - Replace `totalCredit = carry_forward_credit + next_cycle_credit` with `totalCredit = sum(pending wallet entries for this member)`.
-   - Keep the existing logic that compares against `netCycleCost`, builds `payment_allocations`, and marks wallet entries `applied` / partially consumed.
-   - Remove the now-dead `chama_members.update({ carry_forward_credit, next_cycle_credit: 0 })` write (those columns aren't being maintained anymore).
+This fixes mchango, chama, and organization paths in one place.
 
-2. **`supabase/functions/daily-cycle-manager/index.ts`**
-   - Same change: source credit from `chama_overpayment_wallet` instead of member columns; remove the stale member-column write.
+### 2. Patch `withdrawals-crud` manual completion (edge function)
+Replace the four `Number(existingWithdrawal.net_amount)` references in the `isManualCompletion` branch with `Number(existingWithdrawal.amount)` so admin-side "mark as paid" matches the same rule.
 
-3. **Backfill the user's stuck cycle**
-   - Find the affected chama's currently-active cycle.
-   - For each member with a `pending` wallet entry, apply it to their `member_cycle_payments` row for that cycle (mirror the same logic the new code will run on cycle creation), bump `chama.available_balance`, and mark the wallet entries `applied`.
-   - Run as a one-off SQL via the insert/migration tool after the user confirms which chama.
+### 3. Backfill the stuck balance (data fix)
+Audit found exactly one stuck row site-wide:
+- "Full gospel church refunish campaign" — KES 15 stuck.
 
-4. **Verification**
-   - Deploy the two edge functions.
-   - Confirm via `chama_overpayment_wallet` that the user's pending entry flips to `applied` and the new cycle's `member_cycle_payments` row shows `is_paid=true` (or reduced `amount_remaining`).
+Apply: `mchango.available_balance -= 15` and `mchango.current_amount -= 15` for that campaign so it drops from KES 44.76 to KES 29.76.
 
-### Out of scope
-- No schema changes. No UI changes. The `OverpaymentWallet` component already reads from the right table.
-- Not touching `contributions-crud` — its overpayment logic is correct.
+(Run a query before applying to confirm no new stuck rows appeared since.)
 
-### Question before I implement
-Do you want me to also backfill your existing stuck chama (step 3) in the same change, or just fix the code so it works for the next cycle going forward?
+### 4. Verification
+- Deploy edge function + migration.
+- Re-query `mchango` for the user's campaign — balance should be 29.76.
+- Confirm no other entity ended up negative.
+
+## Out of scope
+- No changes to commission math (deductive 7% on contributions stays untouched).
+- No changes to welfare flow (already correct).
+- No UI changes — `available_balance` is what the dashboard reads; once the value is right, every page is right.
+- The `withdrawals.net_amount` column stays as-is (it's accurate as "what the recipient received").
