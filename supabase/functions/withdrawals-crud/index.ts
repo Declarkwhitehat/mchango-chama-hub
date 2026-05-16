@@ -1385,9 +1385,12 @@ serve(async (req) => {
 
       console.log('Withdrawal updated:', withdrawal);
 
-      // If manually completed, update entity total_withdrawn and available_balance
+      // If manually completed, update entity total_withdrawn and available_balance.
+      // Deduct the gross approved outflow (withdrawal.amount), NOT net_amount —
+      // the M-Pesa B2C fee must come out of the entity's balance, otherwise the
+      // fee gets stuck as a phantom positive balance.
       if (isManualCompletion) {
-        const netAmt = Number(existingWithdrawal.net_amount);
+        const netAmt = Number(existingWithdrawal.amount);
         if (existingWithdrawal.chama_id) {
           const { data: entity } = await supabaseAdmin.from('chama').select('total_withdrawn, available_balance').eq('id', existingWithdrawal.chama_id).single();
           if (entity) {
