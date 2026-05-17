@@ -36,3 +36,41 @@ export function getSameDay10PmKenyaCutoff(referenceDate: Date): Date {
     0,
   ));
 }
+
+/**
+ * 9:30 PM EAT (18:30 UTC) on the same Kenya-calendar day as `referenceDate`.
+ * This is the v2 on-time payment cutoff. Payments received AT OR BEFORE this
+ * timestamp count for the current cycle at 5% commission. Payments after this
+ * are late (10% commission) and buffered for the next cycle.
+ */
+export function getSameDay930PmKenyaCutoff(referenceDate: Date): Date {
+  const kenyaClock = toKenyaClock(referenceDate);
+
+  return new Date(Date.UTC(
+    kenyaClock.getUTCFullYear(),
+    kenyaClock.getUTCMonth(),
+    kenyaClock.getUTCDate(),
+    KENYA_930PM_UTC_HOUR,
+    KENYA_930PM_UTC_MINUTE,
+    0,
+    0,
+  ));
+}
+
+/**
+ * 12:01 PM EAT (09:01 UTC) on the same Kenya-calendar day as `referenceDate`.
+ * Used by the first-cycle grace-period courtesy reminder (no amount details).
+ */
+export function getSameDay1201PmKenyaCutoff(referenceDate: Date): Date {
+  const kenyaClock = toKenyaClock(referenceDate);
+
+  return new Date(Date.UTC(
+    kenyaClock.getUTCFullYear(),
+    kenyaClock.getUTCMonth(),
+    kenyaClock.getUTCDate(),
+    KENYA_1201PM_UTC_HOUR,
+    KENYA_1201PM_UTC_MINUTE,
+    0,
+    0,
+  ));
+}
