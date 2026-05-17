@@ -384,6 +384,102 @@ export type Database = {
           },
         ]
       }
+      chama_late_payment_buffer: {
+        Row: {
+          applied_at: string | null
+          applied_to_cycle_id: string | null
+          chama_id: string
+          commission_amount: number
+          commission_rate: number
+          contribution_id: string | null
+          created_at: string
+          gross_amount: number
+          id: string
+          member_id: string
+          missed_cycle_id: string | null
+          mpesa_receipt: string | null
+          net_amount: number
+          note: string | null
+          paid_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_to_cycle_id?: string | null
+          chama_id: string
+          commission_amount: number
+          commission_rate?: number
+          contribution_id?: string | null
+          created_at?: string
+          gross_amount: number
+          id?: string
+          member_id: string
+          missed_cycle_id?: string | null
+          mpesa_receipt?: string | null
+          net_amount: number
+          note?: string | null
+          paid_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_to_cycle_id?: string | null
+          chama_id?: string
+          commission_amount?: number
+          commission_rate?: number
+          contribution_id?: string | null
+          created_at?: string
+          gross_amount?: number
+          id?: string
+          member_id?: string
+          missed_cycle_id?: string | null
+          mpesa_receipt?: string | null
+          net_amount?: number
+          note?: string | null
+          paid_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_late_payment_buffer_applied_to_cycle_id_fkey"
+            columns: ["applied_to_cycle_id"]
+            isOneToOne: false
+            referencedRelation: "contribution_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_late_payment_buffer_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_late_payment_buffer_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_late_payment_buffer_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_late_payment_buffer_missed_cycle_id_fkey"
+            columns: ["missed_cycle_id"]
+            isOneToOne: false
+            referencedRelation: "contribution_cycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chama_member_debts: {
         Row: {
           chama_id: string

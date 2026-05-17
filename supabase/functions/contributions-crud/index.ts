@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { getSameDay930PmKenyaCutoff } from "../_shared/chamaDeadlines.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -453,103 +454,219 @@ async function settleDebts(
     const cyclePayment = cycle.member_cycle_payments?.[0];
     const amountRemaining = cyclePayment?.amount_remaining ?? (cycle.due_amount || contributionAmount);
 
-    // Check if payment is past 10 PM deadline (late)
-    const cycleEndDate = new Date(cycle.end_date);
-    const lateDeadline = new Date(cycleEndDate);
-    lateDeadline.setHours(22, 0, 0, 0);
-    const isLate = now > lateDeadline;
-    const cycleCommissionRate = isLate ? LATE_RATE : ONTIME_RATE;
+    // v2 §5.1/§5.2: on-time cutoff is 9:30 PM EAT on the cycle's last day.
+    // Payments at or before 9:30 PM EAT credit the current cycle at 5%.
+    // Payments AFTER 9:30 PM are LATE: charge 10%, do NOT credit current cycle,
+    // and buffer for auto-application when the next cycle opens.
+    const cutoff930 = getSameDay930PmKenyaCutoff(new Date(cycle.end_date));
+    const isLate = !!cutoff930 && now > cutoff930;
 
-    const grossNeeded = amountRemaining; // deductive: member pays the base amount
-    const toApply = Math.min(remaining, grossNeeded);
-    const commission = toApply * cycleCommissionRate; // deducted from within
-    const net = toApply - commission;
-    remaining -= toApply;
-    toCompany += commission;
-    toCyclePot += net;
+    if (isLate) {
+      const lateRate = LATE_RATE;
+      const grossNeeded = amountRemaining; // member still owes this for the missed cycle
+      const toApply = Math.min(remaining, grossNeeded);
+      const commission = toApply * lateRate;
+      const net = toApply - commission;
+      remaining -= toApply;
+      toCompany += commission;
+      // toCyclePot is NOT incremented — late funds do not enter the current cycle pot.
 
-    const newAmountPaid = (cyclePayment?.amount_paid || 0) + toApply;
-    const isFullyPaid = newAmountPaid >= (cyclePayment?.amount_due || contributionAmount);
+      // Look up the M-Pesa receipt (if known) for buffer dedup
+      let mpesaReceipt: string | null = null;
+      if (contributionId) {
+        const { data: contribRow } = await supabase
+          .from('contributions')
+          .select('mpesa_receipt_number')
+          .eq('id', contributionId)
+          .maybeSingle();
+        mpesaReceipt = contribRow?.mpesa_receipt_number || null;
+      }
 
-    // Update or create cycle payment record
-    if (cyclePayment) {
-      const existingAllocations = cyclePayment.payment_allocations || [];
-      await supabase.from('member_cycle_payments').update({
-        amount_paid: newAmountPaid,
-        amount_remaining: Math.max(0, (cyclePayment.amount_due || contributionAmount) - newAmountPaid),
-        fully_paid: isFullyPaid,
-        is_paid: isFullyPaid,
-        is_late_payment: isLate,
-        paid_at: isFullyPaid ? new Date().toISOString() : null,
-        payment_allocations: JSON.stringify([...existingAllocations, {
-          amount: net,
-          gross_paid: toApply,
-          commission: commission,
-          commission_rate: cycleCommissionRate,
-          timestamp: new Date().toISOString(),
-          source: 'contribution',
-          is_late: isLate
-        }])
-      }).eq('id', cyclePayment.id);
+      // Buffer the late payment for the next cycle
+      const { error: bufErr } = await supabase
+        .from('chama_late_payment_buffer')
+        .insert({
+          chama_id: chamaId,
+          member_id: memberId,
+          missed_cycle_id: cycle.id,
+          gross_amount: toApply,
+          commission_amount: commission,
+          net_amount: net,
+          commission_rate: lateRate,
+          mpesa_receipt: mpesaReceipt,
+          contribution_id: contributionId || null,
+          paid_at: nowISO,
+          status: 'pending',
+          note: `Late payment received ${nowISO} (past 9:30 PM EAT cutoff for Cycle #${cycle.cycle_number}). Buffered for next cycle.`
+        });
+      if (bufErr) {
+        console.error('[contributions-crud] Failed to buffer late payment:', bufErr);
+      }
+
+      // Mark the member's row for the missed cycle as Late, without crediting amount_paid.
+      if (cyclePayment) {
+        const existingAllocations = cyclePayment.payment_allocations || [];
+        await supabase.from('member_cycle_payments').update({
+          is_late_payment: true,
+          payment_allocations: JSON.stringify([...existingAllocations, {
+            amount: 0,
+            gross_paid: toApply,
+            commission: commission,
+            commission_rate: lateRate,
+            timestamp: nowISO,
+            source: 'late_buffer',
+            is_late: true,
+            note: `Late payment of KES ${toApply.toFixed(2)} buffered for next cycle (not credited to Cycle #${cycle.cycle_number})`
+          }])
+        }).eq('id', cyclePayment.id);
+      } else {
+        await supabase.from('member_cycle_payments').insert({
+          member_id: memberId,
+          cycle_id: cycle.id,
+          amount_paid: 0,
+          amount_due: cycle.due_amount || contributionAmount,
+          amount_remaining: cycle.due_amount || contributionAmount,
+          is_paid: false,
+          fully_paid: false,
+          is_late_payment: true,
+          payment_allocations: JSON.stringify([{
+            amount: 0,
+            gross_paid: toApply,
+            commission: commission,
+            commission_rate: lateRate,
+            timestamp: nowISO,
+            source: 'late_buffer',
+            is_late: true,
+            note: `Late payment buffered for next cycle`
+          }])
+        });
+      }
+
+      allocations.push({
+        type: 'late_commission',
+        cycle_number: cycle.cycle_number,
+        amount: commission,
+        destination: 'Platform fee',
+        description: `10% late commission (past 9:30 PM cutoff for Cycle #${cycle.cycle_number})`
+      });
+      allocations.push({
+        type: 'late_buffer',
+        cycle_number: cycle.cycle_number,
+        amount: net,
+        destination: 'Late payment buffer',
+        description: `Buffered KES ${net.toFixed(2)} for next cycle (Cycle #${cycle.cycle_number} marked Late)`
+      });
+
+      await supabase.from('company_earnings').insert({
+        source: 'COMMISSION',
+        amount: commission,
+        group_id: chamaId,
+        description: `Chama late commission (9:30 PM cutoff) — Cycle #${cycle.cycle_number}`
+      });
+      await supabase.from('financial_ledger').insert({
+        transaction_type: 'commission',
+        source_type: 'chama',
+        source_id: chamaId,
+        gross_amount: toApply,
+        commission_amount: commission,
+        net_amount: net,
+        commission_rate: lateRate,
+        reference_id: contributionId || null,
+        description: `Chama late commission (past 9:30 PM EAT) — Cycle #${cycle.cycle_number}`
+      });
     } else {
-      await supabase.from('member_cycle_payments').insert({
-        member_id: memberId,
-        cycle_id: cycle.id,
-        amount_paid: toApply,
-        amount_due: cycle.due_amount || contributionAmount,
-        amount_remaining: Math.max(0, (cycle.due_amount || contributionAmount) - toApply),
-        is_paid: isFullyPaid,
-        fully_paid: isFullyPaid,
-        is_late_payment: isLate,
-        paid_at: isFullyPaid ? new Date().toISOString() : null,
-        payment_allocations: JSON.stringify([{
-          amount: net,
-          gross_paid: toApply,
-          commission: commission,
-          commission_rate: cycleCommissionRate,
-          timestamp: new Date().toISOString(),
-          source: 'contribution',
-          is_late: isLate
-        }])
+      // ON-TIME path — credits current cycle at 5%
+      const cycleCommissionRate = ONTIME_RATE;
+
+      const grossNeeded = amountRemaining; // deductive: member pays the base amount
+      const toApply = Math.min(remaining, grossNeeded);
+      const commission = toApply * cycleCommissionRate; // deducted from within
+      const net = toApply - commission;
+      remaining -= toApply;
+      toCompany += commission;
+      toCyclePot += net;
+
+      const newAmountPaid = (cyclePayment?.amount_paid || 0) + toApply;
+      const isFullyPaid = newAmountPaid >= (cyclePayment?.amount_due || contributionAmount);
+
+      // Update or create cycle payment record
+      if (cyclePayment) {
+        const existingAllocations = cyclePayment.payment_allocations || [];
+        await supabase.from('member_cycle_payments').update({
+          amount_paid: newAmountPaid,
+          amount_remaining: Math.max(0, (cyclePayment.amount_due || contributionAmount) - newAmountPaid),
+          fully_paid: isFullyPaid,
+          is_paid: isFullyPaid,
+          is_late_payment: false,
+          paid_at: isFullyPaid ? new Date().toISOString() : null,
+          payment_allocations: JSON.stringify([...existingAllocations, {
+            amount: net,
+            gross_paid: toApply,
+            commission: commission,
+            commission_rate: cycleCommissionRate,
+            timestamp: new Date().toISOString(),
+            source: 'contribution',
+            is_late: false
+          }])
+        }).eq('id', cyclePayment.id);
+      } else {
+        await supabase.from('member_cycle_payments').insert({
+          member_id: memberId,
+          cycle_id: cycle.id,
+          amount_paid: toApply,
+          amount_due: cycle.due_amount || contributionAmount,
+          amount_remaining: Math.max(0, (cycle.due_amount || contributionAmount) - toApply),
+          is_paid: isFullyPaid,
+          fully_paid: isFullyPaid,
+          is_late_payment: false,
+          paid_at: isFullyPaid ? new Date().toISOString() : null,
+          payment_allocations: JSON.stringify([{
+            amount: net,
+            gross_paid: toApply,
+            commission: commission,
+            commission_rate: cycleCommissionRate,
+            timestamp: new Date().toISOString(),
+            source: 'contribution',
+            is_late: false
+          }])
+        });
+      }
+
+      if (isFullyPaid) periodsCleared++;
+
+      allocations.push({
+        type: 'current_cycle_commission',
+        cycle_number: cycle.cycle_number,
+        amount: commission,
+        destination: 'Platform fee',
+        description: `5% on-time commission on current cycle`
+      });
+      allocations.push({
+        type: 'current_cycle',
+        cycle_number: cycle.cycle_number,
+        amount: net,
+        destination: 'Cycle collection pot',
+        description: `Net contribution to Cycle #${cycle.cycle_number}`
+      });
+
+      await supabase.from('company_earnings').insert({
+        source: 'COMMISSION',
+        amount: commission,
+        group_id: chamaId,
+        description: `Chama on-time commission — Cycle #${cycle.cycle_number}`
+      });
+      await supabase.from('financial_ledger').insert({
+        transaction_type: 'commission',
+        source_type: 'chama',
+        source_id: chamaId,
+        gross_amount: toApply,
+        commission_amount: commission,
+        net_amount: toApply - commission,
+        commission_rate: cycleCommissionRate,
+        reference_id: contributionId || null,
+        description: `Chama on-time commission — Cycle #${cycle.cycle_number}`
       });
     }
-
-    if (isFullyPaid) periodsCleared++;
-
-    allocations.push({
-      type: 'current_cycle_commission',
-      cycle_number: cycle.cycle_number,
-      amount: commission,
-      destination: 'Platform fee',
-      description: `${isLate ? '10% late' : '5% on-time'} commission on current cycle`
-    });
-    allocations.push({
-      type: 'current_cycle',
-      cycle_number: cycle.cycle_number,
-      amount: net,
-      destination: 'Cycle collection pot',
-      description: `Net contribution to Cycle #${cycle.cycle_number}`
-    });
-
-    // Record commission (running company total)
-    await supabase.from('company_earnings').insert({
-      source: 'COMMISSION',
-      amount: commission,
-      group_id: chamaId,
-      description: `Chama ${isLate ? 'late' : 'on-time'} commission — Cycle #${cycle.cycle_number}`
-    });
-    // Paired analytics row in financial_ledger
-    await supabase.from('financial_ledger').insert({
-      transaction_type: 'commission',
-      source_type: 'chama',
-      source_id: chamaId,
-      gross_amount: toApply,
-      commission_amount: commission,
-      net_amount: toApply - commission,
-      commission_rate: cycleCommissionRate,
-      reference_id: contributionId || null,
-      description: `Chama ${isLate ? 'late' : 'on-time'} commission — Cycle #${cycle.cycle_number}`
-    });
   } else if (remaining > 0) {
     // No active cycle found — try to create payment record if we just need to allocate
     // Allocate to member's pending cycles if any exist
