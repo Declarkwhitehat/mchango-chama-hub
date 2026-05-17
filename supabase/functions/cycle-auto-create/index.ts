@@ -334,18 +334,20 @@ Deno.serve(async (req) => {
       console.error('Error creating payment records:', paymentError);
     }
 
-    // Sync overpayment wallet entries — mark as applied/partially consumed (FIFO)
+    // Sync overpayment wallet entries AND late-payment buffer entries — mark as
+    // applied/partially consumed (FIFO within each source: wallet first, then buffer).
     for (const [memberId, totalCredit] of walletByMember.entries()) {
       if (totalCredit <= 0) continue;
       const creditUsed = Math.min(totalCredit, netCycleCost);
-      let walletCreditToConsume = creditUsed;
+      let creditToConsume = creditUsed;
 
-      const memberEntries = (pendingWalletRows || []).filter(r => r.member_id === memberId);
-      for (const entry of memberEntries) {
-        if (walletCreditToConsume <= 0) break;
-        const consumeFromEntry = Math.min(Number(entry.amount), walletCreditToConsume);
+      // First drain the wallet entries for this member
+      const walletEntries = (pendingWalletRows || []).filter(r => r.member_id === memberId);
+      for (const entry of walletEntries) {
+        if (creditToConsume <= 0) break;
+        const consumeFromEntry = Math.min(Number(entry.amount), creditToConsume);
         const walletRemainder = Number(entry.amount) - consumeFromEntry;
-        walletCreditToConsume -= consumeFromEntry;
+        creditToConsume -= consumeFromEntry;
 
         if (walletRemainder <= 0.0001) {
           await supabase.from('chama_overpayment_wallet').update({
@@ -357,6 +359,30 @@ Deno.serve(async (req) => {
           await supabase.from('chama_overpayment_wallet').update({
             amount: walletRemainder,
             description: `Partially applied: KES ${consumeFromEntry.toFixed(2)} to Cycle #${nextCycleNumber}. KES ${walletRemainder.toFixed(2)} remaining.`
+          }).eq('id', entry.id);
+        }
+      }
+
+      // Then drain the late-payment buffer entries for this member
+      const bufferEntries = (pendingBufferRows || []).filter(r => r.member_id === memberId);
+      for (const entry of bufferEntries) {
+        if (creditToConsume <= 0) break;
+        const entryNet = Number(entry.net_amount);
+        const consumeFromEntry = Math.min(entryNet, creditToConsume);
+        const bufferRemainder = entryNet - consumeFromEntry;
+        creditToConsume -= consumeFromEntry;
+
+        if (bufferRemainder <= 0.0001) {
+          await supabase.from('chama_late_payment_buffer').update({
+            status: 'applied',
+            applied_to_cycle_id: newCycle.id,
+            applied_at: new Date().toISOString(),
+            note: `Applied KES ${consumeFromEntry.toFixed(2)} to Cycle #${nextCycleNumber}`
+          }).eq('id', entry.id);
+        } else {
+          await supabase.from('chama_late_payment_buffer').update({
+            net_amount: bufferRemainder,
+            note: `Partially applied: KES ${consumeFromEntry.toFixed(2)} to Cycle #${nextCycleNumber}. KES ${bufferRemainder.toFixed(2)} remaining.`
           }).eq('id', entry.id);
         }
       }
