@@ -272,9 +272,21 @@ Deno.serve(async (req) => {
       .eq('status', 'pending')
       .order('created_at', { ascending: true });
 
+    // v2 §5.2: drain pending LATE-PAYMENT BUFFER rows. The net_amount is already
+    // post-10%-commission and is applied as a credit toward this newly-opened cycle.
+    const { data: pendingBufferRows } = await supabase
+      .from('chama_late_payment_buffer')
+      .select('id, member_id, net_amount, created_at')
+      .eq('chama_id', chamaId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+
     const walletByMember = new Map<string, number>();
     for (const row of pendingWalletRows || []) {
       walletByMember.set(row.member_id, (walletByMember.get(row.member_id) || 0) + Number(row.amount));
+    }
+    for (const row of pendingBufferRows || []) {
+      walletByMember.set(row.member_id, (walletByMember.get(row.member_id) || 0) + Number(row.net_amount));
     }
 
     const paymentRecords = members.map(member => {
