@@ -1,5 +1,7 @@
 const KENYA_OFFSET_MS = 3 * 60 * 60 * 1000;
 const KENYA_10PM_UTC_HOUR = 19;
+const KENYA_930PM_UTC_HOUR = 18;
+const KENYA_930PM_UTC_MINUTE = 30;
 
 function toKenyaClock(input: string | Date | null | undefined): Date | null {
   if (!input) return null;
