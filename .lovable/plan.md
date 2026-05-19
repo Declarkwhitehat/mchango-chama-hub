@@ -1,27 +1,35 @@
 ## Goal
 
-1. Remove the `Pamojanova:` prefix from every SMS in `supabase/functions/chama-join/index.ts` (the only remaining offender — `src/utils/smsService.ts` templates are already clean).
-2. Add success-rate / trust-score guidance to the manager's join-request SMS so they're reminded to check the member's score before approving.
-3. Keep messages short, professional, GSM-7 safe (no emojis), per the existing SMS Sanitization Policy.
+Make the two amount tiles in the chama detail/dashboard clearer:
+
+1. **Total Contribution** — shows everything contributed to the chama so far (net of commission), which is the running pool that will fund payouts.
+2. **Per-cycle amount tile** — renamed to the chama's frequency (e.g. "Daily", "Weekly", "Monthly"). This is the amount each member contributes per cycle and that gets sent out as the payout.
 
 ## Changes
 
-### `supabase/functions/chama-join/index.ts`
+### 1. `src/pages/ChamaDetail.tsx` (header card, ~lines 553–567)
 
-- Line 511 — manager join-request alert. New text:
-  `${requesterName} has requested to join your chama "${chamaName}". Only approve members you personally know. Check their success rate, name, ID and phone in the app before approving.`
+- Rename tile label **"Total Collected (Net)" → "Total Contribution"**. Keep the value `totalContributions` (already the net total contributed so far) and the small helper text about commission.
+- Rename second tile label **"Contribution" → frequency label**:
+  - `daily` → "Daily"
+  - `weekly` → "Weekly"
+  - `monthly` → "Monthly"
+  - `twice_monthly` → "Twice Monthly"
+  - `every_n_days` → `"Every ${every_n_days_count} Days"`
+  
+  Value stays `KES {chama.contribution_amount}`. Add a small caption underneath: *"Amount each member pays per cycle — sent as payout."*
+- Remove the now-redundant "Frequency: …" line below the grid (since the tile label already shows it).
 
-- Line 670 — approval SMS to requester. New text:
-  `Your request to join "${chamaName}" has been approved. Open the app to make your first contribution.`
+### 2. `src/components/MemberDashboard.tsx` (~lines 249–255)
 
-- Line 671 — rejection SMS to requester. New text:
-  `Your request to join "${chamaName}" was not approved by the manager. You may contact them or request a new invite code.`
+- Rename the "Contribution" tile to the same frequency label (Daily / Weekly / Monthly / Twice Monthly / Every N Days).
+- Remove the duplicate frequency caption underneath (it's now in the label).
 
-### `src/utils/smsService.ts`
-- Line 119 — update the stale comment `// SMS Templates — Pamojanova branded, professional, concise` to drop the brand-prefix wording (templates themselves are already prefix-free).
+### 3. Helper
 
-## Notes
+Add a small inline helper `frequencyLabel(frequency, everyN)` in both files (or a shared util `src/utils/chamaFrequency.ts`) to keep label mapping consistent.
 
-- No business logic, RLS, or schema changes.
-- Sender ID already identifies the platform, so removing the prefix matches the SMS Sanitization Policy memory.
-- Other SMS senders across the codebase were checked and do not contain the `Pamojanova:` prefix.
+## Out of scope
+
+- No backend / data changes — both values already exist.
+- No styling/layout changes beyond the label swaps.
