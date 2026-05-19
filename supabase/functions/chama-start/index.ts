@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getNextDay10PmKenyaDeadline } from "../_shared/chamaDeadlines.ts";
+import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate } from "../_shared/chamaDeadlines.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
