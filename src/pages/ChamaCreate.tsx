@@ -177,10 +177,11 @@ const ChamaCreate = () => {
                 <Input
                   id="name"
                   name="name"
-                  placeholder="e.g., Women Empowerment Group"
+                  placeholder="e.g., Mama Mboga SHG"
                   required
-
+                  maxLength={16}
                 />
+                <p className="text-xs text-muted-foreground">Max 16 characters. Letters, numbers, spaces only — no emojis.</p>
               </div>
 
               <div className="space-y-2">
