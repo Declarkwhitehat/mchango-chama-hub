@@ -85,6 +85,7 @@ const AdminDocumentDeletions = lazy(() => import("./pages/AdminDocumentDeletions
 const AdminAccountVerifications = lazy(() => import("./pages/AdminAccountVerifications"));
 const AdminMaintenanceMode = lazy(() => import("./pages/AdminMaintenanceMode"));
 const AdminSmsBalance = lazy(() => import("./pages/AdminSmsBalance"));
+const AdminPaybillBalance = lazy(() => import("./pages/AdminPaybillBalance"));
 const AccountVerification = lazy(() => import("./pages/AccountVerification"));
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -192,6 +193,7 @@ const AppContent = () => {
             <Route path="/admin/account-verifications" element={<AdminProtectedRoute><AdminAccountVerifications /></AdminProtectedRoute>} />
             <Route path="/admin/maintenance" element={<AdminProtectedRoute><AdminMaintenanceMode /></AdminProtectedRoute>} />
             <Route path="/admin/sms-balance" element={<AdminProtectedRoute><AdminSmsBalance /></AdminProtectedRoute>} />
+            <Route path="/admin/paybill-balance" element={<AdminProtectedRoute><AdminPaybillBalance /></AdminProtectedRoute>} />
             <Route path="/account/verify" element={<ProtectedRoute><AccountVerification /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -20,7 +20,8 @@ import {
   CheckCircle,
   Trash2,
   MessageSquareMore,
-  Wrench
+  Wrench,
+  Wallet
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -157,6 +158,7 @@ export function AdminSidebar() {
     { title: "Financial Ledger", url: "/admin/ledger", icon: Landmark },
     { title: "Payment Config", url: "/admin/payment-config", icon: Settings },
     { title: "Payment Search", url: "/admin/payment-search", icon: Search },
+    { title: "Paybill Balance", url: "/admin/paybill-balance", icon: Wallet },
   ];
 
   const supportItems: MenuItem[] = [

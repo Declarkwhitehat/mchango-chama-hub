@@ -1952,6 +1952,63 @@ export type Database = {
         }
         Relationships: []
       }
+      paybill_balance_snapshots: {
+        Row: {
+          charges_paid_account: number | null
+          completed_at: string | null
+          conversation_id: string | null
+          created_at: string
+          id: string
+          merchant_account: number | null
+          organization_settlement_account: number | null
+          originator_conversation_id: string | null
+          queried_at: string
+          queried_by: string | null
+          raw_result: Json | null
+          result_code: number | null
+          result_desc: string | null
+          shortcode: string
+          utility_account: number | null
+          working_account: number | null
+        }
+        Insert: {
+          charges_paid_account?: number | null
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          merchant_account?: number | null
+          organization_settlement_account?: number | null
+          originator_conversation_id?: string | null
+          queried_at?: string
+          queried_by?: string | null
+          raw_result?: Json | null
+          result_code?: number | null
+          result_desc?: string | null
+          shortcode: string
+          utility_account?: number | null
+          working_account?: number | null
+        }
+        Update: {
+          charges_paid_account?: number | null
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          merchant_account?: number | null
+          organization_settlement_account?: number | null
+          originator_conversation_id?: string | null
+          queried_at?: string
+          queried_by?: string | null
+          raw_result?: Json | null
+          result_code?: number | null
+          result_desc?: string | null
+          shortcode?: string
+          utility_account?: number | null
+          working_account?: number | null
+        }
+        Relationships: []
+      }
       payment_methods: {
         Row: {
           account_name: string | null
