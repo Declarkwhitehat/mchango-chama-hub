@@ -145,11 +145,11 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Link2 className="h-5 w-5" />
-                Invite Link
+                <KeyRound className="h-5 w-5" />
+                Invite Code
               </CardTitle>
               <CardDescription>
-                Generate an invite link to share with people you want to invite. Only one active link at a time.
+                Generate an invite code to share with people you want to invite. Only one active code at a time.
               </CardDescription>
             </div>
           </div>
