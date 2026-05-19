@@ -396,7 +396,7 @@ serve(async (req) => {
         const balanceLine = (withdrawal.mchango_id && remainingBalance !== null)
           ? `\nBalance: KES ${remainingBalance.toFixed(2)}`
           : '';
-        const successMessage = `Pamojanova: Withdrawal of ${amountStr} from ${sourceType} "${sourceName}" successful. Ref: ${transactionId}.${balanceLine}`;
+        const successMessage = `Withdrawal of ${amountStr} from ${sourceType} "${sourceName}" successful. Ref: ${transactionId}.${balanceLine}`;
         await sendSMS(recipientPhone, successMessage);
       }
 
@@ -431,8 +431,8 @@ serve(async (req) => {
             payerPhone = payerProfile?.phone || '';
           }
 
-          const payerMsg = `Pamojanova: Your late payment of ${amountStr} to ${recipName} (${recipCode}) for "${chamaName}" Cycle #${cycleNum} has been delivered. Mpesa Ref: ${mpesaRef}. Asante.`;
-          const recipMsg = `Pamojanova: ${amountStr} owed to you from "${chamaName}" Cycle #${cycleNum} has been received from ${payerName} (${payerCode}). Mpesa Ref: ${mpesaRef}.`;
+          const payerMsg = `Your late payment of ${amountStr} to ${recipName} (${recipCode}) for "${chamaName}" Cycle #${cycleNum} has been delivered. Mpesa Ref: ${mpesaRef}. Asante.`;
+          const recipMsg = `${amountStr} owed to you from "${chamaName}" Cycle #${cycleNum} has been received from ${payerName} (${payerCode}). Mpesa Ref: ${mpesaRef}.`;
 
           if (payerPhone) await sendSMS(payerPhone, payerMsg);
           if (recipientPhone) await sendSMS(recipientPhone, recipMsg);
@@ -564,7 +564,7 @@ serve(async (req) => {
           .eq('id', withdrawal.id);
 
         if (recipientPhone) {
-          await sendSMS(recipientPhone, `Pamojanova: Withdrawal of KES ${withdrawal.net_amount?.toFixed(2)} from ${sourceType} "${sourceName}" failed. Reason: ${resultDesc}. Please contact support.`);
+          await sendSMS(recipientPhone, `Withdrawal of KES ${withdrawal.net_amount?.toFixed(2)} from ${sourceType} "${sourceName}" failed. Reason: ${resultDesc}. Please contact support.`);
         }
 
         // Notify requester (in-app + push) and all admins
@@ -601,7 +601,7 @@ serve(async (req) => {
           .eq('id', withdrawal.id);
 
         if (recipientPhone) {
-          await sendSMS(recipientPhone, `Pamojanova: Withdrawal from ${sourceType} "${sourceName}" is delayed. We will retry automatically. If not received within 1 hour, contact support.`);
+          await sendSMS(recipientPhone, `Withdrawal from ${sourceType} "${sourceName}" is delayed. We will retry automatically. If not received within 1 hour, contact support.`);
         }
       }
     }

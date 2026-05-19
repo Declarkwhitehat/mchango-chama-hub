@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
         // Send SMS if phone exists
         if (profile?.phone) {
           const firstName = (profile.full_name || '').split(' ')[0] || 'Member';
-          const message = `Pamojanova: Hi ${firstName}, your contribution of KES ${payment.amount_due} for "${chama.name}" is due today. Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
+          const message = `Hi ${firstName}, your contribution of KES ${payment.amount_due} for "${chama.name}" is due today. Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
 
           const smsResult = await sendSMS(profile.phone, message);
           

@@ -76,7 +76,7 @@ serve(async (req) => {
         category: 'account',
       });
 
-      const sms = `Pamojanova: Hi ${firstName}, your identity verification has been approved. You can now create chamas, welfares, campaigns and organizations on the app.${STOP_FOOTER}`;
+      const sms = `Hi ${firstName}, your identity verification has been approved. You can now create chamas, welfares, campaigns and organizations on the app.${STOP_FOOTER}`;
       if (profile.phone) {
         await supabase.functions.invoke('send-transactional-sms', {
           body: { phone: profile.phone, message: sms, eventType: 'kyc_approved' },
@@ -111,7 +111,7 @@ serve(async (req) => {
         category: 'account',
       });
 
-      const sms = `Pamojanova: Hi ${firstName}, your identity verification was rejected. Reason: ${reason}. Please log in and re-submit your documents.${STOP_FOOTER}`;
+      const sms = `Hi ${firstName}, your identity verification was rejected. Reason: ${reason}. Please log in and re-submit your documents.${STOP_FOOTER}`;
       if (profile.phone) {
         await supabase.functions.invoke('send-transactional-sms', {
           body: { phone: profile.phone, message: sms, eventType: 'kyc_rejected' },
