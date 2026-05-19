@@ -51,6 +51,7 @@ export const ChamaPaymentForm = ({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "checking">("idle");
+  const [timerRefreshKey, setTimerRefreshKey] = useState(0);
 
   useEffect(() => {
     loadMembers();
