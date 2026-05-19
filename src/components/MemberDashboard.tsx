@@ -142,8 +142,26 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
 
   return (
     <div className="space-y-4">
+      {/* Frozen banner */}
+      {(member as any).status === 'frozen' && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-destructive text-lg">Account Frozen</p>
+                <p className="text-sm text-destructive mt-1">
+                  Dues: KES {Number((member as any).frozen_amount_due || 0).toLocaleString()} + 10% fee KES {Number((member as any).frozen_unfreeze_fee || 0).toLocaleString()}.
+                  Pay KES {(Number((member as any).frozen_amount_due || 0) + Number((member as any).frozen_unfreeze_fee || 0)).toLocaleString()} via Paybill 4015351, Account {member.member_code} to auto-unfreeze.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Missed Payments Warning — suppressed during grace period */}
-      {!isGracePeriod && !isCycleComplete && missedCount >= 2 && (
+      {!isGracePeriod && !isCycleComplete && missedCount >= 2 && (member as any).status !== 'frozen' && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
@@ -155,10 +173,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                   ⚠️ {missedCount} Consecutive Missed Payments!
                 </p>
                 <p className="text-sm text-destructive mt-1">
-                  {missedCount >= 3
-                    ? "You have been removed from this group due to 3 consecutive missed payments."
-                    : `You will be REMOVED if you miss 1 more payment! Clear KES ${totalOutstanding.toLocaleString()} immediately.`
-                  }
+                  You will be FROZEN if you miss 1 more payment. Clear KES {totalOutstanding.toLocaleString()} now to stay active.
                 </p>
               </div>
             </div>
