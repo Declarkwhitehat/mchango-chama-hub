@@ -116,7 +116,7 @@ export const verifyOTP = async (
   }
 };
 
-// SMS Templates — Pamojanova branded, professional, concise
+// SMS Templates — professional, concise, no brand prefix (sender ID identifies source)
 const STOP_LINE = '\nSTOP 4569*5#';
 
 export const SMS_TEMPLATES = {

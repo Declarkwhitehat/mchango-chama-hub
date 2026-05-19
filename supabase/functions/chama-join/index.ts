@@ -508,7 +508,7 @@ serve(async (req) => {
 
           const requesterName = requesterProfile?.full_name || 'Someone';
           const chamaName = chama.name;
-          const smsMessage = `Pamojanova: ${requesterName} has requested to join your chama "${chamaName}". Only approve members you personally know. Verify their name, ID and phone in the app before approving.`;
+          const smsMessage = `${requesterName} has requested to join your chama "${chamaName}". Only approve members you personally know. Check their success rate, name, ID and phone in the app before approving.`;
 
           for (const manager of managerProfiles || []) {
             // In-app notification (best effort)
@@ -667,8 +667,8 @@ serve(async (req) => {
 
         const chamaName = (member as any).chama?.name || 'your chama';
         const smsMessage = isApproved
-          ? `Pamojanova: Your request to join "${chamaName}" has been approved. Open the app to make your first contribution.`
-          : `Pamojanova: Your request to join "${chamaName}" was not approved by the manager. You may contact them or request a new invite code.`;
+          ? `Your request to join "${chamaName}" has been approved. Open the app to make your first contribution.`
+          : `Your request to join "${chamaName}" was not approved by the manager. You may contact them or request a new invite code.`;
 
         try {
           await adminClient.from('notifications').insert({
