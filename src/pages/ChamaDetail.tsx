@@ -552,24 +552,21 @@ const ChamaDetail = () => {
 
             <div className="grid grid-cols-2 gap-4 pt-4">
               <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Total Collected (Net)</p>
+                <p className="text-sm text-muted-foreground mb-1">Total Contribution</p>
                 <p className="text-2xl font-bold text-foreground">
                   KES {totalContributions.toLocaleString()}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-1">After 5% commission. Overpayment wallet shown separately.</p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Contribution</p>
+                <p className="text-sm text-muted-foreground mb-1">{frequencyLabel(chama.contribution_frequency, chama.every_n_days_count)}</p>
                 <p className="text-2xl font-bold text-foreground">
                   KES {chama.contribution_amount.toLocaleString()}
                 </p>
+                <p className="text-[10px] text-muted-foreground mt-1">Amount each member pays per cycle — sent as payout.</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-2 border-t border-border text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              <span>Frequency: {chama.contribution_frequency}</span>
-            </div>
           </CardContent>
         </Card>
 
