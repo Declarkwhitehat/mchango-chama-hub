@@ -1043,6 +1043,141 @@ const ChamaDetail = () => {
               />
             </TabsContent>
 
+            <TabsContent value="payouts" className="space-y-4">
+              {(() => {
+                const commissionRate = Number(chama.commission_rate) || 0.05;
+                const contribution = Number(chama.contribution_amount) || 0;
+                const totalMembers = approvedMembers.length;
+                const grossPayout = contribution * totalMembers;
+                const netPayout = grossPayout * (1 - commissionRate);
+
+                const sortedByPosition = [...approvedMembers].sort((a, b) => {
+                  const posA = (a.was_skipped && a.rescheduled_to_position) ? a.rescheduled_to_position : (a.order_index || 0);
+                  const posB = (b.was_skipped && b.rescheduled_to_position) ? b.rescheduled_to_position : (b.order_index || 0);
+                  return posA - posB;
+                });
+
+                const received = sortedByPosition.filter(m => paidOutMemberIds.has(m.id));
+                const currentRecipient = sortedByPosition.find(m => m.id === currentTurnMemberId && !paidOutMemberIds.has(m.id));
+                const upcoming = sortedByPosition.filter(m => !paidOutMemberIds.has(m.id) && m.id !== currentTurnMemberId);
+                const debtors = approvedMembers
+                  .filter(m => (m.balance_deficit && Number(m.balance_deficit) > 0) || (m.missed_payments_count && Number(m.missed_payments_count) > 0))
+                  .sort((a, b) => (Number(b.balance_deficit) || 0) - (Number(a.balance_deficit) || 0));
+
+                const fmt = (n: number) => `KES ${Math.round(n).toLocaleString()}`;
+
+                return (
+                  <>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          Received Payouts ({received.length}/{totalMembers})
+                        </CardTitle>
+                        <CardDescription>Members who have already been paid out this cycle</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {received.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-3">No payouts made yet.</p>
+                        ) : received.map((m, idx) => (
+                          <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
+                              <div className="min-w-0">
+                                <p className="font-medium text-foreground truncate">#{idx + 1} {m.profiles?.full_name || 'Member'}</p>
+                                <p className="text-xs text-muted-foreground">{m.member_code}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-semibold text-green-700 dark:text-green-400">{fmt(netPayout)}</p>
+                              <p className="text-[10px] text-muted-foreground">net received</p>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-primary" />
+                          Next to Receive
+                        </CardTitle>
+                        <CardDescription>Current recipient and upcoming payout queue</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {currentRecipient && (
+                          <div className="flex items-center justify-between p-3 rounded-lg border-2 border-primary bg-primary/5">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="h-10 w-10"><AvatarFallback>{currentRecipient.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-foreground truncate">{currentRecipient.profiles?.full_name || 'Member'}</p>
+                                <p className="text-xs text-muted-foreground">{currentRecipient.member_code}</p>
+                                <Badge className="mt-1 text-[10px]" variant="default">Receiving Now</Badge>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-bold text-primary">{fmt(netPayout)}</p>
+                              <p className="text-[10px] text-muted-foreground">expected net</p>
+                            </div>
+                          </div>
+                        )}
+                        {upcoming.length === 0 && !currentRecipient ? (
+                          <p className="text-sm text-muted-foreground text-center py-3">All members have been paid out.</p>
+                        ) : upcoming.map((m, idx) => (
+                          <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
+                              <div className="min-w-0">
+                                <p className="font-medium text-foreground truncate">Position #{idx + (currentRecipient ? 2 : 1)} · {m.profiles?.full_name || 'Member'}</p>
+                                <p className="text-xs text-muted-foreground">{m.member_code}{nextTurnDates[m.id] ? ` · ${formatDate(nextTurnDates[m.id])}` : ''}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-semibold text-foreground">{fmt(netPayout)}</p>
+                              <p className="text-[10px] text-muted-foreground">expected net</p>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-destructive" />
+                          Members with Debts ({debtors.length})
+                        </CardTitle>
+                        <CardDescription>Outstanding balances owed to the chama</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {debtors.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-3">No outstanding debts. All members are up to date.</p>
+                        ) : debtors.map((m) => (
+                          <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
+                              <div className="min-w-0">
+                                <p className="font-medium text-foreground truncate">{m.profiles?.full_name || 'Member'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {m.member_code}
+                                  {m.missed_payments_count ? ` · ${m.missed_payments_count} missed` : ''}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-semibold text-red-700 dark:text-red-400">{fmt(Number(m.balance_deficit) || 0)}</p>
+                              <p className="text-[10px] text-muted-foreground">owed</p>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </>
+                );
+              })()}
+            </TabsContent>
+
           </Tabs>
         )}
 
