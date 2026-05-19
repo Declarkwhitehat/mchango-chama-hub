@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
     // Send SMS to all members
     const smsPromises = chama.chama_members.map(async (member: any) => {
       const memberProfile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
-      const message = `Pamojanova: "${chama.name}" has completed its full cycle. All members have received their payouts. To rejoin a new cycle, contact your manager ${managerProfile?.full_name || 'your manager'} (${managerProfile?.phone || 'in app'}) or open the app. Member ID: ${member.member_code}.`;
+      const message = `"${chama.name}" has completed its full cycle. All members have received their payouts. To rejoin a new cycle, contact your manager ${managerProfile?.full_name || 'your manager'} (${managerProfile?.phone || 'in app'}) or open the app. Member ID: ${member.member_code}.`;
 
       try {
         const { error: smsError } = await supabase.functions.invoke('send-transactional-sms', {

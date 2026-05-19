@@ -158,7 +158,7 @@ serve(async (req) => {
           if (memberPhone) {
             await sendSMS(
               memberPhone,
-              `Pamojanova: "${chama.name}" has ended. Your remaining wallet balance of KES ${balance.toFixed(2)} was below the M-Pesa payout threshold after fees and absorbed by the platform.`,
+              `"${chama.name}" has ended. Your remaining wallet balance of KES ${balance.toFixed(2)} was below the M-Pesa payout threshold after fees and absorbed by the platform.`,
             );
           }
         } else {
@@ -231,7 +231,7 @@ serve(async (req) => {
           if (memberPhone) {
             await sendSMS(
               memberPhone,
-              `Pamojanova: Your final wallet balance of KES ${netToMember} from "${chama.name}" is being sent to M-Pesa. Mpesa Ref will follow shortly.`,
+              `Your final wallet balance of KES ${netToMember} from "${chama.name}" is being sent to M-Pesa. Mpesa Ref will follow shortly.`,
             );
           }
 
@@ -248,7 +248,7 @@ serve(async (req) => {
         if (memberPhone) {
           await sendSMS(
             memberPhone,
-            `Pamojanova: "${chama.name}" has ended. Your remaining wallet balance of KES ${balance.toFixed(2)} was below the KES 10 payout threshold and absorbed by the platform.`,
+            `"${chama.name}" has ended. Your remaining wallet balance of KES ${balance.toFixed(2)} was below the KES 10 payout threshold and absorbed by the platform.`,
           );
         }
         results.push({ memberId, action: "forfeit", amount: balance });
