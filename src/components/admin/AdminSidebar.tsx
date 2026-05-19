@@ -157,6 +157,7 @@ export function AdminSidebar() {
     { title: "Financial Ledger", url: "/admin/ledger", icon: Landmark },
     { title: "Payment Config", url: "/admin/payment-config", icon: Settings },
     { title: "Payment Search", url: "/admin/payment-search", icon: Search },
+    { title: "Paybill Balance", url: "/admin/paybill-balance", icon: Wallet },
   ];
 
   const supportItems: MenuItem[] = [
