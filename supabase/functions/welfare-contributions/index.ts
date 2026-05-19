@@ -148,7 +148,7 @@ serve(async (req) => {
         p_description: `Welfare contribution commission (${(commissionRate * 100).toFixed(0)}%)`
       });
 
-      // Push + in-app notification to the contributing member
+      // Push + in-app notification + confirmation SMS to the contributing member
       try {
         const { data: welfareName } = await supabaseAdmin
           .from('welfares')
@@ -163,6 +163,27 @@ serve(async (req) => {
           relatedEntityId: welfare_id,
           relatedEntityType: 'welfare',
         });
+
+        // Send confirmation SMS to the contributor
+        const { data: contribProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name, phone')
+          .eq('id', userData.user.id)
+          .maybeSingle();
+        if (contribProfile?.phone) {
+          const firstName = (contribProfile.full_name || '').split(' ')[0] || 'Member';
+          try {
+            await supabaseAdmin.functions.invoke('send-transactional-sms', {
+              body: {
+                phone: contribProfile.phone,
+                message: `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${wName}" has been received. Ref: ${paymentRef}.`,
+                eventType: 'welfare_contribution_confirmation',
+              },
+            });
+          } catch (smsErr) {
+            console.warn('Failed to send welfare contribution SMS:', smsErr);
+          }
+        }
 
         // Notify ALL active welfare members of new contribution
         const { data: allMembers } = await supabaseAdmin
