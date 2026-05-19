@@ -195,3 +195,10 @@ verify_jwt = true
 [functions.delete-my-account]
 verify_jwt = false
 
+[functions.paybill-balance-query]
+verify_jwt = false
+
+[functions.paybill-balance-callback]
+verify_jwt = false
+
+
