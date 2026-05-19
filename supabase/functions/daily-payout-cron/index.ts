@@ -518,31 +518,40 @@ Deno.serve(async (req) => {
                 member.missed_payments_count = newMissedCount;
 
                 if (newMissedCount >= 3) {
-                  console.log(`🚫 [GAP RECOVERY] AUTO-REMOVING member ${member.id} - ${newMissedCount} missed payments`);
+                  // FREEZE (not remove): snapshot dues + 10% unfreeze fee
+                  const unfreezeFee = Math.round(totalOutstanding * 0.10);
+                  console.log(`❄️  [GAP RECOVERY] FREEZING member ${member.id} - ${newMissedCount} missed payments, due KES ${totalOutstanding} + fee KES ${unfreezeFee}`);
 
                   const { data: memberProfile } = await supabase
                     .from('chama_members')
-                    .select('member_code, user_id, is_manager, profiles!chama_members_user_id_fkey(full_name, phone)')
+                    .select('member_code, user_id, profiles!chama_members_user_id_fkey(full_name, phone)')
                     .eq('id', member.id)
                     .single();
 
-                  await supabase.from('chama_member_removals').insert({
-                    chama_id: chama.id,
-                    member_id: member.id,
-                    user_id: memberProfile?.user_id,
-                    removal_reason: `Auto-removed (gap recovery): ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding}`,
-                    chama_name: chama.name,
-                    member_name: memberProfile?.profiles?.full_name,
-                    member_phone: memberProfile?.profiles?.phone,
-                    was_manager: memberProfile?.is_manager || false,
-                    removed_at: new Date().toISOString()
-                  });
-
                   await supabase.from('chama_members').update({
-                    status: 'removed',
-                    removal_reason: `Auto-removed: ${newMissedCount} consecutive missed payments`,
-                    removed_at: new Date().toISOString()
+                    status: 'frozen',
+                    frozen_at: new Date().toISOString(),
+                    frozen_amount_due: totalOutstanding,
+                    frozen_unfreeze_fee: unfreezeFee,
+                    unfrozen_at: null
                   }).eq('id', member.id);
+
+                  const phone = memberProfile?.profiles?.phone;
+                  if (phone) {
+                    await sendSMS(phone, `Your account in ${chama.name} is FROZEN after ${newMissedCount} missed payments. Pay KES ${(totalOutstanding + unfreezeFee).toLocaleString()} (dues + 10% fee) via Paybill 4015351, Account ${memberProfile?.member_code} to auto-unfreeze.`);
+                  }
+
+                  if (memberProfile?.user_id) {
+                    await supabase.from('notifications').insert({
+                      user_id: memberProfile.user_id,
+                      title: 'Account Frozen',
+                      message: `You were frozen in "${chama.name}" after ${newMissedCount} missed payments. Pay KES ${(totalOutstanding + unfreezeFee).toLocaleString()} to auto-unfreeze.`,
+                      type: 'warning',
+                      category: 'chama',
+                      related_entity_id: chama.id,
+                      related_entity_type: 'chama'
+                    });
+                  }
                 }
               }
 
