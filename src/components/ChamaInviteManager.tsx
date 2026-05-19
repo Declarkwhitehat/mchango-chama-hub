@@ -33,6 +33,18 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
   const [maxUses, setMaxUses] = useState(1);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyCode = async (id: string, code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedId(id);
+      toast({ title: "Copied", description: "Invite code copied to clipboard" });
+      setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     if (isManager) {
