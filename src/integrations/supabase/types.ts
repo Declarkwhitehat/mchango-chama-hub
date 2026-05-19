@@ -3902,6 +3902,10 @@ export type Database = {
         Args: { p_email: string; p_id_number: string; p_phone: string }
         Returns: Json
       }
+      try_unfreeze_chama_member: {
+        Args: { p_member_id: string }
+        Returns: undefined
+      }
       update_chama_withdrawn: {
         Args: { p_amount: number; p_chama_id: string }
         Returns: undefined
