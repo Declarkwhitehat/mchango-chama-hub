@@ -185,8 +185,9 @@ export const Header = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-3 sm:py-4 border-t border-border animate-in slide-in-from-top-2">
-            <nav className="flex flex-col gap-1.5 sm:gap-2">
+          <div className="md:hidden py-3 sm:py-4 border-t border-border animate-in slide-in-from-top-2 max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain">
+            <nav className="flex flex-col gap-1.5 sm:gap-2 pb-4">
+
               <Button variant="ghost" onClick={() => { navigate('/mchango'); setMobileMenuOpen(false); }} className="w-full justify-start gap-2">
                 <Heart className="h-4 w-4" />
                 Campaigns
