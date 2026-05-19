@@ -952,16 +952,13 @@ serve(async (req) => {
         });
 
       // Send confirmation SMS
-      try {
-        await supabase.functions.invoke('send-transactional-sms', {
-          body: {
-            phone: phoneNumber,
-            message: `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${welfareData.name}" has been received. Receipt: ${mpesaReceiptNumber}.`,
-          },
-        });
-      } catch (smsError) {
-        console.error('Error sending welfare SMS:', smsError);
-      }
+      await safeSendSms(
+        supabase,
+        phoneNumber,
+        `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${welfareData.name}" has been received. Receipt: ${mpesaReceiptNumber}.`,
+        'welfare-payer'
+      );
+
 
       // Push + in-app notification to the contributing member
       if (matchedMember?.user_id) {
