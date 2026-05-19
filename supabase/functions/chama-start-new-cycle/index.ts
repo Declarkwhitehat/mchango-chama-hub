@@ -412,7 +412,7 @@ Deno.serve(async (req) => {
       .insert({
         chama_id: chamaId,
         cycle_number: 1,
-        start_date: startDate.toISOString(),
+        start_date: getEatMidnightOnePastForDate(startDate).toISOString(),
         end_date: cycleEndDate.toISOString(),
         due_amount: chama.contribution_amount,
         beneficiary_member_id: sortedMembers[0]?.id || null,
