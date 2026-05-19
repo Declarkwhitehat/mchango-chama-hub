@@ -611,6 +611,9 @@ export type Database = {
           expected_contributions: number | null
           first_payment_at: string | null
           first_payment_completed: boolean | null
+          frozen_amount_due: number | null
+          frozen_at: string | null
+          frozen_unfreeze_fee: number | null
           id: string
           is_manager: boolean
           joined_at: string
@@ -634,6 +637,7 @@ export type Database = {
           status: Database["public"]["Enums"]["member_status"]
           swapped_with_member_id: string | null
           total_contributed: number | null
+          unfrozen_at: string | null
           user_id: string | null
           was_skipped: boolean | null
         }
@@ -647,6 +651,9 @@ export type Database = {
           expected_contributions?: number | null
           first_payment_at?: string | null
           first_payment_completed?: boolean | null
+          frozen_amount_due?: number | null
+          frozen_at?: string | null
+          frozen_unfreeze_fee?: number | null
           id?: string
           is_manager?: boolean
           joined_at?: string
@@ -670,6 +677,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["member_status"]
           swapped_with_member_id?: string | null
           total_contributed?: number | null
+          unfrozen_at?: string | null
           user_id?: string | null
           was_skipped?: boolean | null
         }
@@ -683,6 +691,9 @@ export type Database = {
           expected_contributions?: number | null
           first_payment_at?: string | null
           first_payment_completed?: boolean | null
+          frozen_amount_due?: number | null
+          frozen_at?: string | null
+          frozen_unfreeze_fee?: number | null
           id?: string
           is_manager?: boolean
           joined_at?: string
@@ -706,6 +717,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["member_status"]
           swapped_with_member_id?: string | null
           total_contributed?: number | null
+          unfrozen_at?: string | null
           user_id?: string | null
           was_skipped?: boolean | null
         }
