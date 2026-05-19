@@ -108,7 +108,7 @@ export const CurrentCyclePool = ({
           </p>
         </div>
         {fullPool && (
-          <span className="text-xs font-semibold text-success bg-success/10 px-2 py-1 rounded">
+          <span className="text-xs font-semibold text-primary-foreground bg-primary px-2 py-1 rounded">
             FULL
           </span>
         )}
