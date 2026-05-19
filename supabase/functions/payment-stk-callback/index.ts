@@ -712,6 +712,20 @@ serve(async (req) => {
                 relatedEntityType: 'organization',
               });
             }
+
+            // Thank-you SMS to donor
+            try {
+              const donorFirst = (donorName || 'Friend').split(' ')[0];
+              await supabaseClient.functions.invoke('send-transactional-sms', {
+                body: {
+                  phone: orgDonation.phone,
+                  message: `Thank you ${donorFirst}! Your donation of KES ${grossAmount.toLocaleString()} to "${orgName}" has been received. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
+                  eventType: 'organization_donation_thankyou',
+                },
+              });
+            } catch (smsErr) {
+              console.error('Error sending organization thank-you SMS:', smsErr);
+            }
           }
         } catch (notifErr) {
           console.error('Error sending org donation notifications:', notifErr);
