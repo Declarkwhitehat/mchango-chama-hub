@@ -516,7 +516,7 @@ serve(async (req) => {
                       },
                       body: JSON.stringify({
                         phone: manager.phone,
-                        message: `New join request for ${chamaName}! ${requesterName} wants to join. Open the app to approve or reject.`,
+                        message: `New join request for ${chamaName}: ${requesterName} wants to join. Only approve members you personally know. Review their profile details (name, ID, phone) carefully before approving in the app.`,
                         eventType: 'chama_join_request',
                       }),
                     }
