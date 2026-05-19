@@ -7,9 +7,7 @@ import { Label } from "@/components/ui/label";
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Link2, Plus, Loader2, X, Users } from "lucide-react";
-import { ShareMenu } from "@/components/ShareMenu";
-import { publicUrls } from "@/lib/publicUrl";
+import { KeyRound, Plus, Loader2, X, Users, Copy, Check, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
 
 interface InviteCode {
