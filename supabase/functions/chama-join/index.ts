@@ -657,6 +657,65 @@ serve(async (req) => {
 
       console.log('Member status updated:', updatedMember);
 
+      // Notify the requester (member) via SMS + in-app notification
+      try {
+        const { data: requesterProfile } = await adminClient
+          .from('profiles')
+          .select('phone, full_name')
+          .eq('id', member.user_id)
+          .maybeSingle();
+
+        const chamaName = (member as any).chama?.name || 'your chama';
+        const smsMessage = isApproved
+          ? `Pamojanova: Your request to join "${chamaName}" has been approved. Open the app to make your first contribution.`
+          : `Pamojanova: Your request to join "${chamaName}" was not approved by the manager. You may contact them or request a new invite code.`;
+
+        try {
+          await adminClient.from('notifications').insert({
+            user_id: member.user_id,
+            title: isApproved ? 'Join request approved' : 'Join request rejected',
+            message: isApproved
+              ? `You have been approved to join ${chamaName}. Make your first contribution to activate your membership.`
+              : `Your request to join ${chamaName} was not approved.`,
+            type: isApproved ? 'success' : 'info',
+            category: 'chama',
+            related_entity_id: member.chama_id,
+            related_entity_type: 'chama',
+          });
+        } catch (notifErr) {
+          console.error('Failed to insert requester notification:', notifErr);
+        }
+
+        if (requesterProfile?.phone) {
+          try {
+            const smsRes = await fetch(
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-sms`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+                },
+                body: JSON.stringify({
+                  phone: requesterProfile.phone,
+                  message: smsMessage,
+                  eventType: isApproved ? 'chama_join_approved' : 'chama_join_rejected',
+                }),
+              }
+            );
+            const smsBody = await smsRes.text();
+            console.log(`Decision SMS to ${requesterProfile.full_name} (${requesterProfile.phone}) -> ${smsRes.status}: ${smsBody}`);
+          } catch (smsError) {
+            console.error('Failed to send decision SMS to requester:', smsError);
+          }
+        } else {
+          console.log('Requester has no phone, skipping decision SMS');
+        }
+      } catch (notifyError) {
+        console.error('Error notifying requester:', notifyError);
+      }
+
       return new Response(JSON.stringify({ 
         success: true,
         message: `Member ${isApproved ? 'approved' : 'rejected'} successfully`,
