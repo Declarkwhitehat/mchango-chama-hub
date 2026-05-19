@@ -3924,7 +3924,7 @@ export type Database = {
         | "twice_monthly"
       kyc_status: "pending" | "approved" | "rejected"
       mchango_status: "active" | "completed" | "cancelled"
-      member_status: "active" | "inactive" | "left" | "removed"
+      member_status: "active" | "inactive" | "left" | "removed" | "frozen"
       payment_method_type: "mpesa" | "airtel_money" | "bank_account"
       payout_status: "pending" | "processing" | "completed" | "failed"
       rate_limit_type: "ip" | "phone" | "email"
@@ -4075,7 +4075,7 @@ export const Constants = {
       ],
       kyc_status: ["pending", "approved", "rejected"],
       mchango_status: ["active", "completed", "cancelled"],
-      member_status: ["active", "inactive", "left", "removed"],
+      member_status: ["active", "inactive", "left", "removed", "frozen"],
       payment_method_type: ["mpesa", "airtel_money", "bank_account"],
       payout_status: ["pending", "processing", "completed", "failed"],
       rate_limit_type: ["ip", "phone", "email"],
