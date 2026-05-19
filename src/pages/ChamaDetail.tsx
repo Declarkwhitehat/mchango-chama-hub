@@ -980,7 +980,10 @@ const ChamaDetail = () => {
                                 {member.is_manager && (
                                   <Badge variant="outline" className="ml-2">Manager</Badge>
                                 )}
-                                {member.id === currentTurnMemberId && (
+                                {member.status === 'frozen' && (
+                                  <Badge variant="destructive" className="ml-2">Frozen</Badge>
+                                )}
+                                {member.id === currentTurnMemberId && member.status !== 'frozen' && (
                                   <Badge variant="default" className="ml-2">Current Turn</Badge>
                                 )}
                               </p>
