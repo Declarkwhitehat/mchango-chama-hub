@@ -546,16 +546,18 @@ serve(async (req) => {
           description: `Offline mchango donation with ${(commissionRate * 100)}% commission deducted`
         });
 
-      // Send SMS notification
-      try {
-        await supabase.functions.invoke('send-transactional-sms', {
-          body: {
-            phone: phoneNumber,
-            message: `Thank you ${firstName}! Your donation of KSh ${grossAmount} to "${mchangoData.title}" was received. Commission: KSh ${commissionAmount.toFixed(2)} (${(commissionRate * 100).toFixed(0)}%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
-          },
-        });
-      } catch (smsError) {
-        console.error('Error sending SMS:', smsError);
+      // Send thank-you SMS to donor (M-Pesa offline donations of KES 50 and above)
+      if (phoneNumber && grossAmount >= 50) {
+        try {
+          await supabase.functions.invoke('send-transactional-sms', {
+            body: {
+              phone: phoneNumber,
+              message: `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${mchangoData.title}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
+            },
+          });
+        } catch (smsError) {
+          console.error('Error sending SMS:', smsError);
+        }
       }
 
       // Push + in-app notifications (creator/managers + donor if registered)
