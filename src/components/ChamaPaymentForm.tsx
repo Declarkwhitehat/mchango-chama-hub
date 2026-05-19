@@ -271,6 +271,7 @@ export const ChamaPaymentForm = ({
             setNotes("");
             setPaymentType("self");
             setTargetMemberId(currentMemberId);
+            setTimerRefreshKey((k) => k + 1);
             
             if (onPaymentSuccess) {
               onPaymentSuccess();
