@@ -474,65 +474,87 @@ serve(async (req) => {
 
       console.log('New member created:', newMember);
 
-      // Get the requester's profile for SMS notification
-      const { data: requesterProfile } = await supabaseClient
+      // Get the requester's profile for SMS notification (admin client bypasses RLS)
+      const { data: requesterProfile } = await adminClient
         .from('profiles')
         .select('full_name')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
-      // Notify the chama manager via SMS
+      // Notify the chama manager(s) via SMS + in-app notification
       try {
-        // Get manager(s) of this chama
-        const { data: managers } = await supabaseClient
+        // IMPORTANT: use adminClient — a brand-new pending member cannot see
+        // other chama_members rows through RLS, so the user-scoped client
+        // would return an empty managers list and silently skip the SMS.
+        const { data: managers, error: managersError } = await adminClient
           .from('chama_members')
           .select('user_id')
           .eq('chama_id', chama_id)
-          .eq('is_manager', true);
+          .eq('is_manager', true)
+          .eq('status', 'active');
+
+        if (managersError) {
+          console.error('Failed to load managers for notify:', managersError);
+        }
+
+        console.log(`Notify: found ${managers?.length ?? 0} manager(s) for chama ${chama_id}`);
 
         if (managers && managers.length > 0) {
-          // Get manager profiles with phone numbers
           const managerUserIds = managers.map(m => m.user_id);
-          const { data: managerProfiles } = await supabaseClient
+          const { data: managerProfiles } = await adminClient
             .from('profiles')
-            .select('phone, full_name')
+            .select('id, phone, full_name')
             .in('id', managerUserIds);
 
-          if (managerProfiles && managerProfiles.length > 0) {
-            const requesterName = requesterProfile?.full_name || 'Someone';
-            const chamaName = chama.name;
-            
-            // Send SMS to each manager
-            for (const manager of managerProfiles) {
-              if (manager.phone) {
-                try {
-                  await fetch(
-                    `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-sms`,
-                    {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                      },
-                      body: JSON.stringify({
-                        phone: manager.phone,
-                        message: `New join request for ${chamaName}: ${requesterName} wants to join. Only approve members you personally know. Review their profile details (name, ID, phone) carefully before approving in the app.`,
-                        eventType: 'chama_join_request',
-                      }),
-                    }
-                  );
-                  console.log(`SMS notification sent to manager: ${manager.full_name}`);
-                } catch (smsError) {
-                  console.error('Failed to send SMS to manager:', smsError);
-                  // Don't fail the join request if SMS fails
+          const requesterName = requesterProfile?.full_name || 'Someone';
+          const chamaName = chama.name;
+          const smsMessage = `Pamojanova: ${requesterName} has requested to join your chama "${chamaName}". Only approve members you personally know. Verify their name, ID and phone in the app before approving.`;
+
+          for (const manager of managerProfiles || []) {
+            // In-app notification (best effort)
+            try {
+              await adminClient.from('notifications').insert({
+                user_id: manager.id,
+                title: 'New join request',
+                message: `${requesterName} has requested to join ${chamaName}. Review and approve in the app.`,
+                type: 'chama_join_request',
+                metadata: { chama_id, requester_id: user.id },
+              });
+            } catch (notifErr) {
+              console.error('Failed to insert notification:', notifErr);
+            }
+
+            if (!manager.phone) {
+              console.log(`Manager ${manager.full_name} has no phone, skipping SMS`);
+              continue;
+            }
+
+            try {
+              const smsRes = await fetch(
+                `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-sms`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                    'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+                  },
+                  body: JSON.stringify({
+                    phone: manager.phone,
+                    message: smsMessage,
+                    eventType: 'chama_join_request',
+                  }),
                 }
-              }
+              );
+              const smsBody = await smsRes.text();
+              console.log(`SMS to manager ${manager.full_name} (${manager.phone}) -> ${smsRes.status}: ${smsBody}`);
+            } catch (smsError) {
+              console.error('Failed to send SMS to manager:', smsError);
             }
           }
         }
       } catch (notifyError) {
         console.error('Error notifying managers:', notifyError);
-        // Don't fail the join request if notification fails
       }
 
       return new Response(JSON.stringify({ 
