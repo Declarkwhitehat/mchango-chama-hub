@@ -152,50 +152,24 @@ export function NextPaymentTimer({ chamaId, memberId, refreshKey = 0 }: NextPaym
   const passed = remaining <= 0;
 
   return (
-    <div
-      className={cn(
-        "rounded-md border px-4 py-3 flex items-start gap-3",
-        state.isPaidForCurrent
-          ? "border-green-500/30 bg-green-500/5"
-          : passed
-            ? "border-destructive/40 bg-destructive/5"
-            : urgent
-              ? "border-orange-500/40 bg-orange-500/10"
-              : "border-primary/30 bg-primary/5",
-      )}
-    >
+    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 flex items-start gap-3">
       {state.isPaidForCurrent ? (
-        <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
+        <CheckCircle2 className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
       ) : (
-        <Clock
-          className={cn(
-            "h-5 w-5 mt-0.5 shrink-0",
-            passed ? "text-destructive" : urgent ? "text-orange-600" : "text-primary",
-          )}
-        />
+        <Clock className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
       )}
       <div className="space-y-0.5">
-        <p className="text-sm font-medium">
+        <p className="text-sm font-medium text-destructive">
           {state.isPaidForCurrent ? "Next payment due in" : "Time left to pay this cycle"}
         </p>
-        <p
-          className={cn(
-            "text-lg font-bold tabular-nums",
-            state.isPaidForCurrent
-              ? "text-green-600"
-              : passed
-                ? "text-destructive"
-                : urgent
-                  ? "text-orange-600"
-                  : "text-primary",
-          )}
-        >
+        <p className="text-lg font-bold tabular-nums text-destructive">
           {formatRemaining(remaining)}
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-destructive/80">
           Deadline: {state.deadline.toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" })}
         </p>
       </div>
     </div>
   );
 }
+
