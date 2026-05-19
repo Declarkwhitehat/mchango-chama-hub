@@ -430,16 +430,12 @@ export const ChamaPaymentForm = ({
             />
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (Optional)</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any payment notes..."
-              rows={2}
-            />
-          </div>
+          <NextPaymentTimer
+            chamaId={chamaId}
+            memberId={currentMemberId}
+            refreshKey={timerRefreshKey}
+          />
+
 
           <Button 
             type="submit" 
