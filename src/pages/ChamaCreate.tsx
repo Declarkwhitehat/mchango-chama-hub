@@ -67,8 +67,22 @@ const ChamaCreate = () => {
       }
       const formData = new FormData(form);
 
+      const rawName = ((formData.get("name") as string) || "").trim();
+      // Reject emojis and non-printable/symbol chars; allow letters, numbers, spaces, basic punctuation
+      const emojiRegex = /[\p{Extended_Pictographic}\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u200D\uFE0F]/u;
+      if (emojiRegex.test(rawName)) {
+        toast({ title: "Invalid name", description: "Chama name cannot contain emojis.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+      if (rawName.length === 0 || rawName.length > 16) {
+        toast({ title: "Invalid name", description: "Chama name must be 1–16 characters.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+
       const chamaData: Record<string, any> = {
-        name: formData.get("name") as string,
+        name: rawName,
         description: formData.get("description") as string,
         contribution_amount: Number(formData.get("contribution_amount")),
         contribution_frequency: frequency,
@@ -177,10 +191,11 @@ const ChamaCreate = () => {
                 <Input
                   id="name"
                   name="name"
-                  placeholder="e.g., Women Empowerment Group"
+                  placeholder="e.g., Mama Mboga SHG"
                   required
-
+                  maxLength={16}
                 />
+                <p className="text-xs text-muted-foreground">Max 16 characters. Letters, numbers, spaces only — no emojis.</p>
               </div>
 
               <div className="space-y-2">

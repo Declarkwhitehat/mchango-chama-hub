@@ -510,6 +510,22 @@ serve(async (req) => {
         });
       }
 
+      const trimmedName = body.name.trim();
+      const emojiRegex = /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u200D\uFE0F]/u;
+      if (emojiRegex.test(trimmedName)) {
+        return new Response(JSON.stringify({ error: 'Chama name cannot contain emojis.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (trimmedName.length === 0 || trimmedName.length > 16) {
+        return new Response(JSON.stringify({ error: 'Chama name must be 1–16 characters.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      body.name = trimmedName;
+
       // Check for duplicate name
       const { data: existingChama } = await supabaseAdmin
         .from('chama')
