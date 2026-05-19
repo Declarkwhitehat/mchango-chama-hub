@@ -9,6 +9,7 @@ import { CheckCircle2, TrendingUp, CreditCard, AlertCircle } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client";
 import { getNextDay10PmKenyaDeadline } from "@/utils/chamaDeadlines";
 import { frequencyLabel } from "@/utils/chamaFrequency";
+import { CurrentCyclePool } from "@/components/chama/CurrentCyclePool";
 import { toast } from "@/hooks/use-toast";
 // realtime subscription removed in favor of 30s polling
 
