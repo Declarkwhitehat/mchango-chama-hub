@@ -50,19 +50,29 @@ const SOURCE_COLORS: Record<string, string> = {
   mpesa_b2c_revenue: "hsl(195, 75%, 45%)",
   loan_fees: "hsl(180, 60%, 45%)",
   withdrawal_fees: "hsl(20, 70%, 50%)",
+  chama_wallet_forfeit: "hsl(0, 70%, 50%)",
+  chama_wallet_subshilling: "hsl(25, 80%, 50%)",
+  overpayment_wallet: "hsl(280, 60%, 55%)",
+  carry_forward: "hsl(220, 50%, 55%)",
+  late_buffer: "hsl(50, 80%, 45%)",
   other: "hsl(0, 0%, 55%)",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
-  chama: "Chama",
-  mchango: "Mchango",
-  organization: "Organization",
-  welfare: "Welfare",
-  verification_fee: "Verification Fees",
-  mpesa_b2c_revenue: "M-PESA B2C Revenue",
+  chama: "Chama Commission",
+  mchango: "Mchango Commission",
+  organization: "Organization Commission",
+  welfare: "Welfare Commission",
+  verification_fee: "Account Verification Fees",
+  mpesa_b2c_revenue: "Withdrawal Fees (M-Pesa B2C)",
   loan_fees: "Loan Fees",
   withdrawal_fees: "Withdrawal Fees",
-  other: "Other",
+  chama_wallet_forfeit: "Chama Wallet Forfeits (cycle-end sweep)",
+  chama_wallet_subshilling: "Chama Sub-shilling Rounding",
+  overpayment_wallet: "Overpayment Wallet Commission",
+  carry_forward: "Carry-Forward Adjustments",
+  late_buffer: "Late Payment Buffer",
+  other: "Other Earnings",
 };
 
 // Earnings sources whose commission is ALREADY recorded in financial_ledger
@@ -71,9 +81,6 @@ const SOURCE_LABELS: Record<string, string> = {
 const LEDGER_DUPLICATED_EARNINGS = new Set(["COMMISSION"]);
 
 // Ledger transaction types that represent INFLOWS (real revenue events).
-// Payouts and other outflow types are excluded from Gross/Commission/Net KPIs
-// because they are disbursements of funds already collected — counting them
-// would double the gross figure and dilute the effective commission rate.
 const REVENUE_TX_TYPES = new Set([
   "contribution",
   "contribution_summary",
@@ -83,9 +90,6 @@ const REVENUE_TX_TYPES = new Set([
 const isRevenueEntry = (e: { transaction_type?: string | null }) =>
   REVENUE_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
 
-// Gross-bearing tx types: rows that represent the actual money inflow.
-// `commission` rows mirror the gross of an already-counted contribution/donation
-// and only carry the commission slice — including their gross would double-count.
 const GROSS_TX_TYPES = new Set([
   "contribution",
   "contribution_summary",
@@ -94,23 +98,44 @@ const GROSS_TX_TYPES = new Set([
 const isGrossEntry = (e: { transaction_type?: string | null }) =>
   GROSS_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
 
-// Map company_earnings.source → dashboard breakdown bucket key.
-// Lookups are case-insensitive (see earningsBucketFor) so historical
-// camelCase sources like 'accountVerificationFee' map correctly.
+// Map company_earnings.source → dashboard bucket. Any source NOT explicitly
+// listed gets its OWN bucket (raw key, humanized label) so admins see every
+// distinct revenue stream, even new/unknown ones.
 const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
   verification_fee: "verification_fee",
   verificationfee: "verification_fee",
   accountverificationfee: "verification_fee",
   account_verification_fee: "verification_fee",
+  welfareverificationfee: "verification_fee",
+  welfare_verification_fee: "verification_fee",
   mpesa_b2c_revenue: "mpesa_b2c_revenue",
   mpesab2crevenue: "mpesa_b2c_revenue",
   loan_fees: "loan_fees",
   withdrawal_fees: "withdrawal_fees",
-  other: "other",
+  chama_wallet_forfeit: "chama_wallet_forfeit",
+  chamawalletforfeit: "chama_wallet_forfeit",
+  chama_wallet_subshilling: "chama_wallet_subshilling",
+  chamawalletsubshilling: "chama_wallet_subshilling",
+  overpayment_wallet: "overpayment_wallet",
+  carry_forward: "carry_forward",
+  carryforward: "carry_forward",
+  late_buffer: "late_buffer",
+  latebuffer: "late_buffer",
 };
+const humanizeSource = (raw: string) =>
+  String(raw || "other")
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 const earningsBucketFor = (source: string) => {
   const key = String(source || "").toLowerCase().replace(/[\s-]/g, "_");
-  return EARNINGS_SOURCE_TO_BUCKET[key] || EARNINGS_SOURCE_TO_BUCKET[key.replace(/_/g, "")] || "other";
+  return (
+    EARNINGS_SOURCE_TO_BUCKET[key] ||
+    EARNINGS_SOURCE_TO_BUCKET[key.replace(/_/g, "")] ||
+    // Fallback: use the raw source as its own bucket (humanized later).
+    key || "other"
+  );
 };
 
 interface EarningsEntry {
@@ -326,7 +351,7 @@ export function RevenueDashboard() {
     const total = kpis.totalRevenue || 1;
     return Object.entries(map).map(([source, v]) => ({
       source,
-      label: SOURCE_LABELS[source] || source,
+      label: SOURCE_LABELS[source] || humanizeSource(source),
       ...v,
       pct: (v.commission / total) * 100,
       avgRate: v.gross > 0 ? (v.commission / v.gross) * 100 : 0,
