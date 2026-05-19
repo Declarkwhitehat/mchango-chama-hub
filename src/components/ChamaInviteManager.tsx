@@ -188,7 +188,7 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
           ) : activeCodes.length === 0 ? (
             <Alert>
               <AlertDescription>
-                No active invite link. Generate one to start inviting members.
+                No active invite code. Generate one to start inviting members.
               </AlertDescription>
             </Alert>
           ) : (
@@ -196,10 +196,21 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
               {activeCodes.map((inviteCode) => {
                 const remaining = inviteCode.max_uses - inviteCode.use_count;
                 return (
-                  <div key={inviteCode.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="space-y-1 flex-1">
+                  <div key={inviteCode.id} className="flex items-center justify-between p-4 border rounded-lg flex-wrap gap-3">
+                    <div className="space-y-1 flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <code className="font-mono font-bold text-lg">{inviteCode.code}</code>
+                        <code className="font-mono font-bold text-lg tracking-wider">{inviteCode.code}</code>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => copyCode(inviteCode.id, inviteCode.code)}
+                        >
+                          {copiedId === inviteCode.id ? (
+                            <><Check className="h-4 w-4 mr-1" />Copied</>
+                          ) : (
+                            <><Copy className="h-4 w-4 mr-1" />Copy</>
+                          )}
+                        </Button>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Uses: {inviteCode.use_count} / {inviteCode.max_uses} ({remaining} remaining)
@@ -214,12 +225,6 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <ShareMenu 
-                        url={publicUrls.chamaJoin(chamaSlug, inviteCode.code)}
-                        title="Chama Invite"
-                        text={`You're invited to join our Chama! Use code: ${inviteCode.code}`}
-                        label="Share"
-                      />
                       <Button size="sm" variant="destructive" onClick={() => deleteCode(inviteCode.id)}>
                         <X className="h-4 w-4 mr-1" />Delete
                       </Button>
@@ -230,9 +235,15 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
             </div>
           )}
           <Alert>
-            <Link2 className="h-4 w-4" />
+            <KeyRound className="h-4 w-4" />
             <AlertDescription>
-              Each link can be used by the number of people you specify. Generating a new link deactivates the previous one.
+              Share this code with people you want to invite. They enter it in "Join by Code". Generating a new code deactivates the previous one.
+            </AlertDescription>
+          </Alert>
+          <Alert variant="destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertDescription>
+              Only share with people you know and trust. Always verify a member's identity before approving their join request.
             </AlertDescription>
           </Alert>
         </CardContent>
