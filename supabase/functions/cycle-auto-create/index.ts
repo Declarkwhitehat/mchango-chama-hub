@@ -208,8 +208,23 @@ Deno.serve(async (req) => {
         last_cycle_completed_at: new Date().toISOString(),
         accepting_rejoin_requests: true
       }).eq('id', chamaId);
-      return new Response(JSON.stringify({ 
-        success: true, 
+
+      // Trigger end-of-chama wallet sweep (fire-and-forget; idempotent on its own)
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/chama-wallet-sweep`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ chamaId }),
+        });
+      } catch (sweepErr) {
+        console.error('[CYCLE-AUTO-CREATE] wallet sweep dispatch failed:', (sweepErr as Error)?.message);
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
         message: 'All members completed. Chama marked as cycle_complete.',
         cycle_complete: true
       }), {
