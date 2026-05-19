@@ -568,6 +568,16 @@ const ChamaDetail = () => {
               </div>
             </div>
 
+            {chama.status === 'active' && (
+              <CurrentCyclePool
+                chamaId={chama.id}
+                contributionAmount={chama.contribution_amount}
+                commissionRate={chama.commission_rate || 0.05}
+                frequency={chama.contribution_frequency}
+                everyNDays={chama.every_n_days_count}
+              />
+            )}
+
           </CardContent>
         </Card>
 
