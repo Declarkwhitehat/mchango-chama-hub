@@ -13,6 +13,7 @@ import { Loader2, CreditCard, Users, Phone } from "lucide-react";
 import { CHAMA_DEFAULT_COMMISSION_RATE, CHAMA_LATE_COMMISSION_RATE, calculateAmountToPay } from "@/utils/commissionCalculator";
 import { AmountToPayCard } from "@/components/chama/AmountToPayCard";
 import { PaymentAllocationPreview } from "@/components/chama/PaymentAllocationPreview";
+import { NextPaymentTimer } from "@/components/chama/NextPaymentTimer";
 
 interface ChamaPaymentFormProps {
   chamaId: string;
