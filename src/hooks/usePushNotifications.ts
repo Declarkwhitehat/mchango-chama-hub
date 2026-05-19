@@ -118,6 +118,9 @@ const removeListenerHandles = async (handles: PushListenerHandle[]) => {
 export const usePushNotifications = (options?: { enabled?: boolean }) => {
   const { enabled = true } = options ?? {};
   const { user, session } = useAuth();
+  const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
   const registeredRef = useRef(false);
   const listenerHandlesRef = useRef<PushListenerHandle[]>([]);
   const [permissionState, setPermissionState] = useState<PermissionState>('unknown');
@@ -137,6 +140,17 @@ export const usePushNotifications = (options?: { enabled?: boolean }) => {
     }
   }, [user]);
 
+  const handleNotificationTap = useCallback((data: Record<string, any> | undefined) => {
+    try {
+      const route = resolveNotificationRoute(data);
+      if (route) {
+        navigateRef.current(route);
+      }
+    } catch (error) {
+      console.warn('[Push] Failed to navigate from notification (non-fatal):', error);
+    }
+  }, []);
+
   const attachListeners = useCallback(async () => {
     if (!PushNotifications || listenerHandlesRef.current.length > 0) return;
 
@@ -154,14 +168,21 @@ export const usePushNotifications = (options?: { enabled?: boolean }) => {
       ),
       Promise.resolve(
         PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
+          const data = notification?.data;
+          const route = resolveNotificationRoute(data);
           toast.info(notification.title || 'New notification', {
             description: notification.body,
+            action: route
+              ? { label: 'Open', onClick: () => navigateRef.current(route) }
+              : undefined,
           });
         }),
       ),
       Promise.resolve(
         PushNotifications.addListener('pushNotificationActionPerformed', (action: any) => {
           console.log('[Push] Action performed:', action);
+          // FCM data payload arrives as action.notification.data
+          handleNotificationTap(action?.notification?.data);
         }),
       ),
     ]);
@@ -169,7 +190,19 @@ export const usePushNotifications = (options?: { enabled?: boolean }) => {
     listenerHandlesRef.current = results
       .filter((r): r is PromiseFulfilledResult<PushListenerHandle> => r.status === 'fulfilled' && !!r.value)
       .map((r) => r.value);
-  }, [saveToken]);
+
+    // Handle cold-start: app launched by tapping a notification
+    try {
+      const delivered = await PushNotifications.getDeliveredNotifications?.();
+      // No direct API for "launch notification" — Capacitor fires
+      // pushNotificationActionPerformed automatically on cold start, so nothing to do here.
+      void delivered;
+    } catch {
+      // ignore
+    }
+  }, [saveToken, handleNotificationTap]);
+
+
 
   /** Pure check — never prompts. Safe to call anywhere. */
   const checkPermission = useCallback(async (): Promise<PermissionState> => {
