@@ -351,7 +351,7 @@ export function RevenueDashboard() {
     const total = kpis.totalRevenue || 1;
     return Object.entries(map).map(([source, v]) => ({
       source,
-      label: SOURCE_LABELS[source] || source,
+      label: SOURCE_LABELS[source] || humanizeSource(source),
       ...v,
       pct: (v.commission / total) * 100,
       avgRate: v.gross > 0 ? (v.commission / v.gross) * 100 : 0,
