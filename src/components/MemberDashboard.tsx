@@ -237,6 +237,16 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
       {/* Member ID */}
       <CopyableUniqueId uniqueId={member.member_code} label="Member ID (Account No.)" />
 
+      {chama.status === 'active' && (
+        <CurrentCyclePool
+          chamaId={chamaId}
+          contributionAmount={chama.contribution_amount}
+          commissionRate={(chama as any).commission_rate || 0.05}
+          frequency={chama.contribution_frequency}
+          everyNDays={(chama as any).every_n_days_count}
+        />
+      )}
+
       {/* Member Info Card */}
       <Card>
         <CardHeader>
