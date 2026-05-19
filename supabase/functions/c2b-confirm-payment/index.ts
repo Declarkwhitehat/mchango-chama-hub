@@ -692,12 +692,12 @@ serve(async (req) => {
           description: `Offline organization donation with 5% commission deducted`
         });
 
-      // Send SMS notification
+      // Send thank-you SMS to donor
       try {
         await supabase.functions.invoke('send-transactional-sms', {
           body: {
             phone: phoneNumber,
-            message: `Thank you ${firstName}! Your donation of KSh ${grossAmount} to "${orgData.name}" was received. Commission: KSh ${commissionAmount.toFixed(2)} (5%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
+            message: `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${orgData.name}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
           },
         });
       } catch (smsError) {
