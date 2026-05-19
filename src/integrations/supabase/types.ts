@@ -611,6 +611,9 @@ export type Database = {
           expected_contributions: number | null
           first_payment_at: string | null
           first_payment_completed: boolean | null
+          frozen_amount_due: number | null
+          frozen_at: string | null
+          frozen_unfreeze_fee: number | null
           id: string
           is_manager: boolean
           joined_at: string
@@ -634,6 +637,7 @@ export type Database = {
           status: Database["public"]["Enums"]["member_status"]
           swapped_with_member_id: string | null
           total_contributed: number | null
+          unfrozen_at: string | null
           user_id: string | null
           was_skipped: boolean | null
         }
@@ -647,6 +651,9 @@ export type Database = {
           expected_contributions?: number | null
           first_payment_at?: string | null
           first_payment_completed?: boolean | null
+          frozen_amount_due?: number | null
+          frozen_at?: string | null
+          frozen_unfreeze_fee?: number | null
           id?: string
           is_manager?: boolean
           joined_at?: string
@@ -670,6 +677,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["member_status"]
           swapped_with_member_id?: string | null
           total_contributed?: number | null
+          unfrozen_at?: string | null
           user_id?: string | null
           was_skipped?: boolean | null
         }
@@ -683,6 +691,9 @@ export type Database = {
           expected_contributions?: number | null
           first_payment_at?: string | null
           first_payment_completed?: boolean | null
+          frozen_amount_due?: number | null
+          frozen_at?: string | null
+          frozen_unfreeze_fee?: number | null
           id?: string
           is_manager?: boolean
           joined_at?: string
@@ -706,6 +717,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["member_status"]
           swapped_with_member_id?: string | null
           total_contributed?: number | null
+          unfrozen_at?: string | null
           user_id?: string | null
           was_skipped?: boolean | null
         }
@@ -3890,6 +3902,10 @@ export type Database = {
         Args: { p_email: string; p_id_number: string; p_phone: string }
         Returns: Json
       }
+      try_unfreeze_chama_member: {
+        Args: { p_member_id: string }
+        Returns: undefined
+      }
       update_chama_withdrawn: {
         Args: { p_amount: number; p_chama_id: string }
         Returns: undefined
@@ -3924,7 +3940,7 @@ export type Database = {
         | "twice_monthly"
       kyc_status: "pending" | "approved" | "rejected"
       mchango_status: "active" | "completed" | "cancelled"
-      member_status: "active" | "inactive" | "left" | "removed"
+      member_status: "active" | "inactive" | "left" | "removed" | "frozen"
       payment_method_type: "mpesa" | "airtel_money" | "bank_account"
       payout_status: "pending" | "processing" | "completed" | "failed"
       rate_limit_type: "ip" | "phone" | "email"
@@ -4075,7 +4091,7 @@ export const Constants = {
       ],
       kyc_status: ["pending", "approved", "rejected"],
       mchango_status: ["active", "completed", "cancelled"],
-      member_status: ["active", "inactive", "left", "removed"],
+      member_status: ["active", "inactive", "left", "removed", "frozen"],
       payment_method_type: ["mpesa", "airtel_money", "bank_account"],
       payout_status: ["pending", "processing", "completed", "failed"],
       rate_limit_type: ["ip", "phone", "email"],

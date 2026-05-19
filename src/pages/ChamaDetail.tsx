@@ -13,6 +13,7 @@ import { MemberDashboard } from "@/components/MemberDashboard";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 import { OverpaymentWallet } from "@/components/chama/OverpaymentWallet";
+import { CurrentCyclePool } from "@/components/chama/CurrentCyclePool";
 
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
@@ -567,6 +568,16 @@ const ChamaDetail = () => {
                 <p className="text-[10px] text-muted-foreground mt-1">Amount each member pays per cycle — sent as payout.</p>
               </div>
             </div>
+
+            {chama.status === 'active' && (
+              <CurrentCyclePool
+                chamaId={chama.id}
+                contributionAmount={chama.contribution_amount}
+                commissionRate={chama.commission_rate || 0.05}
+                frequency={chama.contribution_frequency}
+                everyNDays={chama.every_n_days_count}
+              />
+            )}
 
           </CardContent>
         </Card>
