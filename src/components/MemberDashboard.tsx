@@ -8,6 +8,7 @@ import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
 import { CheckCircle2, TrendingUp, CreditCard, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getNextDay10PmKenyaDeadline } from "@/utils/chamaDeadlines";
+import { frequencyLabel } from "@/utils/chamaFrequency";
 import { toast } from "@/hooks/use-toast";
 // realtime subscription removed in favor of 30s polling
 
@@ -247,11 +248,11 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
               </p>
             </div>
             <div className="p-4 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground mb-1">Contribution</p>
+              <p className="text-sm text-muted-foreground mb-1">{frequencyLabel(chama.contribution_frequency, (chama as any).every_n_days_count)}</p>
               <p className="text-2xl font-bold text-foreground">
                 KES {chama.contribution_amount.toLocaleString()}
               </p>
-              <p className="text-xs text-muted-foreground mt-1 capitalize">{chama.contribution_frequency}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">Per-cycle amount sent as payout.</p>
             </div>
             <div className="p-4 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground mb-1">Next Due</p>
