@@ -9,6 +9,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Safaricom Daraja sends MSISDN hashed (64-char hex) unless the org is allow-listed
+// for unencrypted MSISDN. Convert real numeric MSISDN to +E.164; return null if hashed.
+function normalizeMsisdn(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!/^[\d+]+$/.test(trimmed)) return null; // hashed / non-numeric
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 9 || digits.length > 15) return null;
+  if (digits.startsWith('254')) return `+${digits}`;
+  if (digits.startsWith('0') && digits.length === 10) return `+254${digits.slice(1)}`;
+  if (digits.length === 9) return `+254${digits}`;
+  return `+${digits}`;
+}
+
+async function safeSendSms(supabase: any, rawPhone: unknown, message: string, label: string) {
+  const phone = normalizeMsisdn(rawPhone);
+  if (!phone) {
+    console.warn(`[${label}] Skipping SMS: MSISDN unavailable (Safaricom returned hashed/invalid value).`);
+    return;
+  }
+  try {
+    await supabase.functions.invoke('send-transactional-sms', { body: { phone, message } });
+  } catch (err) {
+    console.error(`[${label}] SMS send error:`, err);
+  }
+}
+
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
