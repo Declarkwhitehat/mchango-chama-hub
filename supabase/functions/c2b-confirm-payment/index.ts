@@ -9,6 +9,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Safaricom Daraja sends MSISDN hashed (64-char hex) unless the org is allow-listed
+// for unencrypted MSISDN. Convert real numeric MSISDN to +E.164; return null if hashed.
+function normalizeMsisdn(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!/^[\d+]+$/.test(trimmed)) return null; // hashed / non-numeric
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 9 || digits.length > 15) return null;
+  if (digits.startsWith('254')) return `+${digits}`;
+  if (digits.startsWith('0') && digits.length === 10) return `+254${digits.slice(1)}`;
+  if (digits.length === 9) return `+254${digits}`;
+  return `+${digits}`;
+}
+
+async function safeSendSms(supabase: any, rawPhone: unknown, message: string, label: string) {
+  const phone = normalizeMsisdn(rawPhone);
+  if (!phone) {
+    console.warn(`[${label}] Skipping SMS: MSISDN unavailable (Safaricom returned hashed/invalid value).`);
+    return;
+  }
+  try {
+    await supabase.functions.invoke('send-transactional-sms', { body: { phone, message } });
+  } catch (err) {
+    console.error(`[${label}] SMS send error:`, err);
+  }
+}
+
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -204,16 +232,13 @@ serve(async (req) => {
 
       // Send SMS notification to the actual M-Pesa payer
       if (chamaData) {
-        try {
-          await supabase.functions.invoke('send-transactional-sms', {
-            body: {
-              phone: phoneNumber,
-              message: `Payment of KES ${grossAmount.toLocaleString()} received for "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
-            },
-          });
-        } catch (smsError) {
-          console.error('Error sending SMS:', smsError);
-        }
+        await safeSendSms(
+          supabase,
+          phoneNumber,
+          `Payment of KES ${grossAmount.toLocaleString()} received for "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
+          'chama-payer'
+        );
+
 
         // If the payer phone differs from the beneficiary member's profile phone,
         // also notify the beneficiary that someone paid on their behalf.
@@ -585,18 +610,15 @@ serve(async (req) => {
         });
 
       // Send thank-you SMS to donor (M-Pesa offline donations of KES 50 and above)
-      if (phoneNumber && grossAmount >= 50) {
-        try {
-          await supabase.functions.invoke('send-transactional-sms', {
-            body: {
-              phone: phoneNumber,
-              message: `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${mchangoData.title}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
-            },
-          });
-        } catch (smsError) {
-          console.error('Error sending SMS:', smsError);
-        }
+      if (grossAmount >= 50) {
+        await safeSendSms(
+          supabase,
+          phoneNumber,
+          `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${mchangoData.title}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
+          'mchango-donor'
+        );
       }
+
 
       // Push + in-app notifications (creator/managers + donor if registered)
       try {
@@ -731,16 +753,13 @@ serve(async (req) => {
         });
 
       // Send thank-you SMS to donor
-      try {
-        await supabase.functions.invoke('send-transactional-sms', {
-          body: {
-            phone: phoneNumber,
-            message: `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${orgData.name}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
-          },
-        });
-      } catch (smsError) {
-        console.error('Error sending SMS:', smsError);
-      }
+      await safeSendSms(
+        supabase,
+        phoneNumber,
+        `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${orgData.name}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
+        'org-donor'
+      );
+
 
       // Push + in-app notifications (org owner + donor if registered)
       try {
@@ -933,16 +952,13 @@ serve(async (req) => {
         });
 
       // Send confirmation SMS
-      try {
-        await supabase.functions.invoke('send-transactional-sms', {
-          body: {
-            phone: phoneNumber,
-            message: `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${welfareData.name}" has been received. Receipt: ${mpesaReceiptNumber}.`,
-          },
-        });
-      } catch (smsError) {
-        console.error('Error sending welfare SMS:', smsError);
-      }
+      await safeSendSms(
+        supabase,
+        phoneNumber,
+        `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${welfareData.name}" has been received. Receipt: ${mpesaReceiptNumber}.`,
+        'welfare-payer'
+      );
+
 
       // Push + in-app notification to the contributing member
       if (matchedMember?.user_id) {
@@ -999,19 +1015,13 @@ serve(async (req) => {
     console.warn('Searched tables: chama_members.member_code, mchango.paybill_account_id/group_code, organizations.paybill_account_id/group_code, welfares.paybill_account_id/group_code');
     
     // Send SMS to payer informing them the code was invalid
-    if (phoneNumber) {
-      try {
-        await supabase.functions.invoke('send-transactional-sms', {
-          body: {
-            phone: phoneNumber,
-            message: `Your payment of KSh ${amount} (Receipt: ${mpesaReceiptNumber}) was received but the payment code "${accountNumber}" was not found. Your money is safe. Please contact customer care with your correct payment ID to have your payment allocated.`,
-          },
-        });
-        console.log('Sent unmatched payment notification SMS to:', phoneNumber);
-      } catch (smsError) {
-        console.error('Failed to send unmatched payment SMS:', smsError);
-      }
-    }
+    await safeSendSms(
+      supabase,
+      phoneNumber,
+      `Your payment of KSh ${amount} (Receipt: ${mpesaReceiptNumber}) was received but the payment code "${accountNumber}" was not found. Your money is safe. Please contact customer care with your correct payment ID to have your payment allocated.`,
+      'unmatched-payer'
+    );
+
     
     // Accept the payment (return success) - customer support will manually allocate
     return new Response(
