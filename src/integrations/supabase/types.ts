@@ -3520,6 +3520,7 @@ export type Database = {
           id: string
           last_b2c_attempt_at: string | null
           mchango_id: string | null
+          metadata: Json
           net_amount: number
           notes: string | null
           organization_id: string | null
@@ -3553,6 +3554,7 @@ export type Database = {
           id?: string
           last_b2c_attempt_at?: string | null
           mchango_id?: string | null
+          metadata?: Json
           net_amount: number
           notes?: string | null
           organization_id?: string | null
@@ -3586,6 +3588,7 @@ export type Database = {
           id?: string
           last_b2c_attempt_at?: string | null
           mchango_id?: string | null
+          metadata?: Json
           net_amount?: number
           notes?: string | null
           organization_id?: string | null
