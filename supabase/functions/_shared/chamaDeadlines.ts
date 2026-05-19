@@ -74,3 +74,21 @@ export function getSameDay1201PmKenyaCutoff(referenceDate: Date): Date {
     0,
   ));
 }
+
+/**
+ * 00:01 EAT (21:01 UTC of prior calendar day) on the Kenya-calendar day of `referenceDate`.
+ * v2 spec: every cycle's start_date must be 12:01 AM EAT of its calendar day.
+ */
+export function getEatMidnightOnePastForDate(referenceDate: Date): Date {
+  const kenyaClock = toKenyaClock(referenceDate);
+  // 00:01 EAT == prior UTC day at 21:01
+  return new Date(Date.UTC(
+    kenyaClock.getUTCFullYear(),
+    kenyaClock.getUTCMonth(),
+    kenyaClock.getUTCDate() - 1,
+    21,
+    1,
+    0,
+    0,
+  ));
+}

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getNextDay10PmKenyaDeadline } from "../_shared/chamaDeadlines.ts";
+import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate } from "../_shared/chamaDeadlines.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -240,7 +240,7 @@ serve(async (req) => {
       .insert({
         chama_id: chamaId,
         cycle_number: 1,
-        start_date: startDate.toISOString(),
+        start_date: getEatMidnightOnePastForDate(startDate).toISOString(),
         end_date: cycleEndDate.toISOString(),
         due_amount: chama.contribution_amount,
         beneficiary_member_id: sortedMembers[0]?.id || null, // First member gets first payout

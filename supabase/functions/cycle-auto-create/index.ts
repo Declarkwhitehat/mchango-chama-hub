@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { corsHeaders } from '../_shared/cors.ts';
+import { getEatMidnightOnePastForDate } from '../_shared/chamaDeadlines.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -207,8 +208,23 @@ Deno.serve(async (req) => {
         last_cycle_completed_at: new Date().toISOString(),
         accepting_rejoin_requests: true
       }).eq('id', chamaId);
-      return new Response(JSON.stringify({ 
-        success: true, 
+
+      // Trigger end-of-chama wallet sweep (fire-and-forget; idempotent on its own)
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/chama-wallet-sweep`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ chamaId }),
+        });
+      } catch (sweepErr) {
+        console.error('[CYCLE-AUTO-CREATE] wallet sweep dispatch failed:', (sweepErr as Error)?.message);
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
         message: 'All members completed. Chama marked as cycle_complete.',
         cycle_complete: true
       }), {
@@ -236,7 +252,7 @@ Deno.serve(async (req) => {
       .insert({
         chama_id: chamaId,
         cycle_number: nextCycleNumber,
-        start_date: startDate.toISOString(),
+        start_date: getEatMidnightOnePastForDate(startDate).toISOString(),
         end_date: endDate.toISOString(),
         due_amount: chama.contribution_amount,
         beneficiary_member_id: beneficiary.id,
