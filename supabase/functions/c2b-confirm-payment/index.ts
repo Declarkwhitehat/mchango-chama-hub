@@ -894,12 +894,12 @@ serve(async (req) => {
           description: `Offline welfare contribution with ${(commissionRate * 100).toFixed(0)}% commission deducted`
         });
 
-      // Send SMS notification
+      // Send confirmation SMS
       try {
         await supabase.functions.invoke('send-transactional-sms', {
           body: {
             phone: phoneNumber,
-            message: `Thank you ${firstName}! Your contribution of KSh ${grossAmount} to "${welfareData.name}" was received. Commission: KSh ${commissionAmount.toFixed(2)} (${(commissionRate * 100).toFixed(0)}%). Net credited: KSh ${netAmount.toFixed(2)}. Receipt: ${mpesaReceiptNumber}`,
+            message: `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${welfareData.name}" has been received. Receipt: ${mpesaReceiptNumber}.`,
           },
         });
       } catch (smsError) {
