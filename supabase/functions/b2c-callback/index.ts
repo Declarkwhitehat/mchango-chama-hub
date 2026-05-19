@@ -374,8 +374,13 @@ serve(async (req) => {
         }
       }
 
-      // Send tailored payout confirmation SMS
-      if (recipientPhone) {
+      // Detect chama debt-settlement payouts for the dual-SMS path
+      const meta = (withdrawal as any).metadata || {};
+      const isDebtSettlement = meta?.kind === 'chama_debt_settlement';
+      const debtSmsAlreadySent = Boolean(meta?.debt_sms_sent_at);
+
+      // Send tailored payout confirmation SMS (skipped for debt-settlement; handled below)
+      if (recipientPhone && !isDebtSettlement) {
         // Only campaigns (mchango) include remaining balance
         let remainingBalance: number | null = null;
         if (withdrawal.mchango_id) {
@@ -393,6 +398,52 @@ serve(async (req) => {
           : '';
         const successMessage = `Pamojanova: Withdrawal of ${amountStr} from ${sourceType} "${sourceName}" successful. Ref: ${transactionId}.${balanceLine}`;
         await sendSMS(recipientPhone, successMessage);
+      }
+
+      // === DUAL SMS: chama debt-settlement (payer + recipient) ===
+      if (isDebtSettlement && !debtSmsAlreadySent) {
+        try {
+          const amountStr = `KES ${(transactionAmount || withdrawal.net_amount || withdrawal.amount).toFixed(2)}`;
+          const cycleNum = meta.cycle_number ?? '?';
+          const chamaName = sourceName || 'your Chama';
+          const mpesaRef = transactionId || conversationId || 'N/A';
+
+          // Recipient (the shortchanged member) — already have phone + name lookup
+          const { data: recipProfile } = await supabaseAdmin
+            .from('profiles').select('full_name, phone').eq('id', withdrawal.requested_by).maybeSingle();
+          const recipName = recipProfile?.full_name || 'member';
+          const { data: recipMember } = await supabaseAdmin
+            .from('chama_members').select('member_code')
+            .eq('chama_id', meta.payer_chama_id).eq('user_id', withdrawal.requested_by).maybeSingle();
+          const recipCode = recipMember?.member_code || '';
+
+          // Payer (the late member)
+          const { data: payerMember } = await supabaseAdmin
+            .from('chama_members').select('user_id, member_code')
+            .eq('id', meta.payer_member_id).maybeSingle();
+          const payerCode = payerMember?.member_code || '';
+          let payerName = 'member';
+          let payerPhone = '';
+          if (payerMember?.user_id) {
+            const { data: payerProfile } = await supabaseAdmin
+              .from('profiles').select('full_name, phone').eq('id', payerMember.user_id).maybeSingle();
+            payerName = payerProfile?.full_name || 'member';
+            payerPhone = payerProfile?.phone || '';
+          }
+
+          const payerMsg = `Pamojanova: Your late payment of ${amountStr} to ${recipName} (${recipCode}) for "${chamaName}" Cycle #${cycleNum} has been delivered. Mpesa Ref: ${mpesaRef}. Asante.`;
+          const recipMsg = `Pamojanova: ${amountStr} owed to you from "${chamaName}" Cycle #${cycleNum} has been received from ${payerName} (${payerCode}). Mpesa Ref: ${mpesaRef}.`;
+
+          if (payerPhone) await sendSMS(payerPhone, payerMsg);
+          if (recipientPhone) await sendSMS(recipientPhone, recipMsg);
+
+          await supabaseAdmin
+            .from('withdrawals')
+            .update({ metadata: { ...meta, debt_sms_sent_at: new Date().toISOString() } })
+            .eq('id', withdrawal.id);
+        } catch (smsErr) {
+          console.error('Debt-settlement dual SMS failed:', (smsErr as Error)?.message);
+        }
       }
 
       // Push + in-app notification to the requester
