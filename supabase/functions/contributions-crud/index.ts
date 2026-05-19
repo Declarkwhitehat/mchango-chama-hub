@@ -336,6 +336,16 @@ async function settleDebts(
                     notes: `Deficit settlement: Cycle #${cycleNum} late payment received. KES ${principalPay.toFixed(2)} to ${recipientMember.member_code}`,
                     requested_at: new Date().toISOString(),
                     b2c_attempt_count: 0,
+                    metadata: {
+                      kind: 'chama_debt_settlement',
+                      debt_id: debt.id,
+                      deficit_id: deficitRecord.id,
+                      cycle_number: cycleNum,
+                      cycle_id: deficitRecord.cycle_id,
+                      payer_member_id: memberId,
+                      payer_chama_id: chamaId,
+                      principal_amount: principalPay,
+                    },
                     ...(canAutoApprove ? { reviewed_at: new Date().toISOString() } : {})
                   })
                   .select('id')
