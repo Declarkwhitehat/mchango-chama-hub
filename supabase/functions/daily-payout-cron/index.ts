@@ -1153,13 +1153,10 @@ Deno.serve(async (req) => {
             })
             .eq('id', member.id);
 
-          // First cycle: immediate removal; subsequent cycles: removal after 3 misses
-          if (isFirstCycle || newMissedCount >= 3) {
-            const removalReason = isFirstCycle
-              ? `Auto-removed: Did not pay by first deadline (Day 1 rule)`
-              : `Auto-removed: ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}`;
-
-            console.log(`🚫 ${isFirstCycle ? '[DAY 1 RULE]' : ''} AUTO-REMOVING member ${member.member_code} - ${isFirstCycle ? 'first payment missed' : `${newMissedCount} consecutive missed payments`}`);
+          // First cycle: immediate removal (day-1 rule). Subsequent: FREEZE (not remove) after 3 misses.
+          if (isFirstCycle) {
+            const removalReason = `Auto-removed: Did not pay by first deadline (Day 1 rule)`;
+            console.log(`🚫 [DAY 1 RULE] AUTO-REMOVING member ${member.member_code} - first payment missed`);
 
             await supabase.from('chama_member_removals').insert({
               chama_id: chama.id,
@@ -1179,7 +1176,6 @@ Deno.serve(async (req) => {
               removed_at: new Date().toISOString()
             }).eq('id', member.id);
 
-            // Audit log for auto-removal
             await supabase.from('audit_logs').insert({
               action: 'MEMBER_AUTO_REMOVED',
               table_name: 'chama_members',
@@ -1187,19 +1183,15 @@ Deno.serve(async (req) => {
               new_values: { missed_payments: newMissedCount, outstanding: totalOutstanding, chama: chama.name }
             });
 
-            const memberPhone = member.profiles?.phone;
-            if (memberPhone) {
-              const smsMsg = isFirstCycle
-                ? `❌ You have been removed from "${chama.name}" for not paying by the first deadline. All members must pay before the first 10 PM cutoff.`
-                : `❌ You have been removed from "${chama.name}" after ${newMissedCount} consecutive missed payments. Outstanding balance: KES ${totalOutstanding.toLocaleString()}.`;
-              await sendSMS(memberPhone, smsMsg);
+            const memberPhoneRm = member.profiles?.phone;
+            if (memberPhoneRm) {
+              await sendSMS(memberPhoneRm, `You were removed from ${chama.name} for not paying by the first deadline.`);
             }
-
             if (member.user_id) {
               await supabase.from('notifications').insert({
                 user_id: member.user_id,
                 title: 'Removed from Chama',
-                message: `You were removed from "${chama.name}" due to ${newMissedCount} consecutive missed payments. Outstanding: KES ${totalOutstanding.toLocaleString()}.`,
+                message: `You were removed from "${chama.name}" for missing the first deadline.`,
                 type: 'warning',
                 category: 'chama',
                 related_entity_id: chama.id,
@@ -1207,123 +1199,47 @@ Deno.serve(async (req) => {
               });
             }
 
-            // Manager auto-reassignment
-            if (member.is_manager) {
-              console.log(`👑 Removed member was manager. Finding replacement for chama ${chama.name}`);
-              
-              // First try: member with zero missed payments
-              let { data: bestCandidate } = await supabase
-                .from('chama_members')
-                .select('id, user_id, member_code, missed_payments_count, profiles!chama_members_user_id_fkey(full_name, phone)')
-                .eq('chama_id', chama.id)
-                .eq('status', 'active')
-                .eq('approval_status', 'approved')
-                .eq('missed_payments_count', 0)
-                .order('order_index', { ascending: true })
-                .limit(1)
-                .maybeSingle();
-
-              // Fallback: no perfect candidate — pick the most favorable (lowest missed payments)
-              if (!bestCandidate) {
-                console.log(`⚠️ No zero-miss candidate. Selecting most favorable active member for chama ${chama.name}`);
-                const { data: fallbackCandidate } = await supabase
-                  .from('chama_members')
-                  .select('id, user_id, member_code, missed_payments_count, profiles!chama_members_user_id_fkey(full_name, phone)')
-                  .eq('chama_id', chama.id)
-                  .eq('status', 'active')
-                  .eq('approval_status', 'approved')
-                  .order('missed_payments_count', { ascending: true })
-                  .order('order_index', { ascending: true })
-                  .limit(1)
-                  .maybeSingle();
-
-                bestCandidate = fallbackCandidate;
-              }
-
-              if (bestCandidate) {
-                await supabase.from('chama_members')
-                  .update({ is_manager: true })
-                  .eq('id', bestCandidate.id);
-
-                console.log(`👑 New manager assigned: ${bestCandidate.profiles?.full_name} (${bestCandidate.member_code}) [missed: ${bestCandidate.missed_payments_count || 0}]`);
-
-                // Audit log
-                await supabase.from('audit_logs').insert({
-                  action: 'MANAGER_AUTO_REASSIGNED',
-                  table_name: 'chama_members',
-                  record_id: bestCandidate.id,
-                  new_values: {
-                    chama_id: chama.id,
-                    chama_name: chama.name,
-                    new_manager: bestCandidate.member_code,
-                    missed_payments: bestCandidate.missed_payments_count || 0,
-                    reason: 'Previous manager auto-removed. Best available candidate selected.'
-                  }
-                });
-
-                if (bestCandidate.profiles?.phone) {
-                  await sendSMS(bestCandidate.profiles.phone,
-                    `👑 You are now the manager of "${chama.name}". The previous manager was removed due to missed payments. Log in to manage your group.`
-                  );
-                }
-
-                if (bestCandidate.user_id) {
-                  await supabase.from('notifications').insert({
-                    user_id: bestCandidate.user_id,
-                    title: 'You Are Now Manager',
-                    message: `You have been assigned as manager of "${chama.name}" after the previous manager was removed.`,
-                    type: 'info',
-                    category: 'chama',
-                    related_entity_id: chama.id,
-                    related_entity_type: 'chama'
-                  });
-                }
-
-                const { data: remainingMembers } = await supabase
-                  .from('chama_members')
-                  .select('user_id, profiles!chama_members_user_id_fkey(phone)')
-                  .eq('chama_id', chama.id)
-                  .eq('status', 'active')
-                  .eq('approval_status', 'approved')
-                  .neq('id', bestCandidate.id);
-
-                if (remainingMembers) {
-                  for (const rm of remainingMembers) {
-                    if (rm.profiles?.phone) {
-                      await sendSMS(rm.profiles.phone,
-                        `ℹ️ "${chama.name}" has a new manager: ${bestCandidate.profiles?.full_name}. The previous manager was removed due to missed payments.`
-                      );
-                    }
-                  }
-                }
-              } else {
-                // This should be virtually impossible (would mean zero active members)
-                console.error(`🚨 CRITICAL: No active members remain in chama ${chama.name} to assign as manager`);
-                
-                // Notify admins of critical state
-                const { data: adminUsers } = await supabase
-                  .from('user_roles')
-                  .select('user_id')
-                  .eq('role', 'admin');
-
-                for (const admin of (adminUsers || [])) {
-                  await supabase.from('notifications').insert({
-                    user_id: admin.user_id,
-                    title: 'Critical: Chama Has No Members',
-                    message: `Chama "${chama.name}" has no active members remaining after auto-removal. Manual intervention required.`,
-                    type: 'warning',
-                    category: 'admin',
-                    related_entity_id: chama.id,
-                    related_entity_type: 'chama'
-                  });
-                }
-              }
-            }
-
-            // Resequence remaining members
-            console.log(`🔄 Resequencing members for chama ${chama.name} after removal`);
             await supabase.rpc('resequence_member_order', { p_chama_id: chama.id });
             await supabase.rpc('calculate_expected_contributions', { p_chama_id: chama.id });
+            continue;
+          }
+
+          if (newMissedCount >= 3) {
+            // FREEZE: snapshot dues + 10% unfreeze fee. Member stays in roster.
+            const unfreezeFee = Math.round(totalOutstanding * 0.10);
+            console.log(`❄️  FREEZING member ${member.member_code} - ${newMissedCount} missed, due KES ${totalOutstanding} + fee KES ${unfreezeFee}`);
+
+            await supabase.from('chama_members').update({
+              status: 'frozen',
+              frozen_at: new Date().toISOString(),
+              frozen_amount_due: totalOutstanding,
+              frozen_unfreeze_fee: unfreezeFee,
+              unfrozen_at: null
+            }).eq('id', member.id);
+
+            await supabase.from('audit_logs').insert({
+              action: 'MEMBER_FROZEN',
+              table_name: 'chama_members',
+              record_id: member.id,
+              new_values: { missed_payments: newMissedCount, outstanding: totalOutstanding, unfreeze_fee: unfreezeFee, chama: chama.name }
+            });
+
+            const totalToUnfreeze = totalOutstanding + unfreezeFee;
+            const memberPhoneFz = member.profiles?.phone;
+            if (memberPhoneFz) {
+              await sendSMS(memberPhoneFz, `Your account in ${chama.name} is FROZEN after ${newMissedCount} missed payments. Pay KES ${totalToUnfreeze.toLocaleString()} (dues + 10% fee) via Paybill 4015351, Account ${member.member_code} to auto-unfreeze.`);
+            }
+            if (member.user_id) {
+              await supabase.from('notifications').insert({
+                user_id: member.user_id,
+                title: 'Account Frozen',
+                message: `You were frozen in "${chama.name}" after ${newMissedCount} missed payments. Pay KES ${totalToUnfreeze.toLocaleString()} (dues + 10% fee) to auto-unfreeze.`,
+                type: 'warning',
+                category: 'chama',
+                related_entity_id: chama.id,
+                related_entity_type: 'chama'
+              });
+            }
 
             continue;
           }
@@ -1331,8 +1247,8 @@ Deno.serve(async (req) => {
           const memberPhone = member.profiles?.phone;
           if (memberPhone && newMissedCount >= 1) {
             const warningMessage = newMissedCount === 1
-              ? `⚠️ You missed a payment for "${chama.name}". Total outstanding: KES ${totalOutstanding.toLocaleString()}. Pay immediately to avoid penalties.`
-              : `🚨 WARNING: ${newMissedCount} consecutive missed payments for "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. You will be REMOVED after 1 more!`;
+              ? `You missed a payment for ${chama.name}. Outstanding: KES ${totalOutstanding.toLocaleString()}. Pay now to avoid being frozen.`
+              : `WARNING: ${newMissedCount} consecutive missed payments for ${chama.name}. Outstanding: KES ${totalOutstanding.toLocaleString()}. You will be FROZEN after 1 more miss.`;
             await sendSMS(memberPhone, warningMessage);
           }
 
@@ -1347,10 +1263,56 @@ Deno.serve(async (req) => {
 
             if (manager?.profiles?.phone) {
               await sendSMS(manager.profiles.phone,
-                `⚠️ URGENT: Member ${member.profiles?.full_name} (${member.member_code}) has missed ${newMissedCount} payments in "${chama.name}". Outstanding: KES ${totalOutstanding.toLocaleString()}. Auto-removal after 1 more miss.`
+                `Member ${member.profiles?.full_name} (${member.member_code}) has missed ${newMissedCount} payments in ${chama.name}. Outstanding: KES ${totalOutstanding.toLocaleString()}. Auto-freeze after 1 more miss.`
               );
             }
           }
+        }
+
+        // ========== CYCLE-END MANAGER SUMMARY ==========
+        try {
+          const { data: cycleManagers } = await supabase
+            .from('chama_members')
+            .select('user_id, profiles!chama_members_user_id_fkey(full_name, phone)')
+            .eq('chama_id', chama.id)
+            .eq('is_manager', true)
+            .eq('status', 'active')
+            .eq('approval_status', 'approved');
+
+          let summaryMsg: string;
+          let summaryTitle: string;
+
+          if (unpaidMembers.length === 0 && totalMembers > 0) {
+            summaryTitle = 'All Members Paid';
+            summaryMsg = `All ${totalMembers} members paid for cycle ${cycle.cycle_number} of ${chama.name}.`;
+          } else {
+            const names = unpaidMembers
+              .map((u: any) => u.chama_members?.profiles?.full_name || u.chama_members?.member_code || 'Member')
+              .filter(Boolean);
+            const shown = names.slice(0, 5).join(', ');
+            const extra = names.length > 5 ? ` +${names.length - 5} more` : '';
+            summaryTitle = 'Cycle Summary: Missed Payments';
+            summaryMsg = `Cycle ${cycle.cycle_number} of ${chama.name}: ${unpaidMembers.length} missed (${shown}${extra}). Paid: ${paidCount}/${totalMembers}.`;
+          }
+
+          for (const mgr of (cycleManagers || [])) {
+            if (mgr.profiles?.phone) {
+              await sendSMS(mgr.profiles.phone, summaryMsg);
+            }
+            if (mgr.user_id) {
+              await supabase.from('notifications').insert({
+                user_id: mgr.user_id,
+                title: summaryTitle,
+                message: summaryMsg,
+                type: unpaidMembers.length === 0 ? 'success' : 'warning',
+                category: 'chama',
+                related_entity_id: chama.id,
+                related_entity_type: 'chama'
+              });
+            }
+          }
+        } catch (sumErr) {
+          console.error('Manager cycle-summary error:', sumErr);
         }
 
         // ========== AUTO-CREATE NEXT CYCLE ==========
