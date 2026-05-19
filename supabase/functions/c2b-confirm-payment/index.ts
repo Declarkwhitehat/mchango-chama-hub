@@ -1015,19 +1015,13 @@ serve(async (req) => {
     console.warn('Searched tables: chama_members.member_code, mchango.paybill_account_id/group_code, organizations.paybill_account_id/group_code, welfares.paybill_account_id/group_code');
     
     // Send SMS to payer informing them the code was invalid
-    if (phoneNumber) {
-      try {
-        await supabase.functions.invoke('send-transactional-sms', {
-          body: {
-            phone: phoneNumber,
-            message: `Your payment of KSh ${amount} (Receipt: ${mpesaReceiptNumber}) was received but the payment code "${accountNumber}" was not found. Your money is safe. Please contact customer care with your correct payment ID to have your payment allocated.`,
-          },
-        });
-        console.log('Sent unmatched payment notification SMS to:', phoneNumber);
-      } catch (smsError) {
-        console.error('Failed to send unmatched payment SMS:', smsError);
-      }
-    }
+    await safeSendSms(
+      supabase,
+      phoneNumber,
+      `Your payment of KSh ${amount} (Receipt: ${mpesaReceiptNumber}) was received but the payment code "${accountNumber}" was not found. Your money is safe. Please contact customer care with your correct payment ID to have your payment allocated.`,
+      'unmatched-payer'
+    );
+
     
     // Accept the payment (return success) - customer support will manually allocate
     return new Response(
