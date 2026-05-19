@@ -85,6 +85,7 @@ const AdminDocumentDeletions = lazy(() => import("./pages/AdminDocumentDeletions
 const AdminAccountVerifications = lazy(() => import("./pages/AdminAccountVerifications"));
 const AdminMaintenanceMode = lazy(() => import("./pages/AdminMaintenanceMode"));
 const AdminSmsBalance = lazy(() => import("./pages/AdminSmsBalance"));
+const AdminPaybillBalance = lazy(() => import("./pages/AdminPaybillBalance"));
 const AccountVerification = lazy(() => import("./pages/AccountVerification"));
 const queryClient = new QueryClient({
   defaultOptions: {
