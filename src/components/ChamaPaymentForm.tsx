@@ -13,6 +13,7 @@ import { Loader2, CreditCard, Users, Phone } from "lucide-react";
 import { CHAMA_DEFAULT_COMMISSION_RATE, CHAMA_LATE_COMMISSION_RATE, calculateAmountToPay } from "@/utils/commissionCalculator";
 import { AmountToPayCard } from "@/components/chama/AmountToPayCard";
 import { PaymentAllocationPreview } from "@/components/chama/PaymentAllocationPreview";
+import { NextPaymentTimer } from "@/components/chama/NextPaymentTimer";
 
 interface ChamaPaymentFormProps {
   chamaId: string;
@@ -50,6 +51,7 @@ export const ChamaPaymentForm = ({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "checking">("idle");
+  const [timerRefreshKey, setTimerRefreshKey] = useState(0);
 
   useEffect(() => {
     loadMembers();
@@ -269,6 +271,7 @@ export const ChamaPaymentForm = ({
             setNotes("");
             setPaymentType("self");
             setTargetMemberId(currentMemberId);
+            setTimerRefreshKey((k) => k + 1);
             
             if (onPaymentSuccess) {
               onPaymentSuccess();
@@ -430,16 +433,12 @@ export const ChamaPaymentForm = ({
             />
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (Optional)</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any payment notes..."
-              rows={2}
-            />
-          </div>
+          <NextPaymentTimer
+            chamaId={chamaId}
+            memberId={currentMemberId}
+            refreshKey={timerRefreshKey}
+          />
+
 
           <Button 
             type="submit" 
