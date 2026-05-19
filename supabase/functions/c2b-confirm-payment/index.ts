@@ -202,17 +202,55 @@ serve(async (req) => {
         console.error('Error delegating settlement:', settleError);
       }
 
-      // Send SMS notification + push
+      // Send SMS notification to the actual M-Pesa payer
       if (chamaData) {
         try {
           await supabase.functions.invoke('send-transactional-sms', {
             body: {
               phone: phoneNumber,
-              message: `Payment of KSh ${grossAmount} received for ${chamaData.name}. Receipt: ${mpesaReceiptNumber}`,
+              message: `Payment of KES ${grossAmount.toLocaleString()} received for "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
             },
           });
         } catch (smsError) {
           console.error('Error sending SMS:', smsError);
+        }
+
+        // If the payer phone differs from the beneficiary member's profile phone,
+        // also notify the beneficiary that someone paid on their behalf.
+        try {
+          const { data: beneficiaryProfile } = await supabase
+            .from('profiles')
+            .select('full_name, phone')
+            .eq('id', chamaMemberData.user_id)
+            .maybeSingle();
+
+          const normalize = (p?: string | null) => (p || '').replace(/\D/g, '').slice(-9);
+          const payerLast9 = normalize(phoneNumber);
+          const benefLast9 = normalize(beneficiaryProfile?.phone);
+
+          if (beneficiaryProfile?.phone && payerLast9 && payerLast9 !== benefLast9) {
+            const payerName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'A member';
+            await supabase.functions.invoke('send-transactional-sms', {
+              body: {
+                phone: beneficiaryProfile.phone,
+                message: `Good news! ${payerName} has paid KES ${grossAmount.toLocaleString()} for your contribution to "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
+              },
+            });
+
+            if (chamaMemberData?.user_id) {
+              await createNotification(supabase, {
+                userId: chamaMemberData.user_id,
+                title: '🤝 Payment Made on Your Behalf',
+                message: `${payerName} paid KES ${grossAmount.toLocaleString()} for your contribution to "${chamaData.name}".`,
+                type: 'success',
+                category: 'chama',
+                relatedEntityId: chamaMemberData.chama_id,
+                relatedEntityType: 'chama',
+              });
+            }
+          }
+        } catch (benefErr) {
+          console.error('Error notifying chama beneficiary:', benefErr);
         }
 
         // Push + in-app notification to the contributing member
