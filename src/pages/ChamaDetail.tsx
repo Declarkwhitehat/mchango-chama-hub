@@ -849,6 +849,7 @@ const ChamaDetail = () => {
               <TabsTrigger value="members" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Members</TabsTrigger>
               {isMember && <TabsTrigger value="chat" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black flex items-center gap-1"><MessageSquare className="h-3 w-3" />Chat</TabsTrigger>}
               <TabsTrigger value="documents" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Docs</TabsTrigger>
+              <TabsTrigger value="payouts" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Payouts</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard">
