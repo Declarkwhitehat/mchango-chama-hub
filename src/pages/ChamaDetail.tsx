@@ -843,7 +843,7 @@ const ChamaDetail = () => {
         {/* Tabs - Only visible to active approved members and admins */}
         {hasViewAccess && !isRemovedMember && (
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center bg-[#2196F3]">
+            <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center bg-[#2FC089]">
               <TabsTrigger value="dashboard" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Dashboard</TabsTrigger>
               {isManager && !isPendingStatus && <TabsTrigger value="payments" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Payments</TabsTrigger>}
               <TabsTrigger value="members" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Members</TabsTrigger>
