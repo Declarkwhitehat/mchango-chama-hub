@@ -517,8 +517,10 @@ serve(async (req) => {
                 user_id: manager.id,
                 title: 'New join request',
                 message: `${requesterName} has requested to join ${chamaName}. Review and approve in the app.`,
-                type: 'chama_join_request',
-                metadata: { chama_id, requester_id: user.id },
+                type: 'info',
+                category: 'chama',
+                related_entity_id: chama_id,
+                related_entity_type: 'chama',
               });
             } catch (notifErr) {
               console.error('Failed to insert notification:', notifErr);
