@@ -843,12 +843,12 @@ const ChamaDetail = () => {
         {/* Tabs - Only visible to active approved members and admins */}
         {hasViewAccess && !isRemovedMember && (
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center">
-              <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
-              {isManager && !isPendingStatus && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
-              <TabsTrigger value="members" className="text-xs sm:text-sm">Members</TabsTrigger>
-              {isMember && <TabsTrigger value="chat" className="text-xs sm:text-sm flex items-center gap-1"><MessageSquare className="h-3 w-3" />Chat</TabsTrigger>}
-              <TabsTrigger value="documents" className="text-xs sm:text-sm">Docs</TabsTrigger>
+            <TabsList className="w-full overflow-x-auto flex-nowrap justify-start md:justify-center bg-[#2196F3]">
+              <TabsTrigger value="dashboard" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Dashboard</TabsTrigger>
+              {isManager && !isPendingStatus && <TabsTrigger value="payments" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Payments</TabsTrigger>}
+              <TabsTrigger value="members" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Members</TabsTrigger>
+              {isMember && <TabsTrigger value="chat" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black flex items-center gap-1"><MessageSquare className="h-3 w-3" />Chat</TabsTrigger>}
+              <TabsTrigger value="documents" className="text-xs sm:text-sm font-bold text-black data-[state=active]:bg-white data-[state=active]:text-black">Docs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard">
