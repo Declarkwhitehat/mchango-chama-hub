@@ -232,16 +232,13 @@ serve(async (req) => {
 
       // Send SMS notification to the actual M-Pesa payer
       if (chamaData) {
-        try {
-          await supabase.functions.invoke('send-transactional-sms', {
-            body: {
-              phone: phoneNumber,
-              message: `Payment of KES ${grossAmount.toLocaleString()} received for "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
-            },
-          });
-        } catch (smsError) {
-          console.error('Error sending SMS:', smsError);
-        }
+        await safeSendSms(
+          supabase,
+          phoneNumber,
+          `Payment of KES ${grossAmount.toLocaleString()} received for "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
+          'chama-payer'
+        );
+
 
         // If the payer phone differs from the beneficiary member's profile phone,
         // also notify the beneficiary that someone paid on their behalf.
