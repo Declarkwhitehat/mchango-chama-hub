@@ -1,7 +1,53 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+
+/**
+ * Resolve a target route from a push notification's data payload.
+ * Matches the data fields set by the `notify_push_on_notification_insert`
+ * DB trigger and by `createNotification` in `_shared/notifications.ts`.
+ */
+const resolveNotificationRoute = (data: Record<string, any> | undefined): string | null => {
+  if (!data) return null;
+  const category = String(data.category || '').toLowerCase();
+  const entityType = String(data.related_entity_type || '').toLowerCase();
+  const entityId = data.related_entity_id ? String(data.related_entity_id) : '';
+
+  // Prefer explicit route if backend ever sets one
+  if (typeof data.route === 'string' && data.route.startsWith('/')) return data.route;
+
+  // Resolve by entity type first (most specific)
+  if (entityId) {
+    switch (entityType) {
+      case 'chama': return `/chama/${entityId}`;
+      case 'welfare': return `/welfare/${entityId}`;
+      case 'mchango':
+      case 'campaign': return `/mchango/${entityId}`;
+      case 'organization': return `/organizations/${entityId}`;
+      case 'withdrawal': return '/activity';
+      case 'payment':
+      case 'contribution': return '/activity';
+      case 'verification':
+      case 'kyc': return '/profile';
+    }
+  }
+
+  // Fall back to category-based routing
+  switch (category) {
+    case 'chama': return entityId ? `/chama/${entityId}` : '/chama';
+    case 'welfare': return entityId ? `/welfare/${entityId}` : '/welfare';
+    case 'campaign': return entityId ? `/mchango/${entityId}` : '/mchango';
+    case 'organization': return entityId ? `/organizations/${entityId}` : '/organizations';
+    case 'withdrawal':
+    case 'payment':
+    case 'reminder': return '/activity';
+    case 'verification': return '/profile';
+    default: return '/home';
+  }
+};
+
 
 /**
  * Push notifications hook (native-only, never crashes the app).
