@@ -13,6 +13,7 @@ import { MemberDashboard } from "@/components/MemberDashboard";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 import { OverpaymentWallet } from "@/components/chama/OverpaymentWallet";
+import { CurrentCyclePool } from "@/components/chama/CurrentCyclePool";
 
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
 import { CycleCompleteManager } from "@/components/chama/CycleCompleteManager";
