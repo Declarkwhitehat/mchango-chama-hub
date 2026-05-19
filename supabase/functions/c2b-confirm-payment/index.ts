@@ -610,18 +610,15 @@ serve(async (req) => {
         });
 
       // Send thank-you SMS to donor (M-Pesa offline donations of KES 50 and above)
-      if (phoneNumber && grossAmount >= 50) {
-        try {
-          await supabase.functions.invoke('send-transactional-sms', {
-            body: {
-              phone: phoneNumber,
-              message: `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${mchangoData.title}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
-            },
-          });
-        } catch (smsError) {
-          console.error('Error sending SMS:', smsError);
-        }
+      if (grossAmount >= 50) {
+        await safeSendSms(
+          supabase,
+          phoneNumber,
+          `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${mchangoData.title}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
+          'mchango-donor'
+        );
       }
+
 
       // Push + in-app notifications (creator/managers + donor if registered)
       try {
