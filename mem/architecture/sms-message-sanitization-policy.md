@@ -11,4 +11,4 @@ SMS gateways (Onfon Media, Celcom) mangle UTF-8 emojis & smart punctuation when 
 - Replaces smart quotes/dashes/ellipsis/nbsp with ASCII equivalents
 - Collapses extra whitespace
 
-**Authoring rule:** Do NOT add emojis to SMS message templates or notification SMS text. Keep messages plain, professional, and prefixed with `Pamojanova:`. Emojis are allowed only in in-app push/notification titles, never in SMS body.
+**Authoring rule:** Do NOT add emojis to SMS message templates or notification SMS text. Keep messages plain and professional. NEVER prefix SMS with `Pamojanova:` or any brand name — the SMS sender ID already identifies the source. Emojis are allowed only in in-app push/notification titles, never in SMS body.
