@@ -199,7 +199,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
       )}
 
       {/* Cycle Payment Status — only when chama has officially started */}
-      {isPendingStart ? (
+      {isPendingStart && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
@@ -214,14 +214,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
             </div>
           </CardContent>
         </Card>
-      ) : (
-        <CyclePaymentStatus
-          chamaId={chamaId}
-          frequency={chama.contribution_frequency}
-          chamaStartDate={chama.start_date}
-          onPayNow={onPayNow}
-        />
       )}
+
 
       {/* Member ID */}
       <CopyableUniqueId uniqueId={member.member_code} label="Member ID (Account No.)" />
