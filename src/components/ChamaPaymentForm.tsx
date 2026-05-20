@@ -458,6 +458,34 @@ export const ChamaPaymentForm = ({
                   </SelectContent>
                 </Select>
               )}
+
+              {targetMemberId && targetMemberId !== currentMemberId && (
+                <div className="mt-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
+                  {targetInfo?.loading ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Checking what this member owes…
+                    </div>
+                  ) : targetInfo?.fullyPaid ? (
+                    <p className="text-green-600">
+                      {targetInfo.memberName || 'This member'} has already fully paid. Nothing is due.
+                    </p>
+                  ) : targetInfo ? (
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground">
+                        {targetInfo.memberName || 'Member'} ({targetInfo.memberCode})
+                      </p>
+                      <p className="text-muted-foreground">
+                        Paid this cycle: <span className="text-foreground">KES {Math.round(targetInfo.paidThisCycle).toLocaleString()}</span> of KES {Math.round(targetInfo.cycleNetTarget).toLocaleString()}
+                      </p>
+                      <p>
+                        They should pay: <strong className="text-primary">KES {targetRequiredAmount.toLocaleString()}</strong>
+                        <span className="text-xs text-muted-foreground"> (gross, covers all unpaid cycles)</span>
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
           )}
 
