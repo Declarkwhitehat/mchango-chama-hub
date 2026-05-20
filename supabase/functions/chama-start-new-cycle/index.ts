@@ -476,7 +476,7 @@ Deno.serve(async (req) => {
       );
 
       const message =
-        `🔄 New cycle started for "${chama.name}"! You're member #${member.order_index}. You have a 24hr grace period - first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 10:00 PM. Your payout date: ${payoutDate.toLocaleDateString()}. Good luck! 🎯`;
+        `New cycle started for "${chama.name}". You're member #${member.order_index}. You have a 24hr grace period - first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 8:00 PM (Kenya time). Your payout date: ${payoutDate.toLocaleDateString()}.`;
 
       try {
         await supabase.functions.invoke("send-transactional-sms", {
