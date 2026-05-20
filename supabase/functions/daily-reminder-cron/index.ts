@@ -67,11 +67,19 @@ Deno.serve(async (req) => {
     let notificationsCreated = 0;
     let errors = 0;
 
+    // Parse slot from body for slot-specific behavior (1205 = midday, 1815 = evening)
+    let slot: string | null = null;
+    try {
+      const body = await req.clone().json();
+      slot = body?.slot ?? null;
+    } catch (_) { /* no body */ }
+    console.log('[CRON] Slot:', slot ?? 'default');
+
     for (const chama of chamas || []) {
-      // Get current active cycle (due date is today or in the future, but started)
+      // Get current active cycle (must include start_date for grace-period check)
       const { data: cycle } = await supabase
         .from('contribution_cycles')
-        .select('id, end_date')
+        .select('id, start_date, end_date')
         .eq('chama_id', chama.id)
         .lte('start_date', today)
         .gte('end_date', today)
@@ -83,12 +91,15 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Skip reminders during grace period (first 24 hours of cycle)
-      const cycleStartDate = new Date(cycle.start_date || today);
-      const gracePeriodEnd = new Date(cycleStartDate.getTime() + 24 * 60 * 60 * 1000);
-      if (new Date() < gracePeriodEnd) {
-        console.log(`Skipping reminder for ${chama.name} — still in grace period`);
-        continue;
+      // Skip reminders only during the first 24h after cycle start.
+      // Bug-fix: previously start_date was not selected so this guard fell
+      // back to today midnight UTC and silently skipped every reminder.
+      if (cycle.start_date) {
+        const gracePeriodEnd = new Date(new Date(cycle.start_date).getTime() + 24 * 60 * 60 * 1000);
+        if (new Date() < gracePeriodEnd) {
+          console.log(`Skipping reminder for ${chama.name} — still in 24h grace window`);
+          continue;
+        }
       }
 
       // Get unpaid members
@@ -104,8 +115,8 @@ Deno.serve(async (req) => {
           )
         `)
         .eq('cycle_id', cycle.id)
-        .eq('is_paid', false)
-        .is('reminder_sent_at', null);
+        .eq('is_paid', false);
+      // Note: both 12:05 and 18:15 slots should fire; rely on is_paid only.
 
       console.log(`Found ${unpaidPayments?.length || 0} unpaid members for ${chama.name}`);
 
@@ -147,23 +158,30 @@ Deno.serve(async (req) => {
           console.log(`In-app notification created for ${member.member_code}`);
         }
 
-        // Send SMS if phone exists
+        // Send SMS via the platform-standard send-transactional-sms (Onfon)
         if (profile?.phone) {
           const firstName = (profile.full_name || '').split(' ')[0] || 'Member';
-          const message = `Hi ${firstName}, your contribution of KES ${payment.amount_due} for "${chama.name}" is due today. Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
+          const slotLabel = slot === '1815'
+            ? 'Final reminder: deadline 22:00 EAT today.'
+            : 'Deadline: 22:00 EAT today.';
+          const message = `Hi ${firstName}, KES ${payment.amount_due} due for ${chama.name}. ${slotLabel} Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
 
-          const smsResult = await sendSMS(profile.phone, message);
-          
-          if (smsResult.success) {
-            remindersSent++;
-            console.log(`SMS reminder sent to ${member.member_code}`);
-          } else {
+          try {
+            const { error: smsError } = await supabase.functions.invoke('send-transactional-sms', {
+              body: { phone: profile.phone, message, eventType: 'payment_reminder' },
+            });
+            if (smsError) {
+              errors++;
+              console.error(`SMS failed for ${member.member_code}:`, smsError);
+            } else {
+              remindersSent++;
+              console.log(`SMS reminder sent to ${member.member_code}`);
+            }
+          } catch (e) {
             errors++;
-            console.error(`Failed to send SMS to ${member.member_code}:`, smsResult.error);
+            console.error(`SMS exception for ${member.member_code}:`, e);
           }
-
-          // Rate limit - wait 500ms between SMS
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
 
         // Update reminder_sent_at regardless of SMS success (notification was created)
