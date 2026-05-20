@@ -67,11 +67,19 @@ Deno.serve(async (req) => {
     let notificationsCreated = 0;
     let errors = 0;
 
+    // Parse slot from body for slot-specific behavior (1205 = midday, 1815 = evening)
+    let slot: string | null = null;
+    try {
+      const body = await req.clone().json();
+      slot = body?.slot ?? null;
+    } catch (_) { /* no body */ }
+    console.log('[CRON] Slot:', slot ?? 'default');
+
     for (const chama of chamas || []) {
-      // Get current active cycle (due date is today or in the future, but started)
+      // Get current active cycle (must include start_date for grace-period check)
       const { data: cycle } = await supabase
         .from('contribution_cycles')
-        .select('id, end_date')
+        .select('id, start_date, end_date')
         .eq('chama_id', chama.id)
         .lte('start_date', today)
         .gte('end_date', today)
@@ -83,12 +91,15 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Skip reminders during grace period (first 24 hours of cycle)
-      const cycleStartDate = new Date(cycle.start_date || today);
-      const gracePeriodEnd = new Date(cycleStartDate.getTime() + 24 * 60 * 60 * 1000);
-      if (new Date() < gracePeriodEnd) {
-        console.log(`Skipping reminder for ${chama.name} — still in grace period`);
-        continue;
+      // Skip reminders only during the first 24h after cycle start.
+      // Bug-fix: previously start_date was not selected so this guard fell
+      // back to today midnight UTC and silently skipped every reminder.
+      if (cycle.start_date) {
+        const gracePeriodEnd = new Date(new Date(cycle.start_date).getTime() + 24 * 60 * 60 * 1000);
+        if (new Date() < gracePeriodEnd) {
+          console.log(`Skipping reminder for ${chama.name} — still in 24h grace window`);
+          continue;
+        }
       }
 
       // Get unpaid members
