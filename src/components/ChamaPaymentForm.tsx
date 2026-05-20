@@ -38,13 +38,31 @@ export const ChamaPaymentForm = ({
   const [paymentType, setPaymentType] = useState<"self" | "other">("self");
   const [targetMemberId, setTargetMemberId] = useState(currentMemberId);
   const [walletCredit, setWalletCredit] = useState(0);
-  // Golden rule: Gross = Net Needed ÷ (1 - rate), rounded UP.
-  // Wallet credit is already net (commission was taken on the original deposit).
+  const [targetInfo, setTargetInfo] = useState<{
+    loading: boolean;
+    netOutstanding: number; // net still needed across all unpaid cycles
+    paidThisCycle: number;
+    cycleNetTarget: number;
+    fullyPaid: boolean;
+    memberName?: string;
+    memberCode?: string;
+  } | null>(null);
+  // Self required amount (existing behaviour)
   const netCycleTarget = contributionAmount * (1 - commissionRate);
   const netStillNeeded = Math.max(0, netCycleTarget - walletCredit);
-  const requiredAmount =
+  const selfRequiredAmount =
     netStillNeeded > 0 ? Math.ceil(netStillNeeded / (1 - commissionRate)) : 0;
-  const [amount, setAmount] = useState(requiredAmount.toString());
+
+  // Target required amount when paying for another
+  const targetRequiredAmount = targetInfo && targetInfo.netOutstanding > 0
+    ? Math.ceil(targetInfo.netOutstanding / (1 - commissionRate))
+    : 0;
+
+  const requiredAmount = paymentType === "other"
+    ? targetRequiredAmount
+    : selfRequiredAmount;
+
+  const [amount, setAmount] = useState(selfRequiredAmount.toString());
   const [notes, setNotes] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [members, setMembers] = useState<any[]>([]);
@@ -66,8 +84,74 @@ export const ChamaPaymentForm = ({
   useEffect(() => {
     if (paymentType === "self") {
       setTargetMemberId(currentMemberId);
+      setTargetInfo(null);
     }
   }, [paymentType, currentMemberId]);
+
+  // Load target member's outstanding when picking someone else
+  useEffect(() => {
+    if (paymentType !== "other" || !targetMemberId || targetMemberId === currentMemberId) {
+      return;
+    }
+    loadTargetInfo(targetMemberId);
+  }, [paymentType, targetMemberId, currentMemberId, chamaId]);
+
+  const loadTargetInfo = async (memberId: string) => {
+    try {
+      setTargetInfo((prev) => ({
+        loading: true,
+        netOutstanding: prev?.netOutstanding ?? 0,
+        paidThisCycle: prev?.paidThisCycle ?? 0,
+        cycleNetTarget: prev?.cycleNetTarget ?? contributionAmount * (1 - commissionRate),
+        fullyPaid: false,
+      }));
+
+      const target = members.find((m) => m.id === memberId);
+      // Sum unpaid balance across all unpaid cycles for this member
+      const { data: unpaid } = await supabase
+        .from('member_cycle_payments')
+        .select('amount_due, amount_paid, is_paid, cycle_id, contribution_cycles!cycle_id(payout_processed, end_date)')
+        .eq('member_id', memberId)
+        .eq('is_paid', false);
+
+      let netOutstanding = 0;
+      let paidThisCycle = 0;
+      let cycleNetTarget = contributionAmount * (1 - commissionRate);
+      const todayIso = new Date().toISOString();
+      for (const row of unpaid || []) {
+        const cyc: any = (row as any).contribution_cycles;
+        // Skip already paid-out cycles (defensive)
+        if (cyc?.payout_processed) continue;
+        const due = Number(row.amount_due || 0);
+        const paid = Number(row.amount_paid || 0);
+        netOutstanding += Math.max(0, due - paid);
+        // Current-cycle stats (end_date in future)
+        if (cyc?.end_date && cyc.end_date >= todayIso) {
+          paidThisCycle = paid;
+          cycleNetTarget = due;
+        }
+      }
+
+      setTargetInfo({
+        loading: false,
+        netOutstanding,
+        paidThisCycle,
+        cycleNetTarget,
+        fullyPaid: netOutstanding <= 0,
+        memberName: target?.profiles?.full_name,
+        memberCode: target?.member_code,
+      });
+    } catch (err) {
+      console.error('loadTargetInfo error', err);
+      setTargetInfo({
+        loading: false,
+        netOutstanding: 0,
+        paidThisCycle: 0,
+        cycleNetTarget: contributionAmount * (1 - commissionRate),
+        fullyPaid: false,
+      });
+    }
+  };
 
   const loadWalletCredit = async () => {
     try {
