@@ -115,8 +115,8 @@ Deno.serve(async (req) => {
           )
         `)
         .eq('cycle_id', cycle.id)
-        .eq('is_paid', false)
-        .is('reminder_sent_at', null);
+        .eq('is_paid', false);
+      // Note: both 12:05 and 18:15 slots should fire; rely on is_paid only.
 
       console.log(`Found ${unpaidPayments?.length || 0} unpaid members for ${chama.name}`);
 
