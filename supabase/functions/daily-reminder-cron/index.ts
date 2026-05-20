@@ -131,13 +131,8 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Format the due time from cycle end_date
-        const dueDate = new Date(cycle.end_date);
-        const dueTime = dueDate.toLocaleTimeString('en-KE', { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          hour12: true 
-        });
+        // Display deadline as 8:00 PM Kenya time (UI-only; actual cycle close stays at 22:00 EAT)
+        const dueTime = '8:00 PM (Kenya time)';
 
         // Create in-app notification if user_id exists
         if (userId) {
@@ -162,8 +157,8 @@ Deno.serve(async (req) => {
         if (profile?.phone) {
           const firstName = (profile.full_name || '').split(' ')[0] || 'Member';
           const slotLabel = slot === '1815'
-            ? 'Final reminder: deadline 22:00 EAT today.'
-            : 'Deadline: 22:00 EAT today.';
+            ? 'Final reminder: pay before 8:00 PM today (Kenya time).'
+            : 'Deadline: 8:00 PM today (Kenya time).';
           const message = `Hi ${firstName}, KES ${payment.amount_due} due for ${chama.name}. ${slotLabel} Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
 
           try {

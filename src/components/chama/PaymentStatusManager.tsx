@@ -517,7 +517,7 @@ export const PaymentStatusManager = ({
         <CardContent>
           <p className="text-sm text-muted-foreground">
             No contributions are due until you officially start this chama.
-            Once started, members will have until 10:00 PM the next day (Kenya time)
+            Once started, members will have until 8:00 PM the next day (Kenya time)
             to make their first contribution. Payment status will appear here.
           </p>
         </CardContent>
@@ -593,7 +593,7 @@ export const PaymentStatusManager = ({
                   <Clock className="h-4 w-4" />
                   Time left for members to pay this cycle
                 </div>
-                <Badge variant="outline" className="text-xs">10:00 PM Cutoff</Badge>
+                <Badge variant="outline" className="text-xs">8:00 PM Cutoff</Badge>
               </div>
               <div className="flex items-center justify-center gap-2 font-bold text-2xl sm:text-3xl tabular-nums">
                 {days > 0 && (<><span>{String(days).padStart(2,'0')}<span className="text-xs font-normal ml-1">d</span></span><span>:</span></>)}

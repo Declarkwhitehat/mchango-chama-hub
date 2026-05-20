@@ -1126,7 +1126,7 @@ const ChamaDetail = () => {
                               <div className="min-w-0">
                                 <p className="font-semibold text-foreground truncate">{currentRecipient.profiles?.full_name || 'Member'}</p>
                                 <p className="text-xs text-muted-foreground">{currentRecipient.member_code}</p>
-                                <Badge className="mt-1 text-[10px]" variant="default">Receiving Now</Badge>
+                                <Badge className="mt-1 text-[10px]" variant="default">Receiving Today</Badge>
                               </div>
                             </div>
                             <div className="text-right shrink-0">
