@@ -370,9 +370,10 @@ const ChamaDetail = () => {
             // This member IS the current beneficiary - their turn is now
             turnDates[member.id] = new Date();
           } else {
-            // Their turn is cyclesAhead * cycleLength days after current cycle end
+            // Current recipient gets paid at cycleEndDate. Each subsequent
+            // member gets paid one full cycleLength later than the previous one.
             const turnDate = new Date(cycleEndDate);
-            turnDate.setDate(turnDate.getDate() + ((cyclesAhead - 1) * cycleLength));
+            turnDate.setDate(turnDate.getDate() + (cyclesAhead * cycleLength));
             turnDates[member.id] = turnDate;
           }
         });
