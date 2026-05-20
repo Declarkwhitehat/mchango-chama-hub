@@ -158,23 +158,30 @@ Deno.serve(async (req) => {
           console.log(`In-app notification created for ${member.member_code}`);
         }
 
-        // Send SMS if phone exists
+        // Send SMS via the platform-standard send-transactional-sms (Onfon)
         if (profile?.phone) {
           const firstName = (profile.full_name || '').split(' ')[0] || 'Member';
-          const message = `Hi ${firstName}, your contribution of KES ${payment.amount_due} for "${chama.name}" is due today. Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
+          const slotLabel = slot === '1815'
+            ? 'Final reminder: deadline 22:00 EAT today.'
+            : 'Deadline: 22:00 EAT today.';
+          const message = `Hi ${firstName}, KES ${payment.amount_due} due for ${chama.name}. ${slotLabel} Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
 
-          const smsResult = await sendSMS(profile.phone, message);
-          
-          if (smsResult.success) {
-            remindersSent++;
-            console.log(`SMS reminder sent to ${member.member_code}`);
-          } else {
+          try {
+            const { error: smsError } = await supabase.functions.invoke('send-transactional-sms', {
+              body: { phone: profile.phone, message, eventType: 'payment_reminder' },
+            });
+            if (smsError) {
+              errors++;
+              console.error(`SMS failed for ${member.member_code}:`, smsError);
+            } else {
+              remindersSent++;
+              console.log(`SMS reminder sent to ${member.member_code}`);
+            }
+          } catch (e) {
             errors++;
-            console.error(`Failed to send SMS to ${member.member_code}:`, smsResult.error);
+            console.error(`SMS exception for ${member.member_code}:`, e);
           }
-
-          // Rate limit - wait 500ms between SMS
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
 
         // Update reminder_sent_at regardless of SMS success (notification was created)
