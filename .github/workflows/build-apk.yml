@@ -47,7 +47,7 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Patch Android SDK and version (Play Store ready)
+      - name: Patch Android SDK and version
         continue-on-error: true
         run: |
           set +e
@@ -60,33 +60,50 @@ jobs:
             sed -i -E 's/versionCode[[:space:]]+[0-9]+/versionCode 1/' android/app/build.gradle
             sed -i -E 's/versionName[[:space:]]+"[^"]*"/versionName "1.0.0"/' android/app/build.gradle
           fi
-          echo "--- variables.gradle ---"
-          cat android/variables.gradle 2>/dev/null || echo "(missing)"
-          echo "--- app/build.gradle (relevant lines) ---"
-          grep -E "minSdk|targetSdk|compileSdk|versionCode|versionName" android/app/build.gradle 2>/dev/null || echo "(none)"
           exit 0
-
 
       - name: Place google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+
+      - name: Add signing config to build.gradle
+        run: |
+          cat >> android/app/build.gradle << 'EOF'
+
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("release.keystore")
+                      storePassword "${{ secrets.KEYSTORE_PASSWORD }}"
+                      keyAlias "${{ secrets.KEY_ALIAS }}"
+                      keyPassword "${{ secrets.KEY_PASSWORD }}"
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                  }
+              }
+          }
+          EOF
 
       - name: Install sharp for image resizing
         run: npm install -g sharp-cli
 
       - name: Override app icons with custom icon
         run: |
-          # Remove default mipmap XML overrides that ignore PNG files
           rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
           rm -rf android/app/src/main/res/drawable
-          
-          # Resize and place icon at every required size
           mkdir -p android/app/src/main/res/mipmap-mdpi
           mkdir -p android/app/src/main/res/mipmap-hdpi
           mkdir -p android/app/src/main/res/mipmap-xhdpi
           mkdir -p android/app/src/main/res/mipmap-xxhdpi
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-
           npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-mdpi/ic_launcher.png resize 48 48
           npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png resize 48 48
           npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png resize 72 72
@@ -101,25 +118,25 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      - name: Build APK
-        run: cd android && ./gradlew assembleDebug --stacktrace --warning-mode all
+      - name: Build Release APK
+        run: cd android && ./gradlew assembleRelease --stacktrace --warning-mode all
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: pamoja-app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: pamoja-app-release
+          path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
-      - name: Create Release APK
+      - name: Create Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Pamoja App
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          files: android/app/build/outputs/apk/release/app-release.apk
           body: |
-            ✅ Latest build from main branch
-            Download the APK below and install it on your Android phone.
+            ✅ Latest signed release build
+            Download the APK below and install on your Android phone.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
