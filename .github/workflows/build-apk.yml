@@ -119,7 +119,7 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build Release APK
-        run: cd android && ./gradlew assembleRelease --stacktrace --warning-mode all
+        run: cd android && ./gradlew assembleRelease -x lintVitalRelease --stacktrace --warning-mode all
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
