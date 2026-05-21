@@ -36,7 +36,8 @@ export const CurrentCyclePool = ({
       setLoading(true);
       try {
         const nowIso = new Date().toISOString();
-        const { data: cycle } = await supabase
+        // 1) Prefer a cycle whose window brackets "now"
+        let { data: cycle } = await supabase
           .from("contribution_cycles")
           .select("id")
           .eq("chama_id", chamaId)
@@ -45,6 +46,21 @@ export const CurrentCyclePool = ({
           .order("cycle_number", { ascending: false })
           .limit(1)
           .maybeSingle();
+
+        // 2) Fallback: latest open (not yet paid out) cycle — handles the
+        // gap between an expired window and the next cycle being created,
+        // so wallet credits already applied to the next cycle still show.
+        if (!cycle) {
+          const { data: openCycle } = await supabase
+            .from("contribution_cycles")
+            .select("id")
+            .eq("chama_id", chamaId)
+            .eq("payout_processed", false)
+            .order("cycle_number", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          cycle = openCycle || null;
+        }
 
         if (!cycle) {
           setCollectedNet(0);
