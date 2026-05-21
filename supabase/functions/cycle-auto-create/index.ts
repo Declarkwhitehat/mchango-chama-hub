@@ -55,69 +55,78 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
 }
 
 function calculateNextCycleDates(
-  lastEndDate: Date, 
-  frequency: string, 
+  lastEndDate: Date,
+  frequency: string,
   everyNDays?: number,
   monthlyDay?: number | null,
   monthlyDay2?: number | null
 ): { startDate: Date; endDate: Date } {
-  // Start the next cycle IMMEDIATELY (same moment payout completes)
-  const startDate = new Date();
-  startDate.setHours(0, 0, 0, 0);
+  // Anchor the next cycle on the Kenya-calendar day AFTER lastEndDate.
+  // Using "now" caused bugs where, if this function ran at/after the daily
+  // cutoff (22:00 EAT = 19:00 UTC), endDate was set to the same day that
+  // just closed (i.e. already in the past).
+  const KENYA_OFFSET_MS = 3 * 60 * 60 * 1000;
+  const KENYA_22_UTC_HOUR = 19; // 22:00 EAT == 19:00 UTC
 
+  // Kenya-calendar day of lastEndDate's *last second of the closing window*.
+  const lastEndKenya = new Date(lastEndDate.getTime() + KENYA_OFFSET_MS);
+  // Next Kenya day (UTC components shifted)
+  const nextDayY = lastEndKenya.getUTCFullYear();
+  const nextDayM = lastEndKenya.getUTCMonth();
+  const nextDayD = lastEndKenya.getUTCDate() + 1;
+
+  // startDate (for downstream helpers) = next Kenya day at 00:00 EAT (= prior UTC day 21:00)
+  // Helpers like getEatMidnightOnePastForDate will refine this to 00:01 EAT.
+  const startDate = new Date(Date.UTC(nextDayY, nextDayM, nextDayD - 1, 21, 0, 0, 0));
   const endDate = new Date(startDate);
-  
+
   switch (frequency) {
     case 'daily':
-      // End today at 10 PM Kenya time (19:00 UTC)
-      endDate.setUTCHours(19, 0, 0, 0);
+      // End the next Kenya day at 22:00 EAT (= 19:00 UTC of that Kenya day)
+      endDate.setTime(Date.UTC(nextDayY, nextDayM, nextDayD, KENYA_22_UTC_HOUR, 0, 0, 0));
       break;
     case 'weekly':
-      endDate.setDate(endDate.getDate() + 6);
-      endDate.setHours(23, 59, 59, 999);
+      endDate.setUTCDate(endDate.getUTCDate() + 7);
+      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
       break;
     case 'monthly':
       if (monthlyDay) {
-        endDate.setMonth(endDate.getMonth() + 1);
-        endDate.setDate(monthlyDay - 1);
-        endDate.setHours(23, 59, 59, 999);
+        endDate.setUTCMonth(endDate.getUTCMonth() + 1);
+        endDate.setUTCDate(monthlyDay - 1);
       } else {
-        endDate.setMonth(endDate.getMonth() + 1);
-        endDate.setDate(0);
-        endDate.setHours(23, 59, 59, 999);
+        endDate.setUTCMonth(endDate.getUTCMonth() + 1);
+        endDate.setUTCDate(0);
       }
+      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
       break;
     case 'twice_monthly':
       if (monthlyDay && monthlyDay2) {
         const day1 = Math.min(monthlyDay, monthlyDay2);
         const day2 = Math.max(monthlyDay, monthlyDay2);
-        const currentDay = startDate.getDate();
+        const currentDay = nextDayD;
         if (currentDay >= day1 && currentDay < day2) {
-          endDate.setDate(day2 - 1);
-          endDate.setHours(23, 59, 59, 999);
+          endDate.setUTCDate(day2 - 1);
         } else {
-          if (currentDay >= day2) {
-            endDate.setMonth(endDate.getMonth() + 1);
-          }
-          endDate.setDate(day1 - 1);
-          endDate.setHours(23, 59, 59, 999);
+          if (currentDay >= day2) endDate.setUTCMonth(endDate.getUTCMonth() + 1);
+          endDate.setUTCDate(day1 - 1);
         }
       } else {
-        endDate.setDate(endDate.getDate() + 14);
-        endDate.setHours(23, 59, 59, 999);
+        endDate.setUTCDate(endDate.getUTCDate() + 15);
       }
+      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
       break;
     case 'every_n_days':
-      endDate.setDate(endDate.getDate() + (everyNDays || 7) - 1);
-      endDate.setHours(23, 59, 59, 999);
+      endDate.setUTCDate(endDate.getUTCDate() + (everyNDays || 7));
+      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
       break;
     default:
-      endDate.setDate(endDate.getDate() + 6);
-      endDate.setHours(23, 59, 59, 999);
+      endDate.setUTCDate(endDate.getUTCDate() + 7);
+      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
   }
 
   return { startDate, endDate };
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
