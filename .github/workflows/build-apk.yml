@@ -1,6 +1,76 @@
-- name: Add signing config to build.gradle
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Install Capacitor CLI
+        run: npm install -g @capacitor/cli
+
+      - name: Remove incomplete android folder
+        run: rm -rf android
+
+      - name: Add Android platform fresh
+        run: npx cap add android
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Patch Android SDK and version
+        continue-on-error: true
+        run: |
+          set +e
+          if [ -f android/variables.gradle ]; then
+            sed -i -E 's/minSdkVersion[[:space:]]*=[[:space:]]*[0-9]+/minSdkVersion = 24/' android/variables.gradle
+            sed -i -E 's/compileSdkVersion[[:space:]]*=[[:space:]]*[0-9]+/compileSdkVersion = 36/' android/variables.gradle
+            sed -i -E 's/targetSdkVersion[[:space:]]*=[[:space:]]*[0-9]+/targetSdkVersion = 36/' android/variables.gradle
+          fi
+          if [ -f android/app/build.gradle ]; then
+            sed -i -E 's/versionCode[[:space:]]+[0-9]+/versionCode 1/' android/app/build.gradle
+            sed -i -E 's/versionName[[:space:]]+"[^"]*"/versionName "1.0.0"/' android/app/build.gradle
+          fi
+          exit 0
+
+      - name: Place google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Decode Keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+
+      - name: Add signing config to build.gradle
         env:
-          K_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KS_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           K_ALIAS: ${{ secrets.KEY_ALIAS }}
           K_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
@@ -23,3 +93,53 @@
               }
           }
           EOF
+
+      - name: Install sharp for image resizing
+        run: npm install -g sharp-cli
+
+      - name: Override app icons with custom icon
+        run: |
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          rm -rf android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-mdpi/ic_launcher.png resize 48 48
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png resize 48 48
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png resize 72 72
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png resize 72 72
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xhdpi/ic_launcher.png resize 96 96
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png resize 96 96
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png resize 144 144
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png resize 144 144
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png resize 192 192
+          npx sharp -i public/app-icon-512.png -o android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png resize 192 192
+
+      - name: Make Gradle executable
+        run: chmod +x android/gradlew
+
+      - name: Build Release APK
+        run: cd android && ./gradlew assembleRelease -x lintVitalRelease --stacktrace --warning-mode all
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pamoja-app-release
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Pamoja App
+          files: android/app/build/outputs/apk/release/app-release.apk
+          body: |
+            Latest signed release build
+            Download the APK below and install on your Android phone.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
