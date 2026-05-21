@@ -1,6 +1,6 @@
 - name: Add signing config to build.gradle
         env:
-          KS_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          K_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           K_ALIAS: ${{ secrets.KEY_ALIAS }}
           K_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
