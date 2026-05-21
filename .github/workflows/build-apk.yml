@@ -120,11 +120,21 @@ jobs:
       - name: Build Release APK
         run: cd android && ./gradlew assembleRelease -x lintVitalRelease --stacktrace --warning-mode all
 
+      - name: Build Release AAB
+        run: cd android && ./gradlew bundleRelease -x lintVitalRelease --stacktrace --warning-mode all
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: pamoja-app-release
+          name: pamoja-app-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: pamoja-app-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 30
 
       - name: Create Release
@@ -133,9 +143,12 @@ jobs:
         with:
           tag_name: latest
           name: Pamoja App
-          files: android/app/build/outputs/apk/release/app-release.apk
+          files: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
           body: |
             Latest signed release build
-            Download the APK below and install on your Android phone.
+            Download the APK to install directly on Android.
+            Use the AAB for Google Play Store upload.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
