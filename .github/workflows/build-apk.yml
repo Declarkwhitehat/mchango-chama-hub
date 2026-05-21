@@ -69,20 +69,16 @@ jobs:
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
 
       - name: Add signing config to build.gradle
-        env:
-          KS_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          K_ALIAS: ${{ secrets.KEY_ALIAS }}
-          K_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          cat >> android/app/build.gradle << EOF
+          cat >> android/app/build.gradle << 'GRADLE'
 
           android {
               signingConfigs {
                   release {
                       storeFile file("release.keystore")
-                      storePassword "${KS_PASSWORD}"
-                      keyAlias "${K_ALIAS}"
-                      keyPassword "${K_PASSWORD}"
+                      storePassword "Dd39013789ddSs21752533ss"
+                      keyAlias "mykey"
+                      keyPassword "Dd39013789ddSs21752533ss"
                   }
               }
               buildTypes {
@@ -92,7 +88,7 @@ jobs:
                   }
               }
           }
-          EOF
+          GRADLE
 
       - name: Install sharp for image resizing
         run: npm install -g sharp-cli
