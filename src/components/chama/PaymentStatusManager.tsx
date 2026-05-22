@@ -94,13 +94,40 @@ export const PaymentStatusManager = ({
   useEffect(() => {
     fetchData();
 
-    // Poll contributions every 30s instead of realtime subscription
+    // Background poll every 30s as a safety net
     const interval = setInterval(() => fetchData(true), 30000);
+
+    // Realtime: any change to this chama's payments/cycles → refresh
+    const channel = supabase
+      .channel(`payment-status-${chamaId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "member_cycle_payments" },
+        () => fetchData(true)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "contributions", filter: `chama_id=eq.${chamaId}` },
+        () => fetchData(true)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "contribution_cycles", filter: `chama_id=eq.${chamaId}` },
+        () => fetchData(true)
+      )
+      .subscribe();
+
+    // App resume / visibility / online
+    const onRefresh = () => fetchData(true);
+    window.addEventListener("app:refresh", onRefresh);
 
     return () => {
       clearInterval(interval);
+      supabase.removeChannel(channel);
+      window.removeEventListener("app:refresh", onRefresh);
     };
   }, [chamaId]);
+
 
   const fetchData = async (isBackgroundRefetch = false) => {
     try {
