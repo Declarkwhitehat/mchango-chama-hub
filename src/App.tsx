@@ -129,7 +129,9 @@ const AppContent = () => {
       <Sonner />
       
       <NativeDeepLinkHandler />
+      <AppFreshness />
       <PushNotificationInit enabled={!isAuthFlowRoute} />
+
       {!isAdminRoute && <ChatSupport />}
       <MaintenanceGate>
         <Suspense fallback={<PageLoader />}>
