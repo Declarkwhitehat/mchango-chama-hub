@@ -119,29 +119,41 @@ const ChamaDetail = () => {
   useEffect(() => {
     loadChama();
 
-    // Subscribe to membership changes for real-time updates
+    // Subscribe to all relevant tables for real-time updates
     const channel = supabase
-      .channel(`chama-members-${id}`)
+      .channel(`chama-detail-${id}`)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'chama_members',
-          filter: `chama_id=eq.${id}`
-        },
-        (payload) => {
-          console.log('Member change:', payload);
-          // Reload on insert/update/delete so new join requests appear instantly
-          loadChama();
-        }
+        { event: '*', schema: 'public', table: 'chama_members', filter: `chama_id=eq.${id}` },
+        () => loadChama()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'contribution_cycles', filter: `chama_id=eq.${id}` },
+        () => loadChama()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chama_payouts', filter: `chama_id=eq.${id}` },
+        () => loadChama()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'contributions', filter: `chama_id=eq.${id}` },
+        () => loadChama()
       )
       .subscribe();
 
+    // App resume / visibility / online → reload
+    const onRefresh = () => loadChama();
+    window.addEventListener('app:refresh', onRefresh);
+
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('app:refresh', onRefresh);
     };
   }, [id]);
+
 
   useEffect(() => {
     setActiveTab(getStoredTab(tabStorageKey, "dashboard"));
