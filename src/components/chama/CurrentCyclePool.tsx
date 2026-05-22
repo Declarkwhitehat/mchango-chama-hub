@@ -31,67 +31,92 @@ export const CurrentCyclePool = ({
   const [totalMembers, setTotalMembers] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const nowIso = new Date().toISOString();
-        // 1) Prefer a cycle whose window brackets "now"
-        let { data: cycle } = await supabase
+  const load = async () => {
+    setLoading(true);
+    try {
+      const nowIso = new Date().toISOString();
+      // 1) Prefer a cycle whose window brackets "now"
+      let { data: cycle } = await supabase
+        .from("contribution_cycles")
+        .select("id")
+        .eq("chama_id", chamaId)
+        .lte("start_date", nowIso)
+        .gte("end_date", nowIso)
+        .order("cycle_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // 2) Fallback: latest open (not yet paid out) cycle — handles the
+      // gap between an expired window and the next cycle being created,
+      // so wallet credits already applied to the next cycle still show.
+      if (!cycle) {
+        const { data: openCycle } = await supabase
           .from("contribution_cycles")
           .select("id")
           .eq("chama_id", chamaId)
-          .lte("start_date", nowIso)
-          .gte("end_date", nowIso)
+          .eq("payout_processed", false)
           .order("cycle_number", { ascending: false })
           .limit(1)
           .maybeSingle();
-
-        // 2) Fallback: latest open (not yet paid out) cycle — handles the
-        // gap between an expired window and the next cycle being created,
-        // so wallet credits already applied to the next cycle still show.
-        if (!cycle) {
-          const { data: openCycle } = await supabase
-            .from("contribution_cycles")
-            .select("id")
-            .eq("chama_id", chamaId)
-            .eq("payout_processed", false)
-            .order("cycle_number", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          cycle = openCycle || null;
-        }
-
-        if (!cycle) {
-          setCollectedNet(0);
-          setPaidCount(0);
-          return;
-        }
-
-        const { data: payments } = await supabase
-          .from("member_cycle_payments")
-          .select("amount_paid, amount_due, fully_paid")
-          .eq("cycle_id", cycle.id);
-
-        const rows = payments || [];
-        // Cap each member's contribution at amount_due so overpayments don't inflate the pool
-        const grossInPool = rows.reduce(
-          (s, r) => s + Math.min(Number(r.amount_paid || 0), Number(r.amount_due || 0)),
-          0
-        );
-        // Subtract commission to show net (what gets paid out)
-        const net = grossInPool * (1 - commissionRate);
-        setCollectedNet(net);
-        setPaidCount(rows.filter((r) => r.fully_paid).length);
-        setTotalMembers(rows.length);
-      } catch (e) {
-        console.error("CurrentCyclePool load error", e);
-      } finally {
-        setLoading(false);
+        cycle = openCycle || null;
       }
-    };
+
+      if (!cycle) {
+        setCollectedNet(0);
+        setPaidCount(0);
+        return;
+      }
+
+      const { data: payments } = await supabase
+        .from("member_cycle_payments")
+        .select("amount_paid, amount_due, fully_paid")
+        .eq("cycle_id", cycle.id);
+
+      const rows = payments || [];
+      const grossInPool = rows.reduce(
+        (s, r) => s + Math.min(Number(r.amount_paid || 0), Number(r.amount_due || 0)),
+        0
+      );
+      const net = grossInPool * (1 - commissionRate);
+      setCollectedNet(net);
+      setPaidCount(rows.filter((r) => r.fully_paid).length);
+      setTotalMembers(rows.length);
+    } catch (e) {
+      console.error("CurrentCyclePool load error", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     load();
+
+    // Realtime: refresh when payments or cycles for this chama change
+    const channel = supabase
+      .channel(`cycle-pool-${chamaId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "member_cycle_payments" },
+        () => load()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "contribution_cycles", filter: `chama_id=eq.${chamaId}` },
+        () => load()
+      )
+      .subscribe();
+
+    // App resume / visibility / online
+    const onRefresh = () => load();
+    window.addEventListener("app:refresh", onRefresh);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener("app:refresh", onRefresh);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chamaId, refreshKey, commissionRate]);
+
 
   const isDaily = frequency === "daily";
   const label = isDaily
