@@ -134,9 +134,10 @@ const ChamaDetail = () => {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chama_payouts', filter: `chama_id=eq.${id}` },
+        { event: '*', schema: 'public', table: 'payouts', filter: `chama_id=eq.${id}` },
         () => loadChama()
       )
+
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'contributions', filter: `chama_id=eq.${id}` },
