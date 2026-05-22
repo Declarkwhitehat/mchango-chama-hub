@@ -16,6 +16,8 @@ import { usePushNotifications } from "./hooks/usePushNotifications";
 import React from "react";
 import { warmUpNativePlugins } from "./lib/nativePermissions";
 import { MaintenanceGate } from "./components/MaintenanceGate";
+import { AppFreshness } from "./components/AppFreshness";
+
 
 
 // Lazy load all pages for better initial load performance
@@ -90,14 +92,16 @@ const AccountVerification = lazy(() => import("./pages/AccountVerification"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 2 * 60 * 1000,      // 2 min – reuse cached data without refetching
-      gcTime: 10 * 60 * 1000,         // 10 min – keep unused cache entries
-      refetchOnWindowFocus: false,     // don't refetch every tab-switch
-      retry: 1,                        // single retry on failure
-      refetchOnReconnect: 'always',    // do refetch after offline→online
+      staleTime: 30 * 1000,            // 30s – fresher data, especially after returning to the app
+      gcTime: 10 * 60 * 1000,           // 10 min – keep unused cache entries
+      refetchOnWindowFocus: true,       // refetch when tab/app regains focus
+      refetchOnMount: true,
+      retry: 1,                          // single retry on failure
+      refetchOnReconnect: 'always',      // refetch after offline→online
     },
   },
 });
+
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -125,7 +129,9 @@ const AppContent = () => {
       <Sonner />
       
       <NativeDeepLinkHandler />
+      <AppFreshness />
       <PushNotificationInit enabled={!isAuthFlowRoute} />
+
       {!isAdminRoute && <ChatSupport />}
       <MaintenanceGate>
         <Suspense fallback={<PageLoader />}>
