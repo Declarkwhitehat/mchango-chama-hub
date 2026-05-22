@@ -16,6 +16,8 @@ import { usePushNotifications } from "./hooks/usePushNotifications";
 import React from "react";
 import { warmUpNativePlugins } from "./lib/nativePermissions";
 import { MaintenanceGate } from "./components/MaintenanceGate";
+import { AppFreshness } from "./components/AppFreshness";
+
 
 
 // Lazy load all pages for better initial load performance
