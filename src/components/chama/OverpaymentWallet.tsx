@@ -50,7 +50,9 @@ export function OverpaymentWallet({ chamaId, memberId, contributionAmount }: Ove
   const appliedEntries = entries.filter(e => e.status === 'applied');
   const totalPending = pendingEntries.reduce((sum, e) => sum + e.amount, 0);
 
-  if (loading || entries.length === 0) return null;
+  // Hide entirely when there's no pending (available) wallet balance.
+  // Historical applied entries alone shouldn't surface a card that says "0 available".
+  if (loading || entries.length === 0 || totalPending <= 0) return null;
 
   return (
     <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
