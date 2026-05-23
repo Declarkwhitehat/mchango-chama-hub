@@ -1269,6 +1269,57 @@ Deno.serve(async (req) => {
           }
         }
 
+        // ========== AUTO-DELETE CHAMA IF EVERY MEMBER WAS REMOVED ==========
+        // Day-1 rule removes non-payers from cycle 1. If that leaves the chama
+        // with zero active members, kill the chama immediately and notify the manager.
+        try {
+          const { count: activeCount } = await supabase
+            .from('chama_members')
+            .select('id', { count: 'exact', head: true })
+            .eq('chama_id', chama.id)
+            .eq('approval_status', 'approved')
+            .eq('status', 'active');
+
+          if ((activeCount || 0) === 0) {
+            console.log(`🪦 All members removed from "${chama.name}" — auto-deleting chama`);
+            await supabase
+              .from('chama')
+              .update({ status: 'deleted', updated_at: new Date().toISOString() })
+              .eq('id', chama.id);
+
+            // Notify creator
+            const { data: chamaInfo } = await supabase
+              .from('chama')
+              .select('created_by')
+              .eq('id', chama.id)
+              .maybeSingle();
+            if (chamaInfo?.created_by) {
+              const { data: creator } = await supabase
+                .from('profiles')
+                .select('phone, full_name')
+                .eq('id', chamaInfo.created_by)
+                .maybeSingle();
+              if (creator?.phone) {
+                await sendSMS(creator.phone,
+                  `Chama "${chama.name}" was auto-closed: all members were removed for missing the first deadline.`
+                );
+              }
+              await supabase.from('notifications').insert({
+                user_id: chamaInfo.created_by,
+                title: 'Chama Auto-Closed',
+                message: `"${chama.name}" was closed automatically because all members missed the first payment deadline.`,
+                type: 'warning',
+                category: 'chama',
+                related_entity_id: chama.id,
+                related_entity_type: 'chama',
+              });
+            }
+            continue; // Skip summary + next-cycle creation for a dead chama
+          }
+        } catch (delErr) {
+          console.error('Auto-delete (all-removed) check failed:', delErr);
+        }
+
         // ========== CYCLE-END MANAGER SUMMARY ==========
         try {
           const { data: cycleManagers } = await supabase

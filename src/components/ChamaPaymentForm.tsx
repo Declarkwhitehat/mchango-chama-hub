@@ -38,6 +38,7 @@ export const ChamaPaymentForm = ({
   const [paymentType, setPaymentType] = useState<"self" | "other">("self");
   const [targetMemberId, setTargetMemberId] = useState(currentMemberId);
   const [walletCredit, setWalletCredit] = useState(0);
+  const [selfOutstandingNet, setSelfOutstandingNet] = useState<number | null>(null);
   const [targetInfo, setTargetInfo] = useState<{
     loading: boolean;
     netOutstanding: number; // net still needed across all unpaid cycles
@@ -47,11 +48,19 @@ export const ChamaPaymentForm = ({
     memberName?: string;
     memberCode?: string;
   } | null>(null);
-  // Self required amount (existing behaviour)
+
+  // Self required amount — derived from the SAME source the STK push validator uses
+  // (check_member_schedule_eligibility). This guarantees the pre-filled value
+  // matches what the server will accept and prevents the "non-2xx" error
+  // when the member has missed prior cycles.
   const netCycleTarget = contributionAmount * (1 - commissionRate);
-  const netStillNeeded = Math.max(0, netCycleTarget - walletCredit);
-  const selfRequiredAmount =
-    netStillNeeded > 0 ? Math.ceil(netStillNeeded / (1 - commissionRate)) : 0;
+  const fallbackNetStillNeeded = Math.max(0, netCycleTarget - walletCredit);
+  // selfOutstandingNet is GROSS owed across unpaid cycles minus wallet credit (already net),
+  // converted back to gross by dividing by (1 - rate). When the RPC hasn't loaded yet,
+  // fall back to the single-cycle calculation.
+  const selfRequiredAmount = selfOutstandingNet !== null
+    ? (selfOutstandingNet > 0 ? Math.ceil(selfOutstandingNet) : 0)
+    : (fallbackNetStillNeeded > 0 ? Math.ceil(fallbackNetStillNeeded / (1 - commissionRate)) : 0);
 
   // Target required amount when paying for another
   const targetRequiredAmount = targetInfo && targetInfo.netOutstanding > 0
@@ -75,7 +84,30 @@ export const ChamaPaymentForm = ({
     loadMembers();
     loadUserPhone();
     loadWalletCredit();
+    loadSelfOutstanding();
   }, [chamaId, currentMemberId]);
+
+  const loadSelfOutstanding = async () => {
+    try {
+      const { data, error } = await supabase.rpc('check_member_schedule_eligibility', {
+        p_member_id: currentMemberId,
+        p_chama_id: chamaId,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) && data.length > 0 ? data[0] as any : null;
+      const owed = Number(row?.total_amount_owed || 0);
+      const carry = Number(row?.carry_forward || 0);
+      // Server uses Math.max(baseContribution, owed - carry). Mirror that, then
+      // include the wallet credit (which is already net) by passing the gross owed
+      // up directly. The RPC returns GROSS owed (sums amount_due), so feeding it
+      // straight in matches the STK validator's `required` value precisely.
+      const required = Math.max(0, owed - carry);
+      setSelfOutstandingNet(required);
+    } catch (err) {
+      console.error('loadSelfOutstanding error:', err);
+      setSelfOutstandingNet(null); // fall back to single-cycle math
+    }
+  };
 
   useEffect(() => {
     setAmount(requiredAmount.toString());
