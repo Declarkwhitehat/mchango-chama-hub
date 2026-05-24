@@ -1111,7 +1111,10 @@ const ChamaDetail = () => {
                       <CardContent className="space-y-2">
                         {received.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-3">No payouts made yet.</p>
-                        ) : received.map((m, idx) => (
+                        ) : received.map((m, idx) => {
+                          const actual = payoutAmountByMember[m.id] ?? netPayout;
+                          const shortfall = netPayout - actual;
+                          return (
                           <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
@@ -1121,11 +1124,16 @@ const ChamaDetail = () => {
                               </div>
                             </div>
                             <div className="text-right shrink-0">
-                              <p className="font-semibold text-green-700 dark:text-green-400">{fmt(netPayout)}</p>
-                              <p className="text-[10px] text-muted-foreground">net received</p>
+                              <p className="font-semibold text-green-700 dark:text-green-400">{fmt(actual)}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {shortfall > 0.5
+                                  ? `actual · short ${fmt(shortfall)} of ${fmt(netPayout)}`
+                                  : 'net received'}
+                              </p>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </CardContent>
                     </Card>
 
