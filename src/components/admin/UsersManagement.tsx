@@ -145,6 +145,12 @@ export const UsersManagement = () => {
   };
 
   const removeAdminRole = async (userId: string) => {
+    const code = window.prompt("Enter admin privilege code to remove admin role:");
+    if (code === null) return;
+    if (code !== ADMIN_PRIVILEGE_CODE) {
+      toast({ title: "Invalid Code", description: "The privilege code is incorrect", variant: "destructive" });
+      return;
+    }
     setProcessing(userId);
     try {
       const { error } = await supabase
@@ -155,17 +161,15 @@ export const UsersManagement = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Admin role removed",
-      });
-
+      toast({ title: "Success", description: "Admin role removed" });
       await fetchUsers();
     } catch (error: any) {
       console.error('Error removing admin role:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to remove admin role",
+        description: error.message?.toLowerCase().includes('protected')
+          ? "This admin is protected and cannot be removed."
+          : (error.message || "Failed to remove admin role"),
         variant: "destructive",
       });
     } finally {
