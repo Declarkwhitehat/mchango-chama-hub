@@ -113,6 +113,7 @@ const ChamaDetail = () => {
   const [completedCyclesCount, setCompletedCyclesCount] = useState(0);
   const [totalCyclesCount, setTotalCyclesCount] = useState(0);
   const [paidOutMemberIds, setPaidOutMemberIds] = useState<Set<string>>(new Set());
+  const [payoutAmountByMember, setPayoutAmountByMember] = useState<Record<string, number>>({});
   const tabStorageKey = `chama-detail-tab:${id || "current"}`;
   const [activeTab, setActiveTab] = useState(() => getStoredTab(tabStorageKey, "dashboard"));
 
@@ -335,7 +336,7 @@ const ChamaDetail = () => {
         // Fetch all cycles to count completed ones
         const { data: allCycles } = await supabase
           .from('contribution_cycles')
-          .select('id, beneficiary_member_id, end_date, cycle_number, is_complete, payout_processed')
+          .select('id, beneficiary_member_id, end_date, cycle_number, is_complete, payout_processed, payout_amount')
           .eq('chama_id', chamaData.id)
           .order('cycle_number', { ascending: true });
 
@@ -344,12 +345,17 @@ const ChamaDetail = () => {
           setCompletedCyclesCount(completed.length);
           setTotalCyclesCount(approvedMembers.length);
 
-          // Track which members already received payouts
+          // Track which members already received payouts AND the actual amount each got
           const paidMembers = new Set<string>();
+          const amountMap: Record<string, number> = {};
           completed.forEach(c => {
-            if (c.beneficiary_member_id) paidMembers.add(c.beneficiary_member_id);
+            if (c.beneficiary_member_id) {
+              paidMembers.add(c.beneficiary_member_id);
+              amountMap[c.beneficiary_member_id] = Number(c.payout_amount || 0);
+            }
           });
           setPaidOutMemberIds(paidMembers);
+          setPayoutAmountByMember(amountMap);
 
           // Find the current active (incomplete) cycle
           const activeCycle = allCycles.find(c => !c.is_complete);
@@ -1105,7 +1111,10 @@ const ChamaDetail = () => {
                       <CardContent className="space-y-2">
                         {received.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-3">No payouts made yet.</p>
-                        ) : received.map((m, idx) => (
+                        ) : received.map((m, idx) => {
+                          const actual = payoutAmountByMember[m.id] ?? netPayout;
+                          const shortfall = netPayout - actual;
+                          return (
                           <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
@@ -1115,11 +1124,16 @@ const ChamaDetail = () => {
                               </div>
                             </div>
                             <div className="text-right shrink-0">
-                              <p className="font-semibold text-green-700 dark:text-green-400">{fmt(netPayout)}</p>
-                              <p className="text-[10px] text-muted-foreground">net received</p>
+                              <p className="font-semibold text-green-700 dark:text-green-400">{fmt(actual)}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {shortfall > 0.5
+                                  ? `actual · short ${fmt(shortfall)} of ${fmt(netPayout)}`
+                                  : 'net received'}
+                              </p>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </CardContent>
                     </Card>
 
