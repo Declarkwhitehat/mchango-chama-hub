@@ -336,7 +336,7 @@ const ChamaDetail = () => {
         // Fetch all cycles to count completed ones
         const { data: allCycles } = await supabase
           .from('contribution_cycles')
-          .select('id, beneficiary_member_id, end_date, cycle_number, is_complete, payout_processed')
+          .select('id, beneficiary_member_id, end_date, cycle_number, is_complete, payout_processed, payout_amount')
           .eq('chama_id', chamaData.id)
           .order('cycle_number', { ascending: true });
 
@@ -345,12 +345,17 @@ const ChamaDetail = () => {
           setCompletedCyclesCount(completed.length);
           setTotalCyclesCount(approvedMembers.length);
 
-          // Track which members already received payouts
+          // Track which members already received payouts AND the actual amount each got
           const paidMembers = new Set<string>();
+          const amountMap: Record<string, number> = {};
           completed.forEach(c => {
-            if (c.beneficiary_member_id) paidMembers.add(c.beneficiary_member_id);
+            if (c.beneficiary_member_id) {
+              paidMembers.add(c.beneficiary_member_id);
+              amountMap[c.beneficiary_member_id] = Number(c.payout_amount || 0);
+            }
           });
           setPaidOutMemberIds(paidMembers);
+          setPayoutAmountByMember(amountMap);
 
           // Find the current active (incomplete) cycle
           const activeCycle = allCycles.find(c => !c.is_complete);
