@@ -113,6 +113,7 @@ const ChamaDetail = () => {
   const [completedCyclesCount, setCompletedCyclesCount] = useState(0);
   const [totalCyclesCount, setTotalCyclesCount] = useState(0);
   const [paidOutMemberIds, setPaidOutMemberIds] = useState<Set<string>>(new Set());
+  const [payoutAmountByMember, setPayoutAmountByMember] = useState<Record<string, number>>({});
   const tabStorageKey = `chama-detail-tab:${id || "current"}`;
   const [activeTab, setActiveTab] = useState(() => getStoredTab(tabStorageKey, "dashboard"));
 
