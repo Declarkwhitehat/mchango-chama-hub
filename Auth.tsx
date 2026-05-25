@@ -19,7 +19,14 @@ import { TwoFactorVerification } from "@/components/TwoFactorVerification";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   isBiometricEnabledSync,
   isAppLockedSync,
@@ -32,71 +39,126 @@ import {
 } from "@/lib/secureStorage";
 import { isNativeApp, authenticateBiometric, getBiometricType as getBioType } from "@/lib/biometricHandler";
 
-
 const loginSchema = z.object({
-  emailOrPhone: z.string()
+  emailOrPhone: z
+    .string()
     .min(1, "Email or phone number is required")
     .refine(
       (val) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (emailRegex.test(val)) return true;
         const phoneRegex = /^(\+?\d{10,15}|0\d{9}|[17]\d{8,9})$/;
-        return phoneRegex.test(val.replace(/\s/g, ''));
+        return phoneRegex.test(val.replace(/\s/g, ""));
       },
-      { message: "Must be a valid email or phone number (e.g., +254712345678 or 0712345678 or email@example.com)" }
+      { message: "Must be a valid email or phone number (e.g., +254712345678 or 0712345678 or email@example.com)" },
     ),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 const SAFARICOM_PREFIXES = [
-  '700', '701', '702', '703', '704', '705', '706', '707', '708', '709',
-  '710', '711', '712', '713', '714', '715', '716', '717', '718', '719',
-  '720', '721', '722', '723', '724', '725', '726', '727', '728', '729',
-  '740', '741', '742', '743', '745', '746',
-  '757', '758', '759',
-  '768', '769',
-  '790', '791', '792', '793', '794', '795', '796', '797', '798', '799',
-  '110', '111', '112', '113', '114', '115',
+  "700",
+  "701",
+  "702",
+  "703",
+  "704",
+  "705",
+  "706",
+  "707",
+  "708",
+  "709",
+  "710",
+  "711",
+  "712",
+  "713",
+  "714",
+  "715",
+  "716",
+  "717",
+  "718",
+  "719",
+  "720",
+  "721",
+  "722",
+  "723",
+  "724",
+  "725",
+  "726",
+  "727",
+  "728",
+  "729",
+  "740",
+  "741",
+  "742",
+  "743",
+  "745",
+  "746",
+  "757",
+  "758",
+  "759",
+  "768",
+  "769",
+  "790",
+  "791",
+  "792",
+  "793",
+  "794",
+  "795",
+  "796",
+  "797",
+  "798",
+  "799",
+  "110",
+  "111",
+  "112",
+  "113",
+  "114",
+  "115",
 ];
 
 const isSafaricomNumber = (phone: string): boolean => {
-  const numberPart = phone.replace('+254', '');
-  return SAFARICOM_PREFIXES.some(prefix => numberPart.startsWith(prefix));
+  const numberPart = phone.replace("+254", "").replace(/^0/, "");
+  return SAFARICOM_PREFIXES.some((prefix) => numberPart.startsWith(prefix));
 };
 
-const signupSchema = z.object({
-  full_name: z.string().min(2, "Full name is required").max(100),
-  id_number: z.string().min(5, "Valid ID number is required").max(50),
-  phone: z.string()
-    .min(10, "Phone number is required")
-    .transform((val) => {
-      const cleaned = val.replace(/\s/g, '');
-      if (cleaned.startsWith('07') || cleaned.startsWith('01')) {
-        return '+254' + cleaned.slice(1);
-      }
-      if (cleaned.startsWith('7') || cleaned.startsWith('1')) {
-        return '+254' + cleaned;
-      }
-      return cleaned;
-    })
-    .refine((val) => /^\+254\d{9}$/.test(val), "Phone must be a valid Kenyan number (e.g., 0712345678 or +254712345678)")
-    .refine((val) => isSafaricomNumber(val), "Only Safaricom numbers are accepted for M-Pesa payouts"),
-  email: z.string().email("Invalid email address").max(255),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number")
-    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
-  confirmPassword: z.string(),
-  acceptTerms: z.boolean().refine(val => val === true, {
-    message: "You must accept the Terms and Conditions"
-  }),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const signupSchema = z
+  .object({
+    full_name: z.string().min(2, "Full name is required").max(100),
+    id_number: z.string().min(5, "Valid ID number is required").max(50),
+    phone: z
+      .string()
+      .min(10, "Phone number is required")
+      .transform((val) => {
+        const cleaned = val.replace(/\s/g, "");
+        if (cleaned.startsWith("07") || cleaned.startsWith("01")) {
+          return "+254" + cleaned.slice(1);
+        }
+        if (cleaned.startsWith("7") || cleaned.startsWith("1")) {
+          return "+254" + cleaned;
+        }
+        return cleaned;
+      })
+      .refine(
+        (val) => /^\+254\d{9}$/.test(val),
+        "Phone must be a valid Kenyan number (e.g., 0712345678 or +254712345678)",
+      )
+      .refine((val) => isSafaricomNumber(val), "Only Safaricom numbers are accepted for M-Pesa payouts"),
+    email: z.string().email("Invalid email address").max(255),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number")
+      .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
+    confirmPassword: z.string(),
+    acceptTerms: z.boolean().refine((val) => val === true, {
+      message: "You must accept the Terms and Conditions",
+    }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
@@ -106,8 +168,19 @@ const Auth = () => {
   const location = useLocation();
   const returnTo = location.state?.returnTo;
   const { signIn, signUp, user } = useAuth();
-  const { isSupported: isWebAuthnSupported, registerCredential, authenticate, checkHasCredentials, isLoading: isWebAuthnLoading } = useWebAuthn();
-  const { isNativeApp: isNative, isAvailable: isNativeBiometricAvailable, authenticate: nativeAuthenticate, getBiometryType } = useNativeBiometrics();
+  const {
+    isSupported: isWebAuthnSupported,
+    registerCredential,
+    authenticate,
+    checkHasCredentials,
+    isLoading: isWebAuthnLoading,
+  } = useWebAuthn();
+  const {
+    isNativeApp: isNative,
+    isAvailable: isNativeBiometricAvailable,
+    authenticate: nativeAuthenticate,
+    getBiometryType,
+  } = useNativeBiometrics();
   const [isLoading, setIsLoading] = useState(false);
   const [biometricReady, setBiometricReady] = useState(false);
   const [biometricChecked, setBiometricChecked] = useState(false);
@@ -137,7 +210,9 @@ const Auth = () => {
       setBiometricReady(false);
       setBiometricChecked(true);
     }
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isNative, isNativeBiometricAvailable]);
 
   useEffect(() => {
@@ -220,17 +295,14 @@ const Auth = () => {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const response = await fetch(
-        `${supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-          },
-          body: JSON.stringify({ refresh_token: stored.refresh_token }),
-        }
-      );
+      const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseKey,
+        },
+        body: JSON.stringify({ refresh_token: stored.refresh_token }),
+      });
       const result = await response.json();
       if (result.access_token && result.refresh_token) {
         await supabase.auth.setSession({
@@ -258,9 +330,9 @@ const Auth = () => {
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
-  const [signupStep, setSignupStep] = useState<'details' | 'phone'>('details');
+  const [signupStep, setSignupStep] = useState<"details" | "phone">("details");
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
-  const [biometricIdentifier, setBiometricIdentifier] = useState('');
+  const [biometricIdentifier, setBiometricIdentifier] = useState("");
   const [biometricCancelled, setBiometricCancelled] = useState(false);
   const [isInitialCheck, setIsInitialCheck] = useState(false);
   const hasAttemptedAutoLogin = useRef(false);
@@ -281,13 +353,13 @@ const Auth = () => {
 
   // Check localStorage for rate limit on mount
   useEffect(() => {
-    const stored = localStorage.getItem('rateLimitResetTime');
+    const stored = localStorage.getItem("rateLimitResetTime");
     if (stored) {
       const resetTime = new Date(stored);
       if (resetTime > new Date()) {
         setRateLimitResetTime(resetTime);
       } else {
-        localStorage.removeItem('rateLimitResetTime');
+        localStorage.removeItem("rateLimitResetTime");
       }
     }
   }, []);
@@ -304,8 +376,8 @@ const Auth = () => {
 
       if (diff === 0) {
         setRateLimitResetTime(null);
-        localStorage.removeItem('rateLimitResetTime');
-        toast.success('You can now try logging in again');
+        localStorage.removeItem("rateLimitResetTime");
+        toast.success("You can now try logging in again");
       }
     }, 1000);
 
@@ -336,14 +408,14 @@ const Auth = () => {
             if (result.success) {
               const restored = await restoreNativeBiometricSession();
               if (restored) {
-                toast.success('Welcome back!');
-                navigate(returnTo || '/home', { replace: true });
+                toast.success("Welcome back!");
+                navigate(returnTo || "/home", { replace: true });
                 return;
               }
-              toast.error('Your fingerprint session expired. Please log in with your password to re-enable.');
+              toast.error("Your fingerprint session expired. Please log in with your password to re-enable.");
             } else {
               setBiometricCancelled(true);
-              toast.error('Fingerprint cancelled. Please use your password.');
+              toast.error("Fingerprint cancelled. Please use your password.");
             }
           }
           return;
@@ -351,7 +423,7 @@ const Auth = () => {
 
         if (!isWebAuthnSupported()) return;
 
-        const storedIdentifier = localStorage.getItem('lastLoginIdentifier');
+        const storedIdentifier = localStorage.getItem("lastLoginIdentifier");
         if (!storedIdentifier) return;
 
         const hasCredentials = await checkHasCredentials(storedIdentifier);
@@ -360,31 +432,43 @@ const Auth = () => {
         const result = await authenticate(storedIdentifier);
 
         if (result.success) {
-          toast.success('Welcome back!');
-          navigate(returnTo || '/', { replace: true });
+          toast.success("Welcome back!");
+          navigate(returnTo || "/", { replace: true });
         } else {
           setBiometricCancelled(true);
-          toast.error('Fingerprint authentication failed. Please use your password.');
+          toast.error("Fingerprint authentication failed. Please use your password.");
         }
       } catch (error) {
-        console.error('Auto-login error:', error);
+        console.error("Auto-login error:", error);
         setBiometricCancelled(true);
-        toast.error('Fingerprint authentication cancelled. Please use your password.');
+        toast.error("Fingerprint authentication cancelled. Please use your password.");
       } finally {
         setIsInitialCheck(false);
       }
     };
 
     void attemptAutoLogin();
-  }, [authenticate, biometricCancelled, biometricChecked, biometricReady, checkHasCredentials, getBiometryType, isNative, isWebAuthnSupported, nativeAuthenticate, navigate, returnTo]);
+  }, [
+    authenticate,
+    biometricCancelled,
+    biometricChecked,
+    biometricReady,
+    checkHasCredentials,
+    getBiometryType,
+    isNative,
+    isWebAuthnSupported,
+    nativeAuthenticate,
+    navigate,
+    returnTo,
+  ]);
 
   const formatCountdown = (seconds: number): string => {
     if (seconds < 60) {
-      return `${seconds} second${seconds !== 1 ? 's' : ''}`;
+      return `${seconds} second${seconds !== 1 ? "s" : ""}`;
     }
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${minutes} minute${minutes !== 1 ? 's' : ''} ${secs} second${secs !== 1 ? 's' : ''}`;
+    return `${minutes} minute${minutes !== 1 ? "s" : ""} ${secs} second${secs !== 1 ? "s" : ""}`;
   };
 
   const calculatePasswordStrength = (password: string) => {
@@ -424,21 +508,23 @@ const Auth = () => {
     (async () => {
       try {
         const { data } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "admin")
           .maybeSingle();
         if (cancelled) return;
         setDidRedirect(true);
-        navigate(data ? "/admin" : (returnTo || "/home"), { replace: true });
+        navigate(data ? "/admin" : returnTo || "/home", { replace: true });
       } catch {
         if (cancelled) return;
         setDidRedirect(true);
         navigate(returnTo || "/home", { replace: true });
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user, didRedirect, show2FA, showBiometricSetup, isLoading, navigate, returnTo]);
 
   const handleLogin = async (data: LoginFormData) => {
@@ -461,7 +547,7 @@ const Auth = () => {
           if ((error as any).rateLimitInfo?.resetTime) {
             const resetTime = new Date((error as any).rateLimitInfo.resetTime);
             setRateLimitResetTime(resetTime);
-            localStorage.setItem('rateLimitResetTime', resetTime.toISOString());
+            localStorage.setItem("rateLimitResetTime", resetTime.toISOString());
           }
           setRemainingAttempts(null);
           return;
@@ -471,7 +557,11 @@ const Auth = () => {
           setRemainingAttempts((error as any).remainingAttempts);
         }
 
-        if (error.message.includes("Invalid login credentials") || error.message.includes("No account found") || error.message.includes("Invalid")) {
+        if (
+          error.message.includes("Invalid login credentials") ||
+          error.message.includes("No account found") ||
+          error.message.includes("Invalid")
+        ) {
           toast.error("Invalid credentials. Please check your email/phone and password.");
         } else if (error.message.includes("Email not confirmed")) {
           toast.error("Please verify your email address before logging in. Check your inbox.");
@@ -481,7 +571,7 @@ const Auth = () => {
         return;
       }
 
-      localStorage.setItem('lastLoginIdentifier', data.emailOrPhone);
+      localStorage.setItem("lastLoginIdentifier", data.emailOrPhone);
       setRemainingAttempts(null);
       toast.success("Welcome back!");
 
@@ -493,10 +583,10 @@ const Auth = () => {
       const { data: userData } = await supabase.auth.getUser();
       if (userData.user) {
         const { data: adminRole } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userData.user.id)
-          .eq('role', 'admin')
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userData.user.id)
+          .eq("role", "admin")
           .maybeSingle();
 
         if (adminRole) {
@@ -523,32 +613,32 @@ const Auth = () => {
   const handleBiometricLogin = async () => {
     if (isNative) {
       if (!nativeBiometricLoginEnabled) {
-        toast.error('Fingerprint login is not set up. Please log in with your password first.');
+        toast.error("Fingerprint login is not set up. Please log in with your password first.");
         return;
       }
 
-      const result = await nativeAuthenticate('Scan your fingerprint to sign in');
+      const result = await nativeAuthenticate("Scan your fingerprint to sign in");
       if (result.success) {
         const restored = await restoreNativeBiometricSession();
         if (restored) {
-          toast.success('Welcome back!');
-          navigate(returnTo || '/home', { replace: true });
+          toast.success("Welcome back!");
+          navigate(returnTo || "/home", { replace: true });
           return;
         }
-        toast.error('Your session has expired. Please log in with your password once to re-enable fingerprint.');
+        toast.error("Your session has expired. Please log in with your password once to re-enable fingerprint.");
       }
       return;
     }
 
-    const emailOrPhone = loginForm.getValues('emailOrPhone');
+    const emailOrPhone = loginForm.getValues("emailOrPhone");
     if (!emailOrPhone) {
-      toast.error('Please enter your email or phone number first');
+      toast.error("Please enter your email or phone number first");
       return;
     }
     const result = await authenticate(emailOrPhone);
     if (result.success) {
-      localStorage.setItem('lastLoginIdentifier', emailOrPhone);
-      navigate(returnTo || '/home', { replace: true });
+      localStorage.setItem("lastLoginIdentifier", emailOrPhone);
+      navigate(returnTo || "/home", { replace: true });
     }
   };
 
@@ -556,19 +646,19 @@ const Auth = () => {
     setIsLoading(true);
     try {
       if (isNative) {
-        const result = await nativeAuthenticate('Verify your identity to enable fingerprint login');
+        const result = await nativeAuthenticate("Verify your identity to enable fingerprint login");
         if (result.success) {
           const stored = await storeNativeBiometricSession(true);
           if (!stored) {
-            toast.error('Could not save your login session for fingerprint sign-in. Please log in again.');
+            toast.error("Could not save your login session for fingerprint sign-in. Please log in again.");
             setIsLoading(false);
             return;
           }
-          toast.success('Fingerprint login enabled!');
+          toast.success("Fingerprint login enabled!");
           setShowBiometricSetup(false);
-          navigate(returnTo || (signupStep === 'phone' ? '/kyc-upload' : '/home'), { replace: true });
+          navigate(returnTo || (signupStep === "phone" ? "/kyc-upload" : "/home"), { replace: true });
         } else {
-          toast.error(result.error || 'Failed to verify fingerprint');
+          toast.error(result.error || "Failed to verify fingerprint");
         }
         setIsLoading(false);
         return;
@@ -576,17 +666,17 @@ const Auth = () => {
 
       const result = await registerCredential();
       if (result.success) {
-        toast.success('Biometric login enabled successfully!');
+        toast.success("Biometric login enabled successfully!");
         setShowBiometricSetup(false);
 
         if (returnTo) {
           navigate(returnTo, { replace: true });
         } else {
-          navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
+          navigate(signupStep === "phone" ? "/kyc-upload" : "/home");
         }
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to enable biometric login');
+      toast.error(error.message || "Failed to enable biometric login");
     } finally {
       setIsLoading(false);
     }
@@ -597,28 +687,27 @@ const Auth = () => {
     if (returnTo) {
       navigate(returnTo, { replace: true });
     } else {
-      navigate(signupStep === 'phone' ? '/kyc-upload' : '/home');
+      navigate(signupStep === "phone" ? "/kyc-upload" : "/home");
     }
   };
 
   const handleSignup = async (data: SignupFormData) => {
     if (!phoneVerified) {
-      setSignupStep('phone');
+      setSignupStep("phone");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const { data: uniqueCheck } = await supabase
-        .rpc('check_signup_uniqueness', {
-          p_phone: data.phone,
-          p_id_number: data.id_number,
-          p_email: data.email,
-        });
+      const { data: uniqueCheck } = await supabase.rpc("check_signup_uniqueness", {
+        p_phone: data.phone,
+        p_id_number: data.id_number,
+        p_email: data.email,
+      });
 
       if (uniqueCheck) {
-        const check = typeof uniqueCheck === 'string' ? JSON.parse(uniqueCheck) : uniqueCheck;
+        const check = typeof uniqueCheck === "string" ? JSON.parse(uniqueCheck) : uniqueCheck;
         if (check.phone_exists) {
           toast.error("This phone number is already registered. Please use a different number or log in.");
           setIsLoading(false);
@@ -643,11 +732,15 @@ const Auth = () => {
       });
 
       if (signUpError) {
-        if (signUpError.message.includes("phone number is already registered") ||
-            signUpError.message.includes("profiles_phone_unique")) {
+        if (
+          signUpError.message.includes("phone number is already registered") ||
+          signUpError.message.includes("profiles_phone_unique")
+        ) {
           toast.error("This phone number is already registered. Please use a different number or log in.");
-        } else if (signUpError.message.includes("ID number is already registered") ||
-                 signUpError.message.includes("profiles_id_number_key")) {
+        } else if (
+          signUpError.message.includes("ID number is already registered") ||
+          signUpError.message.includes("profiles_id_number_key")
+        ) {
           toast.error("This ID number is already registered. Please contact support if this is an error.");
         } else if (signUpError.message.includes("already registered") || signUpError.message.includes("User already")) {
           toast.error("This email is already registered. Please log in or use a different email.");
@@ -662,27 +755,25 @@ const Auth = () => {
       }
 
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user) {
-          await supabase.from('user_consents').insert({
+          await supabase.from("user_consents").insert({
             user_id: user.id,
-            terms_version: 'v1.0',
-            privacy_version: 'v1.0',
+            terms_version: "v1.0",
+            privacy_version: "v1.0",
             ip_address: null,
           });
         }
       } catch (consentError) {
-        console.error('Failed to record consent:', consentError);
+        console.error("Failed to record consent:", consentError);
       }
 
       try {
-        await sendTransactionalSMS(
-          data.phone,
-          SMS_TEMPLATES.accountCreated(data.full_name),
-          'registration'
-        );
+        await sendTransactionalSMS(data.phone, SMS_TEMPLATES.accountCreated(data.full_name), "registration");
       } catch (smsError) {
-        console.error('Failed to send welcome SMS:', smsError);
+        console.error("Failed to send welcome SMS:", smsError);
       }
 
       toast.success("Account created successfully!");
@@ -694,7 +785,7 @@ const Auth = () => {
         if (returnTo) {
           navigate(returnTo, { replace: true });
         } else {
-          navigate('/kyc-upload');
+          navigate("/kyc-upload");
         }
       }
     } catch (error: any) {
@@ -711,25 +802,27 @@ const Auth = () => {
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
       if (currentSession?.access_token) {
         fetch(`${supabaseUrl}/functions/v1/capture-login-ip`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${currentSession.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentSession.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: JSON.stringify({ is_signup: false }),
-        }).catch(err => console.error('Failed to capture IP after 2FA:', err));
+        }).catch((err) => console.error("Failed to capture IP after 2FA:", err));
       }
     } catch (err) {
-      console.error('Failed to capture IP after 2FA:', err);
+      console.error("Failed to capture IP after 2FA:", err);
     }
 
-    const emailOrPhone = loginForm.getValues('emailOrPhone');
+    const emailOrPhone = loginForm.getValues("emailOrPhone");
     if (emailOrPhone) {
-      localStorage.setItem('lastLoginIdentifier', emailOrPhone);
+      localStorage.setItem("lastLoginIdentifier", emailOrPhone);
     }
 
     toast.success("Welcome back!");
@@ -740,10 +833,10 @@ const Auth = () => {
     const { data: userData } = await supabase.auth.getUser();
     if (userData.user) {
       const { data: adminRole } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userData.user.id)
-        .eq('role', 'admin')
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userData.user.id)
+        .eq("role", "admin")
         .maybeSingle();
 
       if (adminRole) {
@@ -779,11 +872,7 @@ const Auth = () => {
   if (show2FA && pending2FAUserId) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col items-center justify-center px-4">
-        <TwoFactorVerification
-          userId={pending2FAUserId}
-          onVerified={handle2FAVerified}
-          onCancel={handle2FACancel}
-        />
+        <TwoFactorVerification userId={pending2FAUserId} onVerified={handle2FAVerified} onCancel={handle2FACancel} />
       </div>
     );
   }
@@ -791,12 +880,7 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col">
       <div className="container px-4 py-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/")}
-          className="mb-4"
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="mb-4">
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
@@ -812,7 +896,10 @@ const Auth = () => {
               <p className="text-muted-foreground">Join the community of savers and fundraisers</p>
             </div>
 
-            <Tabs defaultValue={new URLSearchParams(location.search).get('tab') === 'signup' ? 'signup' : 'login'} className="w-full">
+            <Tabs
+              defaultValue={new URLSearchParams(location.search).get("tab") === "signup" ? "signup" : "login"}
+              className="w-full"
+            >
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -839,7 +926,11 @@ const Auth = () => {
                                 <div className="flex-1 min-w-0">
                                   <h4 className="font-semibold text-destructive mb-1">Too Many Login Attempts</h4>
                                   <p className="text-sm text-muted-foreground">
-                                    Please wait <span className="font-medium text-foreground">{formatCountdown(remainingSeconds)}</span> before trying again
+                                    Please wait{" "}
+                                    <span className="font-medium text-foreground">
+                                      {formatCountdown(remainingSeconds)}
+                                    </span>{" "}
+                                    before trying again
                                   </p>
                                 </div>
                               </div>
@@ -847,31 +938,33 @@ const Auth = () => {
                           )}
 
                           {!rateLimitResetTime && remainingAttempts !== null && remainingAttempts < 5 && (
-                            <div className={`${
-                              remainingAttempts === 0
-                                ? 'bg-destructive/10 border-destructive/30'
-                                : remainingAttempts <= 2
-                                  ? 'bg-secondary/10 border-secondary/30'
-                                  : 'bg-muted/50 border-border/50'
-                            } border rounded-lg p-3`}>
+                            <div
+                              className={`${
+                                remainingAttempts === 0
+                                  ? "bg-destructive/10 border-destructive/30"
+                                  : remainingAttempts <= 2
+                                    ? "bg-secondary/10 border-secondary/30"
+                                    : "bg-muted/50 border-border/50"
+                              } border rounded-lg p-3`}
+                            >
                               <div className="flex items-center gap-2">
-                                <AlertTriangle className={`h-4 w-4 flex-shrink-0 ${
-                                  remainingAttempts === 0
-                                    ? 'text-destructive'
-                                    : remainingAttempts <= 2
-                                      ? 'text-secondary'
-                                      : 'text-muted-foreground'
-                                }`} />
+                                <AlertTriangle
+                                  className={`h-4 w-4 flex-shrink-0 ${
+                                    remainingAttempts === 0
+                                      ? "text-destructive"
+                                      : remainingAttempts <= 2
+                                        ? "text-secondary"
+                                        : "text-muted-foreground"
+                                  }`}
+                                />
                                 <p className="text-sm">
                                   <span className="font-medium">
                                     {remainingAttempts === 0
-                                      ? 'Last attempt remaining'
-                                      : `${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining`}
+                                      ? "Last attempt remaining"
+                                      : `${remainingAttempts} ${remainingAttempts === 1 ? "attempt" : "attempts"} remaining`}
                                   </span>
                                   {remainingAttempts <= 2 && (
-                                    <span className="text-muted-foreground ml-1">
-                                      before temporary lockout
-                                    </span>
+                                    <span className="text-muted-foreground ml-1">before temporary lockout</span>
                                   )}
                                 </p>
                               </div>
@@ -885,11 +978,7 @@ const Auth = () => {
                               <FormItem>
                                 <FormLabel>Email or Phone Number</FormLabel>
                                 <FormControl>
-                                  <Input
-                                    placeholder="Enter email or phone number"
-                                    {...field}
-                                    autoComplete="username"
-                                  />
+                                  <Input placeholder="Enter email or phone number" {...field} autoComplete="username" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -903,10 +992,7 @@ const Auth = () => {
                                 <FormLabel>Password</FormLabel>
                                 <FormControl>
                                   <div className="relative">
-                                    <Input
-                                      type={showLoginPassword ? "text" : "password"}
-                                      {...field}
-                                    />
+                                    <Input type={showLoginPassword ? "text" : "password"} {...field} />
                                     <Button
                                       type="button"
                                       variant="ghost"
@@ -990,222 +1076,210 @@ const Auth = () => {
                   <CardHeader>
                     <CardTitle>Create Account</CardTitle>
                     <CardDescription>
-                      {signupStep === 'details'
-                        ? 'Get started with your financial journey'
-                        : 'Verify your phone number'
-                      }
+                      {signupStep === "details"
+                        ? "Get started with your financial journey"
+                        : "Verify your phone number"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Form {...signupForm}>
                       <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
-                        {signupStep === 'details' && (
+                        {signupStep === "details" && (
                           <>
-                        <FormField
-                          control={signupForm.control}
-                          name="full_name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Full Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="John Doe" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={signupForm.control}
-                          name="id_number"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>ID Number</FormLabel>
-                              <FormControl>
-                                <Input placeholder="12345678" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={signupForm.control}
-                          name="phone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Phone Number</FormLabel>
-                              <FormControl>
-                                <Input placeholder="+254712345678" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={signupForm.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="email"
-                                  placeholder="name@example.com"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={signupForm.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Password</FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    type={showSignupPassword ? "text" : "password"}
-                                    {...field}
-                                    onChange={(e) => {
-                                      field.onChange(e);
-                                      calculatePasswordStrength(e.target.value);
-                                    }}
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                                    onClick={() => setShowSignupPassword(!showSignupPassword)}
-                                  >
-                                    {showSignupPassword ? (
-                                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                                    ) : (
-                                      <Eye className="h-4 w-4 text-muted-foreground" />
-                                    )}
-                                  </Button>
-                                </div>
-                              </FormControl>
-                              {field.value && (
-                                <div className="space-y-2 mt-2">
-                                  <div className="flex gap-1">
-                                    {[1, 2, 3, 4, 5].map((level) => (
-                                      <div
-                                        key={level}
-                                        className={`h-1 flex-1 rounded-full transition-colors ${
-                                          level <= passwordStrength.score
-                                            ? passwordStrength.score <= 2
-                                              ? "bg-red-500"
-                                              : passwordStrength.score <= 3
-                                              ? "bg-yellow-500"
-                                              : "bg-green-500"
-                                            : "bg-muted"
-                                        }`}
-                                      />
-                                    ))}
-                                  </div>
-                                  <div className="text-xs space-y-1">
-                                    {[
-                                      { check: passwordStrength.hasMinLength, label: "At least 8 characters" },
-                                      { check: passwordStrength.hasUpperCase, label: "One uppercase letter" },
-                                      { check: passwordStrength.hasLowerCase, label: "One lowercase letter" },
-                                      { check: passwordStrength.hasNumber, label: "One number" },
-                                      { check: passwordStrength.hasSpecialChar, label: "One special character" },
-                                    ].map((requirement, index) => (
-                                      <div key={index} className="flex items-center gap-1 text-muted-foreground">
-                                        {requirement.check ? (
-                                          <Check className="h-3 w-3 text-green-500" />
-                                        ) : (
-                                          <X className="h-3 w-3 text-red-500" />
-                                        )}
-                                        <span className={requirement.check ? "text-green-500" : ""}>
-                                          {requirement.label}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
+                            <FormField
+                              control={signupForm.control}
+                              name="full_name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Full Name</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="John Doe" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                               )}
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={signupForm.control}
-                          name="confirmPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Confirm Password</FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    type={showConfirmPassword ? "text" : "password"}
-                                    {...field}
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                  >
-                                    {showConfirmPassword ? (
-                                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                                    ) : (
-                                      <Eye className="h-4 w-4 text-muted-foreground" />
-                                    )}
-                                  </Button>
-                                </div>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={signupForm.control}
-                          name="acceptTerms"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <div className="space-y-1 leading-none">
-                                <FormLabel className="text-sm font-normal">
-                                  I agree to the{" "}
-                                  <Link to="/terms" target="_blank" className="text-primary hover:underline">
-                                    Terms and Conditions
-                                  </Link>
-                                  {" "}and{" "}
-                                  <Link to="/privacy" target="_blank" className="text-primary hover:underline">
-                                    Privacy Policy
-                                  </Link>
-                                </FormLabel>
-                                <FormMessage />
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                        <Button
-                          type="submit"
-                          variant="hero"
-                          className="w-full"
-                          disabled={isLoading}
-                        >
-                          {isLoading ? "Creating account..." : phoneVerified ? "Complete Registration" : "Continue to Verification"}
-                        </Button>
+                            />
+                            <FormField
+                              control={signupForm.control}
+                              name="id_number"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>ID Number</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="12345678" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={signupForm.control}
+                              name="phone"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Phone Number</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="+254712345678" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={signupForm.control}
+                              name="email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email</FormLabel>
+                                  <FormControl>
+                                    <Input type="email" placeholder="name@example.com" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={signupForm.control}
+                              name="password"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Password</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <Input
+                                        type={showSignupPassword ? "text" : "password"}
+                                        {...field}
+                                        onChange={(e) => {
+                                          field.onChange(e);
+                                          calculatePasswordStrength(e.target.value);
+                                        }}
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                        onClick={() => setShowSignupPassword(!showSignupPassword)}
+                                      >
+                                        {showSignupPassword ? (
+                                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                        ) : (
+                                          <Eye className="h-4 w-4 text-muted-foreground" />
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </FormControl>
+                                  {field.value && (
+                                    <div className="space-y-2 mt-2">
+                                      <div className="flex gap-1">
+                                        {[1, 2, 3, 4, 5].map((level) => (
+                                          <div
+                                            key={level}
+                                            className={`h-1 flex-1 rounded-full transition-colors ${
+                                              level <= passwordStrength.score
+                                                ? passwordStrength.score <= 2
+                                                  ? "bg-red-500"
+                                                  : passwordStrength.score <= 3
+                                                    ? "bg-yellow-500"
+                                                    : "bg-green-500"
+                                                : "bg-muted"
+                                            }`}
+                                          />
+                                        ))}
+                                      </div>
+                                      <div className="text-xs space-y-1">
+                                        {[
+                                          { check: passwordStrength.hasMinLength, label: "At least 8 characters" },
+                                          { check: passwordStrength.hasUpperCase, label: "One uppercase letter" },
+                                          { check: passwordStrength.hasLowerCase, label: "One lowercase letter" },
+                                          { check: passwordStrength.hasNumber, label: "One number" },
+                                          { check: passwordStrength.hasSpecialChar, label: "One special character" },
+                                        ].map((requirement, index) => (
+                                          <div key={index} className="flex items-center gap-1 text-muted-foreground">
+                                            {requirement.check ? (
+                                              <Check className="h-3 w-3 text-green-500" />
+                                            ) : (
+                                              <X className="h-3 w-3 text-red-500" />
+                                            )}
+                                            <span className={requirement.check ? "text-green-500" : ""}>
+                                              {requirement.label}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={signupForm.control}
+                              name="confirmPassword"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Confirm Password</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <Input type={showConfirmPassword ? "text" : "password"} {...field} />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                      >
+                                        {showConfirmPassword ? (
+                                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                        ) : (
+                                          <Eye className="h-4 w-4 text-muted-foreground" />
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={signupForm.control}
+                              name="acceptTerms"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                  <FormControl>
+                                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                  </FormControl>
+                                  <div className="space-y-1 leading-none">
+                                    <FormLabel className="text-sm font-normal">
+                                      I agree to the{" "}
+                                      <Link to="/terms" target="_blank" className="text-primary hover:underline">
+                                        Terms and Conditions
+                                      </Link>{" "}
+                                      and{" "}
+                                      <Link to="/privacy" target="_blank" className="text-primary hover:underline">
+                                        Privacy Policy
+                                      </Link>
+                                    </FormLabel>
+                                    <FormMessage />
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <Button type="submit" variant="hero" className="w-full" disabled={isLoading}>
+                              {isLoading
+                                ? "Creating account..."
+                                : phoneVerified
+                                  ? "Complete Registration"
+                                  : "Continue to Verification"}
+                            </Button>
                           </>
                         )}
 
-                        {signupStep === 'phone' && (
+                        {signupStep === "phone" && (
                           <div className="space-y-4">
                             <PhoneVerification
-                              phone={signupForm.watch('phone')}
-                              onPhoneChange={(phone) => signupForm.setValue('phone', phone)}
+                              phone={signupForm.watch("phone")}
+                              onPhoneChange={(phone) => signupForm.setValue("phone", phone)}
                               onVerified={() => {
                                 setPhoneVerified(true);
                                 toast.success("Phone verified! Creating your account...");
@@ -1218,7 +1292,7 @@ const Auth = () => {
                               type="button"
                               variant="outline"
                               className="w-full"
-                              onClick={() => setSignupStep('details')}
+                              onClick={() => setSignupStep("details")}
                             >
                               Back to Details
                             </Button>
@@ -1248,21 +1322,15 @@ const Auth = () => {
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              Your biometric data stays secure on your device and is never shared. You can always use your password if needed.
+              Your biometric data stays secure on your device and is never shared. You can always use your password if
+              needed.
             </p>
           </div>
           <DialogFooter className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleSkipBiometric}
-              disabled={isWebAuthnLoading}
-            >
+            <Button variant="outline" onClick={handleSkipBiometric} disabled={isWebAuthnLoading}>
               Maybe Later
             </Button>
-            <Button
-              onClick={handleEnableBiometric}
-              disabled={isWebAuthnLoading}
-            >
+            <Button onClick={handleEnableBiometric} disabled={isWebAuthnLoading}>
               {isWebAuthnLoading ? "Setting up..." : "Enable Biometric Login"}
             </Button>
           </DialogFooter>
