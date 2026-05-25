@@ -852,9 +852,19 @@ const ChamaDetail = () => {
           <OverpaymentWallet chamaId={chama.id} memberId={currentUserMembership.id} contributionAmount={Number(chama.contribution_amount) || 0} />
         )}
 
-        {/* Payment Form - Only visible to approved members when chama is active */}
-        {isMember && isActive && (
+        {/* Payment Form - visible while chama is active, or after cycle_complete
+            if the member still has outstanding debt to settle to shortchanged peers. */}
+        {isMember && (isActive || (isCycleComplete && Number((currentUserMembership as any)?.balance_deficit || 0) > 0)) && (
           <div id="payment-form-section">
+          {isCycleComplete && (
+            <Card className="mb-3 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+              <CardContent className="pt-4 pb-4">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  This chama's cycle is closed, but you still owe KES {Number((currentUserMembership as any)?.balance_deficit || 0).toLocaleString()} to members who were shortchanged. Pay to settle.
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <ChamaPaymentForm
             chamaId={chama.id}
             currentMemberId={currentUserMembership.id}
