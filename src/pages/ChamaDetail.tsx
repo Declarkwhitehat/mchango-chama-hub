@@ -340,6 +340,26 @@ const ChamaDetail = () => {
           .eq('chama_id', chamaData.id)
           .order('cycle_number', { ascending: true });
 
+        // Fetch completed withdrawals — these tell us who ACTUALLY received money
+        // (handles redirected/skipped payouts so the UI doesn't credit the
+        // originally scheduled member).
+        const { data: chamaWithdrawals } = await supabase
+          .from('withdrawals')
+          .select('cycle_id, requested_by, net_amount, status')
+          .eq('chama_id', chamaData.id)
+          .in('status', ['completed', 'approved', 'processing']);
+
+        // Map cycle_id -> actual recipient user_id + net amount
+        const actualByCycle: Record<string, { userId: string; net: number }> = {};
+        (chamaWithdrawals || []).forEach((w: any) => {
+          if (w.cycle_id && w.requested_by) {
+            actualByCycle[w.cycle_id] = { userId: w.requested_by, net: Number(w.net_amount || 0) };
+          }
+        });
+        // Map user_id -> member.id for lookup
+        const userToMember: Record<string, string> = {};
+        approvedMembers.forEach((m: any) => { if (m.user_id) userToMember[m.user_id] = m.id; });
+
         if (allCycles) {
           const completed = allCycles.filter(c => c.is_complete || c.payout_processed);
           setCompletedCyclesCount(completed.length);
@@ -349,7 +369,15 @@ const ChamaDetail = () => {
           const paidMembers = new Set<string>();
           const amountMap: Record<string, number> = {};
           completed.forEach(c => {
-            if (c.beneficiary_member_id) {
+            const actual = actualByCycle[c.id];
+            if (actual) {
+              const memberId = userToMember[actual.userId];
+              if (memberId) {
+                paidMembers.add(memberId);
+                amountMap[memberId] = actual.net;
+              }
+            } else if (c.beneficiary_member_id && Number(c.payout_amount || 0) > 0) {
+              // Fallback to scheduled beneficiary only when there is a real payout amount
               paidMembers.add(c.beneficiary_member_id);
               amountMap[c.beneficiary_member_id] = Number(c.payout_amount || 0);
             }
