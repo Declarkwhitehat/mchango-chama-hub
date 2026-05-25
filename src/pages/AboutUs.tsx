@@ -135,16 +135,7 @@ export default function AboutUs() {
               <p className="text-sm text-muted-foreground">
                 6+ years in fintech and mobile money solutions
               </p>
-            </Card>
-            <Card className="p-6 text-center">
-              <div className="w-24 h-24 bg-primary/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <Users className="h-12 w-12 text-primary" />
-              </div>
-              <h4 className="font-bold text-lg mb-1 text-foreground">GM</h4>
-              <p className="text-sm text-primary mb-2">Chief Operations Officer</p>
-              <p className="text-sm text-muted-foreground">
-                Specialist in community-based financial services
-              </p>
+            
             </Card>
           </div>
         </div>
@@ -164,7 +155,7 @@ export default function AboutUs() {
                </div>
                <div className="flex justify-between border-b border-border pb-3">
                  <span className="font-medium">Business Registration:</span>
-                 <span>PVT-BN-RRSK656P</span>
+                 <span>BN-DLSZJVL9</span>
               </div>
               <div className="flex justify-between border-b border-border pb-3">
                 <span className="font-medium">Registered Office:</span>
