@@ -15,13 +15,13 @@ Deno.serve(async (req) => {
 
     console.log('Notifying cycle completion for chama:', chamaId);
 
-    // Get chama details with members
+    // Get chama + members
     const { data: chama, error: chamaError } = await supabase
       .from('chama')
       .select(`
         id, name, group_code, last_cycle_completed_at,
         chama_members!inner(
-          id, member_code, is_manager, user_id,
+          id, member_code, is_manager, user_id, balance_deficit,
           profiles!inner(full_name, phone)
         )
       `)
@@ -30,74 +30,100 @@ Deno.serve(async (req) => {
       .eq('chama_members.approval_status', 'approved')
       .single();
 
-    if (chamaError) {
-      console.error('Error fetching chama:', chamaError);
-      throw chamaError;
-    }
+    if (chamaError) throw chamaError;
 
-    // Get manager info
-    const manager = chama.chama_members.find((m: any) => m.is_manager);
+    const manager = (chama.chama_members as any[]).find((m: any) => m.is_manager);
     const managerProfile = Array.isArray(manager?.profiles) ? manager.profiles[0] : manager?.profiles;
-    if (!manager) {
-      throw new Error('No manager found for chama');
-    }
 
-    console.log(`Sending SMS to ${chama.chama_members.length} members`);
+    // Determine actual settlement state for THIS chama
+    const { data: cycles } = await supabase
+      .from('contribution_cycles')
+      .select('id, cycle_number, beneficiary_member_id, payout_amount, members_paid_count, members_skipped_count, payout_type')
+      .eq('chama_id', chamaId)
+      .order('cycle_number', { ascending: true });
 
-    // Send SMS to all members
-    const smsPromises = chama.chama_members.map(async (member: any) => {
-      const memberProfile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
-      const message = `"${chama.name}" has completed its full cycle. All members have received their payouts. To rejoin a new cycle, contact your manager ${managerProfile?.full_name || 'your manager'} (${managerProfile?.phone || 'in app'}) or open the app. Member ID: ${member.member_code}.`;
+    const { data: outstandingDebts } = await supabase
+      .from('chama_member_debts')
+      .select('id, member_id, principal_remaining, penalty_remaining, chama_cycle_deficits!debt_id(recipient_member_id, status)')
+      .eq('chama_id', chamaId)
+      .in('status', ['outstanding', 'partial']);
+
+    const totalDebtPrincipal = (outstandingDebts || []).reduce(
+      (s: number, d: any) => s + Number(d.principal_remaining || 0), 0
+    );
+    const hasOutstandingDebts = (outstandingDebts || []).length > 0;
+    const skippedCount = (cycles || []).reduce(
+      (s: number, c: any) => s + Number(c.members_skipped_count || 0), 0
+    );
+    const allFullyPaid = !hasOutstandingDebts && skippedCount === 0;
+
+    // Build per-member SMS
+    const debtorIds = new Set((outstandingDebts || []).map((d: any) => d.member_id));
+
+    const smsPromises = (chama.chama_members as any[]).map(async (member: any) => {
+      const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+      const phone = profile?.phone;
+      if (!phone) return { success: false, phone: null, error: 'No phone' };
+
+      let message: string;
+      if (debtorIds.has(member.id)) {
+        // This member owes other members money — remind them
+        const owed = (outstandingDebts || [])
+          .filter((d: any) => d.member_id === member.id)
+          .reduce((s: number, d: any) => s + Number(d.principal_remaining || 0) + Number(d.penalty_remaining || 0), 0);
+        message = `Pamojanova: "${chama.name}" cycle is closed but you still owe KES ${owed.toFixed(0)} to other members. Pay via Paybill 4015351, Account ${member.member_code} to clear your debt. STOP 4569*5#`;
+      } else if (allFullyPaid) {
+        message = `Pamojanova: "${chama.name}" cycle is complete. All members paid and all payouts settled. To rejoin a new cycle contact ${managerProfile?.full_name || 'your manager'} (${managerProfile?.phone || 'in app'}). Member ID: ${member.member_code}. STOP 4569*5#`;
+      } else {
+        message = `Pamojanova: "${chama.name}" cycle ended. Some payments are still pending and shortchanged members will be settled as debts are cleared. Member ID: ${member.member_code}. STOP 4569*5#`;
+      }
 
       try {
         const { error: smsError } = await supabase.functions.invoke('send-transactional-sms', {
-          body: {
-            phone: memberProfile?.phone,
-            message,
-            eventType: 'cycle_complete'
-          }
+          body: { phone, message, eventType: 'cycle_complete' }
         });
-
-        if (smsError) {
-          console.error(`Failed to send SMS to ${memberProfile?.phone}:`, smsError);
-          return { success: false, phone: memberProfile?.phone, error: smsError };
-        }
-
-        return { success: true, phone: memberProfile?.phone };
-      } catch (error) {
-        console.error(`Exception sending SMS to ${memberProfile?.phone}:`, error);
-        return { success: false, phone: memberProfile?.phone, error };
+        if (smsError) return { success: false, phone, error: smsError };
+        return { success: true, phone };
+      } catch (err) {
+        return { success: false, phone, error: err };
       }
     });
+
+    // Manager summary
+    if (managerProfile?.phone) {
+      let summary: string;
+      if (allFullyPaid) {
+        summary = `Pamojanova: "${chama.name}" cycle complete. All payouts settled, no debts.`;
+      } else {
+        summary = `Pamojanova: "${chama.name}" cycle ended. ${debtorIds.size} member(s) still owe KES ${totalDebtPrincipal.toFixed(0)} to shortchanged members. Reminders sent. STOP 4569*5#`;
+      }
+      try {
+        await supabase.functions.invoke('send-transactional-sms', {
+          body: { phone: managerProfile.phone, message: summary, eventType: 'cycle_complete_manager' }
+        });
+      } catch (err) {
+        console.error('Manager summary SMS error:', err);
+      }
+    }
 
     const smsResults = await Promise.all(smsPromises);
     const successCount = smsResults.filter(r => r.success).length;
 
-    console.log(`Sent ${successCount}/${chama.chama_members.length} SMS notifications`);
-
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         notificationsSent: successCount,
-        totalMembers: chama.chama_members.length,
-        results: smsResults
+        totalMembers: (chama.chama_members as any[]).length,
+        allFullyPaid,
+        outstandingDebtors: debtorIds.size,
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error) {
     console.error('Error in cycle completion notification:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to send cycle completion notifications';
     return new Response(
-      JSON.stringify({ 
-        error: errorMessage
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      JSON.stringify({ error: (error as Error).message || 'Failed to send cycle completion notifications' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
