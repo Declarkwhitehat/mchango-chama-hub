@@ -62,9 +62,10 @@ export const ChamaPaymentForm = ({
     ? (selfOutstandingNet > 0 ? Math.ceil(selfOutstandingNet) : 0)
     : (fallbackNetStillNeeded > 0 ? Math.ceil(fallbackNetStillNeeded / (1 - commissionRate)) : 0);
 
-  // Target required amount when paying for another
+  // Target required amount when paying for another — RPC returns gross directly,
+  // matching the server validator's `required` value (same source as self).
   const targetRequiredAmount = targetInfo && targetInfo.netOutstanding > 0
-    ? Math.ceil(targetInfo.netOutstanding / (1 - commissionRate))
+    ? Math.ceil(targetInfo.netOutstanding)
     : 0;
 
   const requiredAmount = paymentType === "other"
