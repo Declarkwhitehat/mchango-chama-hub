@@ -86,9 +86,9 @@ serve(async (req) => {
     }
 
     // ═══ SERVER-SIDE CHAMA CONTRIBUTION AMOUNT VERIFICATION ═══
-    // For chama contributions, ensure the requested amount is at least the required
-    // contribution for this member's current cycle (overpayments allowed). For mchango
-    // and other paths, the existing 1..1,000,000 validation is the only check.
+    // Uses get_member_live_outstanding so the validator matches the UI exactly
+    // (unpaid cycles + outstanding debt principal). Penalty is collected on top
+    // by the settlement engine when the payment arrives.
     if (
       body.callback_metadata?.type === 'chama_contribution' &&
       body.chama_id &&
@@ -112,25 +112,25 @@ serve(async (req) => {
       }
 
       const baseContribution = Number(chamaRow.contribution_amount || 0);
-      let outstanding = 0;
-      let carry = 0;
+      let owedFromLive = 0;
+      let walletCredit = 0;
 
-      const { data: scheduleRows, error: scheduleErr } = await supabaseClient
-        .rpc('check_member_schedule_eligibility', {
+      const { data: liveRow, error: liveErr } = await supabaseClient
+        .rpc('get_member_live_outstanding', {
           p_member_id: memberId,
           p_chama_id: chamaId,
         });
 
-      if (!scheduleErr && Array.isArray(scheduleRows) && scheduleRows.length > 0) {
-        const row = scheduleRows[0] as { total_amount_owed?: number; carry_forward?: number };
-        outstanding = Number(row?.total_amount_owed || 0);
-        carry = Number(row?.carry_forward || 0);
-      } else if (scheduleErr) {
-        console.warn('Schedule eligibility lookup failed, falling back to base contribution:', scheduleErr);
+      if (!liveErr && liveRow && !(liveRow as any).error) {
+        owedFromLive = Number((liveRow as any).total_outstanding_no_penalty || 0);
+        walletCredit = Number((liveRow as any).wallet_credit_net || 0);
+      } else if (liveErr) {
+        console.warn('Live outstanding lookup failed, falling back to base contribution:', liveErr);
       }
 
-      const owedAfterCredit = Math.max(outstanding - carry, 0);
-      const required = Math.max(baseContribution, owedAfterCredit);
+      const owedAfterCredit = Math.max(owedFromLive - walletCredit, 0);
+      // If no debts and no unpaid cycles, allow base contribution as the minimum
+      const required = owedFromLive > 0 ? owedAfterCredit : baseContribution;
 
       if (required > 0 && body.amount < required) {
         console.warn('[security] STK push rejected — chama amount below required', {
