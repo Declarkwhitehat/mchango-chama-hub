@@ -129,7 +129,7 @@ export default function AboutUs() {
           </h2>
           <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
             <Card className="p-6 text-center">
-              <img src={declarkPhoto} alt="Declark Okemwa Chacha - CEO" className="w-24 h-24 rounded-full mx-auto mb-4 object-cover" />
+              
               <h4 className="font-bold text-lg mb-1 text-foreground">Declark Okemwa Chacha</h4>
               <p className="text-sm text-primary mb-2">Chief Executive Officer</p>
               <p className="text-sm text-muted-foreground">
