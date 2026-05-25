@@ -1292,7 +1292,7 @@ const Auth = () => {
                               type="button"
                               variant="outline"
                               className="w-full"
-                              onClick={() => setSignupStep("details")}
+                              onClick={() => { setSignupStep("details"); setPhoneVerified(false); }}
                             >
                               Back to Details
                             </Button>
