@@ -3887,7 +3887,12 @@ export type Database = {
         Args: { p_limit?: number; p_search?: string }
         Returns: Json
       }
+      get_chama_current_pool: { Args: { p_chama_id: string }; Returns: Json }
       get_member_dashboard: { Args: { p_chama_id: string }; Returns: Json }
+      get_member_live_outstanding: {
+        Args: { p_chama_id: string; p_member_id: string }
+        Returns: Json
+      }
       get_member_payout_position: {
         Args: { p_member_id: string }
         Returns: {
@@ -3943,6 +3948,10 @@ export type Database = {
           p_withdrawal_id: string
         }
         Returns: Json
+      }
+      recompute_chama_member_balance: {
+        Args: { p_member_id: string }
+        Returns: undefined
       }
       record_company_earning: {
         Args: {
