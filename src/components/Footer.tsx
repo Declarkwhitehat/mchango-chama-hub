@@ -50,7 +50,7 @@ const Footer = () => {
             <h3 className="font-semibold text-lg mb-2">Contact</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>Email: <a href="mailto:info@pamojanova.com" className="hover:text-foreground transition-colors">info@pamojanova.com</a></li>
-              <li>Phone: <a href="tel:+254707874790" className="hover:text-foreground transition-colors">+254 707 874 790</a></li>
+              <li>Phone: <a href="tel:+254755991325" className="hover:text-foreground transition-colors">+254 755 991 325</a></li>
               <li>Nairobi, Kenya</li>
             </ul>
             <div className="flex gap-4 mt-4">
