@@ -62,9 +62,10 @@ export const ChamaPaymentForm = ({
     ? (selfOutstandingNet > 0 ? Math.ceil(selfOutstandingNet) : 0)
     : (fallbackNetStillNeeded > 0 ? Math.ceil(fallbackNetStillNeeded / (1 - commissionRate)) : 0);
 
-  // Target required amount when paying for another
+  // Target required amount when paying for another — RPC returns gross directly,
+  // matching the server validator's `required` value (same source as self).
   const targetRequiredAmount = targetInfo && targetInfo.netOutstanding > 0
-    ? Math.ceil(targetInfo.netOutstanding / (1 - commissionRate))
+    ? Math.ceil(targetInfo.netOutstanding)
     : 0;
 
   const requiredAmount = paymentType === "other"
@@ -89,19 +90,19 @@ export const ChamaPaymentForm = ({
 
   const loadSelfOutstanding = async () => {
     try {
-      const { data, error } = await supabase.rpc('check_member_schedule_eligibility', {
+      // Use the new live RPC: combines unpaid cycles + outstanding debts (principal+penalty).
+      // This is the SAME source the server validator uses, so the prefilled amount
+      // matches the STK-push minimum exactly.
+      const { data, error } = await supabase.rpc('get_member_live_outstanding', {
         p_member_id: currentMemberId,
         p_chama_id: chamaId,
       });
       if (error) throw error;
-      const row = Array.isArray(data) && data.length > 0 ? data[0] as any : null;
-      const owed = Number(row?.total_amount_owed || 0);
-      const carry = Number(row?.carry_forward || 0);
-      // Server uses Math.max(baseContribution, owed - carry). Mirror that, then
-      // include the wallet credit (which is already net) by passing the gross owed
-      // up directly. The RPC returns GROSS owed (sums amount_due), so feeding it
-      // straight in matches the STK validator's `required` value precisely.
-      const required = Math.max(0, owed - carry);
+      const payload: any = data || {};
+      // Gross outstanding (cycle + principal). Penalty is collected on top by
+      // the settlement engine when payment arrives, so we don't add it to the
+      // prefilled value (otherwise members would always be told to over-pay).
+      const required = Math.max(0, Number(payload.total_outstanding_no_penalty || 0));
       setSelfOutstandingNet(required);
     } catch (err) {
       console.error('loadSelfOutstanding error:', err);
@@ -139,25 +140,34 @@ export const ChamaPaymentForm = ({
       }));
 
       const target = members.find((m) => m.id === memberId);
-      // Sum unpaid balance across all unpaid cycles for this member
-      const { data: unpaid } = await supabase
-        .from('member_cycle_payments')
-        .select('amount_due, amount_paid, is_paid, cycle_id, contribution_cycles!cycle_id(payout_processed, end_date)')
-        .eq('member_id', memberId)
-        .eq('is_paid', false);
 
-      let netOutstanding = 0;
+      // Authoritative outstanding from the live RPC — same logic as self
+      const { data: liveData, error: liveErr } = await supabase.rpc('get_member_live_outstanding', {
+        p_member_id: memberId,
+        p_chama_id: chamaId,
+      });
+      if (liveErr) throw liveErr;
+      const livePayload: any = liveData || {};
+      // GROSS outstanding the chama still needs (cycle + principal debt, no penalty)
+      const grossOutstanding = Math.max(0, Number(livePayload.total_outstanding_no_penalty || 0));
+      // Convert to "net" terms (consistent with previous targetInfo.netOutstanding usage)
+      // We treat outstanding as gross-required so we keep the same UI shape.
+      const netOutstanding = grossOutstanding;
+
+      // Current cycle paid/required (for the display strip)
       let paidThisCycle = 0;
       let cycleNetTarget = contributionAmount * (1 - commissionRate);
       const todayIso = new Date().toISOString();
+      const { data: unpaid } = await supabase
+        .from('member_cycle_payments')
+        .select('amount_due, amount_paid, cycle_id, contribution_cycles!cycle_id(end_date, payout_processed)')
+        .eq('member_id', memberId)
+        .eq('is_paid', false);
       for (const row of unpaid || []) {
         const cyc: any = (row as any).contribution_cycles;
-        // Skip already paid-out cycles (defensive)
         if (cyc?.payout_processed) continue;
         const due = Number(row.amount_due || 0);
         const paid = Number(row.amount_paid || 0);
-        netOutstanding += Math.max(0, due - paid);
-        // Current-cycle stats (end_date in future)
         if (cyc?.end_date && cyc.end_date >= todayIso) {
           paidThisCycle = paid;
           cycleNetTarget = due;

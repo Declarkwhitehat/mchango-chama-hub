@@ -34,53 +34,17 @@ export const CurrentCyclePool = ({
   const load = async () => {
     setLoading(true);
     try {
-      const nowIso = new Date().toISOString();
-      // 1) Prefer a cycle whose window brackets "now"
-      let { data: cycle } = await supabase
-        .from("contribution_cycles")
-        .select("id")
-        .eq("chama_id", chamaId)
-        .lte("start_date", nowIso)
-        .gte("end_date", nowIso)
-        .order("cycle_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // 2) Fallback: latest open (not yet paid out) cycle — handles the
-      // gap between an expired window and the next cycle being created,
-      // so wallet credits already applied to the next cycle still show.
-      if (!cycle) {
-        const { data: openCycle } = await supabase
-          .from("contribution_cycles")
-          .select("id")
-          .eq("chama_id", chamaId)
-          .eq("payout_processed", false)
-          .order("cycle_number", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        cycle = openCycle || null;
-      }
-
-      if (!cycle) {
-        setCollectedNet(0);
-        setPaidCount(0);
-        return;
-      }
-
-      const { data: payments } = await supabase
-        .from("member_cycle_payments")
-        .select("amount_paid, amount_due, fully_paid")
-        .eq("cycle_id", cycle.id);
-
-      const rows = payments || [];
-      const grossInPool = rows.reduce(
-        (s, r) => s + Math.min(Number(r.amount_paid || 0), Number(r.amount_due || 0)),
-        0
-      );
-      const net = grossInPool * (1 - commissionRate);
-      setCollectedNet(net);
-      setPaidCount(rows.filter((r) => r.fully_paid).length);
-      setTotalMembers(rows.length);
+      // Authoritative server-side RPC — bypasses per-member RLS so every
+      // member sees identical numbers for the current cycle pool.
+      const { data, error } = await supabase.rpc("get_chama_current_pool", {
+        p_chama_id: chamaId,
+      });
+      if (error) throw error;
+      const payload: any = data || {};
+      if (payload.error) throw new Error(payload.error);
+      setCollectedNet(Number(payload.collected_net || 0));
+      setPaidCount(Number(payload.paid_count || 0));
+      setTotalMembers(Number(payload.total_members || 0));
     } catch (e) {
       console.error("CurrentCyclePool load error", e);
     } finally {

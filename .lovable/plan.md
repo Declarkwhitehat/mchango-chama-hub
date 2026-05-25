@@ -1,43 +1,80 @@
-## Goal
-UI/text-only changes — no business logic changes. Cycle still actually closes at 22:00 EAT; only the displayed deadline and a couple of labels change.
+## What I found
 
-## Changes
+- **Different pool amounts per user:** non-manager members can only read their own `member_cycle_payments`, so `CurrentCyclePool` undercounts the pool for regular members. Managers/admins see more rows, so they see different totals.
+- **CLWXM0009 stale negative balance:** the real debt rows show CLWXM0009 still owes Cycle 4 and Cycle 5, but `chama_members.balance_deficit` is a stale stored value. Payments clear `chama_member_debts`, but the member dashboard still reads the stale column instead of recalculating from live debt/payment rows.
+- **Pay-for-another failure:** the frontend calculates “what another member owes” differently from the backend validator. The UI skips already processed unpaid cycles, while the backend counts them, so the user sends too little and the online payment function rejects it.
+- **Skipped payout display:** CLWXM0009 was skipped for Cycle 4, but the UI can still present payout progress too positively because it treats completed/processed cycles as “received” without clearly showing skipped/deferred status and actual paid amount.
+- **Wrong “all members received” message:** `chama-cycle-complete` hardcodes “All members have received their payouts,” even when there were skipped/deferred members or unpaid deficits.
+- **SMS inconsistency:** there are two SMS paths: some functions call the central transactional SMS service, while `daily-payout-cron` sends directly through a separate provider helper. Failures are not logged/queued consistently, so messages can silently fail.
 
-### 1. Payout label — "Receiving Now" → "Receiving Today"
-- `src/pages/ChamaDetail.tsx` line 1129: badge text `Receiving Now` → `Receiving Today`.
+## Implementation plan
 
-### 2. "Pay for another member" auto-pulls selected member's dues
-- `src/components/ChamaPaymentForm.tsx`:
-  - When `paymentType === "other"` and `targetMemberId` changes, query that member's outstanding (current cycle unpaid balance + missed cycles) and their wallet credit, then:
-    - Recompute `requiredAmount` from the target's net-still-needed instead of the logged-in user's.
-    - Show a small panel: target member's name, member code, what they have paid this cycle, and "He/She should pay: KES X" (or "Already fully paid" when nothing is due).
-  - When switching back to `self`, restore current-user figures.
-  - Phone number stays the payer's (logged-in user) — they're paying on the other person's behalf.
+1. **Make pool totals authoritative and identical for every member**
+   - Add a backend read function that returns the current/open cycle pool using service-level access but only after confirming the caller is a valid chama member, manager, or admin.
+   - Update `CurrentCyclePool` to use this function instead of reading `member_cycle_payments` directly.
+   - Include paid count, total count, actual net pool, expected target, and current cycle id.
 
-### 3. Show deadline as "8:00 PM" everywhere (Kenya time), drop "EAT" suffix
-No backend cron timing changes — only the displayed strings.
+2. **Fix member debt/dashboard balances**
+   - Update `get_member_dashboard` to compute live outstanding balance from:
+     - unpaid `member_cycle_payments`
+     - outstanding/partial `chama_member_debts`
+     - pending deficit obligations
+   - Stop relying on stale `chama_members.balance_deficit` for dashboard balance.
+   - Add a small backend function to recompute and sync `balance_deficit`, `missed_payments_count`, and verification flags after every settlement.
+   - Call this sync inside `contributions-crud` after debt settlement and current-cycle allocation.
 
-- `supabase/functions/daily-reminder-cron/index.ts`:
-  - Replace the `dueTime` formatted from `cycle.end_date` with a fixed `"8:00 PM"` passed into `NotificationTemplates.paymentReminder`.
-  - SMS template lines 165–166:
-    - `Final reminder: deadline 22:00 EAT today.` → `Final reminder: pay before 8:00 PM today (Kenya time).`
-    - `Deadline: 22:00 EAT today.` → `Deadline: 8:00 PM today (Kenya time).`
-- `supabase/functions/chama-grace-reminders/index.ts`:
-  - Push message: `due by 10:00 PM Kenya time today` → `due by 8:00 PM today (Kenya time)`.
-  - SMS message: `due by 10PM today` → `due by 8:00 PM today`.
-- `supabase/functions/chama-start/index.ts` (line 312) and `supabase/functions/chama-start-new-cycle/index.ts` (line 479):
-  - In the start-of-chama / new-cycle SMS, replace `10:00 PM EAT` / `10:00 PM` deadline references with `8:00 PM (Kenya time)`. Payout time text stays as-is (payout still happens at 22:00 EAT).
-- UI badges/labels:
-  - `src/components/chama/PaymentCountdownTimer.tsx` line 215: `10:00 PM Cutoff` → `8:00 PM Cutoff`.
-  - `src/components/chama/PaymentCountdownTimer.tsx` line 276: `Payments after 10:00 PM will be marked as LATE…` → `Payments after 8:00 PM will be marked as LATE…`.
-  - `src/components/chama/PaymentStatusManager.tsx` line 520: `10:00 PM the next day (Kenya time)` → `8:00 PM the next day (Kenya time)`.
-  - `src/components/chama/PaymentStatusManager.tsx` line 596: `10:00 PM Cutoff` → `8:00 PM Cutoff`.
-  - `src/components/MemberDashboard.tsx` line 228: `10:00 PM Kenya time the next day` → `8:00 PM the next day (Kenya time)`.
-  - `src/components/chama/PreStartDashboard.tsx` line 183: `10:00 PM the next day` → `8:00 PM the next day`.
+3. **Fix pay-for-another online payments**
+   - Reuse the same backend eligibility/outstanding function for both self-pay and pay-for-another.
+   - Update `ChamaPaymentForm` so the prefilled amount exactly matches the backend minimum, including old unpaid processed cycles and debts.
+   - Improve the payment error message to show the required amount if rejection still happens.
 
-## Out of scope (intentionally not changed)
-- The actual cycle close / payout time stays at 22:00 EAT. No DB, cron schedule, commission cutoff, or `chamaDeadlines.ts` helper changes.
-- No new memory rules added — this is a wording adjustment only.
+4. **Correct payout and skipped-member display**
+   - Update payout tabs to show:
+     - **Received** only when a withdrawal exists and is completed/processing for that member.
+     - **Skipped / deferred** when `was_skipped`, `payout_skips`, or a redirected cycle exists.
+     - **Actual received** from `contribution_cycles.payout_amount` / matching withdrawal `net_amount`, not theoretical full amount.
+     - **Shortfall still owed** when deficits remain outstanding.
+   - If a member expected KES 95 but received KES 79, show KES 79 received and KES 16 pending until late debt settlement completes.
 
-## Deploy
-After edits, redeploy `daily-reminder-cron`, `chama-grace-reminders`, `chama-start`, and `chama-start-new-cycle`.
+5. **Keep debt settlement open after cycle completion**
+   - Allow payments to settle outstanding chama debts even when the chama is `cycle_complete`.
+   - Route late debt payments to the shortchanged recipient using the existing deficit-settlement withdrawal flow.
+   - Keep showing payment UI when a cycle is complete **only if the member has outstanding debt**.
+
+6. **Fix cycle-complete wording and reminders**
+   - Update `chama-cycle-complete` to inspect actual payouts, skipped members, and outstanding deficits before messaging.
+   - Use accurate messages:
+     - all paid: “Cycle complete. All payouts completed.”
+     - not all paid: “Cycle ended, but some payouts/debts are still pending.”
+   - Send manager summary listing skipped/debtor members and outstanding amounts.
+   - Send debtor reminders to clear debts after cycle completion.
+
+7. **Unify SMS delivery**
+   - Replace direct SMS helper calls in `daily-payout-cron` with the central `send-transactional-sms` function.
+   - Add durable `sms_delivery_logs` records for success/failure so missing SMS can be traced.
+   - Add retries for transient SMS gateway failures.
+   - Keep SMS text GSM-safe and under practical length limits.
+
+8. **Data repair for AMABUKO / CLWXM0009**
+   - Run a safe backend data repair to recompute AMABUKO member balances from actual debt/payment rows.
+   - Reclassify CLWXM0009’s displayed balance based on the two outstanding debt rows and current unpaid cycle rows.
+   - Ensure cycle 5 / last-cycle state does not mark the chama as fully settled while outstanding debts remain.
+
+## Technical changes needed
+
+- Database migration:
+  - New RPC for authoritative current pool.
+  - New RPC/helper to recompute member debt summary.
+  - Optional `sms_delivery_logs` table with secure access rules.
+- Backend functions:
+  - `contributions-crud`
+  - `daily-payout-cron`
+  - `chama-cycle-complete`
+  - `payment-stk-push`
+- Frontend:
+  - `CurrentCyclePool.tsx`
+  - `ChamaPaymentForm.tsx`
+  - `MemberDashboard.tsx`
+  - `ChamaDetail.tsx`
+
+After approval, I’ll implement these fixes and then validate against AMABUKO / CLWXM0009 records directly.
