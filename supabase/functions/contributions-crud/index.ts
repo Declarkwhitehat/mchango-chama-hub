@@ -443,6 +443,44 @@ async function settleDebts(
       ...(newStatus === 'cleared' ? { cleared_at: new Date().toISOString() } : {}),
       payment_allocations: JSON.stringify([...existingAllocs, debtAllocEntry])
     }).eq('id', debt.id);
+
+    // SYNC member_cycle_payments so dashboards/history reflect that the
+    // member fulfilled their obligation for this cycle (principal goes to the
+    // shortchanged recipient, but the duty is met).
+    try {
+      const clearedThisPass = debtAllocEntry.principal_cleared + debtAllocEntry.penalty_cleared;
+      if (clearedThisPass > 0) {
+        const { data: existingMcp } = await supabase
+          .from('member_cycle_payments')
+          .select('id, amount_due, amount_paid, payment_allocations, cycle_id')
+          .eq('cycle_id', (debt as any).cycle_id)
+          .eq('member_id', memberId)
+          .maybeSingle();
+        if (existingMcp) {
+          const newAmountPaid = Number(existingMcp.amount_paid || 0) + debtAllocEntry.principal_cleared;
+          const due = Number(existingMcp.amount_due || contributionAmount);
+          const newRemaining = Math.max(0, due - newAmountPaid);
+          const isFully = newStatus === 'cleared' || newRemaining <= 0;
+          const mcpAllocs = Array.isArray(existingMcp.payment_allocations) ? existingMcp.payment_allocations : [];
+          await supabase.from('member_cycle_payments').update({
+            amount_paid: newAmountPaid,
+            amount_remaining: newRemaining,
+            fully_paid: isFully,
+            is_paid: isFully,
+            ...(isFully ? { paid_at: new Date().toISOString() } : {}),
+            payment_allocations: JSON.stringify([...mcpAllocs, {
+              source: 'debt_settlement',
+              debt_id: debt.id,
+              principal_credited: debtAllocEntry.principal_cleared,
+              penalty_paid: debtAllocEntry.penalty_cleared,
+              timestamp: new Date().toISOString()
+            }])
+          }).eq('id', existingMcp.id);
+        }
+      }
+    } catch (mcpSyncErr) {
+      console.error('[contributions-crud] mcp sync after debt settlement failed:', mcpSyncErr);
+    }
   }
 
   // ── STEP 3: Apply remaining to current cycle ──
