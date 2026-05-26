@@ -192,8 +192,15 @@ async function accrueDebtsForCycle(
     const memberId = payment.member_id || payment.chama_members?.id;
     if (!memberId) continue;
 
-    const principalDebt = contributionAmount;
-    const penaltyDebt = contributionAmount * LATE_PENALTY_RATE;
+    // CRITICAL FIX: compute principal owed net of whatever was already paid
+    // (e.g. wallet credits) so we don't double count when recomputing balances.
+    const alreadyPaid = Number(payment.amount_paid || 0);
+    const principalDebt = Math.max(0, Number(contributionAmount) - alreadyPaid);
+    if (principalDebt <= 0) {
+      console.log(`ℹ️ Skipping debt accrual for member ${memberId} cycle ${cycleId} — already fully paid (KES ${alreadyPaid})`);
+      continue;
+    }
+    const penaltyDebt = principalDebt * LATE_PENALTY_RATE;
 
     // Check if debt already exists for this member+cycle to prevent duplicates
     const { data: existingDebt } = await supabase
@@ -207,6 +214,7 @@ async function accrueDebtsForCycle(
       console.log(`ℹ️ Debt already exists for member ${memberId} cycle ${cycleId} — skipping`);
       continue;
     }
+
 
     const { data: debt, error: debtError } = await supabase
       .from('chama_member_debts')

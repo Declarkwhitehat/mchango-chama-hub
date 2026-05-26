@@ -315,8 +315,10 @@ serve(async (req) => {
       });
 
       if (rpcError || !rpcResult?.success) {
+        // CRITICAL: Safaricom already disbursed funds. Never flip to 'failed'
+        // here — that caused duplicate payouts on retry. Log + alert only.
         const atomicError = rpcError?.message || rpcResult?.error || 'Atomic completion failed';
-        console.error('CRITICAL: Atomic completion failed, not marking as completed:', {
+        console.error('CRITICAL: Atomic completion RPC failed AFTER successful Safaricom callback:', {
           withdrawalId: withdrawal.id,
           atomicError,
           rpcResult,
@@ -325,18 +327,35 @@ serve(async (req) => {
         await supabaseAdmin
           .from('withdrawals')
           .update({
-            status: 'failed',
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            payment_reference: transactionId || conversationId || withdrawal.payment_reference,
             b2c_error_details: {
-              atomic_completion_failed: true,
+              post_completion_alert: true,
               reason: atomicError,
               callback_result_code: resultCode,
               callback_result_desc: resultDesc,
             },
-            notes: (withdrawal.notes || '') + `\n[SYSTEM] Callback success received but atomic completion failed: ${atomicError}`,
+            notes: (withdrawal.notes || '') + `\n[SYSTEM] Safaricom disbursed funds. Atomic deduction warning: ${atomicError}. Admin reconciliation required.`,
           })
           .eq('id', withdrawal.id);
+
+        try {
+          await supabaseAdmin.from('withdrawal_reconciliation_alerts').insert({
+            withdrawal_id: withdrawal.id,
+            alert_type: 'rpc_post_completion_error',
+            severity: 'high',
+            required_amount: withdrawal.amount,
+            details: { atomicError, transactionId, conversationId },
+          });
+        } catch (alertErr) {
+          console.error('Failed to record reconciliation alert:', alertErr);
+        }
       } else {
         console.log('Atomic completion result:', rpcResult);
+        if (rpcResult?.shortfall && Number(rpcResult.shortfall) > 0) {
+          console.warn(`[b2c-callback] Withdrawal ${withdrawal.id} completed with shortfall KES ${rpcResult.shortfall}`);
+        }
       }
 
       // Record commission as company earning

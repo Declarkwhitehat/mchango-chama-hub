@@ -360,7 +360,17 @@ export const WithdrawalsManagement = () => {
   };
 
   const isMpesaPayment = selectedWithdrawal?.payment_method?.method_type === 'mpesa';
-  const isRetryable = selectedWithdrawal && ['failed', 'pending_retry'].includes(selectedWithdrawal.status);
+  // GUARD: never offer "Retry" if Safaricom already confirmed disbursement —
+  // otherwise the recipient is paid twice. Detect via callback ResultCode 0
+  // or an existing ConversationID in notes.
+  const errDetails = selectedWithdrawal?.b2c_error_details as any;
+  const callbackWasSuccessful =
+    errDetails?.callback_result_code === 0 ||
+    errDetails?.post_completion_alert === true ||
+    (typeof selectedWithdrawal?.notes === 'string' && /ConvID=|AG_\d+/.test(selectedWithdrawal.notes));
+  const isRetryable = selectedWithdrawal
+    && ['failed', 'pending_retry'].includes(selectedWithdrawal.status)
+    && !callbackWasSuccessful;
   const isPendingApproval = selectedWithdrawal?.status === 'pending_approval';
 
   if (isLoading) {
@@ -619,6 +629,17 @@ export const WithdrawalsManagement = () => {
                       {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><RefreshCw className="h-4 w-4 mr-2" />Retry M-Pesa Payout</>}
                     </Button>
                   )}
+
+                  {/* DOUBLE-PAY GUARD: Safaricom already confirmed disbursement */}
+                  {selectedWithdrawal && ['failed','pending_retry'].includes(selectedWithdrawal.status) && callbackWasSuccessful && (
+                    <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-sm">
+                      <p className="font-semibold text-amber-700 dark:text-amber-400">Retry blocked — money was already sent.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Safaricom returned a successful B2C result for this withdrawal (ConversationID present or ResultCode 0). Re-triggering would pay the recipient twice. Use the reconciliation tools to mark it complete or adjust the source balance manually.
+                      </p>
+                    </div>
+                  )}
+
 
                   {/* Force Approve for welfare pending_approval */}
                   {isPendingApproval && (
