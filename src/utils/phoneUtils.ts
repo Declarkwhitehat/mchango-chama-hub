@@ -37,6 +37,8 @@ export const formatPhoneDisplay = (phone: string): string => {
   const normalized = normalizePhone(phone);
   if (!normalized) return phone;
   return `+${normalized}`;
+};
+
 
 /**
  * Validate Safaricom number using the full official prefix list.
