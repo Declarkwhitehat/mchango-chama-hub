@@ -37,4 +37,22 @@ export const formatPhoneDisplay = (phone: string): string => {
   const normalized = normalizePhone(phone);
   if (!normalized) return phone;
   return `+${normalized}`;
+
+/**
+ * Validate Safaricom number using the full official prefix list.
+ * Accepts (after normalising to 2547XXXXXXXX / 2541XXXXXXXX):
+ *   - 070x, 071x, 072x, 074x, 075x, 076x, 079x  (07XX series)
+ *   - 0110-0115                                 (011X series)
+ * Reject everything else (Airtel/Telkom etc.).
+ */
+export const isSafaricomNumber = (phone: string): boolean => {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return false;
+  const local = normalized.slice(3); // strip "254"
+  // 9-digit local part: first 3 chars decide network
+  // 7XX series: 700-729 (70/71/72), 740-746 (74), 750-759 (75), 760-769 (76), 790-799 (79)
+  if (/^7(0[0-9]|1[0-9]|2[0-9]|4[0-6]|5[0-9]|6[0-9]|9[0-9])/.test(local)) return true;
+  // 1XX series: 110-115
+  if (/^11[0-5]/.test(local)) return true;
+  return false;
 };
