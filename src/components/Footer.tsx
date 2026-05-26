@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Instagram, Facebook, Twitter } from "lucide-react";
+import { Facebook, Youtube } from "lucide-react";
 
 const BUILD_VERSION = new Date().toISOString().slice(0, 10).replace(/-/g, '') + '.1';
 
@@ -53,28 +53,32 @@ const Footer = () => {
               <li>Phone: <a href="tel:+254755991325" className="hover:text-foreground transition-colors">+254 755 991 325</a></li>
               <li>Nairobi, Kenya</li>
             </ul>
-            <div className="flex gap-4 mt-4">
-              <a
-                href="https://www.instagram.com/4447de?igsh=MW90ZXZiYTk3ZTcxdA=="
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Instagram"
-              >
+            <a
+  href="https://www.tiktok.com/@pamojanova"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="text-muted-foreground hover:text-foreground transition-colors"
+  aria-label="TikTok"
+>
+  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/>
+  </svg>
+</a>
                 <Instagram className="h-5 w-5" />
               </a>
               <a
                 href="https://www.facebook.com/profile.php?id=61588113465884"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Facebook"
-              >
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a
-                href="https://twitter.com/yourhandle"
-                target="_blank"
+                <a
+  href="https://youtube.com/@pamojanova?si=hm1OTiJN8sw7jbrh"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="text-muted-foreground hover:text-foreground transition-colors"
+  aria-label="YouTube"
+>
+  <Youtube className="h-5 w-5" />
+</a>
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="Twitter"
