@@ -3577,6 +3577,56 @@ export type Database = {
           },
         ]
       }
+      withdrawal_reconciliation_alerts: {
+        Row: {
+          acknowledged: boolean
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          available_balance: number | null
+          created_at: string
+          details: Json | null
+          id: string
+          required_amount: number | null
+          severity: string
+          withdrawal_id: string
+        }
+        Insert: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          available_balance?: number | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          required_amount?: number | null
+          severity?: string
+          withdrawal_id: string
+        }
+        Update: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          available_balance?: number | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          required_amount?: number | null
+          severity?: string
+          withdrawal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_reconciliation_alerts_withdrawal_id_fkey"
+            columns: ["withdrawal_id"]
+            isOneToOne: false
+            referencedRelation: "withdrawals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       withdrawals: {
         Row: {
           amount: number
