@@ -630,6 +630,17 @@ export const WithdrawalsManagement = () => {
                     </Button>
                   )}
 
+                  {/* DOUBLE-PAY GUARD: Safaricom already confirmed disbursement */}
+                  {selectedWithdrawal && ['failed','pending_retry'].includes(selectedWithdrawal.status) && callbackWasSuccessful && (
+                    <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-sm">
+                      <p className="font-semibold text-amber-700 dark:text-amber-400">Retry blocked — money was already sent.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Safaricom returned a successful B2C result for this withdrawal (ConversationID present or ResultCode 0). Re-triggering would pay the recipient twice. Use the reconciliation tools to mark it complete or adjust the source balance manually.
+                      </p>
+                    </div>
+                  )}
+
+
                   {/* Force Approve for welfare pending_approval */}
                   {isPendingApproval && (
                     <Button onClick={handleForceApprove} disabled={isProcessing} className="w-full bg-amber-600 hover:bg-amber-700 text-white">
