@@ -360,7 +360,17 @@ export const WithdrawalsManagement = () => {
   };
 
   const isMpesaPayment = selectedWithdrawal?.payment_method?.method_type === 'mpesa';
-  const isRetryable = selectedWithdrawal && ['failed', 'pending_retry'].includes(selectedWithdrawal.status);
+  // GUARD: never offer "Retry" if Safaricom already confirmed disbursement —
+  // otherwise the recipient is paid twice. Detect via callback ResultCode 0
+  // or an existing ConversationID in notes.
+  const errDetails = selectedWithdrawal?.b2c_error_details as any;
+  const callbackWasSuccessful =
+    errDetails?.callback_result_code === 0 ||
+    errDetails?.post_completion_alert === true ||
+    (typeof selectedWithdrawal?.notes === 'string' && /ConvID=|AG_\d+/.test(selectedWithdrawal.notes));
+  const isRetryable = selectedWithdrawal
+    && ['failed', 'pending_retry'].includes(selectedWithdrawal.status)
+    && !callbackWasSuccessful;
   const isPendingApproval = selectedWithdrawal?.status === 'pending_approval';
 
   if (isLoading) {
