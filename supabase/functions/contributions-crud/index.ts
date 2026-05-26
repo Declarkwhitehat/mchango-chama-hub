@@ -204,7 +204,7 @@ async function settleDebts(
   const { data: debts } = await supabase
     .from('chama_member_debts')
     .select(`
-      id, principal_remaining, penalty_remaining, status, payment_allocations,
+      id, cycle_id, principal_remaining, penalty_remaining, status, payment_allocations,
       chama_cycle_deficits!debt_id(
         id, recipient_member_id, status
       ),
