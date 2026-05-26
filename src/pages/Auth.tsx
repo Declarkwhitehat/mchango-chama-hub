@@ -47,12 +47,7 @@ const loginSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-const SAFARICOM_PREFIXES = ['70', '71', '72', '74', '75', '76', '79', '110', '111'];
-
-const isSafaricomNumber = (phone: string): boolean => {
-  const numberPart = phone.replace('+254', '');
-  return SAFARICOM_PREFIXES.some(prefix => numberPart.startsWith(prefix));
-};
+import { isSafaricomNumber } from "@/utils/phoneUtils";
 
 const signupSchema = z.object({
   full_name: z.string().min(2, "Full name is required").max(100),
