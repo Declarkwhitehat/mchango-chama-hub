@@ -171,9 +171,13 @@ const AdminChamaDetail = () => {
       case 'pending':
         return <Badge variant="secondary">Pending</Badge>;
       case 'completed':
-        return <Badge className="bg-blue-600">Completed</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+  return <Badge className="bg-blue-600">Completed</Badge>;
+case 'cycle_complete':
+  return <Badge className="bg-purple-600">Cycle Complete</Badge>;
+case 'frozen':
+  return <Badge className="bg-gray-600">Frozen</Badge>;
+default:
+  return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -281,8 +285,11 @@ const AdminChamaDetail = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">Round {chama.current_cycle_round}</p>
+              <p className="text-2xl font-bold">Cycle #{chama.current_cycle_round}</p>
               <p className="text-xs text-muted-foreground">{cycles.length} total cycles</p>
+{pendingMembers.length > 0 && (
+  <p className="text-xs text-orange-500 font-medium">{pendingMembers.length} pending approval</p>
+)}
             </CardContent>
           </Card>
         </div>
@@ -311,7 +318,7 @@ const AdminChamaDetail = () => {
         {/* Detailed Tabs */}
         <Tabs defaultValue="members" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="members">Members ({members.length})</TabsTrigger>
+            <TabsTrigger value="members">Members ({approvedMembers.length}/{members.length})</TabsTrigger>
             <TabsTrigger value="cycles">Cycles</TabsTrigger>
             <TabsTrigger value="contributions">Contributions</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
