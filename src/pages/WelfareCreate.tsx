@@ -54,7 +54,7 @@ const WelfareCreate = () => {
     } finally {
       setLoading(false);
     }
-  }, [name, description, isPublic, whatsappLink, minPeriod, navigate]);
+  }, [name, description, isPublic, whatsappLink, minPeriod, registrationFee, navigate]);
 
   const { execute: handleCreate, isProcessing } = useDebounceAction(handleCreateInner);
 
