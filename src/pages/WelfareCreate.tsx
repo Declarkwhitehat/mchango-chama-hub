@@ -39,6 +39,7 @@ const WelfareCreate = () => {
           is_public: isPublic,
           whatsapp_link: whatsappLink.trim() || null,
           min_contribution_period_months: minPeriod,
+          registration_fee: Number(registrationFee) || 0,
         },
       });
 
