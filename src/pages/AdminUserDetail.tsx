@@ -780,12 +780,14 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
                           )}
                           {membership.status === 'removed' && (
                             <Badge variant="destructive">Removed</Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                          {(() => {
+            const net = Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0);
+            return (
+              <span className={net >= 0 ? 'text-green-600' : 'text-red-600'}>
+                {net >= 0 ? '+' : ''}KES {Math.abs(net).toLocaleString()}
+              </span>
+            );
+          })()}
               </CardContent>
             </Card>
           </TabsContent>
