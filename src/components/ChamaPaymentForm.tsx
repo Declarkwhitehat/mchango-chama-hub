@@ -567,6 +567,22 @@ export const ChamaPaymentForm = ({
                 <> (wallet credit of KES {walletCredit.toLocaleString()} already applied)</>
               )}
             </p>
+            {parseFloat(amount) > 0 && (
+              <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2 space-y-0.5">
+                <div className="flex justify-between">
+                  <span>You pay:</span>
+                  <span className="font-medium">KES {parseFloat(amount).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-orange-600">
+                  <span>Commission (5%):</span>
+                  <span className="font-medium">− KES {(parseFloat(amount) * 0.05).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-primary font-semibold border-t border-border pt-0.5">
+                  <span>Net to chama pool:</span>
+                  <span>KES {(parseFloat(amount) * 0.95).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
             {parseFloat(amount) > requiredAmount && (
               <p className="text-xs text-green-600">
                 Overpayment of KES {(parseFloat(amount) - requiredAmount).toLocaleString()} will be credited to your next cycle
