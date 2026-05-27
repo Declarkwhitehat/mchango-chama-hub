@@ -171,7 +171,26 @@ serve(async (req) => {
       }
 
       const body = await req.json();
-      const { name, description, is_public, whatsapp_link, min_contribution_period_months } = body;
+      const { name, description, is_public, whatsapp_link, min_contribution_period_months, registration_fee, approve_registration_fee } = body;
+
+      // Load existing welfare + requester role
+      const { data: existingW } = await supabaseAdmin
+        .from('welfares')
+        .select('id, registration_fee, registration_fee_pending, registration_fee_change_requested_by')
+        .eq('id', id)
+        .single();
+      if (!existingW) {
+        return new Response(JSON.stringify({ error: 'Welfare not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const { data: requesterMember } = await supabaseAdmin
+        .from('welfare_members')
+        .select('role')
+        .eq('welfare_id', id)
+        .eq('user_id', userData.user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      const isExecutive = !!requesterMember && ['chairman','secretary','treasurer'].includes(requesterMember.role);
 
       const updateData: Record<string, any> = {};
       if (name !== undefined) updateData.name = name;
@@ -179,6 +198,37 @@ serve(async (req) => {
       if (is_public !== undefined) updateData.is_public = is_public;
       if (whatsapp_link !== undefined) updateData.whatsapp_link = whatsapp_link;
       if (min_contribution_period_months !== undefined) updateData.min_contribution_period_months = min_contribution_period_months;
+
+      // ----- Registration fee dual-approval flow -----
+      if (approve_registration_fee === true) {
+        if (!isExecutive) {
+          return new Response(JSON.stringify({ error: 'Only executives can approve' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        if (existingW.registration_fee_pending === null || existingW.registration_fee_pending === undefined) {
+          return new Response(JSON.stringify({ error: 'No pending registration fee change' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        if (existingW.registration_fee_change_requested_by === userData.user.id) {
+          return new Response(JSON.stringify({ error: 'A different executive must approve the change' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        updateData.registration_fee = existingW.registration_fee_pending;
+        updateData.registration_fee_pending = null;
+        updateData.registration_fee_change_requested_by = null;
+        updateData.registration_fee_change_requested_at = null;
+      } else if (registration_fee !== undefined) {
+        if (!isExecutive) {
+          return new Response(JSON.stringify({ error: 'Only executives can change the registration fee' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const regFee = Number(registration_fee);
+        if (!Number.isFinite(regFee) || regFee < 0 || regFee > 100000) {
+          return new Response(JSON.stringify({ error: 'Registration fee must be between 0 and 100,000' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        if (Number(existingW.registration_fee || 0) === regFee) {
+          return new Response(JSON.stringify({ error: 'New value matches the current fee' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        updateData.registration_fee_pending = regFee;
+        updateData.registration_fee_change_requested_by = userData.user.id;
+        updateData.registration_fee_change_requested_at = new Date().toISOString();
+      }
 
       const { data, error } = await supabaseAdmin
         .from('welfares')
