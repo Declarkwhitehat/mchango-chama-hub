@@ -758,6 +758,35 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
                               </span>
                             </p>
                           </div>
+                        </div>
+
+                        {/* Additional Status Indicators */}
+                        <div className="flex flex-wrap gap-2">
+                          {membership.first_payment_completed && (
+                            <Badge variant="outline" className="text-green-600 border-green-600">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              First Payment Done
+                            </Badge>
+                          )}
+                          {!membership.first_payment_completed && membership.approval_status === 'approved' && (
+                            <Badge variant="outline" className="text-orange-600 border-orange-600">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Awaiting First Payment
+                            </Badge>
+                          )}
+                          {membership.requires_admin_verification && (
+                            <Badge variant="destructive">
+                              Needs Admin Verification
+                            </Badge>
+                          )}
+                          {membership.status === 'removed' && (
+                            <Badge variant="destructive">Removed</Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
