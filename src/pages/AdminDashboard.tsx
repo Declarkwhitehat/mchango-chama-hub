@@ -59,7 +59,6 @@ const AdminDashboard = () => {
         withdrawalsResult,
         callbacksResult,
         transactionsResult,
-        ledgerResult,
         execChangesResult,
         earningsResult,
         activeAccountsResult,
@@ -73,16 +72,14 @@ const AdminDashboard = () => {
         supabase.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('customer_callbacks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('transactions').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
-        supabase.from('financial_ledger').select('commission_amount'),
         supabase.from('welfare_executive_changes').select('*', { count: 'exact', head: true }).eq('admin_decision', 'pending'),
+        // FIX: Use company_earnings only — financial_ledger was causing double-count
         supabase.from('company_earnings').select('amount'),
-        // Active accounts: distinct users across chama_members(active)
         supabase.from('chama_members').select('user_id', { count: 'exact', head: false }).eq('status', 'active').not('user_id', 'is', null),
       ]);
 
-      const ledgerRevenue = ledgerResult.data?.reduce((sum, item) => sum + (item.commission_amount || 0), 0) || 0;
-      const earningsRevenue = earningsResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-      const totalPlatformRevenue = ledgerRevenue + earningsRevenue;
+      // FIX: Revenue from company_earnings only (single source of truth)
+      const totalPlatformRevenue = earningsResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
 
       // Count distinct active users from chama_members
       const uniqueUserIds = new Set<string>();
@@ -245,7 +242,7 @@ const AdminDashboard = () => {
             </div>
           </div>
           <p className="text-xs text-muted-foreground max-w-xs text-right">
-            Users participating in at least one active Chama, Welfare, Campaign, or Organization
+            Users participating in at least one active Chama
           </p>
         </div>
 
