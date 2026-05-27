@@ -244,11 +244,11 @@ const MchangoCreate = () => {
                     name="duration"
                     type="number"
                     placeholder="30"
-                    min="1"
+                    min="3"
                     max="90"
                     required
-
                   />
+                  <p className="text-xs text-muted-foreground">Minimum 3 days, maximum 90 days</p>
                 </div>
               </div>
 
