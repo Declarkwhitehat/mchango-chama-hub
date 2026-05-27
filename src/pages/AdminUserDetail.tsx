@@ -748,14 +748,14 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
 <div>
   <p className="text-xs text-muted-foreground">Net Balance</p>
   <p className="font-medium">
-    {(() => {
-      const net = Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0);
-      return (
-        <span className={net >= 0 ? 'text-green-600' : 'text-red-600'}>
-          {net >= 0 ? '+' : ''}KES {Math.abs(net).toLocaleString()}
-        </span>
-      );
-    })()}
+    <span className={
+      (Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0)) >= 0
+        ? 'text-green-600'
+        : 'text-red-600'
+    }>
+      {(Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0)) >= 0 ? '+' : ''}
+      KES {Math.abs(Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0)).toLocaleString()}
+    </span>
   </p>
 </div>
 
