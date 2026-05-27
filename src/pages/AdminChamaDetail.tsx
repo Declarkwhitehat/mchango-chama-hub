@@ -375,14 +375,24 @@ const AdminChamaDetail = () => {
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">
-                            {Number(member.balance_credit || 0) > 0 && (
-                              <Badge className="bg-green-600">+{Number(member.balance_credit).toLocaleString()}</Badge>
-                            )}
-                            {Number(member.balance_deficit || 0) > 0 && (
-                              <Badge variant="destructive">-{Number(member.balance_deficit).toLocaleString()}</Badge>
-                            )}
-                            {!member.balance_credit && !member.balance_deficit && '-'}
-                          </div>
+  {Number(member.balance_credit || 0) > 0 && (
+    <Badge className="bg-green-600">+{Number(member.balance_credit).toLocaleString()}</Badge>
+  )}
+  {Number(member.balance_deficit || 0) > 0 && (
+    <Badge variant="destructive">-{Number(member.balance_deficit).toLocaleString()}</Badge>
+  )}
+  {!member.balance_credit && !member.balance_deficit && '-'}
+  {(Number(member.balance_credit || 0) > 0 || Number(member.balance_deficit || 0) > 0) && (
+    <div className={`text-xs font-bold ${
+      (Number(member.balance_credit || 0) - Number(member.balance_deficit || 0)) >= 0
+        ? 'text-green-600'
+        : 'text-red-600'
+    }`}>
+      Net: {(Number(member.balance_credit || 0) - Number(member.balance_deficit || 0)) >= 0 ? '+' : ''}
+      KES {Math.abs(Number(member.balance_credit || 0) - Number(member.balance_deficit || 0)).toLocaleString()}
+    </div>
+  )}
+</div>
                         </TableCell>
                         <TableCell>
                           <Button
