@@ -874,52 +874,92 @@ serve(async (req) => {
       }
 
       if (matchedMember) {
-        // Record welfare contribution for matched member
-        const { data: contribution, error: contribError } = await supabase
-          .from('welfare_contributions')
-          .insert({
-            welfare_id: welfareData.id,
-            member_id: matchedMember.id,
-            user_id: matchedMember.user_id,
-            gross_amount: grossAmount,
-            commission_amount: commissionAmount,
-            net_amount: netAmount,
-            payment_reference: mpesaReceiptNumber,
-            payment_method: 'mpesa_offline',
-            payment_status: 'completed',
-            cycle_month: cycleMonth,
-            completed_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (contribError) {
-          console.error('Error recording welfare contribution:', contribError);
-          throw contribError;
-        }
-
-        // Update member total_contributed
-        const { data: memberData } = await supabase
+        // Pull member registration state
+        const { data: memberFull } = await supabase
           .from('welfare_members')
-          .select('total_contributed')
+          .select('registration_status, registration_fee_due, registration_fee_paid, total_contributed')
           .eq('id', matchedMember.id)
           .single();
 
+        // Allocate to registration fee first if pending/partial
+        let regApplied = 0;
+        let regFullyPaid = false;
+        if (memberFull && (memberFull.registration_status === 'pending' || memberFull.registration_status === 'partial')) {
+          const { data: allocRes } = await supabase.rpc('apply_welfare_registration_payment', {
+            p_member_id: matchedMember.id,
+            p_gross: grossAmount,
+          });
+          regApplied = Number(allocRes?.applied || 0);
+          regFullyPaid = !!allocRes?.fully_paid;
+        }
+
+        const recordRow = async (g: number, refSuffix: string, category: string) => {
+          const c = Math.round(g * commissionRate * 100) / 100;
+          const n = Math.round((g - c) * 100) / 100;
+          const ref = refSuffix ? `${mpesaReceiptNumber}-${refSuffix}` : mpesaReceiptNumber;
+          const { data: row, error: insErr } = await supabase
+            .from('welfare_contributions')
+            .insert({
+              welfare_id: welfareData.id,
+              member_id: matchedMember.id,
+              user_id: matchedMember.user_id,
+              gross_amount: g,
+              commission_amount: c,
+              net_amount: n,
+              payment_reference: ref,
+              payment_method: 'mpesa_offline',
+              payment_status: 'completed',
+              cycle_month: cycleMonth,
+              category,
+              completed_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+          if (insErr) {
+            console.error('Error recording welfare contribution row:', insErr);
+            throw insErr;
+          }
+          await supabase.rpc('record_company_earning', {
+            p_source: 'welfare_contribution',
+            p_amount: c,
+            p_group_id: welfareData.id,
+            p_reference_id: row?.id,
+            p_description: `Welfare offline ${category} commission (${(commissionRate * 100).toFixed(0)}%)`,
+          });
+          return { row, c, n };
+        };
+
+        let regNet = 0;
+        if (regApplied > 0) {
+          const r = await recordRow(regApplied, 'REG', 'registration_fee');
+          regNet = r.n;
+        }
+        const remainder = grossAmount - regApplied;
+        if (remainder > 0) {
+          await recordRow(remainder, '', 'contribution');
+        }
+
+        // Update member total_contributed
         await supabase
           .from('welfare_members')
-          .update({ total_contributed: (memberData?.total_contributed || 0) + grossAmount })
+          .update({ total_contributed: (memberFull?.total_contributed || 0) + grossAmount })
           .eq('id', matchedMember.id);
 
-        // Record company earning
-        await supabase.rpc('record_company_earning', {
-          p_source: 'welfare_contribution',
-          p_amount: commissionAmount,
-          p_group_id: welfareData.id,
-          p_reference_id: contribution?.id,
-          p_description: `Welfare offline contribution commission (${(commissionRate * 100).toFixed(0)}%)`
-        });
+        if (regFullyPaid) {
+          try {
+            await supabase.from('notifications').insert({
+              user_id: matchedMember.user_id,
+              title: 'Registration Confirmed',
+              message: `Your registration to "${welfareData.name}" is complete. You are now an active member.`,
+              type: 'success',
+              category: 'welfare',
+              related_entity_type: 'welfare',
+              related_entity_id: welfareData.id,
+            });
+          } catch (_) { /* ignore */ }
+        }
 
-        console.log('Welfare contribution recorded for matched member');
+        console.log('Welfare contribution recorded for matched member', { regApplied, remainder });
       } else {
         console.warn('No welfare member matched by phone. Welfare balance updated but no member contribution record created.');
       }
