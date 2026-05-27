@@ -738,56 +738,26 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
                             </p>
                           </div>
                           <div>
-  <p className="text-xs text-muted-foreground">Deficit</p>
-  <p className="font-medium">
-    {Number(membership.balance_deficit || 0) > 0 ? (
-      <span className="text-red-600">-KES {Number(membership.balance_deficit).toLocaleString()}</span>
-    ) : '-'}
-  </p>
-</div>
-<div>
-  <p className="text-xs text-muted-foreground">Net Balance</p>
-  <p className="font-medium">
-    <span className={
-      (Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0)) >= 0
-        ? 'text-green-600'
-        : 'text-red-600'
-    }>
-      {(Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0)) >= 0 ? '+' : ''}
-      KES {Math.abs(Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0)).toLocaleString()}
-    </span>
-  </p>
-</div>
-
-                        {/* Additional Status Indicators */}
-                        <div className="flex flex-wrap gap-2">
-                          {membership.first_payment_completed && (
-                            <Badge variant="outline" className="text-green-600 border-green-600">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              First Payment Done
-                            </Badge>
-                          )}
-                          {!membership.first_payment_completed && membership.approval_status === 'approved' && (
-                            <Badge variant="outline" className="text-orange-600 border-orange-600">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Awaiting First Payment
-                            </Badge>
-                          )}
-                          {membership.requires_admin_verification && (
-                            <Badge variant="destructive">
-                              Needs Admin Verification
-                            </Badge>
-                          )}
-                          {membership.status === 'removed' && (
-                            <Badge variant="destructive">Removed</Badge>
-                          {(() => {
-            const net = Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0);
-            return (
-              <span className={net >= 0 ? 'text-green-600' : 'text-red-600'}>
-                {net >= 0 ? '+' : ''}KES {Math.abs(net).toLocaleString()}
-              </span>
-            );
-          })()}
+                            <p className="text-xs text-muted-foreground">Deficit</p>
+                            <p className="font-medium">
+                              {Number(membership.balance_deficit || 0) > 0 ? (
+                                <span className="text-red-600">-KES {Number(membership.balance_deficit).toLocaleString()}</span>
+                              ) : '-'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Net Balance</p>
+                            <p className="font-medium">
+                              <span className={
+                                (Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0)) >= 0
+                                  ? 'text-green-600'
+                                  : 'text-red-600'
+                              }>
+                                {(Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0)) >= 0 ? '+' : ''}
+                                KES {Math.abs(Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0)).toLocaleString()}
+                              </span>
+                            </p>
+                          </div>
               </CardContent>
             </Card>
           </TabsContent>
