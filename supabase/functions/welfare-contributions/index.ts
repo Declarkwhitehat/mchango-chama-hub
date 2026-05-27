@@ -183,15 +183,25 @@ serve(async (req) => {
         .eq('id', member.id);
 
       const contribution = primaryContribution;
-      const error: any = null;
       const commissionAmount = totalCommission;
       const netAmount = totalNet;
-      // (commission already recorded per-row above)
-      const _noop = { p_source: 'welfare_contribution', p_amount: commissionAmount,
-        p_group_id: welfare_id,
-        p_reference_id: contribution.id,
-        p_description: `Welfare contribution commission (${(commissionRate * 100).toFixed(0)}%)`
-      });
+
+      // Notify member if registration just became confirmed
+      if (regFullyPaid) {
+        try {
+          const { data: w } = await supabaseAdmin.from('welfares').select('name').eq('id', welfare_id).single();
+          await supabaseAdmin.from('notifications').insert({
+            user_id: userData.user.id,
+            title: 'Registration Confirmed',
+            message: `Your registration to "${w?.name || 'the welfare'}" is complete. You are now an active member.`,
+            type: 'success',
+            category: 'welfare',
+            related_entity_type: 'welfare',
+            related_entity_id: welfare_id,
+          });
+        } catch (_) { /* ignore */ }
+      }
+
 
       // Push + in-app notification + confirmation SMS to the contributing member
       try {
