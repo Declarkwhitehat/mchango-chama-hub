@@ -99,10 +99,15 @@ serve(async (req) => {
       }
 
       const body = await req.json();
-      const { name, description, is_public, whatsapp_link, min_contribution_period_months } = body;
+      const { name, description, is_public, whatsapp_link, min_contribution_period_months, registration_fee } = body;
 
       if (!name || name.trim().length < 3) {
         return new Response(JSON.stringify({ error: 'Name must be at least 3 characters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const regFee = Number(registration_fee || 0);
+      if (!Number.isFinite(regFee) || regFee < 0 || regFee > 100000) {
+        return new Response(JSON.stringify({ error: 'Registration fee must be between 0 and 100,000' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       // Check for duplicate name
@@ -129,6 +134,7 @@ serve(async (req) => {
           is_public: is_public !== false,
           whatsapp_link: whatsapp_link || null,
           min_contribution_period_months: min_contribution_period_months || 3,
+          registration_fee: regFee,
         })
         .select()
         .single();
