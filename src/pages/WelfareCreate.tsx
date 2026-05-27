@@ -21,6 +21,7 @@ const WelfareCreate = () => {
   const [isPublic, setIsPublic] = useState(true);
   const [whatsappLink, setWhatsappLink] = useState("");
   const [minPeriod, setMinPeriod] = useState(3);
+  const [registrationFee, setRegistrationFee] = useState(0);
 
   const handleCreateInner = useCallback(async () => {
     if (!name.trim() || name.trim().length < 3) {
