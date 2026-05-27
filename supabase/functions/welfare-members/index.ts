@@ -159,6 +159,18 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'welfare_id or group_code required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      // Pull registration fee + welfare name for SMS
+      const { data: welfareInfo } = await supabaseAdmin
+        .from('welfares')
+        .select('name, registration_fee')
+        .eq('id', targetWelfareId)
+        .single();
+      const regFee = Number(welfareInfo?.registration_fee || 0);
+      const wName = welfareInfo?.name || 'Welfare';
+
+      const initialRegStatus = regFee > 0 ? 'pending' : 'confirmed';
+      const initialDeadline = regFee > 0 ? new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() : null;
+
       const { data: existing } = await supabaseAdmin
         .from('welfare_members')
         .select('id, status')
@@ -170,26 +182,44 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Already a member' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Rejoin: reactivate existing member with same member_code
+      // Rejoin: reactivate existing member with same member_code; reset registration if fee applies
       if (existing && (existing.status === 'left' || existing.status === 'removed')) {
         const { data, error } = await supabaseAdmin
           .from('welfare_members')
-          .update({ status: 'active', role: 'member' })
+          .update({
+            status: 'active',
+            role: 'member',
+            registration_status: initialRegStatus,
+            registration_fee_due: regFee,
+            registration_fee_paid: 0,
+            registration_deadline: initialDeadline,
+            registration_last_reminder_at: null,
+          })
           .eq('id', existing.id)
           .select('*, profiles:user_id(full_name, phone)')
           .single();
 
         if (error) throw error;
+        await sendRegistrationJoinNotice(supabaseAdmin, data, wName, regFee);
         return new Response(JSON.stringify({ data, rejoined: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       const { data, error } = await supabaseAdmin
         .from('welfare_members')
-        .insert({ welfare_id: targetWelfareId, user_id: user.id, role: 'member', status: 'active' })
+        .insert({
+          welfare_id: targetWelfareId,
+          user_id: user.id,
+          role: 'member',
+          status: 'active',
+          registration_status: initialRegStatus,
+          registration_fee_due: regFee,
+          registration_deadline: initialDeadline,
+        })
         .select('*, profiles:user_id(full_name, phone)')
         .single();
 
       if (error) throw error;
+      await sendRegistrationJoinNotice(supabaseAdmin, data, wName, regFee);
       return new Response(JSON.stringify({ data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
