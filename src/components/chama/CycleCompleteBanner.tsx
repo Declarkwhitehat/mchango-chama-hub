@@ -14,6 +14,8 @@ interface CycleCompleteBannerProps {
   contributionAmount?: number;
   contributionFrequency?: string;
   minMembers?: number;
+  isFrozen?: boolean;
+  outstandingDebt?: number;
 }
 
 export function CycleCompleteBanner({ 
@@ -22,7 +24,9 @@ export function CycleCompleteBanner({
   userId, 
   contributionAmount, 
   contributionFrequency,
-  minMembers 
+  minMembers,
+  isFrozen = false,
+  outstandingDebt = 0,
 }: CycleCompleteBannerProps) {
   const [rejoinRequest, setRejoinRequest] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -141,7 +145,15 @@ export function CycleCompleteBanner({
             </div>
           )}
 
-          {!rejoinRequest && (
+         {isFrozen ? (
+            <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
+              ❄️ Your account is frozen. Clear your outstanding balance of KES {outstandingDebt.toLocaleString()} first, then you can rejoin.
+            </div>
+          ) : outstandingDebt > 0 ? (
+            <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-300 dark:border-orange-700 rounded-lg text-sm text-orange-700 dark:text-orange-400">
+              ⚠️ You have an outstanding balance of KES {outstandingDebt.toLocaleString()}. You must clear this before rejoining. Late payment rules apply.
+            </div>
+          ) : !rejoinRequest ? (
             <div className="space-y-3">
               <div className="flex items-center justify-center gap-2">
                 <Checkbox 
@@ -168,7 +180,7 @@ export function CycleCompleteBanner({
                 )}
               </Button>
             </div>
-          )}
+          ) : null}
 
           {rejoinRequest?.status === 'pending' && (
             <Badge variant="secondary" className="text-base px-4 py-2">
