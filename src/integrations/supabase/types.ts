@@ -3132,6 +3132,7 @@ export type Database = {
       }
       welfare_contributions: {
         Row: {
+          category: string
           commission_amount: number | null
           completed_at: string | null
           created_at: string
@@ -3149,6 +3150,7 @@ export type Database = {
           welfare_id: string
         }
         Insert: {
+          category?: string
           commission_amount?: number | null
           completed_at?: string | null
           created_at?: string
@@ -3166,6 +3168,7 @@ export type Database = {
           welfare_id: string
         }
         Update: {
+          category?: string
           commission_amount?: number | null
           completed_at?: string | null
           created_at?: string
@@ -3362,6 +3365,11 @@ export type Database = {
           is_eligible_for_withdrawal: boolean | null
           joined_at: string
           member_code: string | null
+          registration_deadline: string | null
+          registration_fee_due: number
+          registration_fee_paid: number
+          registration_last_reminder_at: string | null
+          registration_status: string
           role: string
           status: string
           total_contributed: number | null
@@ -3374,6 +3382,11 @@ export type Database = {
           is_eligible_for_withdrawal?: boolean | null
           joined_at?: string
           member_code?: string | null
+          registration_deadline?: string | null
+          registration_fee_due?: number
+          registration_fee_paid?: number
+          registration_last_reminder_at?: string | null
+          registration_status?: string
           role?: string
           status?: string
           total_contributed?: number | null
@@ -3386,6 +3399,11 @@ export type Database = {
           is_eligible_for_withdrawal?: boolean | null
           joined_at?: string
           member_code?: string | null
+          registration_deadline?: string | null
+          registration_fee_due?: number
+          registration_fee_paid?: number
+          registration_last_reminder_at?: string | null
+          registration_status?: string
           role?: string
           status?: string
           total_contributed?: number | null
@@ -3402,6 +3420,44 @@ export type Database = {
           },
           {
             foreignKeyName: "welfare_members_welfare_id_fkey"
+            columns: ["welfare_id"]
+            isOneToOne: false
+            referencedRelation: "welfares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      welfare_registration_credits: {
+        Row: {
+          amount: number
+          consumed_at: string | null
+          consumed_member_id: string | null
+          created_at: string
+          id: string
+          user_id: string
+          welfare_id: string
+        }
+        Insert: {
+          amount: number
+          consumed_at?: string | null
+          consumed_member_id?: string | null
+          created_at?: string
+          id?: string
+          user_id: string
+          welfare_id: string
+        }
+        Update: {
+          amount?: number
+          consumed_at?: string | null
+          consumed_member_id?: string | null
+          created_at?: string
+          id?: string
+          user_id?: string
+          welfare_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_registration_credits_welfare_id_fkey"
             columns: ["welfare_id"]
             isOneToOne: false
             referencedRelation: "welfares"
@@ -3493,6 +3549,10 @@ export type Database = {
           min_contribution_period_months: number | null
           name: string
           paybill_account_id: string | null
+          registration_fee: number
+          registration_fee_change_requested_at: string | null
+          registration_fee_change_requested_by: string | null
+          registration_fee_pending: number | null
           slug: string
           status: string
           total_commission_paid: number | null
@@ -3526,6 +3586,10 @@ export type Database = {
           min_contribution_period_months?: number | null
           name: string
           paybill_account_id?: string | null
+          registration_fee?: number
+          registration_fee_change_requested_at?: string | null
+          registration_fee_change_requested_by?: string | null
+          registration_fee_pending?: number | null
           slug: string
           status?: string
           total_commission_paid?: number | null
@@ -3559,6 +3623,10 @@ export type Database = {
           min_contribution_period_months?: number | null
           name?: string
           paybill_account_id?: string | null
+          registration_fee?: number
+          registration_fee_change_requested_at?: string | null
+          registration_fee_change_requested_by?: string | null
+          registration_fee_pending?: number | null
           slug?: string
           status?: string
           total_commission_paid?: number | null
@@ -3844,6 +3912,10 @@ export type Database = {
       admin_clear_payout_default: { Args: { p_user_id: string }; Returns: Json }
       admin_search: {
         Args: { p_query: string; p_type?: string }
+        Returns: Json
+      }
+      apply_welfare_registration_payment: {
+        Args: { p_gross: number; p_member_id: string }
         Returns: Json
       }
       calculate_available_loan_pool: {

@@ -68,10 +68,10 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Welfare is frozen. Contact admin.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Get member record with total_contributed
+      // Get member record with total_contributed + registration status
       const { data: member } = await supabaseAdmin
         .from('welfare_members')
-        .select('id, total_contributed')
+        .select('id, total_contributed, registration_status, registration_fee_due, registration_fee_paid, member_code')
         .eq('welfare_id', welfare_id)
         .eq('user_id', userData.user.id)
         .eq('status', 'active')
@@ -83,13 +83,11 @@ serve(async (req) => {
 
       const commissionRate = Number(welfare.commission_rate) || COMMISSION_RATES.WELFARE;
       const grossAmount = Number(amount);
-      const commissionAmount = Math.round(grossAmount * commissionRate * 100) / 100;
-      const netAmount = Math.round((grossAmount - commissionAmount) * 100) / 100;
 
       const cycleMonth = new Date().toISOString().substring(0, 7);
       const paymentRef = payment_reference || `WC-${crypto.randomUUID().substring(0, 8)}`;
 
-      // Idempotency guard: check for duplicate payment_reference
+      // Idempotency guard
       const { data: existing } = await supabaseAdmin
         .from('welfare_contributions')
         .select('*')
@@ -102,34 +100,79 @@ serve(async (req) => {
         return new Response(JSON.stringify({ data: existing }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      const { data: contribution, error } = await supabaseAdmin
-        .from('welfare_contributions')
-        .insert({
-          welfare_id,
-          member_id: member.id,
-          user_id: userData.user.id,
-          gross_amount: grossAmount,
-          commission_amount: commissionAmount,
-          net_amount: netAmount,
-          payment_reference: paymentRef,
-          payment_method: payment_method || 'mpesa',
-          payment_status: 'completed',
-          cycle_month: cycleMonth,
-          completed_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+      // ===== Registration-fee allocation FIRST =====
+      let regApplied = 0;
+      let regFullyPaid = false;
+      if (member.registration_status === 'pending' || member.registration_status === 'partial') {
+        const { data: allocRes } = await supabaseAdmin.rpc('apply_welfare_registration_payment', {
+          p_member_id: member.id,
+          p_gross: grossAmount,
+        });
+        regApplied = Number(allocRes?.applied || 0);
+        regFullyPaid = !!allocRes?.fully_paid;
+      }
 
-      if (error) throw error;
+      const contributionGross = grossAmount - regApplied;
 
-      // Update welfare balances using actual DB values
+      // Helper to insert a welfare_contributions row + update balances
+      const recordRow = async (gross: number, refSuffix: string, category: string) => {
+        const commission = Math.round(gross * commissionRate * 100) / 100;
+        const net = Math.round((gross - commission) * 100) / 100;
+        const ref = refSuffix ? `${paymentRef}-${refSuffix}` : paymentRef;
+        const { data: row, error: insErr } = await supabaseAdmin
+          .from('welfare_contributions')
+          .insert({
+            welfare_id,
+            member_id: member.id,
+            user_id: userData.user.id,
+            gross_amount: gross,
+            commission_amount: commission,
+            net_amount: net,
+            payment_reference: ref,
+            payment_method: payment_method || 'mpesa',
+            payment_status: 'completed',
+            cycle_month: cycleMonth,
+            category,
+            completed_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        if (insErr) throw insErr;
+        await supabaseAdmin.rpc('record_company_earning', {
+          p_source: 'welfare_contribution',
+          p_amount: commission,
+          p_group_id: welfare_id,
+          p_reference_id: row.id,
+          p_description: `Welfare ${category} commission (${(commissionRate * 100).toFixed(0)}%)`,
+        });
+        return { row, commission, net };
+      };
+
+      let totalCommission = 0;
+      let totalNet = 0;
+      let primaryContribution: any = null;
+
+      if (regApplied > 0) {
+        const r = await recordRow(regApplied, 'REG', 'registration_fee');
+        totalCommission += r.commission;
+        totalNet += r.net;
+        primaryContribution = r.row;
+      }
+      if (contributionGross > 0) {
+        const r = await recordRow(contributionGross, '', 'contribution');
+        totalCommission += r.commission;
+        totalNet += r.net;
+        primaryContribution = r.row;
+      }
+
+      // Update welfare balances once
       await supabaseAdmin
         .from('welfares')
         .update({
           total_gross_collected: (welfare.total_gross_collected || 0) + grossAmount,
-          total_commission_paid: (welfare.total_commission_paid || 0) + commissionAmount,
-          available_balance: (welfare.available_balance || 0) + netAmount,
-          current_amount: (welfare.current_amount || 0) + netAmount,
+          total_commission_paid: (welfare.total_commission_paid || 0) + totalCommission,
+          available_balance: (welfare.available_balance || 0) + totalNet,
+          current_amount: (welfare.current_amount || 0) + totalNet,
         })
         .eq('id', welfare_id);
 
@@ -139,14 +182,26 @@ serve(async (req) => {
         .update({ total_contributed: (member.total_contributed || 0) + grossAmount })
         .eq('id', member.id);
 
-      // Record company earning
-      await supabaseAdmin.rpc('record_company_earning', {
-        p_source: 'welfare_contribution',
-        p_amount: commissionAmount,
-        p_group_id: welfare_id,
-        p_reference_id: contribution.id,
-        p_description: `Welfare contribution commission (${(commissionRate * 100).toFixed(0)}%)`
-      });
+      const contribution = primaryContribution;
+      const commissionAmount = totalCommission;
+      const netAmount = totalNet;
+
+      // Notify member if registration just became confirmed
+      if (regFullyPaid) {
+        try {
+          const { data: w } = await supabaseAdmin.from('welfares').select('name').eq('id', welfare_id).single();
+          await supabaseAdmin.from('notifications').insert({
+            user_id: userData.user.id,
+            title: 'Registration Confirmed',
+            message: `Your registration to "${w?.name || 'the welfare'}" is complete. You are now an active member.`,
+            type: 'success',
+            category: 'welfare',
+            related_entity_type: 'welfare',
+            related_entity_id: welfare_id,
+          });
+        } catch (_) { /* ignore */ }
+      }
+
 
       // Push + in-app notification + confirmation SMS to the contributing member
       try {

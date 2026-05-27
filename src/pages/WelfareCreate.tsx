@@ -21,6 +21,7 @@ const WelfareCreate = () => {
   const [isPublic, setIsPublic] = useState(true);
   const [whatsappLink, setWhatsappLink] = useState("");
   const [minPeriod, setMinPeriod] = useState(3);
+  const [registrationFee, setRegistrationFee] = useState(0);
 
   const handleCreateInner = useCallback(async () => {
     if (!name.trim() || name.trim().length < 3) {
@@ -38,6 +39,7 @@ const WelfareCreate = () => {
           is_public: isPublic,
           whatsapp_link: whatsappLink.trim() || null,
           min_contribution_period_months: minPeriod,
+          registration_fee: Number(registrationFee) || 0,
         },
       });
 
@@ -52,7 +54,7 @@ const WelfareCreate = () => {
     } finally {
       setLoading(false);
     }
-  }, [name, description, isPublic, whatsappLink, minPeriod, navigate]);
+  }, [name, description, isPublic, whatsappLink, minPeriod, registrationFee, navigate]);
 
   const { execute: handleCreate, isProcessing } = useDebounceAction(handleCreateInner);
 
@@ -110,6 +112,19 @@ const WelfareCreate = () => {
                   onChange={(e) => setMinPeriod(Number(e.target.value))}
                 />
                 <p className="text-xs text-muted-foreground">Members must contribute for this many months before being eligible to receive withdrawals</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="registrationFee">Registration Fee (KES)</Label>
+                <Input
+                  id="registrationFee"
+                  type="number"
+                  min={0}
+                  max={100000}
+                  value={registrationFee}
+                  onChange={(e) => setRegistrationFee(Number(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground">Charged once when new members join. Members have 5 days to pay or they are auto-removed. Leave 0 to disable. Changes later require dual executive approval.</p>
               </div>
 
               <div className="space-y-2">

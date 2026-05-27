@@ -35,7 +35,7 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
     try {
       const { data: member, error } = await supabase
         .from('welfare_members')
-        .select('id, member_code, user_id, status')
+        .select('id, member_code, user_id, status, registration_status')
         .eq('welfare_id', welfareId)
         .eq('member_code', code)
         .maybeSingle();
@@ -43,6 +43,10 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
       if (error) throw error;
       if (!member) { toast.error("Member ID not found in this welfare group"); return; }
       if (member.status !== 'active') { toast.error("This member is not active"); return; }
+      if ((member as any).registration_status && (member as any).registration_status !== 'confirmed') {
+        toast.error("This member has not completed their registration fee and cannot receive payouts");
+        return;
+      }
 
       const { data: profile, error: pErr } = await supabase
         .from('profiles')
