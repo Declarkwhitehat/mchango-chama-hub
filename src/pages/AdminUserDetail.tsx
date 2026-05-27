@@ -738,14 +738,26 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">Deficit</p>
-                            <p className="font-medium">
-                              {Number(membership.balance_deficit || 0) > 0 ? (
-                                <span className="text-red-600">-KES {Number(membership.balance_deficit).toLocaleString()}</span>
-                              ) : '-'}
-                            </p>
-                          </div>
-                        </div>
+  <p className="text-xs text-muted-foreground">Deficit</p>
+  <p className="font-medium">
+    {Number(membership.balance_deficit || 0) > 0 ? (
+      <span className="text-red-600">-KES {Number(membership.balance_deficit).toLocaleString()}</span>
+    ) : '-'}
+  </p>
+</div>
+<div>
+  <p className="text-xs text-muted-foreground">Net Balance</p>
+  <p className="font-medium">
+    {(() => {
+      const net = Number(membership.balance_credit || 0) - Number(membership.balance_deficit || 0);
+      return (
+        <span className={net >= 0 ? 'text-green-600' : 'text-red-600'}>
+          {net >= 0 ? '+' : ''}KES {Math.abs(net).toLocaleString()}
+        </span>
+      );
+    })()}
+  </p>
+</div>
 
                         {/* Additional Status Indicators */}
                         <div className="flex flex-wrap gap-2">
