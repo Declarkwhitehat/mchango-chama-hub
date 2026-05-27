@@ -115,6 +115,19 @@ const WelfareCreate = () => {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="registrationFee">Registration Fee (KES)</Label>
+                <Input
+                  id="registrationFee"
+                  type="number"
+                  min={0}
+                  max={100000}
+                  value={registrationFee}
+                  onChange={(e) => setRegistrationFee(Number(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground">Charged once when new members join. Members have 5 days to pay or they are auto-removed. Leave 0 to disable. Changes later require dual executive approval.</p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="whatsapp">WhatsApp Group Link (optional)</Label>
                 <Input
                   id="whatsapp"
