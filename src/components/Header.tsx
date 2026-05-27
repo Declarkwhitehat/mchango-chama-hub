@@ -71,7 +71,7 @@ export const Header = () => {
             onClick={() => navigate('/')}
           >
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Chama & Mchango
+              Pamoja Nova
             </h1>
           </div>
 
