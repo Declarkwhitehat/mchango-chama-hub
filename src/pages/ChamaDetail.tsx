@@ -947,6 +947,16 @@ const ChamaDetail = () => {
             )}
 
             <TabsContent value="members" className="space-y-4">
+          {isManager && (() => {
+            const debtorMembers = approvedMembers.filter(m => Number(m.balance_deficit || 0) > 0 || Number(m.missed_payments_count || 0) > 0);
+            const totalOwed = debtorMembers.reduce((sum, m) => sum + Number(m.balance_deficit || 0), 0);
+            if (debtorMembers.length === 0) return null;
+            return (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm">
+                <p className="font-semibold text-destructive">⚠️ {debtorMembers.length} member{debtorMembers.length > 1 ? 's' : ''} with outstanding debt — Total owed: KES {totalOwed.toLocaleString()}</p>
+              </div>
+            );
+          })()}
               {/* WhatsApp Group Link Manager */}
               <WhatsAppLinkManager
                 entityId={chama.id}
