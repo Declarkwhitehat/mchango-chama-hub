@@ -77,7 +77,7 @@ export const AdminFinancialOverview = () => {
         supabase.from('organization_donations').select('gross_amount, commission_amount, net_amount').eq('payment_status', 'completed'),
         supabase.from('welfares').select('total_gross_collected, total_commission_paid, available_balance'),
         supabase.from('welfare_contributions').select('gross_amount, commission_amount, net_amount').eq('payment_status', 'completed'),
-        supabase.from('withdrawals').select('net_amount, mchango_id, chama_id, welfare_id').eq('status', 'pending'),
+        supabase.from('withdrawals').select('net_amount, mchango_id, chama_id, welfare_id, organization_id').eq('status', 'pending'),
         supabase.from('company_earnings').select('source, amount')
       ]);
 
@@ -96,7 +96,7 @@ export const AdminFinancialOverview = () => {
       const orgGross = orgDonationsResult.data?.reduce((sum, d) => sum + (d.gross_amount || d.net_amount || 0), 0) || 0;
       const orgCommission = orgDonationsResult.data?.reduce((sum, d) => sum + (d.commission_amount || 0), 0) || 0;
       const orgClient = orgGross - orgCommission;
-      const orgPendingWithdrawals = 0;
+      const orgPendingWithdrawals = pendingWithdrawalsResult.data?.filter(w => w.organization_id).reduce((sum, w) => sum + (w.net_amount || 0), 0) || 0;
 
       // Calculate Welfare totals (5% commission)
       const welfareGross = welfareContributionsResult.data?.reduce((sum, c) => sum + (c.gross_amount || 0), 0) || 0;
