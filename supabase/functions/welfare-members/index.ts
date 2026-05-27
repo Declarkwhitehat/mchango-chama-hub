@@ -2,6 +2,57 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
 
+// Send registration-fee SMS + push when a member joins (and credit may already have settled it)
+async function sendRegistrationJoinNotice(supabaseAdmin: any, member: any, welfareName: string, regFee: number) {
+  try {
+    const memberCode = member.member_code || '';
+    const remaining = Math.max(Number(member.registration_fee_due || 0) - Number(member.registration_fee_paid || 0), 0);
+    const status = member.registration_status || 'confirmed';
+
+    let title = 'Welcome to ' + welfareName;
+    let body: string;
+    let smsBody: string | null = null;
+
+    if (regFee <= 0 || status === 'confirmed') {
+      body = 'You are now a confirmed member of ' + welfareName + '.';
+      smsBody = 'Welcome to ' + welfareName + '. You are a confirmed member.';
+    } else {
+      const deadline = member.registration_deadline
+        ? new Date(member.registration_deadline).toLocaleDateString('en-GB')
+        : '5 days';
+      body = 'Pay KES ' + remaining.toLocaleString() + ' registration fee within 5 days to activate membership.';
+      smsBody = 'Welcome to ' + welfareName + '. Pay KES ' + remaining.toLocaleString()
+        + ' registration fee via Paybill 4015351, Account ' + memberCode
+        + ' by ' + deadline + ' to become an active member.';
+    }
+
+    // Push + in-app
+    await supabaseAdmin.from('notifications').insert({
+      user_id: member.user_id,
+      title,
+      message: body,
+      type: status === 'confirmed' ? 'success' : 'action_required',
+      category: 'welfare',
+      related_entity_type: 'welfare',
+      related_entity_id: member.welfare_id,
+    });
+
+    // SMS
+    const phone = (member as any).profiles?.phone;
+    if (phone && smsBody) {
+      try {
+        await supabaseAdmin.functions.invoke('send-transactional-sms', {
+          body: { phone, message: smsBody, eventType: 'welfare_registration_join' },
+        });
+      } catch (smsErr) {
+        console.warn('welfare-members: registration SMS failed:', smsErr);
+      }
+    }
+  } catch (e) {
+    console.warn('welfare-members: sendRegistrationJoinNotice failed (non-fatal):', e);
+  }
+}
+
 // Helper: Record executive change, cancel pending withdrawals, notify all members
 async function handleExecutiveChange(
   supabaseAdmin: any,
