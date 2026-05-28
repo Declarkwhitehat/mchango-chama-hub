@@ -70,6 +70,54 @@ export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman,
     }
   };
 
+  const requestFeeChange = async () => {
+    const v = Number(feeInput);
+    if (!Number.isFinite(v) || v < 0 || v > 100000) {
+      toast.error('Enter a value between 0 and 100,000');
+      return;
+    }
+    setSubmittingFee(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(`welfare-crud/${welfareId}`, {
+        method: 'PUT',
+        body: { registration_fee: v },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Change requested. A second executive must approve.');
+      setFeeInput('');
+      onRoleAssigned();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to request change');
+    } finally {
+      setSubmittingFee(false);
+    }
+  };
+
+  const approveFeeChange = async () => {
+    setSubmittingFee(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(`welfare-crud/${welfareId}`, {
+        method: 'PUT',
+        body: { approve_registration_fee: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Registration fee updated.');
+      onRoleAssigned();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to approve');
+    } finally {
+      setSubmittingFee(false);
+    }
+  };
+
+  const canManageFee = isExecutive || isChairman;
+  const pendingFee = welfare?.registration_fee_pending;
+  const pendingRequester = welfare?.registration_fee_change_requested_by;
+  const isOwnRequest = pendingRequester && user?.id === pendingRequester;
+
+
   const roleCard = (title: string, icon: React.ReactNode, member: any, roleKey: string) => (
     <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
       <div className="flex items-center gap-3">
