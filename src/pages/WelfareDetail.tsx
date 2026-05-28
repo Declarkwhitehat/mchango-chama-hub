@@ -390,10 +390,13 @@ const WelfareDetail = () => {
             <WelfareExecutivePanel
               members={activeMembers}
               welfareId={welfare.id}
+              welfare={welfare}
               isChairman={isChairman}
+              isExecutive={isExecutive}
               isAdmin={isAdmin}
               onRoleAssigned={fetchWelfare}
             />
+
           </TabsContent>
 
           <TabsContent value="contribute">
