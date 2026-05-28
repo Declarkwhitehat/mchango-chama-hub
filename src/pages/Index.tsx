@@ -66,7 +66,7 @@ const Index = () => {
               <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight">
   The All-in-One Digital Hub for{" "}
   <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent block">
-  Chamas, Mchango/Campaigns,{" "}
+  Chamas, Mchango/Campaign {" "}
   </span>
   <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent block">
     Welfares & Organizations
