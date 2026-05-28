@@ -101,41 +101,41 @@ const Index = () => {
               </p>
               
               {/* CTA Buttons */}
-              <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 sm:gap-4 justify-center items-center pt-4 sm:pt-6 max-w-4xl mx-auto">
+              <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:gap-4 justify-center items-center pt-4 sm:pt-6 max-w-4xl mx-auto px-2">
                 <Button 
                   variant="hero" 
                   size="xl"
-                  className="w-full sm:w-auto sm:min-w-[180px]"
+                  className="w-full sm:w-auto sm:min-w-[180px] text-sm"
                   onClick={() => window.location.href = '/mchango'}
                 >
-                  <Heart className="mr-2 h-5 w-5" />
+                  <Heart className="mr-1 h-4 w-4" />
                   Campaigns
                 </Button>
                 <Button 
                   variant="heroSecondary" 
                   size="xl"
-                  className="w-full sm:w-auto sm:min-w-[180px]"
+                  className="w-full sm:w-auto sm:min-w-[180px] text-sm"
                   onClick={() => window.location.href = '/chama'}
                 >
-                  <Users className="mr-2 h-5 w-5" />
+                  <Users className="mr-1 h-4 w-4" />
                   Chamas
                 </Button>
                 <Button 
                   variant="heroSecondary" 
                   size="xl"
-                  className="w-full sm:w-auto sm:min-w-[180px]"
+                  className="w-full sm:w-auto sm:min-w-[180px] text-sm"
                   onClick={() => window.location.href = '/welfare'}
                 >
-                  <ShieldCheck className="mr-2 h-5 w-5" />
+                  <ShieldCheck className="mr-1 h-4 w-4" />
                   Welfare
                 </Button>
                 <Button 
                   variant="heroSecondary" 
                   size="xl"
-                  className="w-full sm:w-auto sm:min-w-[180px]"
+                  className="w-full sm:w-auto sm:min-w-[180px] text-sm"
                   onClick={() => window.location.href = '/organizations'}
                 >
-                  <Building2 className="mr-2 h-5 w-5" />
+                  <Building2 className="mr-1 h-4 w-4" />
                   Organizations
                 </Button>
               </div>
