@@ -529,8 +529,14 @@ const WelfareDetail = () => {
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <span className="text-sm font-bold">KES {contributed.toLocaleString()}</span>
-                              <Badge variant="outline" className="capitalize text-xs">{member.role}</Badge>
+                              <div className="flex gap-1">
+                                <Badge variant="outline" className="capitalize text-xs">{member.role}</Badge>
+                                {member.registration_status && member.registration_status !== 'confirmed' && (
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/60">Pending reg.</Badge>
+                                )}
+                              </div>
                             </div>
+
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
