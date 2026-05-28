@@ -2,24 +2,32 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Crown, BookOpen, Landmark, UserCheck, UserMinus, Loader2, ChevronDown } from "lucide-react";
+import { Crown, BookOpen, Landmark, UserCheck, UserMinus, Loader2, ChevronDown, Wallet } from "lucide-react";
 
 interface Props {
   members: any[];
   welfareId: string;
+  welfare?: any;
   isChairman: boolean;
+  isExecutive?: boolean;
   isAdmin?: boolean;
   onRoleAssigned: () => void;
 }
 
-export const WelfareExecutivePanel = ({ members, welfareId, isChairman, isAdmin = false, onRoleAssigned }: Props) => {
+export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman, isExecutive = false, isAdmin = false, onRoleAssigned }: Props) => {
+  const { user } = useAuth();
   const [assigning, setAssigning] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [feeInput, setFeeInput] = useState<string>('');
+  const [submittingFee, setSubmittingFee] = useState(false);
+
 
   const chairman = members.find((m: any) => m.role === 'chairman');
   const secretary = members.find((m: any) => m.role === 'secretary');
@@ -61,6 +69,54 @@ export const WelfareExecutivePanel = ({ members, welfareId, isChairman, isAdmin 
       setRemovingId(null);
     }
   };
+
+  const requestFeeChange = async () => {
+    const v = Number(feeInput);
+    if (!Number.isFinite(v) || v < 0 || v > 100000) {
+      toast.error('Enter a value between 0 and 100,000');
+      return;
+    }
+    setSubmittingFee(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(`welfare-crud/${welfareId}`, {
+        method: 'PUT',
+        body: { registration_fee: v },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Change requested. A second executive must approve.');
+      setFeeInput('');
+      onRoleAssigned();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to request change');
+    } finally {
+      setSubmittingFee(false);
+    }
+  };
+
+  const approveFeeChange = async () => {
+    setSubmittingFee(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(`welfare-crud/${welfareId}`, {
+        method: 'PUT',
+        body: { approve_registration_fee: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Registration fee updated.');
+      onRoleAssigned();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to approve');
+    } finally {
+      setSubmittingFee(false);
+    }
+  };
+
+  const canManageFee = isExecutive || isChairman;
+  const pendingFee = welfare?.registration_fee_pending;
+  const pendingRequester = welfare?.registration_fee_change_requested_by;
+  const isOwnRequest = pendingRequester && user?.id === pendingRequester;
+
 
   const roleCard = (title: string, icon: React.ReactNode, member: any, roleKey: string) => (
     <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
@@ -111,6 +167,55 @@ export const WelfareExecutivePanel = ({ members, welfareId, isChairman, isAdmin 
         {roleCard("Chairman", <Crown className="h-4 w-4 text-primary" />, chairman, "chairman")}
         {roleCard("Secretary", <BookOpen className="h-4 w-4 text-primary" />, secretary, "secretary")}
         {roleCard("Treasurer", <Landmark className="h-4 w-4 text-primary" />, treasurer, "treasurer")}
+
+        {/* Registration fee management */}
+        {welfare && (
+          <div className="mt-4 pt-4 border-t space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Wallet className="h-4 w-4 text-primary" />
+              Registration Fee
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div>
+                <p className="text-xs text-muted-foreground">Current</p>
+                <p className="font-bold">KES {Number(welfare.registration_fee || 0).toLocaleString()}</p>
+              </div>
+              {pendingFee != null && (
+                <div className="text-right">
+                  <p className="text-xs text-amber-600">Pending</p>
+                  <p className="font-bold text-amber-600">KES {Number(pendingFee).toLocaleString()}</p>
+                </div>
+              )}
+            </div>
+            {canManageFee && pendingFee == null && (
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="New fee (KES)"
+                  value={feeInput}
+                  onChange={(e) => setFeeInput(e.target.value)}
+                  min={0}
+                  max={100000}
+                />
+                <Button size="sm" onClick={requestFeeChange} disabled={submittingFee || !feeInput}>
+                  Request
+                </Button>
+              </div>
+            )}
+            {canManageFee && pendingFee != null && (
+              isOwnRequest ? (
+                <p className="text-xs text-muted-foreground">Waiting for a second executive to approve.</p>
+              ) : (
+                <Button size="sm" onClick={approveFeeChange} disabled={submittingFee}>
+                  {submittingFee ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Approve change to KES {Number(pendingFee).toLocaleString()}
+                </Button>
+              )
+            )}
+          </div>
+        )}
+
+
 
         {/* Admin member management */}
         {canManage && members.length > 0 && (

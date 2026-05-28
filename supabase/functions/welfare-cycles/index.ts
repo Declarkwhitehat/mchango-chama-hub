@@ -119,29 +119,56 @@ serve(async (req) => {
         .update({ contribution_amount: amount })
         .eq('id', welfare_id);
 
-      // Notify all welfare members about the new cycle
+      // Load welfare for name + paybill account context
+      const { data: welfareRow } = await supabaseAdmin
+        .from('welfares')
+        .select('name')
+        .eq('id', welfare_id)
+        .single();
+      const welfareName = welfareRow?.name || 'Welfare';
+
+      // Notify (in-app + push + SMS) every active confirmed member
       const { data: allMembers } = await supabaseAdmin
         .from('welfare_members')
-        .select('user_id')
+        .select('user_id, member_code, registration_status, profiles:user_id(phone)')
         .eq('welfare_id', welfare_id)
         .eq('status', 'active');
 
-      if (allMembers && allMembers.length > 0) {
-        const notifications = allMembers.map((m: any) => ({
+      const confirmedMembers = (allMembers || []).filter(
+        (m: any) => !m.registration_status || m.registration_status === 'confirmed'
+      );
+
+      if (confirmedMembers.length > 0) {
+        const deadlineStr = end_date;
+        const notifications = confirmedMembers.map((m: any) => ({
           user_id: m.user_id,
           title: 'New Contribution Cycle',
-          message: `A new contribution cycle of KES ${amount.toLocaleString()} has been set. Deadline: ${deadline_days ? `${deadline_days} days` : end_date}.`,
+          message: `${welfareName}: pay KES ${amount.toLocaleString()} via Paybill 4015351, Acc ${m.member_code}, by ${deadlineStr}.`,
           type: 'info',
           category: 'welfare',
           related_entity_type: 'welfare',
           related_entity_id: welfare_id,
         }));
-
         await supabaseAdmin.from('notifications').insert(notifications);
+
+        // Fan out SMS + push
+        for (const m of confirmedMembers as any[]) {
+          const smsBody = `${welfareName}: pay KES ${amount.toLocaleString()} via Paybill 4015351, Acc ${m.member_code}, by ${deadlineStr}.`;
+          const phone = m.profiles?.phone;
+          if (phone) {
+            supabaseAdmin.functions.invoke('send-transactional-sms', {
+              body: { phone, message: smsBody, eventType: 'welfare_new_cycle' },
+            }).catch((e: unknown) => console.warn('cycle SMS failed:', e));
+          }
+          supabaseAdmin.functions.invoke('send-push-notification', {
+            body: { user_id: m.user_id, title: 'New Contribution Cycle', body: smsBody },
+          }).catch(() => {});
+        }
       }
 
       return new Response(JSON.stringify({ data }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
 
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {

@@ -72,7 +72,7 @@ serve(async (req) => {
 
       // Detail by ID or slug
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      const selectQuery = `*, welfare_members(id, user_id, role, status, member_code, total_contributed, joined_at, is_eligible_for_withdrawal, profiles:user_id(full_name, phone, email))`;
+      const selectQuery = `*, welfare_members(id, user_id, role, status, member_code, total_contributed, joined_at, is_eligible_for_withdrawal, registration_status, registration_fee_due, registration_fee_paid, registration_deadline, profiles:user_id(full_name, phone, email))`;
 
       let data, error;
       if (isUuid) {

@@ -319,6 +319,39 @@ const WelfareDetail = () => {
           </Card>
         </div>
 
+        {/* Registration fee alert for own member if not confirmed */}
+        {(() => {
+          const me = welfare.welfare_members?.find((m: any) => m.user_id === user?.id);
+          if (!me || !me.registration_status || me.registration_status === 'confirmed') return null;
+          if (me.status === 'removed') return null;
+          const due = Number(me.registration_fee_due || 0);
+          const paid = Number(me.registration_fee_paid || 0);
+          const remaining = Math.max(0, due - paid);
+          if (remaining <= 0) return null;
+          const deadline = me.registration_deadline ? new Date(me.registration_deadline) : null;
+          return (
+            <Card className="mb-4 border-amber-500/60 bg-amber-50 dark:bg-amber-950/20">
+              <CardContent className="pt-4 pb-4 space-y-2">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="h-5 w-5" />
+                  <p className="font-semibold">Complete your registration to activate membership</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div><p className="text-muted-foreground">Due</p><p className="font-bold">KES {due.toLocaleString()}</p></div>
+                  <div><p className="text-muted-foreground">Paid</p><p className="font-bold">KES {paid.toLocaleString()}</p></div>
+                  <div><p className="text-muted-foreground">Remaining</p><p className="font-bold text-amber-700 dark:text-amber-400">KES {remaining.toLocaleString()}</p></div>
+                </div>
+                <div className="text-xs space-y-1 pt-1 border-t border-amber-500/30">
+                  <p>Pay via <span className="font-mono font-bold">Paybill 4015351</span>, Account <span className="font-mono font-bold">{me.member_code}</span></p>
+                  {deadline && <p className="text-muted-foreground">Deadline: {deadline.toLocaleString('en-KE')}</p>}
+                </div>
+                <Button size="sm" onClick={() => handleTabChange('contribute')}>Pay Now</Button>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
+
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 6 + (isExecutive ? 2 : 0))}, 1fr)` }}>
             <TabsTrigger value="overview" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Overview</TabsTrigger>
@@ -357,10 +390,13 @@ const WelfareDetail = () => {
             <WelfareExecutivePanel
               members={activeMembers}
               welfareId={welfare.id}
+              welfare={welfare}
               isChairman={isChairman}
+              isExecutive={isExecutive}
               isAdmin={isAdmin}
               onRoleAssigned={fetchWelfare}
             />
+
           </TabsContent>
 
           <TabsContent value="contribute">
@@ -493,8 +529,14 @@ const WelfareDetail = () => {
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <span className="text-sm font-bold">KES {contributed.toLocaleString()}</span>
-                              <Badge variant="outline" className="capitalize text-xs">{member.role}</Badge>
+                              <div className="flex gap-1">
+                                <Badge variant="outline" className="capitalize text-xs">{member.role}</Badge>
+                                {member.registration_status && member.registration_status !== 'confirmed' && (
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/60">Pending reg.</Badge>
+                                )}
+                              </div>
                             </div>
+
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
