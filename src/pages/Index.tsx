@@ -69,7 +69,7 @@ const Index = () => {
     Chamas, Mchango/Campaigns,{" "}
   </span>
   <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent block">
-    Welfares and Organizations
+    Welfares & Organizations
   </span>
 </h1>
               <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto px-4">
