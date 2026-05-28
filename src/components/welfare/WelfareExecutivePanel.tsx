@@ -168,6 +168,55 @@ export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman,
         {roleCard("Secretary", <BookOpen className="h-4 w-4 text-primary" />, secretary, "secretary")}
         {roleCard("Treasurer", <Landmark className="h-4 w-4 text-primary" />, treasurer, "treasurer")}
 
+        {/* Registration fee management */}
+        {welfare && (
+          <div className="mt-4 pt-4 border-t space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Wallet className="h-4 w-4 text-primary" />
+              Registration Fee
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div>
+                <p className="text-xs text-muted-foreground">Current</p>
+                <p className="font-bold">KES {Number(welfare.registration_fee || 0).toLocaleString()}</p>
+              </div>
+              {pendingFee != null && (
+                <div className="text-right">
+                  <p className="text-xs text-amber-600">Pending</p>
+                  <p className="font-bold text-amber-600">KES {Number(pendingFee).toLocaleString()}</p>
+                </div>
+              )}
+            </div>
+            {canManageFee && pendingFee == null && (
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="New fee (KES)"
+                  value={feeInput}
+                  onChange={(e) => setFeeInput(e.target.value)}
+                  min={0}
+                  max={100000}
+                />
+                <Button size="sm" onClick={requestFeeChange} disabled={submittingFee || !feeInput}>
+                  Request
+                </Button>
+              </div>
+            )}
+            {canManageFee && pendingFee != null && (
+              isOwnRequest ? (
+                <p className="text-xs text-muted-foreground">Waiting for a second executive to approve.</p>
+              ) : (
+                <Button size="sm" onClick={approveFeeChange} disabled={submittingFee}>
+                  {submittingFee ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Approve change to KES {Number(pendingFee).toLocaleString()}
+                </Button>
+              )
+            )}
+          </div>
+        )}
+
+
+
         {/* Admin member management */}
         {canManage && members.length > 0 && (
           <div className="mt-4 pt-4 border-t">
