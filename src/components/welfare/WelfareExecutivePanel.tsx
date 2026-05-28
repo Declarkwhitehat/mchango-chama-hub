@@ -2,24 +2,32 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Crown, BookOpen, Landmark, UserCheck, UserMinus, Loader2, ChevronDown } from "lucide-react";
+import { Crown, BookOpen, Landmark, UserCheck, UserMinus, Loader2, ChevronDown, Wallet } from "lucide-react";
 
 interface Props {
   members: any[];
   welfareId: string;
+  welfare?: any;
   isChairman: boolean;
+  isExecutive?: boolean;
   isAdmin?: boolean;
   onRoleAssigned: () => void;
 }
 
-export const WelfareExecutivePanel = ({ members, welfareId, isChairman, isAdmin = false, onRoleAssigned }: Props) => {
+export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman, isExecutive = false, isAdmin = false, onRoleAssigned }: Props) => {
+  const { user } = useAuth();
   const [assigning, setAssigning] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [feeInput, setFeeInput] = useState<string>('');
+  const [submittingFee, setSubmittingFee] = useState(false);
+
 
   const chairman = members.find((m: any) => m.role === 'chairman');
   const secretary = members.find((m: any) => m.role === 'secretary');
