@@ -865,6 +865,70 @@ export type Database = {
           },
         ]
       }
+      chama_payout_shortfalls: {
+        Row: {
+          beneficiary_member_id: string
+          chama_id: string
+          created_at: string
+          cycle_id: string
+          id: string
+          last_b2c_transaction_id: string | null
+          settled_amount: number
+          settled_at: string | null
+          shortfall_amount: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          beneficiary_member_id: string
+          chama_id: string
+          created_at?: string
+          cycle_id: string
+          id?: string
+          last_b2c_transaction_id?: string | null
+          settled_amount?: number
+          settled_at?: string | null
+          shortfall_amount: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          beneficiary_member_id?: string
+          chama_id?: string
+          created_at?: string
+          cycle_id?: string
+          id?: string
+          last_b2c_transaction_id?: string | null
+          settled_amount?: number
+          settled_at?: string | null
+          shortfall_amount?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chama_payout_shortfalls_beneficiary_member_id_fkey"
+            columns: ["beneficiary_member_id"]
+            isOneToOne: false
+            referencedRelation: "chama_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_payout_shortfalls_chama_id_fkey"
+            columns: ["chama_id"]
+            isOneToOne: false
+            referencedRelation: "chama"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chama_payout_shortfalls_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: true
+            referencedRelation: "contribution_cycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chama_rejoin_requests: {
         Row: {
           chama_id: string
@@ -3965,6 +4029,17 @@ export type Database = {
       check_signup_uniqueness: {
         Args: { p_email: string; p_id_number: string; p_phone: string }
         Returns: Json
+      }
+      claim_chama_shortfall_for_settlement: {
+        Args: { p_amount: number; p_chama_id: string }
+        Returns: {
+          apply_amount: number
+          beneficiary_member_id: string
+          cycle_id: string
+          fully_settled: boolean
+          id: string
+          remaining_shortfall: number
+        }[]
       }
       claim_cycle_for_processing: {
         Args: { p_cycle_id: string }
