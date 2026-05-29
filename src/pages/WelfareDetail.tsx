@@ -121,6 +121,29 @@ const WelfareDetail = () => {
   const isExecutive = isChairman || isSecretary || isTreasurer;
   const isMember = !!myRole;
 
+  // === Pending-registration gating ===
+  // If the viewer is a welfare member but hasn't completed registration, show a restricted view only.
+  const myWelfareRow = welfare.welfare_members?.find((m: any) => m.user_id === user?.id);
+  const isPendingRegistration =
+    !!myWelfareRow &&
+    myWelfareRow.status === 'active' &&
+    (myWelfareRow.registration_status === 'pending' || myWelfareRow.registration_status === 'partial') &&
+    Number(myWelfareRow.registration_fee_due || 0) > Number(myWelfareRow.registration_fee_paid || 0);
+
+  if (isPendingRegistration && !isAdmin) {
+    return (
+      <Layout>
+        <SEO
+          title={`${welfare.name} — Complete registration`}
+          description={`Pay your registration fee to join ${welfare.name}.`}
+          path={`/welfare/${(welfare as any).slug || welfare.id}`}
+        />
+        <PendingMemberView welfare={welfare} member={myWelfareRow} onPaid={fetchWelfare} />
+      </Layout>
+    );
+  }
+
+
   const handleLeave = async () => {
     setLeaving(true);
     try {
