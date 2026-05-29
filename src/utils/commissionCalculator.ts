@@ -3,8 +3,18 @@
  */
 export const MCHANGO_COMMISSION_RATE = 0.07; // 7%
 export const CHAMA_DEFAULT_COMMISSION_RATE = 0.05; // 5% on-time
-export const CHAMA_LATE_COMMISSION_RATE = 0.10; // 10% late
+/**
+ * Late payment model: member pays contribution × 1.10.
+ *  - penalty = contribution × 0.10  → platform earnings (chama_late_penalty)
+ *  - commission = contribution × 0.05 → platform earnings (chama_commission)
+ *  - net to chama pool = contribution × 0.95
+ * The constant below is the PENALTY rate on top of the base contribution
+ * (NOT a deductive commission against the gross paid).
+ */
+export const CHAMA_LATE_PENALTY_RATE = 0.10; // 10% surcharge added to base
+export const CHAMA_LATE_COMMISSION_RATE = 0.10; // legacy alias — total platform take rate (0.10 + 0.05*… see helper)
 export const ORGANIZATION_COMMISSION_RATE = 0.05; // 5%
+
 
 /**
  * Calculate commission amount (deductive — from within the payment)
