@@ -20,6 +20,7 @@ import { VerificationRequestButton } from "@/components/VerificationRequestButto
 import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecutiveChangeBanner";
 import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
 import { GroupDocuments } from "@/components/GroupDocuments";
+import { PendingMemberView } from "@/components/welfare/PendingMemberView";
 import { WelfareWithdrawalStatus } from "@/components/welfare/WelfareWithdrawalStatus";
 import { WelfareLeaveRequests } from "@/components/welfare/WelfareLeaveRequests";
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
