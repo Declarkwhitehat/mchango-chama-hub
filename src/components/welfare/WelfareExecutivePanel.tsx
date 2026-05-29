@@ -175,6 +175,9 @@ export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman,
               <Wallet className="h-4 w-4 text-primary" />
               Registration Fee
             </div>
+            <p className="text-xs text-muted-foreground">
+              Charged 10% platform commission (other welfare contributions are charged 5%).
+            </p>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div>
                 <p className="text-xs text-muted-foreground">Current</p>
