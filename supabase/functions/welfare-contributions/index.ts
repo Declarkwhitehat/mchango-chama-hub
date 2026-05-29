@@ -114,9 +114,12 @@ serve(async (req) => {
 
       const contributionGross = grossAmount - regApplied;
 
+      // Registration fee carries a higher 10% platform commission; normal contributions stay at the welfare's rate.
+      const REGISTRATION_COMMISSION_RATE = 0.10;
+
       // Helper to insert a welfare_contributions row + update balances
-      const recordRow = async (gross: number, refSuffix: string, category: string) => {
-        const commission = Math.round(gross * commissionRate * 100) / 100;
+      const recordRow = async (gross: number, refSuffix: string, category: string, rate: number) => {
+        const commission = Math.round(gross * rate * 100) / 100;
         const net = Math.round((gross - commission) * 100) / 100;
         const ref = refSuffix ? `${paymentRef}-${refSuffix}` : paymentRef;
         const { data: row, error: insErr } = await supabaseAdmin
@@ -139,11 +142,11 @@ serve(async (req) => {
           .single();
         if (insErr) throw insErr;
         await supabaseAdmin.rpc('record_company_earning', {
-          p_source: 'welfare_contribution',
+          p_source: category === 'registration_fee' ? 'welfare_registration' : 'welfare_contribution',
           p_amount: commission,
           p_group_id: welfare_id,
           p_reference_id: row.id,
-          p_description: `Welfare ${category} commission (${(commissionRate * 100).toFixed(0)}%)`,
+          p_description: `Welfare ${category} commission (${(rate * 100).toFixed(0)}%)`,
         });
         return { row, commission, net };
       };
@@ -153,13 +156,13 @@ serve(async (req) => {
       let primaryContribution: any = null;
 
       if (regApplied > 0) {
-        const r = await recordRow(regApplied, 'REG', 'registration_fee');
+        const r = await recordRow(regApplied, 'REG', 'registration_fee', REGISTRATION_COMMISSION_RATE);
         totalCommission += r.commission;
         totalNet += r.net;
         primaryContribution = r.row;
       }
       if (contributionGross > 0) {
-        const r = await recordRow(contributionGross, '', 'contribution');
+        const r = await recordRow(contributionGross, '', 'contribution', commissionRate);
         totalCommission += r.commission;
         totalNet += r.net;
         primaryContribution = r.row;
