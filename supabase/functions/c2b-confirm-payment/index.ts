@@ -969,14 +969,22 @@ serve(async (req) => {
         console.warn('No welfare member matched by phone. Welfare balance updated but no member contribution record created.');
       }
 
+      // Fallback when no member was matched: charge the welfare default rate on the full amount.
+      const finalCommission = matchedMember
+        ? totalCommissionForBalances
+        : Math.round(grossAmount * commissionRate * 100) / 100;
+      const finalNet = matchedMember
+        ? totalNetForBalances
+        : Math.round((grossAmount - finalCommission) * 100) / 100;
+
       // Update welfare financials
       await supabase
         .from('welfares')
         .update({
           total_gross_collected: (welfareData.total_gross_collected || 0) + grossAmount,
-          total_commission_paid: (welfareData.total_commission_paid || 0) + commissionAmount,
-          available_balance: (welfareData.available_balance || 0) + netAmount,
-          current_amount: (welfareData.current_amount || 0) + netAmount,
+          total_commission_paid: (welfareData.total_commission_paid || 0) + finalCommission,
+          available_balance: (welfareData.available_balance || 0) + finalNet,
+          current_amount: (welfareData.current_amount || 0) + finalNet,
         })
         .eq('id', welfareData.id);
 
@@ -988,12 +996,12 @@ serve(async (req) => {
           source_type: 'welfare',
           source_id: welfareData.id,
           gross_amount: grossAmount,
-          commission_amount: commissionAmount,
-          net_amount: netAmount,
+          commission_amount: finalCommission,
+          net_amount: finalNet,
           commission_rate: commissionRate,
           payer_name: displayName,
           payer_phone: phoneNumber,
-          description: `Offline welfare contribution with ${(commissionRate * 100).toFixed(0)}% commission deducted`
+          description: `Offline welfare contribution (registration fee 10%, contributions ${(commissionRate * 100).toFixed(0)}%)`
         });
 
       // Send confirmation SMS
