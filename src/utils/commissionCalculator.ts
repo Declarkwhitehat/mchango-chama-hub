@@ -55,9 +55,24 @@ export const formatCommissionPercentage = (rate: number): string => {
 };
 
 /**
- * Calculate the total amount a member needs to pay for N cycles,
- * factoring in tiered commission (5% on-time, 10% late).
- * Deductive model: member pays base amount, commission deducted from within.
+ * Late payment math (single source of truth).
+ *  - gross_due   = C * 1.10  (member pays 110% of contribution)
+ *  - penalty     = C * 0.10  → platform earnings
+ *  - commission  = C * 0.05  → platform earnings
+ *  - net_to_pool = C * 0.95  → chama pool (or routed to a shortchanged beneficiary)
+ */
+export const calculateLatePayment = (baseContribution: number) => {
+  const grossDue = baseContribution * 1.10;
+  const penalty = baseContribution * 0.10;
+  const commission = baseContribution * 0.05;
+  const netToPool = baseContribution * 0.95;
+  return { grossDue, penalty, commission, netToPool };
+};
+
+/**
+ * Calculate the total amount a member needs to pay for N cycles.
+ *  - On-time cycles: base only (5% commission deducted from within → 0.95C net to pool)
+ *  - Late cycles: member pays 1.10C; 0.10C penalty + 0.05C commission → platform; 0.95C → pool
  */
 export const calculateAmountToPay = (
   baseContribution: number,
@@ -69,31 +84,37 @@ export const calculateAmountToPay = (
   baseTotal: number;
   onTimeCommission: number;
   lateCommission: number;
+  latePenalty: number;
   totalCommission: number;
   totalPayable: number;
 } => {
   const onTimeCycles = currentCycleDue ? 1 : 0;
   const lateCycles = missedCycles;
-  
+
   const onTimeBase = onTimeCycles * baseContribution;
   const lateBase = lateCycles * baseContribution;
   const baseTotal = onTimeBase + lateBase;
-  
-  // Deductive model: commission is extracted FROM the base
+
+  // On-time: 5% deductive commission on the base
   const onTimeCommission = onTimeBase * CHAMA_DEFAULT_COMMISSION_RATE;
-  const lateCommission = lateBase * CHAMA_LATE_COMMISSION_RATE;
-  const totalCommission = onTimeCommission + lateCommission;
-  
+  // Late: penalty 10% + commission 5% (both on the base, both go to platform)
+  const latePenalty = lateBase * 0.10;
+  const lateCommission = lateBase * 0.05;
+  const totalCommission = onTimeCommission + lateCommission + latePenalty;
+
   return {
     onTimeCycles,
     lateCycles,
     baseTotal,
     onTimeCommission,
     lateCommission,
+    latePenalty,
     totalCommission,
-    totalPayable: baseTotal, // member pays the base amount; commission deducted from within
+    // Member actually sends: on-time at face value + late cycles at 110% of base
+    totalPayable: onTimeBase + lateBase * 1.10,
   };
 };
+
 
 /**
  * Get commission info for Mchango (deductive)
