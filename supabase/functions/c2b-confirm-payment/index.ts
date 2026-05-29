@@ -842,9 +842,8 @@ serve(async (req) => {
       console.log('Found Welfare group:', welfareData);
 
       const commissionRate = Number(welfareData.commission_rate) || COMMISSION_RATES.WELFARE;
+      const REGISTRATION_COMMISSION_RATE = 0.10;
       const grossAmount = parseFloat(amount);
-      const commissionAmount = Math.round(grossAmount * commissionRate * 100) / 100;
-      const netAmount = Math.round((grossAmount - commissionAmount) * 100) / 100;
 
       const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'Anonymous';
       const cycleMonth = new Date().toISOString().substring(0, 7);
@@ -873,6 +872,10 @@ serve(async (req) => {
         }
       }
 
+      // Track real commission/net totals (registration is 10%, contribution is welfare rate)
+      let totalCommissionForBalances = 0;
+      let totalNetForBalances = 0;
+
       if (matchedMember) {
         // Pull member registration state
         const { data: memberFull } = await supabase
@@ -893,8 +896,8 @@ serve(async (req) => {
           regFullyPaid = !!allocRes?.fully_paid;
         }
 
-        const recordRow = async (g: number, refSuffix: string, category: string) => {
-          const c = Math.round(g * commissionRate * 100) / 100;
+        const recordRow = async (g: number, refSuffix: string, category: string, rate: number) => {
+          const c = Math.round(g * rate * 100) / 100;
           const n = Math.round((g - c) * 100) / 100;
           const ref = refSuffix ? `${mpesaReceiptNumber}-${refSuffix}` : mpesaReceiptNumber;
           const { data: row, error: insErr } = await supabase
@@ -920,23 +923,25 @@ serve(async (req) => {
             throw insErr;
           }
           await supabase.rpc('record_company_earning', {
-            p_source: 'welfare_contribution',
+            p_source: category === 'registration_fee' ? 'welfare_registration' : 'welfare_contribution',
             p_amount: c,
             p_group_id: welfareData.id,
             p_reference_id: row?.id,
-            p_description: `Welfare offline ${category} commission (${(commissionRate * 100).toFixed(0)}%)`,
+            p_description: `Welfare offline ${category} commission (${(rate * 100).toFixed(0)}%)`,
           });
           return { row, c, n };
         };
 
-        let regNet = 0;
         if (regApplied > 0) {
-          const r = await recordRow(regApplied, 'REG', 'registration_fee');
-          regNet = r.n;
+          const r = await recordRow(regApplied, 'REG', 'registration_fee', REGISTRATION_COMMISSION_RATE);
+          totalCommissionForBalances += r.c;
+          totalNetForBalances += r.n;
         }
         const remainder = grossAmount - regApplied;
         if (remainder > 0) {
-          await recordRow(remainder, '', 'contribution');
+          const r = await recordRow(remainder, '', 'contribution', commissionRate);
+          totalCommissionForBalances += r.c;
+          totalNetForBalances += r.n;
         }
 
         // Update member total_contributed
