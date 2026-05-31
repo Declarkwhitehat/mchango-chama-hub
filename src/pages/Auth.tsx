@@ -262,6 +262,8 @@ const Auth = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
   const phoneVerifiedRef = useRef(false);
+  const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  const verifiedPhoneRef = useRef<string | null>(null);
   const [signupStep, setSignupStep] = useState<'details' | 'phone'>('details');
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [biometricIdentifier, setBiometricIdentifier] = useState('');
@@ -364,6 +366,18 @@ const Auth = () => {
 
   const loginForm = useForm<LoginFormData>({ resolver: zodResolver(loginSchema) });
   const signupForm = useForm<SignupFormData>({ resolver: zodResolver(signupSchema) });
+
+  // Invalidate OTP verification if the phone number is edited after verifying.
+  const watchedSignupPhone = signupForm.watch('phone');
+  useEffect(() => {
+    if (!verifiedPhoneRef.current) return;
+    if (watchedSignupPhone && watchedSignupPhone !== verifiedPhoneRef.current) {
+      phoneVerifiedRef.current = false;
+      setPhoneVerified(false);
+      verifiedPhoneRef.current = null;
+      setVerifiedPhone(null);
+    }
+  }, [watchedSignupPhone]);
 
   const [didRedirect, setDidRedirect] = useState(false);
   useEffect(() => {
@@ -543,6 +557,20 @@ const Auth = () => {
   };
 
   const handleSignup = async (data: SignupFormData) => {
+    // Guard against editing the phone after OTP verification:
+    // re-require verification if the form phone no longer matches the verified one.
+    const verifiedFor = verifiedPhoneRef.current || verifiedPhone;
+    const phoneMismatch = phoneVerifiedRef.current && verifiedFor && verifiedFor !== data.phone;
+    if (phoneMismatch) {
+      phoneVerifiedRef.current = false;
+      setPhoneVerified(false);
+      verifiedPhoneRef.current = null;
+      setVerifiedPhone(null);
+      setSignupStep('phone');
+      toast.error('Phone number changed. Please verify the new number.');
+      return;
+    }
+
     if (!phoneVerifiedRef.current && !phoneVerified) {
       setSignupStep('phone');
       return;
@@ -1158,8 +1186,11 @@ const Auth = () => {
                               phone={signupForm.watch('phone')}
                               onPhoneChange={(phone) => signupForm.setValue('phone', phone)}
                               onVerified={() => {
+                                const verifiedNumber = signupForm.getValues('phone');
                                 phoneVerifiedRef.current = true;
                                 setPhoneVerified(true);
+                                verifiedPhoneRef.current = verifiedNumber;
+                                setVerifiedPhone(verifiedNumber);
                                 toast.success("Phone verified! Creating your account...");
                                 signupForm.handleSubmit(handleSignup)();
                               }}
