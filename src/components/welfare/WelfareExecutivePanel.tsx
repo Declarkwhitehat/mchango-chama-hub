@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Crown, BookOpen, Landmark, UserCheck, UserMinus, Loader2, ChevronDown, Wallet } from "lucide-react";
+import { Crown, BookOpen, Landmark, UserCheck, UserMinus, Loader2, ChevronDown, Wallet, Clock, Send } from "lucide-react";
 
 interface Props {
   members: any[];
