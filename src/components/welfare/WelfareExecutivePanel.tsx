@@ -27,6 +27,31 @@ export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman,
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [feeInput, setFeeInput] = useState<string>('');
   const [submittingFee, setSubmittingFee] = useState(false);
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+
+  const pendingRegMembers = members.filter(
+    (m: any) =>
+      m.status === 'active' &&
+      (m.registration_status === 'pending' || m.registration_status === 'partial') &&
+      Number(m.registration_fee_due || 0) > Number(m.registration_fee_paid || 0)
+  );
+
+  const sendReminder = async (memberId: string) => {
+    setRemindingId(memberId);
+    try {
+      const { data, error } = await supabase.functions.invoke('welfare-registration-remind', {
+        body: { member_id: memberId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Reminder sent');
+      onRoleAssigned();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to send reminder');
+    } finally {
+      setRemindingId(null);
+    }
+  };
 
 
   const chairman = members.find((m: any) => m.role === 'chairman');
