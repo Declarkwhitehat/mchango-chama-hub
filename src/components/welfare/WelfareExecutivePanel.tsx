@@ -243,6 +243,54 @@ export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman,
           </div>
         )}
 
+        {/* Pending registration members — visible to all executives */}
+        {(isExecutive || isChairman || isAdmin) && pendingRegMembers.length > 0 && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock className="h-4 w-4 text-amber-600" />
+              <p className="text-sm font-medium">
+                Pending Registration
+                <Badge variant="outline" className="ml-2">{pendingRegMembers.length}</Badge>
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Members who haven't paid the registration fee yet. They become full members only after payment. Auto-reminders run daily; you can also send one manually (max once per hour).
+            </p>
+            <div className="space-y-2">
+              {pendingRegMembers.map((m: any) => {
+                const due = Number(m.registration_fee_due || 0);
+                const paid = Number(m.registration_fee_paid || 0);
+                const remaining = Math.max(0, due - paid);
+                const dl = m.registration_deadline ? new Date(m.registration_deadline) : null;
+                const expired = dl ? dl.getTime() < Date.now() : false;
+                const daysLeft = dl ? Math.max(0, Math.ceil((dl.getTime() - Date.now()) / 86400000)) : null;
+                return (
+                  <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border bg-amber-50/40 dark:bg-amber-950/10">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{m.profiles?.full_name || m.member_code}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Acc {m.member_code} · KES {remaining.toLocaleString()} due
+                        {dl && (
+                          <> · {expired ? <span className="text-destructive">expired</span> : `${daysLeft}d left`}</>
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => sendReminder(m.id)}
+                      disabled={remindingId === m.id || expired}
+                      className="gap-1"
+                    >
+                      {remindingId === m.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                      Remind
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
 
         {/* Admin member management */}
