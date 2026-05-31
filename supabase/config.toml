@@ -156,6 +156,9 @@ verify_jwt = false
 [functions.welfare-withdrawal-approve]
 verify_jwt = false
 
+[functions.welfare-registration-remind]
+verify_jwt = false
+
 [functions.b2c-status-query]
 verify_jwt = false
 
