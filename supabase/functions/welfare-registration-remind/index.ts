@@ -53,7 +53,7 @@ serve(async (req) => {
     const { data: member, error: mErr } = await supabaseAdmin
       .from("welfare_members")
       .select(
-        "id, welfare_id, user_id, member_code, registration_fee_due, registration_fee_paid, registration_status, registration_deadline, last_reminder_at, welfares(name), profiles:user_id(phone, full_name)"
+        "id, welfare_id, user_id, member_code, registration_fee_due, registration_fee_paid, registration_status, registration_deadline, registration_last_reminder_at, welfares(name), profiles:user_id(phone, full_name)"
       )
       .eq("id", member_id)
       .maybeSingle();
@@ -102,8 +102,8 @@ serve(async (req) => {
     }
 
     // Throttle: max 1 manual reminder per hour per member
-    if (member.last_reminder_at) {
-      const last = new Date(member.last_reminder_at).getTime();
+    if (member.registration_last_reminder_at) {
+      const last = new Date(member.registration_last_reminder_at).getTime();
       if (Date.now() - last < 60 * 60 * 1000) {
         const mins = Math.ceil((60 * 60 * 1000 - (Date.now() - last)) / 60000);
         return new Response(
@@ -151,7 +151,7 @@ serve(async (req) => {
 
     await supabaseAdmin
       .from("welfare_members")
-      .update({ last_reminder_at: new Date().toISOString() })
+      .update({ registration_last_reminder_at: new Date().toISOString() })
       .eq("id", member.id);
 
     return new Response(JSON.stringify({ success: true, remaining }), {
