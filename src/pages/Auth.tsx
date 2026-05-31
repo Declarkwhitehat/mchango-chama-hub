@@ -1174,8 +1174,11 @@ const Auth = () => {
                               phone={signupForm.watch('phone')}
                               onPhoneChange={(phone) => signupForm.setValue('phone', phone)}
                               onVerified={() => {
+                                const verifiedNumber = signupForm.getValues('phone');
                                 phoneVerifiedRef.current = true;
                                 setPhoneVerified(true);
+                                verifiedPhoneRef.current = verifiedNumber;
+                                setVerifiedPhone(verifiedNumber);
                                 toast.success("Phone verified! Creating your account...");
                                 signupForm.handleSubmit(handleSignup)();
                               }}
