@@ -545,6 +545,20 @@ const Auth = () => {
   };
 
   const handleSignup = async (data: SignupFormData) => {
+    // Guard against editing the phone after OTP verification:
+    // re-require verification if the form phone no longer matches the verified one.
+    const verifiedFor = verifiedPhoneRef.current || verifiedPhone;
+    const phoneMismatch = phoneVerifiedRef.current && verifiedFor && verifiedFor !== data.phone;
+    if (phoneMismatch) {
+      phoneVerifiedRef.current = false;
+      setPhoneVerified(false);
+      verifiedPhoneRef.current = null;
+      setVerifiedPhone(null);
+      setSignupStep('phone');
+      toast.error('Phone number changed. Please verify the new number.');
+      return;
+    }
+
     if (!phoneVerifiedRef.current && !phoneVerified) {
       setSignupStep('phone');
       return;
