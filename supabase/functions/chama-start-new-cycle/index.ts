@@ -228,6 +228,14 @@ Deno.serve(async (req) => {
 
     throwIfError(deletePayoutSkipsError);
 
+    // Delete overpayment wallet entries first (FK references contributions)
+    const { error: deleteWalletError } = await supabase
+      .from("chama_overpayment_wallet")
+      .delete()
+      .eq("chama_id", chamaId);
+
+    throwIfError(deleteWalletError);
+
     // Delete old contributions (payment records from previous cycle)
     const { error: deleteContributionsError } = await supabase
       .from("contributions")
