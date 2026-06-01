@@ -109,7 +109,7 @@ serve(async (req) => {
       console.warn('request-account-verification: notifications failed (non-fatal):', notifErr);
     }
 
-    return new Response(JSON.stringify({ success: true, request_id: reqId, checkout_request_id: checkoutId }),
+    return new Response(JSON.stringify({ success: true, request_id: reqId, checkout_request_id: checkoutId, fee_amount: fee }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     console.error('request-account-verification error', e);
