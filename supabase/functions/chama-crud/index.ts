@@ -63,6 +63,7 @@ serve(async (req) => {
           is_public,
           profiles:created_by (
             full_name,
+              is_verified,
             email
           ),
           chama_members (
@@ -97,6 +98,7 @@ serve(async (req) => {
           *,
           profiles:created_by (
             full_name,
+              is_verified,
             email,
             phone
           ),
@@ -111,6 +113,7 @@ serve(async (req) => {
             order_index,
             profiles!chama_members_user_id_fkey (
               full_name,
+              is_verified,
               email
             )
           )
@@ -137,6 +140,7 @@ serve(async (req) => {
             *,
             profiles:created_by (
               full_name,
+              is_verified,
               email,
               phone
             ),
@@ -151,6 +155,7 @@ serve(async (req) => {
               order_index,
               profiles!chama_members_user_id_fkey (
                 full_name,
+              is_verified,
                 email
               )
             )
@@ -177,6 +182,7 @@ serve(async (req) => {
           *,
           profiles:created_by (
             full_name,
+              is_verified,
             email,
             phone
           ),
@@ -191,6 +197,7 @@ serve(async (req) => {
             order_index,
             profiles!chama_members_user_id_fkey (
               full_name,
+              is_verified,
               email
             )
           )
@@ -257,6 +264,7 @@ serve(async (req) => {
             *,
             profiles:created_by (
               full_name,
+              is_verified,
               email,
               phone
             ),
@@ -271,6 +279,7 @@ serve(async (req) => {
               order_index,
               profiles!chama_members_user_id_fkey (
                 full_name,
+              is_verified,
                 email
               )
             )
@@ -297,6 +306,7 @@ serve(async (req) => {
               *,
               profiles:created_by (
                 full_name,
+              is_verified,
                 email,
                 phone
               ),
@@ -311,6 +321,7 @@ serve(async (req) => {
                 order_index,
                 profiles!chama_members_user_id_fkey (
                   full_name,
+              is_verified,
                   email
                 )
               )
@@ -337,6 +348,7 @@ serve(async (req) => {
             *,
             profiles:created_by (
               full_name,
+              is_verified,
               email,
               phone
             ),
@@ -351,6 +363,7 @@ serve(async (req) => {
               order_index,
               profiles!chama_members_user_id_fkey (
                 full_name,
+              is_verified,
                 email
               )
             )

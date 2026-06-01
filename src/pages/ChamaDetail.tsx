@@ -93,6 +93,7 @@ interface ChamaData {
       full_name: string;
       email: string;
       phone?: string;
+      is_verified?: boolean;
     };
   }>;
 }
@@ -1043,8 +1044,9 @@ const ChamaDetail = () => {
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium text-foreground">
-                                {member.profiles?.full_name || 'Unknown'}
+                              <p className="font-medium text-foreground inline-flex items-center gap-1 flex-wrap">
+                                <span>{member.profiles?.full_name || 'Unknown'}</span>
+                                {member.profiles?.is_verified && <VerifiedBadge size="sm" />}
                                 {member.is_manager && (
                                   <Badge variant="outline" className="ml-2">Manager</Badge>
                                 )}
@@ -1167,7 +1169,7 @@ const ChamaDetail = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate">#{idx + 1} {m.profiles?.full_name || 'Member'}</p>
+                                <p className="font-medium text-foreground truncate">#{idx + 1} {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{m.member_code}</p>
                               </div>
                             </div>
@@ -1199,7 +1201,7 @@ const ChamaDetail = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-10 w-10"><AvatarFallback>{currentRecipient.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-semibold text-foreground truncate">{currentRecipient.profiles?.full_name || 'Member'}</p>
+                                <p className="font-semibold text-foreground truncate">{currentRecipient.profiles?.full_name || 'Member'} {currentRecipient.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{currentRecipient.member_code}</p>
                                 <Badge className="mt-1 text-[10px]" variant="default">Receiving Today</Badge>
                               </div>
@@ -1217,7 +1219,7 @@ const ChamaDetail = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate">Position #{idx + (currentRecipient ? 2 : 1)} · {m.profiles?.full_name || 'Member'}</p>
+                                <p className="font-medium text-foreground truncate">Position #{idx + (currentRecipient ? 2 : 1)} · {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{m.member_code}{nextTurnDates[m.id] ? ` · ${formatDate(nextTurnDates[m.id])}` : ''}</p>
                               </div>
                             </div>
@@ -1246,7 +1248,7 @@ const ChamaDetail = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate">{m.profiles?.full_name || 'Member'}</p>
+                                <p className="font-medium text-foreground truncate">{m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">
                                   {m.member_code}
                                   {m.missed_payments_count ? ` · ${m.missed_payments_count} missed` : ''}

@@ -57,7 +57,7 @@ export const VerificationRequestButton = ({
     }
   }, [user, entityId, entityType, isOwner]);
 
-  const fetchVerificationFee = async () => {
+  const fetchVerificationFee = async (): Promise<number> => {
     try {
       const { data } = await supabase
         .from('platform_settings')
@@ -66,11 +66,15 @@ export const VerificationRequestButton = ({
         .maybeSingle();
       if (data && typeof data.setting_value === 'object' && data.setting_value !== null) {
         const val = data.setting_value as { amount?: number };
-        if (val.amount) setVerificationFee(val.amount);
+        if (typeof val.amount === 'number') {
+          setVerificationFee(val.amount);
+          return val.amount;
+        }
       }
     } catch (e) {
       console.error('Error fetching verification fee:', e);
     }
+    return verificationFee;
   };
 
   const fetchExistingRequest = async () => {
@@ -113,6 +117,8 @@ export const VerificationRequestButton = ({
     }
 
     setIsSubmitting(true);
+    // Always refetch the latest fee right before charging so admin edits take effect immediately
+    const liveFee = await fetchVerificationFee();
     try {
       // For non-chama entities, check balance BEFORE attempting insert
       let balance = 0;
@@ -131,10 +137,10 @@ export const VerificationRequestButton = ({
           balance = data?.available_balance ?? 0;
         }
 
-        if (balance < verificationFee) {
+        if (balance < liveFee) {
           toast({
             title: "Insufficient Balance",
-            description: `You need at least KSh ${verificationFee} in your ${entityType === 'mchango' ? 'campaign' : entityType} balance to request verification.`,
+            description: `You need at least KSh ${liveFee} in your ${entityType === 'mchango' ? 'campaign' : entityType} balance to request verification.`,
             variant: "destructive",
           });
           setIsSubmitting(false);
@@ -168,16 +174,16 @@ export const VerificationRequestButton = ({
       // Deduct fee AFTER successful insert
       if (requiresFee) {
         if (entityType === 'mchango') {
-          await supabase.from('mchango').update({ available_balance: balance - verificationFee }).eq('id', entityId);
+          await supabase.from('mchango').update({ available_balance: balance - liveFee }).eq('id', entityId);
         } else if (entityType === 'organization') {
-          await supabase.from('organizations').update({ available_balance: balance - verificationFee }).eq('id', entityId);
+          await supabase.from('organizations').update({ available_balance: balance - liveFee }).eq('id', entityId);
         } else if (entityType === 'welfare') {
-          await supabase.from('welfares').update({ available_balance: balance - verificationFee }).eq('id', entityId);
+          await supabase.from('welfares').update({ available_balance: balance - liveFee }).eq('id', entityId);
         }
 
         // Record fee as company revenue
         await supabase.from('company_earnings').insert({
-          amount: verificationFee,
+          amount: liveFee,
           source: 'verificationFee',
           description: `Verification fee for ${entityType}: ${entityName}`,
           group_id: entityId,
@@ -187,7 +193,7 @@ export const VerificationRequestButton = ({
       toast({
         title: "Request Submitted",
         description: requiresFee
-          ? `KSh ${verificationFee} has been deducted. Your verification request has been submitted for admin review.`
+          ? `KSh ${liveFee} has been deducted. Your verification request has been submitted for admin review.`
           : "Your verification request has been submitted for admin review",
       });
 
@@ -223,7 +229,7 @@ export const VerificationRequestButton = ({
     }
     if (existingRequest.status === 'rejected') {
       return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(o) => { setIsOpen(o); if (o) fetchVerificationFee(); }}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2 text-destructive">
               <XCircle className="h-4 w-4" />

@@ -27,6 +27,7 @@ import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
 import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 import SEO from "@/components/SEO";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
@@ -547,7 +548,7 @@ const WelfareDetail = () => {
                                 <span className="text-xs font-bold text-primary">#{index + 1}</span>
                               </div>
                               <div>
-                                <p className="font-semibold text-sm">{member.profiles?.full_name || 'Unknown'}</p>
+                                <p className="font-semibold text-sm inline-flex items-center gap-1 flex-wrap"><span>{member.profiles?.full_name || 'Unknown'}</span>{member.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground font-mono">{member.member_code || 'No ID'}</p>
                               </div>
                             </div>
