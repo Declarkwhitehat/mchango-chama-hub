@@ -229,7 +229,7 @@ export const VerificationRequestButton = ({
     }
     if (existingRequest.status === 'rejected') {
       return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(o) => { setIsOpen(o); if (o) fetchVerificationFee(); }}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2 text-destructive">
               <XCircle className="h-4 w-4" />
