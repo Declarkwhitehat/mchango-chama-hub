@@ -113,6 +113,8 @@ export const VerificationRequestButton = ({
     }
 
     setIsSubmitting(true);
+    // Always refetch the latest fee right before charging so admin edits take effect immediately
+    await fetchVerificationFee();
     try {
       // For non-chama entities, check balance BEFORE attempting insert
       let balance = 0;
