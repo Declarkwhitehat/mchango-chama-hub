@@ -1248,7 +1248,7 @@ const ChamaDetail = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate">{m.profiles?.full_name || 'Member'}</p>
+                                <p className="font-medium text-foreground truncate">{m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">
                                   {m.member_code}
                                   {m.missed_payments_count ? ` · ${m.missed_payments_count} missed` : ''}
