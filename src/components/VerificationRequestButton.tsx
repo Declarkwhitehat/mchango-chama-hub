@@ -137,10 +137,10 @@ export const VerificationRequestButton = ({
           balance = data?.available_balance ?? 0;
         }
 
-        if (balance < verificationFee) {
+        if (balance < liveFee) {
           toast({
             title: "Insufficient Balance",
-            description: `You need at least KSh ${verificationFee} in your ${entityType === 'mchango' ? 'campaign' : entityType} balance to request verification.`,
+            description: `You need at least KSh ${liveFee} in your ${entityType === 'mchango' ? 'campaign' : entityType} balance to request verification.`,
             variant: "destructive",
           });
           setIsSubmitting(false);
@@ -174,16 +174,16 @@ export const VerificationRequestButton = ({
       // Deduct fee AFTER successful insert
       if (requiresFee) {
         if (entityType === 'mchango') {
-          await supabase.from('mchango').update({ available_balance: balance - verificationFee }).eq('id', entityId);
+          await supabase.from('mchango').update({ available_balance: balance - liveFee }).eq('id', entityId);
         } else if (entityType === 'organization') {
-          await supabase.from('organizations').update({ available_balance: balance - verificationFee }).eq('id', entityId);
+          await supabase.from('organizations').update({ available_balance: balance - liveFee }).eq('id', entityId);
         } else if (entityType === 'welfare') {
-          await supabase.from('welfares').update({ available_balance: balance - verificationFee }).eq('id', entityId);
+          await supabase.from('welfares').update({ available_balance: balance - liveFee }).eq('id', entityId);
         }
 
         // Record fee as company revenue
         await supabase.from('company_earnings').insert({
-          amount: verificationFee,
+          amount: liveFee,
           source: 'verificationFee',
           description: `Verification fee for ${entityType}: ${entityName}`,
           group_id: entityId,
@@ -193,7 +193,7 @@ export const VerificationRequestButton = ({
       toast({
         title: "Request Submitted",
         description: requiresFee
-          ? `KSh ${verificationFee} has been deducted. Your verification request has been submitted for admin review.`
+          ? `KSh ${liveFee} has been deducted. Your verification request has been submitted for admin review.`
           : "Your verification request has been submitted for admin review",
       });
 
