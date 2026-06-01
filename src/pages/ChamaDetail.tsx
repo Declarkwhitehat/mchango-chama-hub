@@ -93,6 +93,7 @@ interface ChamaData {
       full_name: string;
       email: string;
       phone?: string;
+      is_verified?: boolean;
     };
   }>;
 }
