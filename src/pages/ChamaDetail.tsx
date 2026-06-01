@@ -1201,7 +1201,7 @@ const ChamaDetail = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-10 w-10"><AvatarFallback>{currentRecipient.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-semibold text-foreground truncate">{currentRecipient.profiles?.full_name || 'Member'}</p>
+                                <p className="font-semibold text-foreground truncate">{currentRecipient.profiles?.full_name || 'Member'} {currentRecipient.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{currentRecipient.member_code}</p>
                                 <Badge className="mt-1 text-[10px]" variant="default">Receiving Today</Badge>
                               </div>
