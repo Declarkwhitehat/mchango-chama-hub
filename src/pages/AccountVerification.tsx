@@ -87,6 +87,15 @@ const AccountVerification = () => {
     if (!phone) { toast({ title: "Phone required", variant: "destructive" }); return; }
     setSubmitting(true);
     try {
+      // Always refetch the latest fee right before charging so admin edits take effect immediately
+      const { data: feeRow } = await supabase
+        .from("platform_settings")
+        .select("setting_value")
+        .eq("setting_key", "user_verification_fee")
+        .maybeSingle();
+      const liveAmt = (feeRow?.setting_value as any)?.amount;
+      if (typeof liveAmt === "number") setFee(liveAmt);
+
       const ext = selfie.name.split(".").pop() || "jpg";
       const path = `${user.id}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("verification-selfies").upload(path, selfie, { upsert: true, contentType: selfie.type });
@@ -97,9 +106,11 @@ const AccountVerification = () => {
       });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || "Failed");
 
+      const charged = (data as any)?.fee_amount ?? liveAmt ?? fee;
+      setFee(charged);
       toast({
         title: "STK Push sent",
-        description: `Enter your M-Pesa PIN to pay KES ${fee}. Your verification will be reviewed once payment is confirmed.`,
+        description: `Enter your M-Pesa PIN to pay KES ${charged}. Your verification will be reviewed once payment is confirmed.`,
       });
       // refresh request
       const { data: req } = await supabase.from("user_verification_requests").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
