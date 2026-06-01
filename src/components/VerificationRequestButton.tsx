@@ -57,7 +57,7 @@ export const VerificationRequestButton = ({
     }
   }, [user, entityId, entityType, isOwner]);
 
-  const fetchVerificationFee = async () => {
+  const fetchVerificationFee = async (): Promise<number> => {
     try {
       const { data } = await supabase
         .from('platform_settings')
@@ -66,11 +66,15 @@ export const VerificationRequestButton = ({
         .maybeSingle();
       if (data && typeof data.setting_value === 'object' && data.setting_value !== null) {
         const val = data.setting_value as { amount?: number };
-        if (val.amount) setVerificationFee(val.amount);
+        if (typeof val.amount === 'number') {
+          setVerificationFee(val.amount);
+          return val.amount;
+        }
       }
     } catch (e) {
       console.error('Error fetching verification fee:', e);
     }
+    return verificationFee;
   };
 
   const fetchExistingRequest = async () => {
