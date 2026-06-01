@@ -27,6 +27,7 @@ import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
 import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 import SEO from "@/components/SEO";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
