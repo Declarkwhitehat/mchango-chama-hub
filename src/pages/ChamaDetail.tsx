@@ -1044,8 +1044,9 @@ const ChamaDetail = () => {
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium text-foreground">
-                                {member.profiles?.full_name || 'Unknown'}
+                              <p className="font-medium text-foreground inline-flex items-center gap-1 flex-wrap">
+                                <span>{member.profiles?.full_name || 'Unknown'}</span>
+                                {member.profiles?.is_verified && <VerifiedBadge size="sm" />}
                                 {member.is_manager && (
                                   <Badge variant="outline" className="ml-2">Manager</Badge>
                                 )}
