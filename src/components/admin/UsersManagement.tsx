@@ -401,6 +401,12 @@ export const UsersManagement = () => {
                           Admin
                         </Badge>
                       )}
+                      {user.is_verified && !isDeleted && (
+                        <Badge className="bg-[#1d9bf0] hover:bg-[#1d83d3] text-white">
+                          <BadgeCheck className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
+                      )}
                       {!isDeleted && getKycBadge(user.kyc_status)}
                     </div>
                     <p className="text-sm text-muted-foreground">{user.email}</p>
@@ -453,6 +459,18 @@ export const UsersManagement = () => {
                             </>
                           )}
                         </Button>
+                        {user.is_verified && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRevokeVerification(user)}
+                            disabled={processing === user.id}
+                            title="Remove verified status"
+                          >
+                            <BadgeCheck className="h-4 w-4 mr-1 text-[#1d9bf0]" />
+                            Remove Verified
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="destructive"
