@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
-import { createNotification, NotificationTemplates } from "../_shared/notifications.ts";
+import { createNotification, notifyAllAdmins, NotificationTemplates } from "../_shared/notifications.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -151,6 +151,26 @@ serve(async (req) => {
         });
       } catch (notifErr) {
         console.warn('welfare-crud: notification failed (non-fatal):', notifErr);
+      }
+
+      try {
+        const { data: creator } = await supabaseAdmin
+          .from('profiles')
+          .select('is_verified, full_name')
+          .eq('id', userData.user.id)
+          .maybeSingle();
+        if (creator?.is_verified) {
+          await notifyAllAdmins(supabaseAdmin, {
+            title: 'Verified user created welfare',
+            message: `${creator.full_name || 'A verified user'} created welfare "${data.name}". Review verification status.`,
+            type: 'info',
+            category: 'verification',
+            relatedEntityId: data.id,
+            relatedEntityType: 'welfare',
+          });
+        }
+      } catch (e) {
+        console.warn('welfare-crud: admin verified-creation notify failed (non-fatal):', e);
       }
 
       return new Response(JSON.stringify({ data }), {

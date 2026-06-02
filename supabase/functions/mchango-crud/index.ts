@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { createNotification, NotificationTemplates } from "../_shared/notifications.ts";
+import { createNotification, notifyAllAdmins, NotificationTemplates } from "../_shared/notifications.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -267,6 +267,26 @@ serve(async (req) => {
         });
       } catch (notifErr) {
         console.warn('mchango-crud: notification failed (non-fatal):', notifErr);
+      }
+
+      try {
+        const { data: creator } = await supabaseClient
+          .from('profiles')
+          .select('is_verified, full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (creator?.is_verified) {
+          await notifyAllAdmins(supabaseClient, {
+            title: 'Verified user created campaign',
+            message: `${creator.full_name || 'A verified user'} created campaign "${data.title}". Review verification status.`,
+            type: 'info',
+            category: 'verification',
+            relatedEntityId: data.id,
+            relatedEntityType: 'mchango',
+          });
+        }
+      } catch (e) {
+        console.warn('mchango-crud: admin verified-creation notify failed (non-fatal):', e);
       }
 
       return new Response(JSON.stringify({ data }), {

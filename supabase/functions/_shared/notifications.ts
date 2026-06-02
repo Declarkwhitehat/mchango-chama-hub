@@ -93,8 +93,9 @@ export async function createNotification(
       console.error('Error creating notification:', error);
     }
 
-    // 2. Send push notification banner (fire-and-forget, never blocks)
-    void sendPushNotification(params.userId, params.title, params.message);
+    // 2. Push notification is sent automatically by the DB trigger
+    //    `notifications_push_after_insert` → `notify_push_on_notification_insert()`.
+    //    Do NOT also call sendPushNotification here or users get duplicate banners.
 
   } catch (err) {
     console.error('Failed to create notification:', err);

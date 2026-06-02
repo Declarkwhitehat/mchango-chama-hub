@@ -192,6 +192,11 @@ const OrganizationCreate = () => {
 
       if (error) throw error;
 
+      // Best-effort: alert admins if the creator is a verified account
+      supabase.functions.invoke('notify-admin-verified-create', {
+        body: { entity_type: 'organization', entity_id: data.id, entity_name: data.name },
+      }).catch(() => {});
+
       toast.success("Organization registered successfully!");
       navigate(`/organizations/${data.slug}`);
     } catch (error: any) {
