@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key, Trash2, RotateCcw, AlertTriangle } from "lucide-react";
+import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key, Trash2, RotateCcw, AlertTriangle, BadgeCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, differenceInDays } from "date-fns";
 
@@ -19,6 +19,7 @@ interface User {
   kyc_status: string;
   created_at: string;
   deleted_at: string | null;
+  is_verified?: boolean | null;
 }
 
 interface UserRole {
@@ -60,7 +61,7 @@ export const UsersManagement = () => {
     try {
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
-        .select('id, full_name, email, phone, kyc_status, created_at, deleted_at')
+        .select('id, full_name, email, phone, kyc_status, created_at, deleted_at, is_verified')
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -258,6 +259,28 @@ export const UsersManagement = () => {
       });
     } finally {
       setRestoring(false);
+    }
+  };
+
+  const handleRevokeVerification = async (user: User) => {
+    const reason = window.prompt(
+      `Remove verified status from ${user.full_name}?\n\nOptional: enter a reason that will be sent to the user via SMS.`,
+      ''
+    );
+    if (reason === null) return; // cancelled
+    setProcessing(user.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-revoke-verification', {
+        body: { user_id: user.id, reason: reason.trim() || undefined },
+      });
+      if (error) throw new Error(error.message || 'Failed to revoke verification');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: 'Verification removed', description: `${user.full_name} is no longer verified. SMS sent.` });
+      await fetchUsers();
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Failed to revoke verification', variant: 'destructive' });
+    } finally {
+      setProcessing(null);
     }
   };
 
