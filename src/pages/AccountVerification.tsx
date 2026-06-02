@@ -52,7 +52,7 @@ const AccountVerification = () => {
   const takeNativeSelfie = async () => {
     try {
       const photo = await CapCamera.getPhoto({
-        quality: 100,
+        quality: 70,
         allowEditing: false,
         resultType: CameraResultType.Base64,
         source: CameraSource.Camera,
