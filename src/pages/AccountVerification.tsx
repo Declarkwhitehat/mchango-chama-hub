@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Capacitor } from "@capacitor/core";
 import { Camera as CapCamera, CameraResultType, CameraSource } from "@capacitor/camera";
+import { compressImage } from "@/utils/imageCompression";
 
 const AccountVerification = () => {
   const { user } = useAuth();
@@ -51,7 +52,7 @@ const AccountVerification = () => {
   const takeNativeSelfie = async () => {
     try {
       const photo = await CapCamera.getPhoto({
-        quality: 100,
+        quality: 70,
         allowEditing: false,
         resultType: CameraResultType.Base64,
         source: CameraSource.Camera,
@@ -81,6 +82,36 @@ const AccountVerification = () => {
     }
   };
 
+  const pollPaymentStatus = async (reqId: string) => {
+    // Poll for up to ~75s (15 tries × 5s) for callback to flip payment_status
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const { data: row } = await supabase
+        .from("user_verification_requests")
+        .select("*")
+        .eq("id", reqId)
+        .maybeSingle();
+      if (!row) continue;
+      setRequest(row);
+      if (row.payment_status === "paid") {
+        toast({ title: "Payment confirmed", description: "Your verification is now under review." });
+        return;
+      }
+      if (row.payment_status === "failed") {
+        toast({
+          title: "Payment failed",
+          description: "STK push was not completed (insufficient funds, cancelled, or timed out). Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    toast({
+      title: "Still waiting for payment",
+      description: "We haven't received confirmation yet. If you completed the payment, refresh this page shortly.",
+    });
+  };
+
   const submit = async () => {
     if (!user) return;
     if (!selfie) { toast({ title: "Selfie required", variant: "destructive" }); return; }
@@ -96,9 +127,19 @@ const AccountVerification = () => {
       const liveAmt = (feeRow?.setting_value as any)?.amount;
       if (typeof liveAmt === "number") setFee(liveAmt);
 
-      const ext = selfie.name.split(".").pop() || "jpg";
+      // Compress selfie before upload — original quality 100 photos can be 5-10MB and take 30+s to upload
+      let toUpload: File = selfie;
+      try {
+        toUpload = await compressImage(selfie, { maxBytes: 300 * 1024 });
+      } catch (e) {
+        console.warn("Selfie compression failed, uploading original", e);
+      }
+
+      const ext = (toUpload.name.split(".").pop() || "jpg").toLowerCase();
       const path = `${user.id}/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("verification-selfies").upload(path, selfie, { upsert: true, contentType: selfie.type });
+      const { error: upErr } = await supabase.storage
+        .from("verification-selfies")
+        .upload(path, toUpload, { upsert: true, contentType: toUpload.type || "image/jpeg" });
       if (upErr) throw upErr;
 
       const { data, error } = await supabase.functions.invoke("request-account-verification", {
@@ -108,13 +149,21 @@ const AccountVerification = () => {
 
       const charged = (data as any)?.fee_amount ?? liveAmt ?? fee;
       setFee(charged);
+      const reqId = (data as any)?.request_id;
       toast({
         title: "STK Push sent",
-        description: `Enter your M-Pesa PIN to pay KES ${charged}. Your verification will be reviewed once payment is confirmed.`,
+        description: `Enter your M-Pesa PIN to pay KES ${charged}. Awaiting confirmation…`,
       });
-      // refresh request
-      const { data: req } = await supabase.from("user_verification_requests").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      // refresh request and start polling for the payment callback
+      const { data: req } = await supabase
+        .from("user_verification_requests")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       setRequest(req);
+      if (reqId) pollPaymentStatus(reqId);
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
