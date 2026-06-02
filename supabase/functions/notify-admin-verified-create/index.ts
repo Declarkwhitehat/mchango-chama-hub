@@ -1,0 +1,82 @@
+// Called from the client after a verified user creates an entity that is
+// inserted client-side (e.g. organizations). The 3 server-side crud
+// functions notify admins inline; this exists so the org create flow can do
+// the same without bypassing RLS or trusting client claims.
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { notifyAllAdmins } from "../_shared/notifications.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const ENTITY_LABELS: Record<string, string> = {
+  organization: 'organization',
+  chama: 'chama',
+  welfare: 'welfare',
+  mchango: 'campaign',
+  campaign: 'campaign',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const authHeader = req.headers.get('Authorization')?.replace('Bearer ', '');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: { user } } = await supabase.auth.getUser(authHeader);
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { entity_type, entity_id, entity_name } = await req.json();
+    if (!entity_type || !entity_name) {
+      return new Response(JSON.stringify({ error: 'Missing fields' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: creator } = await supabase
+      .from('profiles')
+      .select('is_verified, full_name')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!creator?.is_verified) {
+      return new Response(JSON.stringify({ skipped: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const label = ENTITY_LABELS[String(entity_type).toLowerCase()] || String(entity_type);
+    await notifyAllAdmins(supabase, {
+      title: `Verified user created ${label}`,
+      message: `${creator.full_name || 'A verified user'} created ${label} "${entity_name}". Review verification status.`,
+      type: 'info',
+      category: 'verification',
+      relatedEntityId: entity_id || undefined,
+      relatedEntityType: entity_type,
+    });
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (e) {
+    console.error('notify-admin-verified-create error', e);
+    return new Response(JSON.stringify({ error: (e as Error).message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
