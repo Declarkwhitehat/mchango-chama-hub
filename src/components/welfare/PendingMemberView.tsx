@@ -8,6 +8,8 @@ import { AlertTriangle, Clock, Copy, Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { GroupDocuments } from "@/components/GroupDocuments";
+import { useAuth } from "@/contexts/AuthContext";
+import { normalizePhone } from "@/utils/phoneUtils";
 
 interface Props {
   welfare: any;
@@ -41,6 +43,7 @@ const copy = async (text: string, label: string) => {
 };
 
 export const PendingMemberView = ({ welfare, member, onPaid }: Props) => {
+  const { user, profile } = useAuth();
   const [paying, setPaying] = useState(false);
   const due = Number(member.registration_fee_due || 0);
   const paid = Number(member.registration_fee_paid || 0);
@@ -51,14 +54,24 @@ export const PendingMemberView = ({ welfare, member, onPaid }: Props) => {
   const triggerStk = async () => {
     setPaying(true);
     try {
+      const normalizedPhone = normalizePhone(profile?.phone || member.profiles?.phone || "");
+      if (!normalizedPhone) {
+        throw new Error("Your profile phone number is missing or invalid. Update your profile, then try again.");
+      }
+
       const { data, error } = await supabase.functions.invoke("payment-stk-push", {
         body: {
+          phone_number: normalizedPhone,
           amount: Math.ceil(remaining),
           account_reference: member.member_code,
           transaction_desc: "Welfare Reg",
-          purpose: "welfare_registration",
-          welfare_id: welfare.id,
-          member_id: member.id,
+          callback_metadata: {
+            type: "welfare_contribution",
+            welfare_id: welfare.id,
+            member_id: member.id,
+            recipient_member_code: member.member_code,
+            user_id: user?.id,
+          },
         },
       });
       if (error) throw error;
