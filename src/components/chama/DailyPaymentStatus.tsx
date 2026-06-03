@@ -70,7 +70,7 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
   const [totalOutstanding, setTotalOutstanding] = useState(0);
   const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
 
-  const graceDeadline = getNextDay10PmKenyaDeadline(chamaStartDate);
+  const graceDeadline = cycleInfo?.end_date ? new Date(cycleInfo.end_date) : getNextDay10PmKenyaDeadline(chamaStartDate);
   const isGracePeriod = !!graceDeadline && Date.now() < graceDeadline.getTime();
 
   const loadPaymentStatus = async () => {
@@ -241,7 +241,7 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
         countdownDeadline={(isGracePeriod
           ? graceDeadline
           : frequency === 'daily'
-            ? getSameDay10PmKenyaCutoff(cycleInfo.end_date)
+            ? new Date(cycleInfo.end_date)
             : null
         )?.toISOString()}
         contributionAmount={cycleInfo.due_amount}
