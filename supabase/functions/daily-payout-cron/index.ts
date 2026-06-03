@@ -645,6 +645,7 @@ Deno.serve(async (req) => {
         let actualBeneficiary = scheduledBeneficiary;
         let wasSkipped = false;
         let skipPayout = false;
+        let adminApprovalPending = false;
 
         if (!eligibility.isEligible) {
           console.log(`⚠️ Member ${scheduledBeneficiary.member_code} NOT ELIGIBLE for payout. Details: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}, has outstanding debts: ${eligibility.hasDebts}, missed_payments_count: ${scheduledBeneficiary.missed_payments_count || 0}`);
@@ -805,6 +806,7 @@ Deno.serve(async (req) => {
             }
 
             // Create the approval request only if there's money to distribute
+            adminApprovalPending = approvalPayoutAmount > 0;
             const { data: approvalReq, error: approvalError } = approvalPayoutAmount > 0 ? await supabase
               .from('payout_approval_requests')
               .insert({
@@ -896,7 +898,7 @@ Deno.serve(async (req) => {
         const paidCount = allFullyPaidMembers.length;
         const unpaidMembers = payments?.filter((p: any) => !p.fully_paid) || [];
 
-        if (skipPayout) {
+        if (skipPayout && !adminApprovalPending) {
           await supabase
             .from('contribution_cycles')
             .update({
