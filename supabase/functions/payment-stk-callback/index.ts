@@ -440,7 +440,6 @@ serve(async (req) => {
           net_amount: netAmount,
           payment_status: 'completed',
           mpesa_receipt_number: mpesaReceiptNumber,
-          payment_reference: mpesaReceiptNumber || checkoutRequestId,
           category: isRegistration ? 'registration_fee' : 'contribution',
           completed_at: new Date().toISOString(),
         })
