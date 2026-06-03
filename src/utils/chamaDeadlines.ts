@@ -1,4 +1,5 @@
 const KENYA_OFFSET_MS = 3 * 60 * 60 * 1000;
+const KENYA_9PM_UTC_HOUR = 18;
 const KENYA_10PM_UTC_HOUR = 19;
 const KENYA_930PM_UTC_HOUR = 18;
 const KENYA_930PM_UTC_MINUTE = 30;
@@ -30,6 +31,8 @@ function buildKenya10PmCutoff(input: string | Date | null | undefined, dayOffset
 export function getNextDay10PmKenyaDeadline(input: string | Date | null | undefined): Date | null {
   return buildKenya10PmCutoff(input, 1);
 }
+
+export const getNextDay9PmKenyaDeadline = getNextDay10PmKenyaDeadline;
 
 export function getSameDay10PmKenyaCutoff(input: string | Date | null | undefined): Date | null {
   return buildKenya10PmCutoff(input, 0);
