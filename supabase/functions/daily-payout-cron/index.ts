@@ -1299,6 +1299,12 @@ Deno.serve(async (req) => {
 
           if ((activeCount || 0) === 0) {
             console.log(`🪦 All members removed from "${chama.name}" — auto-deleting chama`);
+            const missedNames = unpaidMembers
+              .map((u: any) => u.chama_members?.profiles?.full_name || u.chama_members?.member_code || 'Member')
+              .filter(Boolean)
+              .slice(0, 8)
+              .join(', ');
+            const allRemovedSummary = `Cycle ${cycle.cycle_number} of ${chama.name}: no member paid by the deadline. Removed: ${missedNames || 'all members'}. Chama auto-closed.`;
             await supabase
               .from('chama')
               .update({ status: 'deleted', updated_at: new Date().toISOString() })
@@ -1317,14 +1323,12 @@ Deno.serve(async (req) => {
                 .eq('id', chamaInfo.created_by)
                 .maybeSingle();
               if (creator?.phone) {
-                await sendSMS(creator.phone,
-                  `Chama "${chama.name}" was auto-closed: all members were removed for missing the first deadline.`
-                );
+                await sendSMS(creator.phone, allRemovedSummary);
               }
               await supabase.from('notifications').insert({
                 user_id: chamaInfo.created_by,
                 title: 'Chama Auto-Closed',
-                message: `"${chama.name}" was closed automatically because all members missed the first payment deadline.`,
+                message: allRemovedSummary,
                 type: 'warning',
                 category: 'chama',
                 related_entity_id: chama.id,
