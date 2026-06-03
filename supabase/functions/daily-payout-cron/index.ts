@@ -803,6 +803,7 @@ Deno.serve(async (req) => {
                 members_skipped_count: ineligibleDetails.length
               }).eq('id', cycle.id);
               skipPayout = true;
+              adminApprovalPending = false;
             }
 
             // Create the approval request only if there's money to distribute
@@ -827,7 +828,7 @@ Deno.serve(async (req) => {
               } else {
                 console.error('Error creating approval request:', approvalError);
               }
-            } else {
+            } else if (approvalReq) {
               console.log(`📋 Admin approval request created: ${approvalReq?.id}`);
 
               // Notify admins
