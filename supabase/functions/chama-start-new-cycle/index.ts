@@ -395,11 +395,6 @@ Deno.serve(async (req) => {
     const graceDeadline = getNextDay10PmKenyaDeadline(startDate);
 
     // ========== CREATE FIRST CONTRIBUTION CYCLE ==========
-    const cycleLength = getCycleLengthInDays(
-      chama.contribution_frequency,
-      chama.every_n_days_count,
-    );
-
     // First cycle always closes next day at 9:00 PM EAT, regardless of frequency.
     const cycleEndDate = graceDeadline;
 
