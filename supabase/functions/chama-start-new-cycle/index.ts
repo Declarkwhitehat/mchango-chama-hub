@@ -391,7 +391,7 @@ Deno.serve(async (req) => {
 
     throwIfError(updateError);
 
-    // ========== CALCULATE GRACE PERIOD (next day at 10:00 PM Kenya time) ==========
+    // ========== CALCULATE FIRST PAYMENT DEADLINE (next day at 9:00 PM EAT) ==========
     const graceDeadline = getNextDay10PmKenyaDeadline(startDate);
 
     // ========== CREATE FIRST CONTRIBUTION CYCLE ==========
@@ -400,15 +400,8 @@ Deno.serve(async (req) => {
       chama.every_n_days_count,
     );
 
-    const normalCycleEndDate = calculateCycleEndDate(
-      startDate,
-      chama.contribution_frequency,
-      chama.every_n_days_count,
-      chama.monthly_contribution_day,
-      chama.monthly_contribution_day_2,
-    );
-    // Ensure first cycle end is at least the grace deadline
-    const cycleEndDate = normalCycleEndDate > graceDeadline ? normalCycleEndDate : graceDeadline;
+    // First cycle always closes next day at 9:00 PM EAT, regardless of frequency.
+    const cycleEndDate = graceDeadline;
 
     // Sort members by order_index to find first beneficiary
     const sortedMembers = [...createdMembers].sort((a, b) => a.order_index - b.order_index);
@@ -478,13 +471,8 @@ Deno.serve(async (req) => {
     });
 
     const smsPromises = sortedMembers.map(async (member) => {
-      const payoutDate = new Date(startDate);
-      payoutDate.setDate(
-        payoutDate.getDate() + (member.order_index - 1) * cycleLength,
-      );
-
       const message =
-        `New cycle started for "${chama.name}". You're member #${member.order_index}. You have a 24hr grace period - first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 8:00 PM (Kenya time). Your payout date: ${payoutDate.toLocaleDateString()}.`;
+        `New cycle started for "${chama.name}". You're member #${member.order_index}. First payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 9:00 PM. Paybill 4015351, Account ${member.member_code}.`;
 
       try {
         await supabase.functions.invoke("send-transactional-sms", {
