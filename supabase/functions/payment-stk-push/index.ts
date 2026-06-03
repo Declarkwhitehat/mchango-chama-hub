@@ -359,8 +359,58 @@ serve(async (req) => {
       }
     }
 
-    // --- Step 6: Return result with deposit_id and contribution_id ---
-    return new Response(JSON.stringify({ ...result, contribution_id: contributionId }), {
+    // --- Step 5: Create pending welfare contribution for callback matching ---
+    let welfareContributionId = null;
+    if (body.callback_metadata?.type === 'welfare_contribution' && result.CheckoutRequestID) {
+      const welfareId = body.callback_metadata.welfare_id as string | undefined;
+      const recipientCode = body.callback_metadata.recipient_member_code as string | undefined;
+      if (welfareId) {
+        const memberQuery = supabaseClient
+          .from('welfare_members')
+          .select('id, user_id, registration_status, registration_fee_due, registration_fee_paid')
+          .eq('welfare_id', welfareId)
+          .eq('status', 'active')
+          .limit(1);
+
+        const { data: memberRows } = recipientCode
+          ? await memberQuery.eq('member_code', recipientCode)
+          : await memberQuery.eq('id', body.callback_metadata.member_id as string);
+        const welfareMember = memberRows?.[0];
+
+        if (welfareMember) {
+          const registrationRemaining = Math.max(0, Number(welfareMember.registration_fee_due || 0) - Number(welfareMember.registration_fee_paid || 0));
+          const category = registrationRemaining > 0 && body.amount <= registrationRemaining ? 'registration_fee' : 'contribution';
+          const { data: welfareContribution, error: welfareContributionError } = await supabaseClient
+            .from('welfare_contributions')
+            .insert({
+              welfare_id: welfareId,
+              member_id: welfareMember.id,
+              user_id: welfareMember.user_id,
+              gross_amount: body.amount,
+              commission_amount: 0,
+              net_amount: body.amount,
+              payment_reference: result.CheckoutRequestID,
+              payment_method: 'mpesa',
+              payment_status: 'pending',
+              cycle_month: new Date().toISOString().substring(0, 7),
+              category,
+            })
+            .select('id')
+            .single();
+
+          if (welfareContributionError) {
+            console.error('Error creating pending welfare contribution:', welfareContributionError);
+          } else {
+            welfareContributionId = welfareContribution.id;
+          }
+        } else {
+          console.error('No welfare member found for STK metadata', { welfareId, recipientCode });
+        }
+      }
+    }
+
+    // --- Step 6: Return result with contribution IDs ---
+    return new Response(JSON.stringify({ ...result, contribution_id: contributionId, welfare_contribution_id: welfareContributionId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
