@@ -149,8 +149,8 @@ serve(async (req) => {
     const startDate = new Date();
 
     // ============================================
-    // CALCULATE GRACE PERIOD END (next day at 10:00 PM Kenya time)
-    // Members get until 10:00 PM the next day to make their first payment
+    // CALCULATE FIRST PAYMENT DEADLINE (next day at 9:00 PM EAT)
+    // First cycle is always due the next day, regardless of chama frequency.
     // ============================================
     const graceDeadline = getNextDay10PmKenyaDeadline(startDate);
 
@@ -224,15 +224,12 @@ serve(async (req) => {
 
     // ============================================
     // CREATE FIRST CONTRIBUTION CYCLE
-    // End date includes 24hr grace period: at least until graceDeadline
+    // First cycle always closes next day at 9:00 PM EAT.
     // ============================================
-    const normalCycleEndDate = calculateCycleEndDate(startDate, chama.contribution_frequency, chama.every_n_days_count, chama.monthly_contribution_day, chama.monthly_contribution_day_2);
-    // Ensure the first cycle end is at least the grace deadline (next day 10PM)
-    const cycleEndDate = normalCycleEndDate > graceDeadline ? normalCycleEndDate : graceDeadline;
+    const cycleEndDate = graceDeadline;
 
     console.log('First cycle dates:', {
-      normalEnd: normalCycleEndDate.toISOString(),
-      withGrace: cycleEndDate.toISOString(),
+      firstCycleEnd: cycleEndDate.toISOString(),
     });
     
     const { data: firstCycle, error: cycleError } = await supabaseClient
@@ -309,7 +306,7 @@ serve(async (req) => {
       const payoutStr = fmtEAT(payoutDate);
       const aheadLine = i === 0 ? 'You are first in line.' : `Members ahead of you: ${memberIndex - 1}.`;
 
-      const message = `"${chama.name}" has started. You are Member #${memberIndex} of ${sortedMembers.length}. Grace period: first payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 8:00 PM (Kenya time). Contribute ${frequencyText}. Your payout: ${payoutStr}. ${aheadLine}`;
+      const message = `"${chama.name}" has started. You are Member #${memberIndex} of ${sortedMembers.length}. First payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr} at 9:00 PM. Paybill 4015351, Account ${member.member_code}. ${aheadLine}`;
 
       if (member.profiles?.phone) {
         try {
