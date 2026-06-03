@@ -647,7 +647,19 @@ Deno.serve(async (req) => {
         let skipPayout = false;
         let adminApprovalPending = false;
 
-        if (!eligibility.isEligible) {
+        if (cycle.cycle_number === 1) {
+          const { data: firstCyclePayments } = await supabase
+            .from('member_cycle_payments')
+            .select('fully_paid')
+            .eq('cycle_id', cycle.id);
+          const noOnePaidFirstCycle = (firstCyclePayments || []).length > 0 && (firstCyclePayments || []).every((p: any) => !p.fully_paid);
+          if (noOnePaidFirstCycle) {
+            console.log(`ℹ️ ${chama.name} first cycle ended with zero payments — skipping beneficiary deferral/admin payout review; members will be removed.`);
+            skipPayout = true;
+          }
+        }
+
+        if (!skipPayout && !eligibility.isEligible) {
           console.log(`⚠️ Member ${scheduledBeneficiary.member_code} NOT ELIGIBLE for payout. Details: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}, has outstanding debts: ${eligibility.hasDebts}, missed_payments_count: ${scheduledBeneficiary.missed_payments_count || 0}`);
           
           // Detailed audit log for eligibility failure
