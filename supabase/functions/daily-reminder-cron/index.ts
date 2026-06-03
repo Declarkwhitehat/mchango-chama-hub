@@ -37,6 +37,14 @@ async function sendSMS(phone: string, message: string) {
   }
 }
 
+function formatEatDeadline(input: string): string {
+  return new Date(input).toLocaleTimeString('en-KE', {
+    timeZone: 'Africa/Nairobi',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -102,6 +110,12 @@ Deno.serve(async (req) => {
         }
       }
 
+      const cycleDeadline = new Date(cycle.end_date);
+      if (new Date() >= cycleDeadline) {
+        console.log(`Skipping reminder for ${chama.name} — cycle deadline already passed`);
+        continue;
+      }
+
       // Get unpaid members
       const { data: unpaidPayments } = await supabase
         .from('member_cycle_payments')
@@ -131,8 +145,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Display deadline as 8:00 PM Kenya time (UI-only; actual cycle close stays at 22:00 EAT)
-        const dueTime = '8:00 PM (Kenya time)';
+        const dueTime = formatEatDeadline(cycle.end_date);
 
         // Create in-app notification if user_id exists
         if (userId) {
@@ -157,8 +170,8 @@ Deno.serve(async (req) => {
         if (profile?.phone) {
           const firstName = (profile.full_name || '').split(' ')[0] || 'Member';
           const slotLabel = slot === '1815'
-            ? 'Final reminder: pay before 8:00 PM today (Kenya time).'
-            : 'Deadline: 8:00 PM today (Kenya time).';
+            ? `Final reminder: pay before ${dueTime} today.`
+            : `Deadline: ${dueTime} today.`;
           const message = `Hi ${firstName}, KES ${payment.amount_due} due for ${chama.name}. ${slotLabel} Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
 
           try {

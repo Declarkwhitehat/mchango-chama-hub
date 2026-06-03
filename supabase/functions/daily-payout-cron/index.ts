@@ -346,14 +346,6 @@ Deno.serve(async (req) => {
     let errors = 0;
 
     for (const chama of chamas || []) {
-      // ========== GRACE PERIOD: skip chamas in their first 24h ==========
-      const chamaStart = new Date(chama.start_date || chama.created_at);
-      const graceEnds = new Date(chamaStart.getTime() + 24 * 60 * 60 * 1000);
-      if (new Date() < graceEnds) {
-        console.log(`[GRACE] Skipping ${chama.name} — still in 24h grace period`);
-        continue;
-      }
-
       const now = new Date().toISOString();
       
       // ========== GAP RECOVERY: Create missing cycles ==========
@@ -653,8 +645,21 @@ Deno.serve(async (req) => {
         let actualBeneficiary = scheduledBeneficiary;
         let wasSkipped = false;
         let skipPayout = false;
+        let adminApprovalPending = false;
 
-        if (!eligibility.isEligible) {
+        if (cycle.cycle_number === 1) {
+          const { data: firstCyclePayments } = await supabase
+            .from('member_cycle_payments')
+            .select('fully_paid')
+            .eq('cycle_id', cycle.id);
+          const noOnePaidFirstCycle = (firstCyclePayments || []).length > 0 && (firstCyclePayments || []).every((p: any) => !p.fully_paid);
+          if (noOnePaidFirstCycle) {
+            console.log(`ℹ️ ${chama.name} first cycle ended with zero payments — skipping beneficiary deferral/admin payout review; members will be removed.`);
+            skipPayout = true;
+          }
+        }
+
+        if (!skipPayout && !eligibility.isEligible) {
           console.log(`⚠️ Member ${scheduledBeneficiary.member_code} NOT ELIGIBLE for payout. Details: ${eligibility.unpaidCycles} unpaid cycle(s), shortfall KES ${eligibility.shortfall}, has outstanding debts: ${eligibility.hasDebts}, missed_payments_count: ${scheduledBeneficiary.missed_payments_count || 0}`);
           
           // Detailed audit log for eligibility failure
@@ -810,9 +815,11 @@ Deno.serve(async (req) => {
                 members_skipped_count: ineligibleDetails.length
               }).eq('id', cycle.id);
               skipPayout = true;
+              adminApprovalPending = false;
             }
 
             // Create the approval request only if there's money to distribute
+            adminApprovalPending = approvalPayoutAmount > 0;
             const { data: approvalReq, error: approvalError } = approvalPayoutAmount > 0 ? await supabase
               .from('payout_approval_requests')
               .insert({
@@ -833,7 +840,7 @@ Deno.serve(async (req) => {
               } else {
                 console.error('Error creating approval request:', approvalError);
               }
-            } else {
+            } else if (approvalReq) {
               console.log(`📋 Admin approval request created: ${approvalReq?.id}`);
 
               // Notify admins
@@ -903,6 +910,21 @@ Deno.serve(async (req) => {
         const allFullyPaidMembers = payments?.filter((p: any) => p.fully_paid) || [];
         const paidCount = allFullyPaidMembers.length;
         const unpaidMembers = payments?.filter((p: any) => !p.fully_paid) || [];
+
+        if (skipPayout && !adminApprovalPending) {
+          await supabase
+            .from('contribution_cycles')
+            .update({
+              is_complete: true,
+              payout_amount: 0,
+              payout_type: 'none',
+              members_paid_count: paidCount,
+              members_skipped_count: unpaidMembers.length,
+              total_collected_amount: 0,
+              total_expected_amount: totalMembers * chama.contribution_amount,
+            })
+            .eq('id', cycle.id);
+        }
 
         if (!skipPayout && !existingWithdrawal) {
           // Use available_balance as source of truth — commission already deducted per-contribution
@@ -1290,6 +1312,12 @@ Deno.serve(async (req) => {
 
           if ((activeCount || 0) === 0) {
             console.log(`🪦 All members removed from "${chama.name}" — auto-deleting chama`);
+            const missedNames = unpaidMembers
+              .map((u: any) => u.chama_members?.profiles?.full_name || u.chama_members?.member_code || 'Member')
+              .filter(Boolean)
+              .slice(0, 8)
+              .join(', ');
+            const allRemovedSummary = `Cycle ${cycle.cycle_number} of ${chama.name}: no member paid by the deadline. Removed: ${missedNames || 'all members'}. Chama auto-closed.`;
             await supabase
               .from('chama')
               .update({ status: 'deleted', updated_at: new Date().toISOString() })
@@ -1308,14 +1336,12 @@ Deno.serve(async (req) => {
                 .eq('id', chamaInfo.created_by)
                 .maybeSingle();
               if (creator?.phone) {
-                await sendSMS(creator.phone,
-                  `Chama "${chama.name}" was auto-closed: all members were removed for missing the first deadline.`
-                );
+                await sendSMS(creator.phone, allRemovedSummary);
               }
               await supabase.from('notifications').insert({
                 user_id: chamaInfo.created_by,
                 title: 'Chama Auto-Closed',
-                message: `"${chama.name}" was closed automatically because all members missed the first payment deadline.`,
+                message: allRemovedSummary,
                 type: 'warning',
                 category: 'chama',
                 related_entity_id: chama.id,

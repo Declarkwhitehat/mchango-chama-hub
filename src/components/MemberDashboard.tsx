@@ -225,7 +225,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                 <p className="font-semibold text-primary">Chama hasn't started yet</p>
                 <p className="text-sm text-muted-foreground">
                   No contributions are due until the manager officially starts this chama.
-                  Once started, you'll have until <strong>8:00 PM the next day (Kenya time)</strong> to make your first payment.
+                  Once started, you'll have until <strong>9:00 PM the next day</strong> to make your first payment.
                 </p>
               </div>
             </div>

@@ -212,7 +212,7 @@ export function PaymentCountdownTimer({
               <IconComponent className={cn("h-5 w-5", styles.text)} />
               <span className={cn("font-medium", styles.text)}>{styles.message}</span>
             </div>
-            <Badge variant="outline" className="text-xs">8:00 PM Cutoff</Badge>
+              <Badge variant="outline" className="text-xs">9:00 PM Cutoff</Badge>
           </div>
 
           <div className="flex items-center justify-center gap-1 sm:gap-2">
@@ -273,7 +273,7 @@ export function PaymentCountdownTimer({
 
           {(urgency === 'critical' || urgency === 'urgent') && (
             <p className="text-xs text-center text-destructive">
-              ⚠️ Payments after 8:00 PM will be marked as LATE and 10% penalty deducted
+              ⚠️ Payments after 9:00 PM will be marked as LATE and 10% penalty deducted
             </p>
           )}
         </div>

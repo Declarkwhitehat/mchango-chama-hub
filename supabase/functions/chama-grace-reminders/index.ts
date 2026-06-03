@@ -8,6 +8,14 @@ const PUSH_WINDOW_MAX_MS = 10.5 * 60 * 60 * 1000;
 const SMS_WINDOW_MIN_MS = 5.5 * 60 * 60 * 1000;
 const SMS_WINDOW_MAX_MS = 6.5 * 60 * 60 * 1000;
 
+function formatEatDeadline(input: string): string {
+  return new Date(input).toLocaleTimeString("en-KE", {
+    timeZone: "Africa/Nairobi",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -42,6 +50,8 @@ Deno.serve(async (req) => {
 
       const deadlineMs = new Date(cycle.end_date).getTime();
       const remaining = deadlineMs - now;
+      if (remaining <= 0) continue;
+      const deadlineText = formatEatDeadline(cycle.end_date);
 
       const inPushWindow = remaining >= PUSH_WINDOW_MIN_MS && remaining <= PUSH_WINDOW_MAX_MS;
       const inSmsWindow = remaining >= SMS_WINDOW_MIN_MS && remaining <= SMS_WINDOW_MAX_MS;
@@ -83,7 +93,7 @@ Deno.serve(async (req) => {
             const { error: notifErr } = await supabase.from("notifications").insert({
               user_id: userId,
               title: `Pay your first contribution today`,
-              message: `Your first contribution of KES ${Number(chama.contribution_amount).toLocaleString()} for "${chama.name}" is due by 8:00 PM today (Kenya time). Tap to pay now.`,
+              message: `Your first contribution of KES ${Number(chama.contribution_amount).toLocaleString()} for "${chama.name}" is due by ${deadlineText} today. Tap to pay now.`,
               type: "warning",
               category: "chama_payment",
               related_entity_id: chama.id,
@@ -105,7 +115,7 @@ Deno.serve(async (req) => {
             .insert({ member_id: memberId, cycle_id: cycle.id, reminder_type: "sms_6h" });
 
           if (!dupErr) {
-            const message = `Pamoja Nova: ${fullName.split(" ")[0]}, your KES ${Number(chama.contribution_amount).toLocaleString()} for "${chama.name}" is due by 8:00 PM today (Kenya time). PAY NOW or you will be REMOVED from the chama.`.slice(0, 160);
+            const message = `Pamoja Nova: ${fullName.split(" ")[0]}, your KES ${Number(chama.contribution_amount).toLocaleString()} for "${chama.name}" is due by ${deadlineText} today. Pay now or you will be removed.`.slice(0, 160);
 
             try {
               const { error: smsErr } = await supabase.functions.invoke("send-transactional-sms", {

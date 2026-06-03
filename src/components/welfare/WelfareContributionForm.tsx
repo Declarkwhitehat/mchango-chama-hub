@@ -145,7 +145,8 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
           callback_metadata: {
             type: "welfare_contribution",
             welfare_id: welfareId,
-            member_id: memberId,
+            member_id: payForOther ? undefined : memberId,
+            recipient_member_code: recipientCode,
             user_id: user?.id,
           },
         },
