@@ -346,14 +346,6 @@ Deno.serve(async (req) => {
     let errors = 0;
 
     for (const chama of chamas || []) {
-      // ========== GRACE PERIOD: skip chamas in their first 24h ==========
-      const chamaStart = new Date(chama.start_date || chama.created_at);
-      const graceEnds = new Date(chamaStart.getTime() + 24 * 60 * 60 * 1000);
-      if (new Date() < graceEnds) {
-        console.log(`[GRACE] Skipping ${chama.name} — still in 24h grace period`);
-        continue;
-      }
-
       const now = new Date().toISOString();
       
       // ========== GAP RECOVERY: Create missing cycles ==========
