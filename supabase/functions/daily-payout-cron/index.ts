@@ -896,6 +896,21 @@ Deno.serve(async (req) => {
         const paidCount = allFullyPaidMembers.length;
         const unpaidMembers = payments?.filter((p: any) => !p.fully_paid) || [];
 
+        if (skipPayout) {
+          await supabase
+            .from('contribution_cycles')
+            .update({
+              is_complete: true,
+              payout_amount: 0,
+              payout_type: 'none',
+              members_paid_count: paidCount,
+              members_skipped_count: unpaidMembers.length,
+              total_collected_amount: 0,
+              total_expected_amount: totalMembers * chama.contribution_amount,
+            })
+            .eq('id', cycle.id);
+        }
+
         if (!skipPayout && !existingWithdrawal) {
           // Use available_balance as source of truth — commission already deducted per-contribution
           const { data: chamaPoolBalance } = await supabase
