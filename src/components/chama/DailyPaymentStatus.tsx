@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
 import { PaymentCountdownTimer } from "./PaymentCountdownTimer";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { getNextDay10PmKenyaDeadline, getSameDay10PmKenyaCutoff } from "@/utils/chamaDeadlines";
+import { getNextDay10PmKenyaDeadline } from "@/utils/chamaDeadlines";
 
 interface CyclePaymentStatusProps {
   chamaId: string;
