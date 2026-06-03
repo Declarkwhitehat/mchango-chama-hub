@@ -390,6 +390,105 @@ serve(async (req) => {
       );
     }
 
+    // Check if this is a welfare contribution / registration fee STK payment
+    const { data: welfarePayments } = await supabaseClient
+      .from('welfare_contributions')
+      .select('*, welfares(id, name, commission_rate, total_gross_collected, total_commission_paid, available_balance, current_amount), welfare_members(id, user_id, total_contributed, registration_status, registration_fee_due, registration_fee_paid)')
+      .eq('payment_reference', checkoutRequestId);
+
+    if (welfarePayments && welfarePayments.length > 0) {
+      const pending = welfarePayments[0];
+      if (pending.payment_status === 'completed') {
+        return new Response(JSON.stringify({ success: true, message: 'Already processed', welfare_contribution_id: pending.id }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (status === 'failed') {
+        await supabaseClient.from('welfare_contributions').update({ payment_status: 'failed' }).eq('id', pending.id);
+        return new Response(JSON.stringify({ success: true, message: 'Welfare payment failed' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const grossAmount = paidAmount || pending.gross_amount;
+      const member = pending.welfare_members;
+      const welfare = pending.welfares;
+      const welfareRate = Number(welfare?.commission_rate || COMMISSION_RATES.WELFARE);
+      const registrationRemaining = Math.max(0, Number(member?.registration_fee_due || 0) - Number(member?.registration_fee_paid || 0));
+      const isRegistration = registrationRemaining > 0 && grossAmount <= registrationRemaining;
+      const rate = isRegistration ? 0.10 : welfareRate;
+      const commissionAmount = Math.round(grossAmount * rate * 100) / 100;
+      const netAmount = Math.round((grossAmount - commissionAmount) * 100) / 100;
+
+      let regFullyPaid = false;
+      if (isRegistration && member?.id) {
+        const { data: allocRes } = await supabaseClient.rpc('apply_welfare_registration_payment', {
+          p_member_id: member.id,
+          p_gross: grossAmount,
+        });
+        regFullyPaid = !!allocRes?.fully_paid;
+      }
+
+      const { data: updatedWelfarePayment, error: welfarePaymentError } = await supabaseClient
+        .from('welfare_contributions')
+        .update({
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
+          payment_status: 'completed',
+          mpesa_receipt_number: mpesaReceiptNumber,
+          payment_reference: mpesaReceiptNumber || checkoutRequestId,
+          category: isRegistration ? 'registration_fee' : 'contribution',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', pending.id)
+        .eq('payment_status', 'pending')
+        .select()
+        .single();
+
+      if (welfarePaymentError) throw welfarePaymentError;
+
+      await supabaseClient.from('welfares').update({
+        total_gross_collected: (welfare?.total_gross_collected || 0) + grossAmount,
+        total_commission_paid: (welfare?.total_commission_paid || 0) + commissionAmount,
+        available_balance: (welfare?.available_balance || 0) + netAmount,
+        current_amount: (welfare?.current_amount || 0) + netAmount,
+      }).eq('id', pending.welfare_id);
+
+      if (member?.id) {
+        await supabaseClient.from('welfare_members').update({
+          total_contributed: (member.total_contributed || 0) + grossAmount,
+        }).eq('id', member.id);
+      }
+
+      await supabaseClient.rpc('record_company_earning', {
+        p_source: isRegistration ? 'welfare_registration' : 'welfare_contribution',
+        p_amount: commissionAmount,
+        p_group_id: pending.welfare_id,
+        p_reference_id: pending.id,
+        p_description: `Welfare ${isRegistration ? 'registration fee' : 'contribution'} commission (${(rate * 100).toFixed(0)}%)`,
+      });
+
+      if (member?.user_id) {
+        await createNotification(supabaseClient, {
+          userId: member.user_id,
+          ...(regFullyPaid
+            ? { title: 'Registration Confirmed', message: `Your registration to "${welfare?.name || 'the welfare'}" is complete.`, type: 'success' as const, category: 'welfare' as const }
+            : NotificationTemplates.paymentConfirmed(grossAmount, mpesaReceiptNumber || checkoutRequestId)),
+          relatedEntityId: pending.welfare_id,
+          relatedEntityType: 'welfare',
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, message: 'Welfare payment processed', contribution: updatedWelfarePayment }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Check if this is a mchango donation
     const { data: donations } = await supabaseClient
       .from('mchango_donations')
