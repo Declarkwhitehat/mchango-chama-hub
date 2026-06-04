@@ -35,6 +35,8 @@ interface CycleInfo {
   payout_type?: string;
   end_date: string;
   due_amount: number;
+  start_date?: string | null;
+  cycle_number?: number | null;
 }
 
 interface CycleHistoryItem {
