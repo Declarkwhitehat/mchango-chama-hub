@@ -104,7 +104,9 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
           payout_processed: data.cycle.payout_processed,
           payout_type: data.cycle.payout_type,
           end_date: data.cycle.end_date,
-          due_amount: data.cycle.due_amount
+          due_amount: data.cycle.due_amount,
+          start_date: data.cycle.start_date ?? null,
+          cycle_number: data.cycle.cycle_number ?? null,
         });
 
         const paymentData = data.payments?.map((p: any) => ({
