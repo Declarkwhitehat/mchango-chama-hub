@@ -17,6 +17,8 @@ interface PaymentCountdownTimerProps {
   isPaid: boolean;
   isGracePeriod?: boolean;
   onPayNow?: () => void;
+  cycleStartDate?: string | null;
+  cycleNumber?: number | null;
 }
 
 export function PaymentCountdownTimer({
