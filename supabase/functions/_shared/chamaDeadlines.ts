@@ -95,3 +95,36 @@ export function getEatMidnightOnePastForDate(referenceDate: Date): Date {
     0,
   ));
 }
+
+/**
+ * For twice-monthly chamas, return the next upcoming chosen contribution day
+ * at 21:00 EAT (18:00 UTC). If both chosen days have passed this Kenya month,
+ * roll to the earlier day next month.
+ */
+export function getTwiceMonthlyFirstDeadline(
+  referenceDate: Date,
+  day1: number,
+  day2: number,
+): Date {
+  const lo = Math.min(day1, day2);
+  const hi = Math.max(day1, day2);
+  const kenyaClock = toKenyaClock(referenceDate);
+  const y = kenyaClock.getUTCFullYear();
+  const m = kenyaClock.getUTCMonth();
+  const d = kenyaClock.getUTCDate();
+
+  let targetYear = y;
+  let targetMonth = m;
+  let targetDay: number;
+
+  if (d < lo) {
+    targetDay = lo;
+  } else if (d < hi) {
+    targetDay = hi;
+  } else {
+    targetDay = lo;
+    targetMonth = m + 1;
+  }
+
+  return new Date(Date.UTC(targetYear, targetMonth, targetDay, KENYA_9PM_UTC_HOUR, 0, 0, 0));
+}

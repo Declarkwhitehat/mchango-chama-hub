@@ -17,6 +17,8 @@ interface PaymentCountdownTimerProps {
   isPaid: boolean;
   isGracePeriod?: boolean;
   onPayNow?: () => void;
+  cycleStartDate?: string | null;
+  cycleNumber?: number | null;
 }
 
 export function PaymentCountdownTimer({
@@ -29,7 +31,9 @@ export function PaymentCountdownTimer({
   totalCount,
   isPaid,
   isGracePeriod = false,
-  onPayNow
+  onPayNow,
+  cycleStartDate,
+  cycleNumber,
 }: PaymentCountdownTimerProps) {
   const [timeRemaining, setTimeRemaining] = useState<{
     days: number;
@@ -232,6 +236,16 @@ export function PaymentCountdownTimer({
               </>
             )}
           </div>
+
+          {cycleStartDate && cycleNumber && cycleNumber > 1 && (
+            <p className="text-xs text-center text-muted-foreground">
+              Cycle opened: {new Date(cycleStartDate).toLocaleString('en-GB', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: false,
+                timeZone: 'Africa/Nairobi',
+              })} EAT
+            </p>
+          )}
 
           <div className="text-center space-y-1">
             <p className="text-lg font-semibold">

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate } from "../_shared/chamaDeadlines.ts";
+import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate, getTwiceMonthlyFirstDeadline } from "../_shared/chamaDeadlines.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -149,14 +149,27 @@ serve(async (req) => {
     const startDate = new Date();
 
     // ============================================
-    // CALCULATE FIRST PAYMENT DEADLINE (next day at 9:00 PM EAT)
-    // First cycle is always due the next day, regardless of chama frequency.
+    // CALCULATE FIRST PAYMENT DEADLINE
+    // Twice-monthly chamas: first cycle closes on the next upcoming chosen
+    // contribution day at 21:00 EAT. All other frequencies: next day at 21:00 EAT.
     // ============================================
-    const graceDeadline = getNextDay10PmKenyaDeadline(startDate);
+    const isTwiceMonthly =
+      chama.contribution_frequency === 'twice_monthly' &&
+      chama.monthly_contribution_day &&
+      chama.monthly_contribution_day_2;
 
-    console.log('Grace period:', {
+    const graceDeadline = isTwiceMonthly
+      ? getTwiceMonthlyFirstDeadline(
+          startDate,
+          chama.monthly_contribution_day,
+          chama.monthly_contribution_day_2,
+        )
+      : getNextDay10PmKenyaDeadline(startDate);
+
+    console.log('First cycle deadline:', {
       startDate: startDate.toISOString(),
       graceDeadline: graceDeadline.toISOString(),
+      isTwiceMonthly,
     });
 
     // ============================================
