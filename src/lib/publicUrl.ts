@@ -37,7 +37,7 @@ export const buildPublicUrl = (path: string): string => {
 export const toPublicUrl = (urlOrPath: string): string => {
   try {
     const url = new URL(urlOrPath, PUBLIC_BASE_URL);
-    if (KNOWN_PUBLIC_HOSTS.has(url.host)) return url.toString();
+    // Always normalize to the canonical non-www host.
     return `${PUBLIC_BASE_URL}${url.pathname}${url.search}${url.hash}`;
   } catch {
     return buildPublicUrl(urlOrPath);
