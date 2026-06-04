@@ -31,7 +31,9 @@ export function PaymentCountdownTimer({
   totalCount,
   isPaid,
   isGracePeriod = false,
-  onPayNow
+  onPayNow,
+  cycleStartDate,
+  cycleNumber,
 }: PaymentCountdownTimerProps) {
   const [timeRemaining, setTimeRemaining] = useState<{
     days: number;
