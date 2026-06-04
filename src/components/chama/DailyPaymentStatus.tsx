@@ -256,6 +256,8 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
         isPaid={currentUserPaid}
         isGracePeriod={isGracePeriod}
         onPayNow={onPayNow}
+        cycleStartDate={cycleInfo.start_date}
+        cycleNumber={cycleInfo.cycle_number}
       />
 
       {/* Per-Cycle Payment History — Collapsible */}
