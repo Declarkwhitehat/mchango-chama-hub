@@ -54,12 +54,30 @@ export const PendingMemberView = ({ welfare, member, onPaid }: Props) => {
   const triggerStk = async () => {
     setPaying(true);
     try {
-      const normalizedPhone = normalizePhone(profile?.phone || member.profiles?.phone || "");
+      // Resolve phone in priority: live auth profile → joined member.profiles → fresh DB lookup
+      let rawPhone: string | null | undefined = profile?.phone || member?.profiles?.phone;
+      if (!rawPhone && user?.id) {
+        const { data: p } = await supabase
+          .from("profiles")
+          .select("phone")
+          .eq("id", user.id)
+          .maybeSingle();
+        rawPhone = p?.phone;
+      }
+      const normalizedPhone = normalizePhone(rawPhone || "");
       if (!normalizedPhone) {
-        throw new Error("Your profile phone number is missing or invalid. Update your profile, then try again.");
+        throw new Error(
+          "Your profile phone number is missing or invalid. Open Profile, save your Safaricom number, then try again."
+        );
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Your session expired. Please log in again.");
       }
 
       const { data, error } = await supabase.functions.invoke("payment-stk-push", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
         body: {
           phone_number: normalizedPhone,
           amount: Math.ceil(remaining),
@@ -74,7 +92,7 @@ export const PendingMemberView = ({ welfare, member, onPaid }: Props) => {
           },
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(error.message || "Payment service rejected the request");
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success("STK push sent — enter your M-Pesa PIN");
       setTimeout(onPaid, 8000);
