@@ -237,6 +237,16 @@ export function PaymentCountdownTimer({
             )}
           </div>
 
+          {cycleStartDate && cycleNumber && cycleNumber > 1 && (
+            <p className="text-xs text-center text-muted-foreground">
+              Cycle opened: {new Date(cycleStartDate).toLocaleString('en-GB', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: false,
+                timeZone: 'Africa/Nairobi',
+              })} EAT
+            </p>
+          )}
+
           <div className="text-center space-y-1">
             <p className="text-lg font-semibold">
               Pay KES {Math.round(totalPayable || contributionAmount).toLocaleString()}
