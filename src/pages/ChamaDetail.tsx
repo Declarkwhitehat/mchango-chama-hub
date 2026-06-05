@@ -38,7 +38,7 @@ import { formatDate } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { frequencyLabel } from "@/utils/chamaFrequency";
+import { frequencyLabel, addCyclesToDeadline } from "@/utils/chamaFrequency";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
