@@ -96,6 +96,24 @@ export const DonorsList = ({ mchangoId, totalAmount, targetAmount, mchangoTitle 
           currentAmount={totalAmount}
           commissionRate={COMMISSION_RATE}
         />
+        {/* Highest single donation */}
+        {(() => {
+          if (completedDonations.length === 0) return null;
+          const top = [...completedDonations].sort((a, b) => Number(b.amount) - Number(a.amount))[0];
+          return (
+            <div className="flex items-center justify-between p-3 rounded-lg border border-primary/30 bg-primary/5">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Highest Donation</p>
+                <p className="font-semibold">{top.display_name || 'Anonymous'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatDistanceToNow(new Date(top.created_at), { addSuffix: true })}
+                </p>
+              </div>
+              <p className="text-lg font-bold text-primary">KES {Number(top.amount).toLocaleString()}</p>
+            </div>
+          );
+        })()}
+
 
         <div>
           <h3 className="font-semibold mb-3">

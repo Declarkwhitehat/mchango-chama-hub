@@ -160,7 +160,7 @@ const Home = () => {
     setLoading(true);
 
     // Fetch all data in parallel, handling each independently
-    const [mchangoResult, chamaResult, memberChamaResult, orgResult, welfareResult] = await Promise.allSettled([
+    const [mchangoResult, chamaResult, memberChamaResult, orgResult, welfareResult, donatedMchangoResult] = await Promise.allSettled([
       supabase
         .from('mchango')
         .select('id, title, slug, description, target_amount, current_amount, end_date, created_at')
@@ -200,14 +200,41 @@ const Home = () => {
         .order('created_at', { ascending: false })
         .limit(50),
       supabase.functions.invoke('welfare-crud', { method: 'GET' }),
+      // Mchangos the user has donated to (completed donations)
+      supabase
+        .from('mchango_donations')
+        .select(`
+          mchango_id,
+          mchango:mchango_id (
+            id, title, slug, description, target_amount, current_amount, end_date, created_at, created_by, status
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('payment_status', 'completed')
+        .limit(100),
     ]);
 
-    // Process mchango
+    // Process mchango — merge own + donated, dedupe, drop inactive
+    let ownMchangos: Mchango[] = [];
     if (mchangoResult.status === 'fulfilled' && !mchangoResult.value.error) {
-      setMchangoList(mchangoResult.value.data || []);
+      ownMchangos = mchangoResult.value.data || [];
     } else {
       console.error('Error fetching mchangos:', mchangoResult.status === 'fulfilled' ? mchangoResult.value.error : mchangoResult.reason);
     }
+    let donatedMchangos: Mchango[] = [];
+    if (donatedMchangoResult.status === 'fulfilled' && !donatedMchangoResult.value.error) {
+      const seen = new Set(ownMchangos.map(m => m.id));
+      (donatedMchangoResult.value.data || []).forEach((d: any) => {
+        const m = d.mchango;
+        if (m && m.status === 'active' && !seen.has(m.id)) {
+          seen.add(m.id);
+          donatedMchangos.push(m);
+        }
+      });
+    } else {
+      console.error('Error fetching donated mchangos:', donatedMchangoResult.status === 'fulfilled' ? donatedMchangoResult.value.error : donatedMchangoResult.reason);
+    }
+    setMchangoList([...ownMchangos, ...donatedMchangos]);
 
     // Process chamas
     if (chamaResult.status === 'fulfilled' && !chamaResult.value.error) {
@@ -249,14 +276,20 @@ const Home = () => {
     }
   }, [user, fetchUserData]);
 
-  // Refresh dashboard lists when a new Chama/Mchango is created
+  // Refresh dashboard lists when a new Chama/Mchango is created, or when the
+  // tab/window regains focus (kills stale data shown after returning to app).
   useEffect(() => {
     const onCreated = () => { fetchUserData(); };
+    const onFocus = () => { if (document.visibilityState === 'visible') fetchUserData(); };
     window.addEventListener('mchango:created', onCreated);
     window.addEventListener('chama:created', onCreated);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
     return () => {
       window.removeEventListener('mchango:created', onCreated);
       window.removeEventListener('chama:created', onCreated);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
     };
   }, [fetchUserData]);
 

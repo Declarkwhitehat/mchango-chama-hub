@@ -38,7 +38,7 @@ import { formatDate } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { frequencyLabel } from "@/utils/chamaFrequency";
+import { frequencyLabel, addCyclesToDeadline } from "@/utils/chamaFrequency";
 
 const getStoredTab = (key: string, fallback: string) => {
   if (typeof window === "undefined") return fallback;
@@ -59,6 +59,8 @@ interface ChamaData {
   created_at: string;
   start_date?: string | null;
   every_n_days_count?: number;
+  monthly_contribution_day?: number | null;
+  monthly_contribution_day_2?: number | null;
   current_cycle_round?: number;
   last_cycle_completed_at?: string;
   accepting_rejoin_requests?: boolean;
@@ -405,24 +407,27 @@ const ChamaDetail = () => {
         // Find the index of the current beneficiary in the sorted member list
         const currentIdx = approvedMembers.findIndex(m => m.id === currentBeneficiaryId);
 
-        // Calculate future turn dates for each member relative to the current cycle
+        // Calculate future turn dates for each member relative to the current cycle.
+        // Honour twice_monthly / monthly chosen-day schedules instead of treating
+        // every chama as weekly.
         const turnDates: Record<string, Date> = {};
         const cycleEndDate = currentCycleEndDate ? new Date(currentCycleEndDate) : new Date();
+        const scheduleOpts = {
+          frequency: chamaData.contribution_frequency,
+          everyNDaysCount: chamaData.every_n_days_count,
+          monthlyDay: chamaData.monthly_contribution_day,
+          monthlyDay2: chamaData.monthly_contribution_day_2,
+        };
 
         approvedMembers.forEach((member, idx) => {
-          // How many cycles ahead is this member from the current beneficiary?
           let cyclesAhead = idx - currentIdx;
           if (cyclesAhead < 0) cyclesAhead += approvedMembers.length;
 
           if (cyclesAhead === 0) {
-            // This member IS the current beneficiary - their turn is now
-            turnDates[member.id] = new Date();
+            // Current beneficiary receives at the actual cycle end date — not "today".
+            turnDates[member.id] = new Date(cycleEndDate);
           } else {
-            // Current recipient gets paid at cycleEndDate. Each subsequent
-            // member gets paid one full cycleLength later than the previous one.
-            const turnDate = new Date(cycleEndDate);
-            turnDate.setDate(turnDate.getDate() + (cyclesAhead * cycleLength));
-            turnDates[member.id] = turnDate;
+            turnDates[member.id] = addCyclesToDeadline(cycleEndDate, cyclesAhead, scheduleOpts);
           }
         });
 
@@ -1203,7 +1208,13 @@ const ChamaDetail = () => {
                               <div className="min-w-0">
                                 <p className="font-semibold text-foreground truncate">{currentRecipient.profiles?.full_name || 'Member'} {currentRecipient.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{currentRecipient.member_code}</p>
-                                <Badge className="mt-1 text-[10px]" variant="default">Receiving Today</Badge>
+                                {(() => {
+                                  const d = nextTurnDates[currentRecipient.id];
+                                  if (!d) return <Badge className="mt-1 text-[10px]" variant="default">Next to receive</Badge>;
+                                  const today = new Date();
+                                  const isToday = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+                                  return <Badge className="mt-1 text-[10px]" variant="default">{isToday ? 'Receiving Today' : `Receiving ${formatDate(d)}`}</Badge>;
+                                })()}
                               </div>
                             </div>
                             <div className="text-right shrink-0">
