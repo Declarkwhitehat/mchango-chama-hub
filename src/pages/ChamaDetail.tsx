@@ -407,24 +407,27 @@ const ChamaDetail = () => {
         // Find the index of the current beneficiary in the sorted member list
         const currentIdx = approvedMembers.findIndex(m => m.id === currentBeneficiaryId);
 
-        // Calculate future turn dates for each member relative to the current cycle
+        // Calculate future turn dates for each member relative to the current cycle.
+        // Honour twice_monthly / monthly chosen-day schedules instead of treating
+        // every chama as weekly.
         const turnDates: Record<string, Date> = {};
         const cycleEndDate = currentCycleEndDate ? new Date(currentCycleEndDate) : new Date();
+        const scheduleOpts = {
+          frequency: chamaData.contribution_frequency,
+          everyNDaysCount: chamaData.every_n_days_count,
+          monthlyDay: chamaData.monthly_contribution_day,
+          monthlyDay2: chamaData.monthly_contribution_day_2,
+        };
 
         approvedMembers.forEach((member, idx) => {
-          // How many cycles ahead is this member from the current beneficiary?
           let cyclesAhead = idx - currentIdx;
           if (cyclesAhead < 0) cyclesAhead += approvedMembers.length;
 
           if (cyclesAhead === 0) {
-            // This member IS the current beneficiary - their turn is now
-            turnDates[member.id] = new Date();
+            // Current beneficiary receives at the actual cycle end date — not "today".
+            turnDates[member.id] = new Date(cycleEndDate);
           } else {
-            // Current recipient gets paid at cycleEndDate. Each subsequent
-            // member gets paid one full cycleLength later than the previous one.
-            const turnDate = new Date(cycleEndDate);
-            turnDate.setDate(turnDate.getDate() + (cyclesAhead * cycleLength));
-            turnDates[member.id] = turnDate;
+            turnDates[member.id] = addCyclesToDeadline(cycleEndDate, cyclesAhead, scheduleOpts);
           }
         });
 
