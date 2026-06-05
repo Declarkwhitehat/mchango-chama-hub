@@ -59,6 +59,8 @@ interface ChamaData {
   created_at: string;
   start_date?: string | null;
   every_n_days_count?: number;
+  monthly_contribution_day?: number | null;
+  monthly_contribution_day_2?: number | null;
   current_cycle_round?: number;
   last_cycle_completed_at?: string;
   accepting_rejoin_requests?: boolean;
