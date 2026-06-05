@@ -276,14 +276,20 @@ const Home = () => {
     }
   }, [user, fetchUserData]);
 
-  // Refresh dashboard lists when a new Chama/Mchango is created
+  // Refresh dashboard lists when a new Chama/Mchango is created, or when the
+  // tab/window regains focus (kills stale data shown after returning to app).
   useEffect(() => {
     const onCreated = () => { fetchUserData(); };
+    const onFocus = () => { if (document.visibilityState === 'visible') fetchUserData(); };
     window.addEventListener('mchango:created', onCreated);
     window.addEventListener('chama:created', onCreated);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
     return () => {
       window.removeEventListener('mchango:created', onCreated);
       window.removeEventListener('chama:created', onCreated);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
     };
   }, [fetchUserData]);
 
