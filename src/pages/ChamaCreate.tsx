@@ -365,25 +365,8 @@ const ChamaCreate = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="is_public">Visibility *</Label>
-                <Select
-                  name="is_public"
-                  defaultValue="true"
+              {/* Chamas are always private — only invited/joined members can see details. */}
 
-                >
-                  <SelectTrigger id="is_public">
-                    <SelectValue placeholder="Select visibility" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Public (Listable)</SelectItem>
-                    <SelectItem value="false">Private (Invite Only)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Public chamas are listable, but internal details remain private to members
-                </p>
-              </div>
 
 
               <div className="space-y-2">
