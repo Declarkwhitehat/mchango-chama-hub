@@ -129,7 +129,51 @@ serve(async (req) => {
       });
     }
 
-    // DELETE action — require name confirmation
+    // HARD DELETE action — permanent wipe: frees phone/email/national_id
+    if (action === 'hard_delete') {
+      if (!confirm_name || confirm_name.trim().toLowerCase() !== profile.full_name.trim().toLowerCase()) {
+        return new Response(JSON.stringify({ error: 'Name confirmation does not match. Please type the exact user name.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`Admin ${callerData.user.id} HARD-deleting user ${user_id}`);
+
+      // Audit BEFORE wiping so the row survives the cascade.
+      try {
+        await supabaseAdmin.from('audit_logs').insert({
+          action: 'HARD_DELETE',
+          table_name: 'profiles',
+          record_id: user_id,
+          user_id: callerData.user.id,
+          new_values: { hard_deleted_at: new Date().toISOString(), reason: body.reason || 'Hard-deleted by admin' },
+        });
+      } catch (_) { /* best-effort */ }
+
+      // Delete the profile row first so dependent FKs cascade cleanly.
+      const { error: profErr } = await supabaseAdmin
+        .from('profiles')
+        .delete()
+        .eq('id', user_id);
+      if (profErr) {
+        return new Response(JSON.stringify({
+          error: 'Failed to delete profile (referenced by other records). Resolve dependencies and retry.',
+          details: (profErr as any).message,
+        }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Permanently delete from auth.users — frees the phone & email immediately.
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(user_id);
+      } catch (e) {
+        console.log('Warning: auth.deleteUser failed:', (e as any).message);
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'User permanently deleted. Phone and email are now available for re-registration.',
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     if (!confirm_name || confirm_name.trim().toLowerCase() !== profile.full_name.trim().toLowerCase()) {
       return new Response(JSON.stringify({ error: 'Name confirmation does not match. Please type the exact user name.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
