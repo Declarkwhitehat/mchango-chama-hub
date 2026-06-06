@@ -169,9 +169,19 @@ Deno.serve(async (req) => {
         // Send SMS via the platform-standard send-transactional-sms (Onfon)
         if (profile?.phone) {
           const firstName = (profile.full_name || '').split(' ')[0] || 'Member';
-          const slotLabel = slot === '1815'
-            ? `Final reminder: pay before ${dueTime} today.`
-            : `Deadline: ${dueTime} today.`;
+          // Determine if "today" (Kenya date) equals the deadline date
+          const eatToday = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const eatDeadlineDate = new Date(new Date(cycle.end_date).getTime() + 3 * 60 * 60 * 1000)
+            .toISOString().split('T')[0];
+          const isDeadlineDay = eatToday === eatDeadlineDate;
+          const deadlineDateStr = new Date(cycle.end_date).toLocaleDateString('en-KE', {
+            timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short',
+          });
+          const slotLabel = isDeadlineDay
+            ? (slot === '1815'
+                ? `Final reminder: pay before ${dueTime} today.`
+                : `Deadline: ${dueTime} today.`)
+            : `Pay by ${deadlineDateStr} at ${dueTime}.`;
           const message = `Hi ${firstName}, KES ${payment.amount_due} due for ${chama.name}. ${slotLabel} Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
 
           try {
