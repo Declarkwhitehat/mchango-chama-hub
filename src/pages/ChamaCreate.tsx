@@ -89,7 +89,7 @@ const ChamaCreate = () => {
         every_n_days_count: frequency === "every_n_days" ? Number(formData.get("every_n_days_count")) : null,
         min_members: Number(formData.get("min_members")) || 2,
         max_members: Number(formData.get("max_members")),
-        is_public: formData.get("is_public") === "true",
+        is_public: false,
         whatsapp_link: formData.get("whatsapp_link") as string || null,
       };
 
