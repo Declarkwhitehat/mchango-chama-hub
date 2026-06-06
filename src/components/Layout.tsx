@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FloatingActionMenu } from "@/components/FloatingActionMenu";
+import { KycBanner } from "@/components/KycBanner";
 import { cn } from "@/lib/utils";
 
 interface LayoutProps {
