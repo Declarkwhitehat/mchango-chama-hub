@@ -187,15 +187,23 @@ export const UsersManagement = () => {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDeleteUser = async () => {
+  const confirmDeleteUser = async (mode: 'soft' | 'hard_delete' = 'soft') => {
     if (!pendingDeleteUser) return;
+    if (mode === 'hard_delete') {
+      const ok = window.confirm(
+        `PERMANENT DELETE: ${pendingDeleteUser.full_name}\n\n` +
+        `This wipes the profile and auth account. The phone & email become reusable immediately. This cannot be undone.\n\nProceed?`
+      );
+      if (!ok) return;
+    }
     setDeleting(true);
     try {
       const response = await supabase.functions.invoke('admin-delete-user', {
-        body: { 
-          user_id: pendingDeleteUser.id, 
+        body: {
+          user_id: pendingDeleteUser.id,
           privilege_code: deletePrivilegeCode,
           confirm_name: deleteConfirmName,
+          ...(mode === 'hard_delete' ? { action: 'hard_delete' } : {}),
         },
       });
 
