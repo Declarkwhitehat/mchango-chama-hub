@@ -608,13 +608,21 @@ export const UsersManagement = () => {
             }}>
               Cancel
             </AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => confirmDeleteUser('hard_delete')}
+              disabled={!deletePrivilegeCode || !deleteConfirmName || deleting}
+              className="border-destructive text-destructive hover:bg-destructive/10"
+            >
+              Hard Delete (Permanent)
+            </Button>
             <AlertDialogAction
-              onClick={confirmDeleteUser}
+              onClick={() => confirmDeleteUser('soft')}
               disabled={!deletePrivilegeCode || !deleteConfirmName || deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Delete User
+              Soft Delete (45-day)
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
