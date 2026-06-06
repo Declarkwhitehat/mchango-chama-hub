@@ -187,15 +187,23 @@ export const UsersManagement = () => {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDeleteUser = async () => {
+  const confirmDeleteUser = async (mode: 'soft' | 'hard_delete' = 'soft') => {
     if (!pendingDeleteUser) return;
+    if (mode === 'hard_delete') {
+      const ok = window.confirm(
+        `PERMANENT DELETE: ${pendingDeleteUser.full_name}\n\n` +
+        `This wipes the profile and auth account. The phone & email become reusable immediately. This cannot be undone.\n\nProceed?`
+      );
+      if (!ok) return;
+    }
     setDeleting(true);
     try {
       const response = await supabase.functions.invoke('admin-delete-user', {
-        body: { 
-          user_id: pendingDeleteUser.id, 
+        body: {
+          user_id: pendingDeleteUser.id,
           privilege_code: deletePrivilegeCode,
           confirm_name: deleteConfirmName,
+          ...(mode === 'hard_delete' ? { action: 'hard_delete' } : {}),
         },
       });
 
@@ -600,13 +608,21 @@ export const UsersManagement = () => {
             }}>
               Cancel
             </AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => confirmDeleteUser('hard_delete')}
+              disabled={!deletePrivilegeCode || !deleteConfirmName || deleting}
+              className="border-destructive text-destructive hover:bg-destructive/10"
+            >
+              Hard Delete (Permanent)
+            </Button>
             <AlertDialogAction
-              onClick={confirmDeleteUser}
+              onClick={() => confirmDeleteUser('soft')}
               disabled={!deletePrivilegeCode || !deleteConfirmName || deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Delete User
+              Soft Delete (45-day)
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
