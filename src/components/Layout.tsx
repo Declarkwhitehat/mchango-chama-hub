@@ -212,6 +212,9 @@ export const Layout = ({ children, showBackButton = false, title }: LayoutProps)
         </div>
       </header>
 
+      {/* Global KYC banner */}
+      <KycBanner />
+
       {/* Breadcrumbs */}
       <Breadcrumbs />
 
