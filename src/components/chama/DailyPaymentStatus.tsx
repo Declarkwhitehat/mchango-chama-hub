@@ -128,12 +128,19 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
 
           const { data: memberData } = await supabase
             .from('chama_members')
-            .select('id')
+            .select('id, missed_payments_count, balance_deficit')
             .eq('chama_id', chamaId)
             .eq('user_id', session.user.id)
             .eq('approval_status', 'approved')
             .maybeSingle();
-          if (memberData) setCurrentMemberId(memberData.id);
+          if (memberData) {
+            setCurrentMemberId(memberData.id);
+            // Source of truth for missed/outstanding is the settlement engine on chama_members
+            const dbMissed = Number(memberData.missed_payments_count || 0);
+            const dbDeficit = Number(memberData.balance_deficit || 0);
+            setMissedCyclesCount(dbMissed);
+            setTotalOutstanding(dbDeficit);
+          }
         }
       }
 
@@ -144,18 +151,9 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
 
         if (!historyError && historyData?.cycles) {
           setCycleHistory(historyData.cycles);
-          
-          if (isGracePeriod) {
-            setMissedCyclesCount(0);
-            setTotalOutstanding(0);
-          } else {
-            const missed = historyData.cycles.filter((c: CycleHistoryItem) => c.status === 'missed');
-            setMissedCyclesCount(missed.length);
-            const outstanding = missed.reduce((sum: number, c: CycleHistoryItem) => {
-              return sum + (c.member_payment?.amount_remaining || c.due_amount);
-            }, 0);
-            setTotalOutstanding(outstanding);
-          }
+          // Note: missedCyclesCount / totalOutstanding are derived from chama_members above
+          // (settlement-engine truth). We no longer recompute from cycle history to avoid
+          // false positives when carry_forward/credit has already cleared a cycle.
         }
       }
     } catch (error: any) {
@@ -165,6 +163,7 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     loadPaymentStatus();

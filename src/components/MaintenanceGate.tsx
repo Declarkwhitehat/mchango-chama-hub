@@ -72,9 +72,15 @@ export function MaintenanceGate({ children }: MaintenanceGateProps) {
       )
       .subscribe();
 
+    const onVisible = () => { if (!document.hidden) fetchState(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", fetchState);
+
     return () => {
       mounted = false;
       supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", fetchState);
     };
   }, []);
 
