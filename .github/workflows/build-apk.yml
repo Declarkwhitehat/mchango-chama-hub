@@ -57,8 +57,22 @@ jobs:
             sed -i -E 's/targetSdkVersion[[:space:]]*=[[:space:]]*[0-9]+/targetSdkVersion = 36/' android/variables.gradle
           fi
           if [ -f android/app/build.gradle ]; then
-            sed -i -E 's/versionCode[[:space:]]+[0-9]+/versionCode 2/' android/app/build.gradle
-           sed -i -E 's/versionName[[:space:]]+"[^"]*"/versionName "1.0.1"/' android/app/build.gradle
+            # Auto-increment versionCode from last used (start at 3)
+            LAST_CODE=${{ github.run_number }}
+            NEW_CODE=$((LAST_CODE + 2))
+
+            # Auto-increment versionName starting from 1.0.2
+            BASE_PATCH=2
+            TOTAL=$((LAST_CODE + BASE_PATCH - 1))
+            MAJOR=1
+            MINOR=$((TOTAL / 10))
+            PATCH=$((TOTAL % 10))
+            NEW_NAME="$MAJOR.$MINOR.$PATCH"
+
+            sed -i -E "s/versionCode[[:space:]]+[0-9]+/versionCode $NEW_CODE/" android/app/build.gradle
+            sed -i -E "s/versionName[[:space:]]+\"[^\"]*\"/versionName \"$NEW_NAME\"/" android/app/build.gradle
+
+            echo "Built with versionCode=$NEW_CODE versionName=$NEW_NAME"
           fi
           exit 0
 
