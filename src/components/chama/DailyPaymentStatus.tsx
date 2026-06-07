@@ -128,12 +128,19 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
 
           const { data: memberData } = await supabase
             .from('chama_members')
-            .select('id')
+            .select('id, missed_payments_count, balance_deficit')
             .eq('chama_id', chamaId)
             .eq('user_id', session.user.id)
             .eq('approval_status', 'approved')
             .maybeSingle();
-          if (memberData) setCurrentMemberId(memberData.id);
+          if (memberData) {
+            setCurrentMemberId(memberData.id);
+            // Source of truth for missed/outstanding is the settlement engine on chama_members
+            const dbMissed = Number(memberData.missed_payments_count || 0);
+            const dbDeficit = Number(memberData.balance_deficit || 0);
+            setMissedCyclesCount(dbMissed);
+            setTotalOutstanding(dbDeficit);
+          }
         }
       }
 
