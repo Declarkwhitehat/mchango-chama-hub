@@ -151,27 +151,11 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
 
         if (!historyError && historyData?.cycles) {
           setCycleHistory(historyData.cycles);
-          
-          if (isGracePeriod) {
-            setMissedCyclesCount(0);
-            setTotalOutstanding(0);
-          } else {
-            const missed = historyData.cycles.filter((c: CycleHistoryItem) => c.status === 'missed');
-            setMissedCyclesCount(missed.length);
-            const outstanding = missed.reduce((sum: number, c: CycleHistoryItem) => {
-              return sum + (c.member_payment?.amount_remaining || c.due_amount);
-            }, 0);
-            setTotalOutstanding(outstanding);
-          }
+          // Note: missedCyclesCount / totalOutstanding are derived from chama_members above
+          // (settlement-engine truth). We no longer recompute from cycle history to avoid
+          // false positives when carry_forward/credit has already cleared a cycle.
         }
       }
-    } catch (error: any) {
-      console.error('Error loading payment status:', error);
-      toast.error('Failed to load payment status');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     loadPaymentStatus();
