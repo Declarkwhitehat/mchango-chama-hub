@@ -105,6 +105,19 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Name must be at least 3 characters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      // KYC gate: only KYC-approved users may create a welfare
+      const { data: kycProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('kyc_status')
+        .eq('id', userData.user.id)
+        .maybeSingle();
+      if (!kycProfile || kycProfile.kyc_status !== 'approved') {
+        return new Response(JSON.stringify({
+          error: 'KYC verification required. Please complete identity verification before creating a welfare.',
+          kyc_status: kycProfile?.kyc_status || 'unknown',
+        }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       const regFee = Number(registration_fee || 0);
       if (!Number.isFinite(regFee) || regFee < 0 || regFee > 100000) {
         return new Response(JSON.stringify({ error: 'Registration fee must be between 0 and 100,000' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
