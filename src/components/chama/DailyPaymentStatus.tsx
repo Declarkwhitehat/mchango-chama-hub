@@ -156,6 +156,14 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
           // false positives when carry_forward/credit has already cleared a cycle.
         }
       }
+    } catch (error: any) {
+      console.error('Error loading payment status:', error);
+      toast.error('Failed to load payment status');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     loadPaymentStatus();
