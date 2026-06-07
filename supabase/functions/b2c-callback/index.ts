@@ -415,7 +415,7 @@ serve(async (req) => {
         const balanceLine = (withdrawal.mchango_id && remainingBalance !== null)
           ? `\nBalance: KES ${remainingBalance.toFixed(2)}`
           : '';
-        const successMessage = `Withdrawal of ${amountStr} from ${sourceType} "${sourceName}" successful. Ref: ${transactionId}.${balanceLine}`;
+        const successMessage = `You have received ${amountStr} from ${sourceType} "${sourceName}". Mpesa Ref: ${transactionId}.${balanceLine}`;
         await sendSMS(recipientPhone, successMessage);
       }
 
