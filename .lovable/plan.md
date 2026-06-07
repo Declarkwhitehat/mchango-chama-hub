@@ -1,76 +1,112 @@
-## Scope
 
-Complete the three deferred edge-function pieces from the previous turn, plus a small welfare test helper so you can verify the registration flow on "The chachas" without recreating it.
+## What I found (root causes)
 
-## A. Welfare: enable a test fee on "The chachas" (quick)
-
-1. Direct DB update: `welfares.registration_fee = 100` for `The chachas`.
-2. Reset your own `welfare_members` row on that welfare to `registration_status='pending'`, `registration_fee_due=100`, `registration_fee_paid=0`, `registration_deadline = now()+5d`.
-3. You then refresh `/welfare/<id>` and see the amber `PendingMemberView`, get the join SMS via Onfon, and can test the STK / Paybill flow.
-
-(No code change — just two SQL operations.)
-
-## B. Chama late-payment formula migration (big change)
-
-### New invariant
-For every late cycle on base contribution `C`:
+### 1. Simon Karanja KYC bypass — privilege escalation via RLS
+The `profiles` table has this policy:
 ```
-member pays gross  = C * 1.10
-penalty            = C * 0.10  → company_earnings  (category 'chama_late_penalty')
-commission         = C * 0.05  → company_earnings  (category 'chama_commission')
-net to chama pool  = C * 0.95
+UPDATE "Users can update own profile" USING (auth.uid() = id)  -- no with_check, no column restriction
 ```
-On-time math (`C` flat, 5% deductive) is unchanged.
+Combined with `is_verified` default `false` and `kyc_status` default `pending`, **any logged-in user can `UPDATE profiles SET kyc_status='approved', is_verified=true WHERE id = auth.uid()`** from the browser. No selfie, no fee, no admin needed. That is exactly Simon's row: `kyc_status='approved'`, `is_verified=true`, `kyc_submitted_at=NULL`, `kyc_reviewed_at=NULL`, `id_front_url=NULL`. He set it himself.
 
-### Files to update (single PR)
+The welfare RLS check `kyc_status='approved'` then passed, and `welfare-crud` has no server-side KYC gate at all (unlike chama-crud / mchango-crud), so creation went through.
 
-1. **`src/utils/commissionCalculator.ts`** — already has `calculateLatePayment(C)` helper from the previous turn; verify `calculateAmountToPay` returns `totalPayable = (onTimeCycles * C) + (lateCycles * C * 1.10)` and exports a flag UI can read.
-2. **`src/components/chama/AmountToPayCard.tsx` + `NextPaymentTimer.tsx` + `PaymentCountdownTimer.tsx`** — show the inflated `totalPayable` and a "Includes KES X late penalty" sub-line.
-3. **`src/components/ChamaPaymentForm.tsx`** — STK push `amount` must equal the new `totalPayable` (1.10 × C per late cycle).
-4. **`supabase/functions/contributions-crud/index.ts`** — rewrite both late branches (lines ~240-260 and ~510-625):
-   - Split `commission = toApply * 0.10` into `penalty = base * 0.10` (recorded as category `chama_late_penalty`) + `commission = base * 0.05` (category `chama_commission`).
-   - `net = toApply - penalty - commission` (= `base * 0.95`).
-   - `member_cycle_payments.amount_paid` stores `base` (so "1 cycle paid" semantics remain).
-   - After computing net, call new helper `settleChamaShortfall(supabase, chama_id, net)` → FIFO over `chama_payout_shortfalls`, deduct from net, then credit leftover to `chama.available_balance`.
-5. **`supabase/functions/c2b-confirm-payment/index.ts`** (chama branch, lines 116-235) — already delegates to `contributions-crud settle-only`. Only change: pass an explicit `is_late_hint` so the local `commissionAmount` in the `contributions` insert reflects the new split for the receipt PDF.
-6. **`supabase/functions/daily-payout-cron/index.ts`** — at payout time:
-   - Expected pool = `active_members * C * 0.95`.
-   - If `chama.available_balance < expected`, insert `chama_payout_shortfalls` row (`shortfall_amount = expected - actual`, `status='pending'`).
-   - Pay out whatever exists (existing behaviour).
-   - On subsequent late payments, the FIFO helper from §4 settles via B2C top-up by invoking `b2c-initiate` with `purpose='chama_late_topup'` and idempotency key `cycle_id|mpesa_receipt`.
-7. **`supabase/functions/b2c-result/index.ts`** — on success for purpose `chama_late_topup`, update `chama_payout_shortfalls.settled_amount`, set `status='settled'` when fully covered, store `b2c_transaction_id`, send beneficiary SMS: `"KES X late top-up from {member_code} received. M-Pesa {receipt}."`.
+### 2. Maintenance Mode does nothing for normal users
+`platform_settings` has only `Admins can view`. Regular users get an empty result, so `MaintenanceGate` always reads `enabled=false`. The gate works for admins (who bypass anyway) and nobody else.
 
-### New shared helper
+### 3. Chama Set "1 missed payments"
+DB shows both members `missed_payments_count=0`, `balance_deficit=0`, no rows in `chama_member_debts` or `chama_cycle_deficits`. The "missed" tag in `MemberDetailPanel` comes from the cross-chama trust score RPC (`total_missed_payments`) which counts historical misses from other chamas and surfaces them on every chama detail. The Chama Set members list itself is clean — the misleading badge needs to be scoped to the current chama.
 
-`supabase/functions/_shared/chamaShortfall.ts`:
-```ts
-export async function settleChamaShortfall(
-  supabase, chamaId, netAvailable, sourceReceipt
-): Promise<{ toPool: number; toppedUp: number }>
+### 4. Notifications
+- Auto-removal currently only writes an in-app notification, no SMS.
+- Payout completion sends push to donors (mchango) but the chama/welfare payout recipient gets no SMS confirming "you received KES X from <chama name>".
+- Push fan-out is wide: chat messages, every join request, every contribution by every member, daily reminders, cycle-open, KYC pings, verification pings. Need to keep only payment-affecting and money-moving events.
+
+---
+
+## Fixes
+
+### A. Lock down profile self-update (security)
+Migration:
+1. Drop the unrestricted "Users can update own profile" policy.
+2. Recreate it with a `WITH CHECK` that blocks changes to KYC / verification / role columns:
+```sql
+CREATE POLICY "Users can update own profile (safe cols)"
+ON public.profiles FOR UPDATE TO authenticated
+USING (auth.uid() = id)
+WITH CHECK (
+  auth.uid() = id
+  AND kyc_status       = (SELECT kyc_status       FROM profiles WHERE id = auth.uid())
+  AND is_verified      = (SELECT is_verified      FROM profiles WHERE id = auth.uid())
+  AND kyc_submitted_at IS NOT DISTINCT FROM (SELECT kyc_submitted_at FROM profiles WHERE id = auth.uid())
+  AND kyc_reviewed_at  IS NOT DISTINCT FROM (SELECT kyc_reviewed_at  FROM profiles WHERE id = auth.uid())
+  AND kyc_reviewed_by  IS NOT DISTINCT FROM (SELECT kyc_reviewed_by  FROM profiles WHERE id = auth.uid())
+  AND verified_at      IS NOT DISTINCT FROM (SELECT verified_at      FROM profiles WHERE id = auth.uid())
+);
 ```
-Uses RPC `claim_chama_shortfall_for_settlement` (already created in the prior migration) and invokes `b2c-initiate` for each claim.
+3. Belt-and-braces trigger `prevent_kyc_self_escalation` BEFORE UPDATE on `profiles`: if the caller is not service_role and not admin, force the protected columns to their OLD values.
+4. Reset Simon back to clean state: `kyc_status='pending'`, `is_verified=false`. Delete the welfare he created (or set it to inactive pending KYC — confirm in plan), and notify him by SMS to re-submit KYC.
 
-### Admin visibility (small)
+### B. Server-side KYC gates on every creation path
+Add the same gate that `chama-crud` uses to:
+- `welfare-crud` (insert branch, before INSERT)
+- Org creation path (currently direct from `src/pages/OrganizationCreate.tsx` — move insert through a new `organizations-crud` edge function OR add a `KYC approved users can create organizations` RLS policy on `organizations` like the welfare one). Plan picks the RLS-policy route since organizations are already a single table — faster and equally safe.
+- Mchango: already gated, leave alone.
+Also add KYC RLS policies to `welfares` insert (already exists per migrations) and verify they reference `kyc_status='approved' AND is_verified=true` (welfare currently checks only kyc_status — tighten to require both).
 
-- `src/pages/AdminTransactions.tsx` — add `Late top-up` filter chip (reads `b2c_transactions.purpose='chama_late_topup'`).
-- `WelfareTransactionLog`-style component for chama executives showing pending shortfalls.
+### C. Maintenance Mode actually restricts
+Migration: add a public-readable policy limited to maintenance keys:
+```sql
+CREATE POLICY "Anyone can read maintenance flags"
+ON public.platform_settings FOR SELECT TO anon, authenticated
+USING (setting_key IN ('maintenance_mode','maintenance_title','maintenance_message'));
+GRANT SELECT ON public.platform_settings TO anon;
+```
+Keep admin-only policies for other keys. `MaintenanceGate` will then receive real values for everyone. Add a focus/visibilitychange refetch so toggling it propagates without realtime.
 
-### Memory
+### D. Chama Set "1 missed" false flag
+In `MemberDetailPanel.tsx` (and `ChamaDetail.tsx` member rows), stop surfacing cross-chama `total_missed_payments` as a per-chama badge. Show it only inside the Trust Score expanded panel and label it "Lifetime misses across all chamas". The per-member row badges use only `member.missed_payments_count` (current chama).
 
-- Update `mem://chama/late-payment-formula` with the final split, shortfall flow, and the B2C purpose code.
+### E. Auto-removal SMS
+In `chama-crud` / wherever `removed_at` is set (the day-1 auto-removal path and the manual removal path), after the removal: call `send-transactional-sms` with a sanitized message: `Hi {first_name}, you have been removed from {chama_name} due to {reason}. You can rejoin if the manager re-opens the chama.` Push stays as in-app only.
 
-## C. Out of scope (explicit)
+### F. Payout receipt SMS to recipient
+After successful B2C in `b2c-callback` (chama) and `welfare-cooling-off-payout`, when status flips to completed, send the **recipient** an SMS:
+`Hi {first_name}, you have received KES {net_amount} from {group_name} payout. M-Pesa ref: {receipt}. Sisi tuko pamoja.` (no emojis, sanitized).
 
-- On-time math, frozen-member logic, welfare math, STK push limits, deadlines — untouched.
-- No change to `c2b-confirm-payment` welfare or mchango branches.
-- No retroactive re-pricing of already-settled late payments.
+### G. Push notification diet
+Update `_shared/notifications.ts` / call-sites to suppress push (keep in-app only) for these categories — they will no longer be sent via `send-push-notification`:
+- `chat_message`
+- `chama_contribution` (every member ping when somebody else pays)
+- `welfare_contribution_received` (peer pings)
+- `cycle_opened` / `cycle_reminder` non-final
+- `kyc_submitted` / verification request pings to the user themselves (admin still gets push)
+- Join/leave requests to non-managers
+Keep push for: payouts, withdrawals, KYC approved/rejected, removal, freeze, manager-approval-required, final-deadline reminder, money received.
 
-## Risk callouts
+---
 
-- **Idempotency**: every `b2c-initiate` call must include a unique `originator_conversation_id = cycle_id|mpesa_receipt|shortfall_id` to survive callback retries.
-- **Pool double-count**: net from a late payment must NEVER be added to `chama.available_balance` before the shortfall claim returns — otherwise we'd both top up the prior beneficiary AND inflate the current pool.
-- **Member-facing display**: AmountToPayCard must update in the same release as the STK amount, otherwise users will be charged 1.10× while seeing 1.0×.
+## Files / surfaces touched
 
-## Approval needed
+**Migration** (one file, with grants + policies + trigger + Simon reset):
+- `supabase/migrations/<new>.sql`
 
-Reply **"go"** to execute A+B+C as a single deploy, or **"only A"** if you want to just unblock welfare testing first and defer the chama refactor.
+**Edge functions**
+- `supabase/functions/welfare-crud/index.ts` — add KYC gate on insert + recipient SMS hook
+- `supabase/functions/b2c-callback/index.ts` — recipient SMS after completion
+- `supabase/functions/welfare-cooling-off-payout/index.ts` — recipient SMS
+- `supabase/functions/chama-crud/index.ts` — SMS on auto-removal / manual removal
+- `supabase/functions/_shared/notifications.ts` — push category allowlist
+- Removal of push from non-critical call-sites (chat, peer contributions, cycle open)
+
+**Frontend**
+- `src/components/MaintenanceGate.tsx` — focus/visibility refetch
+- `src/components/chama/MemberDetailPanel.tsx` — relabel lifetime misses, gate badge
+- `src/pages/ChamaDetail.tsx` — only show `missed_payments_count` in row badge
+- `src/pages/OrganizationCreate.tsx` — guarded by new RLS, surface friendly error if not KYC
+
+## Out of scope (will not change in this pass)
+- Reworking trust score schema
+- Rewriting org creation to go through an edge function (RLS sufficient)
+- Email/business-email setup (separate request)
+
+Reply "go" to implement.
