@@ -388,8 +388,14 @@ const ChamaDetail = () => {
           setPaidOutMemberIds(paidMembers);
           setPayoutAmountByMember(amountMap);
 
-          // Find the current active (incomplete) cycle
-          const activeCycle = allCycles.find(c => !c.is_complete);
+          // Find the current active cycle: use payout_processed (not is_complete)
+          // because a cycle can be marked complete after the contribution cutoff
+          // while the payout is still pending. Treating it as "active" keeps
+          // the current beneficiary on the page until the payout actually fires
+          // and the next cycle is opened. Without this, the fallback path
+          // (which advances by elapsed days) wrongly hands today's slot to the
+          // next member and labels the real beneficiary with yesterday's date.
+          const activeCycle = allCycles.find(c => !c.payout_processed && Number(c.payout_amount || 0) === 0);
           if (activeCycle) {
             currentBeneficiaryId = activeCycle.beneficiary_member_id;
             currentCycleEndDate = activeCycle.end_date;
