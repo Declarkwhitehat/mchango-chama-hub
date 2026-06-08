@@ -135,11 +135,17 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
   const totalOutstanding = member.total_outstanding || 0;
   const isCycleComplete = chama.status === 'cycle_complete';
   const isPendingStart = chama.status === 'pending';
+  const isChamaDeleted = chama.status === 'deleted' || chama.status === 'inactive';
 
   const graceDeadline = chama.status === 'active'
     ? getNextDay10PmKenyaDeadline(chama.start_date)
     : null;
   const isGracePeriod = !!graceDeadline && Date.now() < graceDeadline.getTime();
+  // Suppress all penalty/missed-payment warnings for chamas that are no longer
+  // active. A deleted chama can still carry historical balance_deficit /
+  // missed_payments_count rows from before deletion; those debts can't be
+  // settled and must not nag the user across the app.
+  const showDebtWarnings = !isGracePeriod && !isCycleComplete && !isChamaDeleted;
 
   return (
     <div className="space-y-4">
