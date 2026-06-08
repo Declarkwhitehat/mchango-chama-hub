@@ -294,7 +294,7 @@ const MchangoDetail = () => {
                       {daysLeft} days left
                     </Badge>
                   )}
-                  <ShareMenu url={shareUrl} title={campaign?.title || "Mchango Campaign"} text={`Support ${campaign?.title} on Pamoja Nova`} />
+                  <ShareMenu url={shareUrl} title={campaign?.title || "Mchango Campaign"} text={``} />
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
