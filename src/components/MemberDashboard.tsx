@@ -167,8 +167,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         </Card>
       )}
 
-      {/* Missed Payments Warning — suppressed during grace period */}
-      {!isGracePeriod && !isCycleComplete && missedCount >= 2 && (member as any).status !== 'frozen' && (
+      {/* Missed Payments Warning — suppressed during grace period and on deleted chamas */}
+      {showDebtWarnings && missedCount >= 2 && (member as any).status !== 'frozen' && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
@@ -188,7 +188,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         </Card>
       )}
 
-      {!isGracePeriod && !isCycleComplete && missedCount === 1 && (
+      {showDebtWarnings && missedCount === 1 && (
         <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
