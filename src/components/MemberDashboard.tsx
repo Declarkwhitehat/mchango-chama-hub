@@ -135,11 +135,17 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
   const totalOutstanding = member.total_outstanding || 0;
   const isCycleComplete = chama.status === 'cycle_complete';
   const isPendingStart = chama.status === 'pending';
+  const isChamaDeleted = chama.status === 'deleted' || chama.status === 'inactive';
 
   const graceDeadline = chama.status === 'active'
     ? getNextDay10PmKenyaDeadline(chama.start_date)
     : null;
   const isGracePeriod = !!graceDeadline && Date.now() < graceDeadline.getTime();
+  // Suppress all penalty/missed-payment warnings for chamas that are no longer
+  // active. A deleted chama can still carry historical balance_deficit /
+  // missed_payments_count rows from before deletion; those debts can't be
+  // settled and must not nag the user across the app.
+  const showDebtWarnings = !isGracePeriod && !isCycleComplete && !isChamaDeleted;
 
   return (
     <div className="space-y-4">
@@ -161,8 +167,8 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         </Card>
       )}
 
-      {/* Missed Payments Warning — suppressed during grace period */}
-      {!isGracePeriod && !isCycleComplete && missedCount >= 2 && (member as any).status !== 'frozen' && (
+      {/* Missed Payments Warning — suppressed during grace period and on deleted chamas */}
+      {showDebtWarnings && missedCount >= 2 && (member as any).status !== 'frozen' && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
@@ -182,7 +188,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         </Card>
       )}
 
-      {!isGracePeriod && !isCycleComplete && missedCount === 1 && (
+      {showDebtWarnings && missedCount === 1 && (
         <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
