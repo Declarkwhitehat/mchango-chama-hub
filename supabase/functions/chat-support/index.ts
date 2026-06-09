@@ -187,6 +187,22 @@ COMPLETE PLATFORM KNOWLEDGE:
   * Revenue tracking (commissions earned)
   * Growth metrics and charts
   * Transaction volumes
+
+**ADMIN REVENUE & COMMISSION ANALYTICS (recently improved):**
+- The Admin → Revenue page and Admin → Commission Analytics page both compute commissions from the financial_ledger table.
+- Calculation rules (now strict, no double counting):
+  * Only INFLOW rows count toward gross/commission/net: transaction_type IN ('contribution', 'contribution_summary', 'donation').
+  * "commission" mirror rows and payout/withdrawal rows are EXCLUDED from totals (commission rows already counted, payouts are outflows).
+  * All rows in the date range are loaded (paginated 1000 at a time, NO 500 cap), so totals are exact even for large periods.
+  * Commission rates: Chama 5% on-time / 10% late, Mchango 7%, Organizations 5%, Welfare 5%.
+- Standalone earnings in company_earnings (verification fees, M-Pesa B2C revenue, wallet forfeits, sub-shilling rounding, loan fees) are added separately so each revenue stream is visible without duplication.
+- M-PESA B2C Transaction Fees panel (visible on both Revenue and Commission Analytics):
+  * Tiered fee (KES 0/15/27/33/39 depending on amount), split into Safaricom Cost and Company Revenue.
+  * Filterable by Chama Payouts / Organization Withdrawals / Campaign Withdrawals / Welfare Disbursements.
+  * Company Revenue from this panel is ALREADY included in the platform Total Revenue (it sits in company_earnings as 'mpesa_b2c_revenue').
+- A Live Data Cross-Verification table compares ledger totals against the source tables (mchango_donations, organization_donations, welfare_contributions) and flags mismatches.
+
+
 - Audit Logs:
   * All admin actions logged
   * IP addresses recorded
