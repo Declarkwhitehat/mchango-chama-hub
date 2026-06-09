@@ -514,6 +514,11 @@ export const CommissionAnalyticsDashboard = () => {
         </Card>
       </div>
 
+      {/* M-Pesa B2C Transaction Fees — recipient-paid fee tier breakdown */}
+      <MpesaFeeSummary />
+
+
+
       {/* Live Data Verification — per-source comparison */}
       {liveVerification && (() => {
         const TOL = 0.01; // 1 cent
