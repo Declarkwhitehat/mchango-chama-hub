@@ -71,11 +71,11 @@ Deno.serve(async (req) => {
         const owed = (outstandingDebts || [])
           .filter((d: any) => d.member_id === member.id)
           .reduce((s: number, d: any) => s + Number(d.principal_remaining || 0) + Number(d.penalty_remaining || 0), 0);
-        message = `Pamojanova: "${chama.name}" cycle is closed but you still owe KES ${owed.toFixed(0)} to other members. Pay via Paybill 4015351, Account ${member.member_code} to clear your debt. STOP 4569*5#`;
+        message = `"${chama.name}" cycle is closed but you still owe KES ${owed.toFixed(0)} to other members. Pay via Paybill 4015351, Account ${member.member_code} to clear your debt. STOP 4569*5#`;
       } else if (allFullyPaid) {
-        message = `Pamojanova: "${chama.name}" cycle is complete. All members paid and all payouts settled. To rejoin a new cycle contact ${managerProfile?.full_name || 'your manager'} (${managerProfile?.phone || 'in app'}). Member ID: ${member.member_code}. STOP 4569*5#`;
+        message = `"${chama.name}" cycle is complete. All members paid and all payouts settled. To rejoin a new cycle contact ${managerProfile?.full_name || 'your manager'} (${managerProfile?.phone || 'in app'}). Member ID: ${member.member_code}. STOP 4569*5#`;
       } else {
-        message = `Pamojanova: "${chama.name}" cycle ended. Some payments are still pending and shortchanged members will be settled as debts are cleared. Member ID: ${member.member_code}. STOP 4569*5#`;
+        message = `"${chama.name}" cycle ended. Some payments are still pending and shortchanged members will be settled as debts are cleared. Member ID: ${member.member_code}. STOP 4569*5#`;
       }
 
       try {
@@ -93,9 +93,9 @@ Deno.serve(async (req) => {
     if (managerProfile?.phone) {
       let summary: string;
       if (allFullyPaid) {
-        summary = `Pamojanova: "${chama.name}" cycle complete. All payouts settled, no debts.`;
+        summary = `"${chama.name}" cycle complete. All payouts settled, no debts.`;
       } else {
-        summary = `Pamojanova: "${chama.name}" cycle ended. ${debtorIds.size} member(s) still owe KES ${totalDebtPrincipal.toFixed(0)} to shortchanged members. Reminders sent. STOP 4569*5#`;
+        summary = `"${chama.name}" cycle ended. ${debtorIds.size} member(s) still owe KES ${totalDebtPrincipal.toFixed(0)} to shortchanged members. Reminders sent. STOP 4569*5#`;
       }
       try {
         await supabase.functions.invoke('send-transactional-sms', {
