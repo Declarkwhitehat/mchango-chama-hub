@@ -30,6 +30,13 @@ import {
   formatCommissionPercentage
 } from "@/utils/commissionCalculator";
 import jsPDF from "jspdf";
+import { MpesaFeeSummary } from "./MpesaFeeSummary";
+
+// Ledger inflow row types — money flowing INTO the platform.
+const REVENUE_TX_TYPES = new Set(["contribution", "contribution_summary", "donation"]);
+// "commission" rows mirror the inflow's commission portion (duplicate) — exclude from sums.
+const isInflowRow = (e: { transaction_type?: string | null }) =>
+  REVENUE_TX_TYPES.has(String(e.transaction_type || "").toLowerCase());
 
 interface LedgerEntry {
   id: string;
