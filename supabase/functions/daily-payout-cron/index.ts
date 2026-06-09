@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { getSameDay10PmKenyaCutoff } from '../_shared/chamaDeadlines.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getMpesaTransactionFee } from '../_shared/mpesaTransactionFee.ts';
+import { applyPendingWalletToCycle } from '../_shared/applyChamaWallet.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -617,6 +618,32 @@ Deno.serve(async (req) => {
         if (!claimed) {
           console.log(`⚠️ Cycle ${cycle.id} already claimed by another process — skipping`);
           continue;
+        }
+
+        // ========== APPLY PENDING WALLET / LATE-BUFFER CREDITS ==========
+        // Wallet credit may have been deposited AFTER this cycle was created
+        // (e.g. an overpayment from the previous cycle). Apply it BEFORE any
+        // eligibility / unpaid / debt-accrual / missed-payment logic so the
+        // member is never falsely marked as missed when they already have
+        // money in their wallet for this chama.
+        try {
+          const walletApplied = await applyPendingWalletToCycle(
+            supabase,
+            chama.id,
+            cycle.id,
+            Number(chama.contribution_amount),
+            Number(chama.commission_rate ?? 0.05),
+          );
+          if (walletApplied.membersCredited > 0) {
+            console.log(
+              `[WALLET-APPLY] Cycle ${cycle.cycle_number} (${chama.name}): credited ${walletApplied.membersCredited} member(s), net KES ${walletApplied.netCreditApplied} (wallet rows ${walletApplied.walletRowsApplied}, buffer rows ${walletApplied.bufferRowsApplied})`,
+            );
+          }
+        } catch (walletErr) {
+          console.error(
+            `[WALLET-APPLY] Failed for cycle ${cycle.id}:`,
+            (walletErr as Error)?.message,
+          );
         }
 
         // ========== DUPLICATE PAYOUT GUARD ==========
