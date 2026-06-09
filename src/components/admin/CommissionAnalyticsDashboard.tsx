@@ -234,6 +234,7 @@ export const CommissionAnalyticsDashboard = () => {
 
     const points: TrendPoint[] = intervals.map(iv => {
       const bucket = ledgerData.filter(e => {
+        if (!isInflowRow(e)) return false;
         const d = parseISO(e.created_at);
         return isWithinInterval(d, { start: iv.start, end: iv.end });
       });
