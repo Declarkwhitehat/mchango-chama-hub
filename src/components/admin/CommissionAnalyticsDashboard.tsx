@@ -448,6 +448,7 @@ export const CommissionAnalyticsDashboard = () => {
                   <SelectItem value="mchango">Mchango</SelectItem>
                   <SelectItem value="chama">Chama</SelectItem>
                   <SelectItem value="organization">Organizations</SelectItem>
+                  <SelectItem value="welfare">Welfare</SelectItem>
                 </SelectContent>
               </Select>
             </div>
