@@ -152,47 +152,55 @@ export const CommissionAnalyticsDashboard = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from("financial_ledger")
-        .select("*")
-        .gte("created_at", startOfDay(parseISO(dateFrom)).toISOString())
-        .lte("created_at", endOfDay(parseISO(dateTo)).toISOString())
-        .order("created_at", { ascending: false });
+      const fromISO = startOfDay(parseISO(dateFrom)).toISOString();
+      const toISO = endOfDay(parseISO(dateTo)).toISOString();
 
-      if (sourceFilter !== "all") {
-        query = query.eq("source_type", sourceFilter);
+      // Paginate through ALL rows (no 500-row cap) so totals are exact.
+      const batchSize = 1000;
+      let page = 0;
+      let all: LedgerEntry[] = [];
+      while (true) {
+        let q = supabase
+          .from("financial_ledger")
+          .select("*")
+          .gte("created_at", fromISO)
+          .lte("created_at", toISO)
+          .order("created_at", { ascending: false })
+          .range(page * batchSize, (page + 1) * batchSize - 1);
+        if (sourceFilter !== "all") q = q.eq("source_type", sourceFilter);
+        const { data, error } = await q;
+        if (error) throw error;
+        const rows = (data || []) as LedgerEntry[];
+        all = all.concat(rows);
+        if (rows.length < batchSize) break;
+        page++;
       }
 
-      const { data, error } = await query.limit(500);
-      if (error) throw error;
+      setLedgerData(all);
 
-      const entries = (data || []) as LedgerEntry[];
-      setLedgerData(entries);
+      // Count ONLY inflow rows (contribution / contribution_summary / donation).
+      // "commission" rows mirror their inflow row's commission and would double-count.
+      // Payout/withdrawal rows are outflows, not revenue.
+      const inflows = all.filter(isInflowRow);
 
       const s: SummaryData = {
         totalGross: 0, totalCommission: 0, totalNet: 0,
         mchangoCommission: 0, chamaCommission: 0, orgCommission: 0, welfareCommission: 0,
         mchangoGross: 0, chamaGross: 0, orgGross: 0, welfareGross: 0,
-        transactionCount: entries.length
+        transactionCount: inflows.length,
       };
 
-      for (const e of entries) {
-        s.totalGross += Number(e.gross_amount);
-        s.totalCommission += Number(e.commission_amount);
-        s.totalNet += Number(e.net_amount);
-        if (e.source_type === "mchango") {
-          s.mchangoCommission += Number(e.commission_amount);
-          s.mchangoGross += Number(e.gross_amount);
-        } else if (e.source_type === "chama") {
-          s.chamaCommission += Number(e.commission_amount);
-          s.chamaGross += Number(e.gross_amount);
-        } else if (e.source_type === "organization") {
-          s.orgCommission += Number(e.commission_amount);
-          s.orgGross += Number(e.gross_amount);
-        } else if (e.source_type === "welfare") {
-          s.welfareCommission += Number(e.commission_amount);
-          s.welfareGross += Number(e.gross_amount);
-        }
+      for (const e of inflows) {
+        const g = Number(e.gross_amount) || 0;
+        const c = Number(e.commission_amount) || 0;
+        const n = Number(e.net_amount) || 0;
+        s.totalGross += g;
+        s.totalCommission += c;
+        s.totalNet += n;
+        if (e.source_type === "mchango") { s.mchangoCommission += c; s.mchangoGross += g; }
+        else if (e.source_type === "chama") { s.chamaCommission += c; s.chamaGross += g; }
+        else if (e.source_type === "organization") { s.orgCommission += c; s.orgGross += g; }
+        else if (e.source_type === "welfare") { s.welfareCommission += c; s.welfareGross += g; }
       }
       setSummary(s);
     } catch (err: any) {
