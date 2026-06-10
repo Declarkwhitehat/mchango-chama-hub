@@ -269,7 +269,10 @@ export const VerificationRequestsManagement = () => {
         if (val.amount) verificationFee = val.amount;
       }
 
-      const requiresRefund = selectedRequest.entity_type !== 'chama';
+      // Skip refund for auto-created requests (no fee was ever charged).
+      const isAutoCreated = typeof selectedRequest.request_reason === 'string' &&
+        selectedRequest.request_reason.startsWith('[AUTO]');
+      const requiresRefund = selectedRequest.entity_type !== 'chama' && !isAutoCreated;
       
       if (requiresRefund) {
         const tableName = selectedRequest.entity_type === 'mchango' ? 'mchango' 
