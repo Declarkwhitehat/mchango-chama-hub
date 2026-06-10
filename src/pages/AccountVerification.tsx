@@ -20,7 +20,7 @@ const AccountVerification = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState<any>(null);
   const [request, setRequest] = useState<any>(null);
-  const [fee, setFee] = useState<number>(1500);
+  const [fee, setFee] = useState<number | null>(null);
   const [phone, setPhone] = useState("");
   const [selfie, setSelfie] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
