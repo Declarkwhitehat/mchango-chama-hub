@@ -634,17 +634,26 @@ serve(async (req) => {
         console.warn('chama-crud: notification failed (non-fatal):', notifErr);
       }
 
-      // Admin review alert if the creator is a verified account.
+      // Admin review request if the creator is a verified account.
+      // The entity is NOT auto-verified — admin must approve via the
+      // verification_requests workflow (badge appears on approval).
       try {
         const { data: creator } = await supabaseAdmin
           .from('profiles')
-          .select('is_verified, full_name')
+          .select('is_verified, full_name, phone')
           .eq('id', user.id)
           .maybeSingle();
         if (creator?.is_verified) {
+          const requesterLabel = creator.full_name || creator.phone || 'verified user';
+          await supabaseAdmin.from('verification_requests').insert({
+            entity_type: 'chama',
+            entity_id: data.id,
+            requested_by: user.id,
+            request_reason: `[AUTO] Created by verified account: ${requesterLabel}. No fee charged — please review and approve verified badge.`,
+          });
           await notifyAllAdmins(supabaseAdmin, {
-            title: 'Verified user created chama',
-            message: `${creator.full_name || 'A verified user'} created chama "${data.name}". Review verification status.`,
+            title: 'Verified user created chama — review',
+            message: `${requesterLabel} created chama "${data.name}". Approve in Verification Requests to issue the badge.`,
             type: 'info',
             category: 'verification',
             relatedEntityId: data.id,
@@ -652,7 +661,7 @@ serve(async (req) => {
           });
         }
       } catch (e) {
-        console.warn('chama-crud: admin verified-creation notify failed (non-fatal):', e);
+        console.warn('chama-crud: admin verified-creation request failed (non-fatal):', e);
       }
 
       return new Response(JSON.stringify({ data }), {
