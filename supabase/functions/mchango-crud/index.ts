@@ -272,13 +272,20 @@ serve(async (req) => {
       try {
         const { data: creator } = await supabaseClient
           .from('profiles')
-          .select('is_verified, full_name')
+          .select('is_verified, full_name, phone')
           .eq('id', user.id)
           .maybeSingle();
         if (creator?.is_verified) {
+          const requesterLabel = creator.full_name || creator.phone || 'verified user';
+          await supabaseClient.from('verification_requests').insert({
+            entity_type: 'mchango',
+            entity_id: data.id,
+            requested_by: user.id,
+            request_reason: `[AUTO] Created by verified account: ${requesterLabel}. No fee charged — please review and approve verified badge.`,
+          });
           await notifyAllAdmins(supabaseClient, {
-            title: 'Verified user created campaign',
-            message: `${creator.full_name || 'A verified user'} created campaign "${data.title}". Review verification status.`,
+            title: 'Verified user created campaign — review',
+            message: `${requesterLabel} created campaign "${data.title}". Approve in Verification Requests to issue the badge.`,
             type: 'info',
             category: 'verification',
             relatedEntityId: data.id,
@@ -286,7 +293,7 @@ serve(async (req) => {
           });
         }
       } catch (e) {
-        console.warn('mchango-crud: admin verified-creation notify failed (non-fatal):', e);
+        console.warn('mchango-crud: admin verified-creation request failed (non-fatal):', e);
       }
 
       return new Response(JSON.stringify({ data }), {

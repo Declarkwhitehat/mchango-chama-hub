@@ -20,7 +20,7 @@ const AccountVerification = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState<any>(null);
   const [request, setRequest] = useState<any>(null);
-  const [fee, setFee] = useState<number>(1500);
+  const [fee, setFee] = useState<number | null>(null);
   const [phone, setPhone] = useState("");
   const [selfie, setSelfie] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -147,7 +147,7 @@ const AccountVerification = () => {
       });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || "Failed");
 
-      const charged = (data as any)?.fee_amount ?? liveAmt ?? fee;
+      const charged = (data as any)?.fee_amount ?? liveAmt ?? fee ?? 0;
       setFee(charged);
       const reqId = (data as any)?.request_id;
       toast({
@@ -184,14 +184,14 @@ const AccountVerification = () => {
       <main className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2"><BadgeCheck className="h-7 w-7 text-blue-500" /> Account Verification</h1>
-          <p className="text-muted-foreground mt-1">Verified accounts get a blue badge and any chama, welfare, organization or campaign they create is auto-verified for free.</p>
+          <p className="text-muted-foreground mt-1">Verified accounts get a blue badge and any chama, welfare, organization or campaign they create is reviewed by an admin at no extra fee.</p>
         </div>
 
         {isVerified && (
           <Card className="border-blue-300 bg-blue-50/40">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-blue-600" /> Your account is verified</CardTitle>
-              <CardDescription>All your existing and future groups & campaigns are auto-verified.</CardDescription>
+              <CardDescription>Any new chama, welfare, organization or campaign you create goes straight to admin for a free badge review.</CardDescription>
             </CardHeader>
           </Card>
         )}
@@ -218,7 +218,9 @@ const AccountVerification = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Get Verified</CardTitle>
-              <CardDescription>Take a clear selfie and pay KES {fee.toLocaleString()} via M-Pesa STK push.</CardDescription>
+              <CardDescription>
+                Take a clear selfie and pay {fee === null ? "the verification fee" : `KES ${fee.toLocaleString()}`} via M-Pesa STK push.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -238,9 +240,9 @@ const AccountVerification = () => {
               </div>
               <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/40">
                 <span className="text-sm">Verification Fee</span>
-                <Badge variant="secondary">KES {fee.toLocaleString()}</Badge>
+                <Badge variant="secondary">{fee === null ? "Loading…" : `KES ${fee.toLocaleString()}`}</Badge>
               </div>
-              <Button onClick={submit} disabled={submitting} className="w-full gap-2">
+              <Button onClick={submit} disabled={submitting || fee === null} className="w-full gap-2">
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />}
                 Pay & Submit
               </Button>

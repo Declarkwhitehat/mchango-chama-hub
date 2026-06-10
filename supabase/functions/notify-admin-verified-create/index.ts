@@ -61,9 +61,26 @@ serve(async (req) => {
     }
 
     const label = ENTITY_LABELS[String(entity_type).toLowerCase()] || String(entity_type);
+    const requesterLabel = creator.full_name || 'verified user';
+
+    // Auto-create a verification request so admin can review & approve
+    // (entity is no longer auto-verified for verified creators).
+    if (entity_id) {
+      try {
+        await supabase.from('verification_requests').insert({
+          entity_type: String(entity_type).toLowerCase(),
+          entity_id,
+          requested_by: user.id,
+          request_reason: `[AUTO] Created by verified account: ${requesterLabel}. No fee charged — please review and approve verified badge.`,
+        });
+      } catch (e) {
+        console.warn('notify-admin-verified-create: insert request failed (non-fatal):', e);
+      }
+    }
+
     await notifyAllAdmins(supabase, {
-      title: `Verified user created ${label}`,
-      message: `${creator.full_name || 'A verified user'} created ${label} "${entity_name}". Review verification status.`,
+      title: `Verified user created ${label} — review`,
+      message: `${requesterLabel} created ${label} "${entity_name}". Approve in Verification Requests to issue the badge.`,
       type: 'info',
       category: 'verification',
       relatedEntityId: entity_id || undefined,

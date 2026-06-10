@@ -169,13 +169,20 @@ serve(async (req) => {
       try {
         const { data: creator } = await supabaseAdmin
           .from('profiles')
-          .select('is_verified, full_name')
+          .select('is_verified, full_name, phone')
           .eq('id', userData.user.id)
           .maybeSingle();
         if (creator?.is_verified) {
+          const requesterLabel = creator.full_name || creator.phone || 'verified user';
+          await supabaseAdmin.from('verification_requests').insert({
+            entity_type: 'welfare',
+            entity_id: data.id,
+            requested_by: userData.user.id,
+            request_reason: `[AUTO] Created by verified account: ${requesterLabel}. No fee charged — please review and approve verified badge.`,
+          });
           await notifyAllAdmins(supabaseAdmin, {
-            title: 'Verified user created welfare',
-            message: `${creator.full_name || 'A verified user'} created welfare "${data.name}". Review verification status.`,
+            title: 'Verified user created welfare — review',
+            message: `${requesterLabel} created welfare "${data.name}". Approve in Verification Requests to issue the badge.`,
             type: 'info',
             category: 'verification',
             relatedEntityId: data.id,
@@ -183,7 +190,7 @@ serve(async (req) => {
           });
         }
       } catch (e) {
-        console.warn('welfare-crud: admin verified-creation notify failed (non-fatal):', e);
+        console.warn('welfare-crud: admin verified-creation request failed (non-fatal):', e);
       }
 
       return new Response(JSON.stringify({ data }), {

@@ -909,6 +909,8 @@ const ChamaDetail = () => {
             chamaId={chama.id}
             currentMemberId={currentUserMembership.id}
             contributionAmount={chama.contribution_amount}
+            currentCycleDue={isActive}
+            missedCycles={Number((currentUserMembership as any)?.missed_payments_count || 0)}
             onPaymentSuccess={loadChama}
           />
           </div>
