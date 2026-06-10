@@ -184,14 +184,14 @@ const AccountVerification = () => {
       <main className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2"><BadgeCheck className="h-7 w-7 text-blue-500" /> Account Verification</h1>
-          <p className="text-muted-foreground mt-1">Verified accounts get a blue badge and any chama, welfare, organization or campaign they create is auto-verified for free.</p>
+          <p className="text-muted-foreground mt-1">Verified accounts get a blue badge and any chama, welfare, organization or campaign they create is reviewed by an admin at no extra fee.</p>
         </div>
 
         {isVerified && (
           <Card className="border-blue-300 bg-blue-50/40">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-blue-600" /> Your account is verified</CardTitle>
-              <CardDescription>All your existing and future groups & campaigns are auto-verified.</CardDescription>
+              <CardDescription>Any new chama, welfare, organization or campaign you create goes straight to admin for a free badge review.</CardDescription>
             </CardHeader>
           </Card>
         )}
