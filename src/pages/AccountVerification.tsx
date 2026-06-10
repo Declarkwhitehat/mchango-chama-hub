@@ -147,7 +147,7 @@ const AccountVerification = () => {
       });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || "Failed");
 
-      const charged = (data as any)?.fee_amount ?? liveAmt ?? fee;
+      const charged = (data as any)?.fee_amount ?? liveAmt ?? fee ?? 0;
       setFee(charged);
       const reqId = (data as any)?.request_id;
       toast({
@@ -218,7 +218,9 @@ const AccountVerification = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Get Verified</CardTitle>
-              <CardDescription>Take a clear selfie and pay KES {fee.toLocaleString()} via M-Pesa STK push.</CardDescription>
+              <CardDescription>
+                Take a clear selfie and pay {fee === null ? "the verification fee" : `KES ${fee.toLocaleString()}`} via M-Pesa STK push.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -238,9 +240,9 @@ const AccountVerification = () => {
               </div>
               <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/40">
                 <span className="text-sm">Verification Fee</span>
-                <Badge variant="secondary">KES {fee.toLocaleString()}</Badge>
+                <Badge variant="secondary">{fee === null ? "Loading…" : `KES ${fee.toLocaleString()}`}</Badge>
               </div>
-              <Button onClick={submit} disabled={submitting} className="w-full gap-2">
+              <Button onClick={submit} disabled={submitting || fee === null} className="w-full gap-2">
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />}
                 Pay & Submit
               </Button>
