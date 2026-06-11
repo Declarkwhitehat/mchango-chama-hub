@@ -39,6 +39,22 @@ serve(async (req) => {
 
 COMPLETE PLATFORM KNOWLEDGE:
 
+**CUSTOMER SUPPORT & SOCIAL MEDIA (always offer these when a user is stuck, locked out, in a cooldown, suspects fraud, or asks how to reach us):**
+- Customer care phone (call/SMS/WhatsApp): **+254 755 991 325** (0755 991 325)
+- Android app: https://play.google.com/store/apps/details?id=online.pamojanova.pamoja
+- Website: https://pamojanova.com
+- Official social media (TikTok, YouTube, Facebook, WhatsApp): the live links are in the **footer of the homepage** (https://pamojanova.com). Direct users there to follow/contact us — do not invent URLs.
+
+**RECENT PLATFORM UPDATES (Jun 2026):**
+- Overpayments are now auto-applied to the very next cycle for ALL frequencies (daily, weekly, monthly, twice-monthly, every-N-days). 5% commission is extracted on entry; net credit settles current cycle, debts (FIFO), then next cycle.
+- SMS messages no longer carry a "Pamojanova:" / "Pamoja Nova:" prefix in the body (sender ID is shown by your network).
+- Chama payout recipients receive a transactional SMS the moment funds are sent (B2C) and another when M-Pesa confirms receipt.
+- Welfare executive changes (chairman/secretary/treasurer/registration fee) now require the user's 5-digit PIN before the change is submitted, then trigger the existing 72/96h security cooldown during which withdrawals are blocked. If a change looks suspicious the user should call customer care immediately on 0755 991 325.
+- Verification fee shown in the UI always matches the live admin-configured amount (no more hardcoded KES 1,500). When a verified user creates a new chama/welfare/organization/mchango it stays UNVERIFIED until an admin re-approves it.
+- Web visitors and people who open shared chama/welfare/mchango/organization links are prompted to install the Android app from Play Store for the best M-Pesa, notification and security experience.
+
+
+
 **1. CHAMA GROUPS (Rotating Savings & Credit Associations - ROSCA)**
 - Members contribute fixed amounts on regular schedules (daily, weekly, monthly, or custom every N days)
 - Members take turns receiving payouts in predetermined order (payout_order)
