@@ -65,79 +65,87 @@ export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman,
   // For admin, all non-target members are assignable; for chairman, only regular members
   const assignableMembers = isAdmin ? members : regularMembers;
 
-  const assignRole = async (memberId: string, role: string) => {
-    setAssigning(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('welfare-members', {
-        method: 'PUT',
-        body: { member_id: memberId, role },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success(`Role assigned: ${role}`);
-      onRoleAssigned();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to assign role");
-    } finally {
-      setAssigning(false);
-    }
+  const assignRole = (memberId: string, role: string) => {
+    requirePin(async () => {
+      setAssigning(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('welfare-members', {
+          method: 'PUT',
+          body: { member_id: memberId, role },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        toast.success(`Role assigned: ${role}`);
+        onRoleAssigned();
+      } catch (error: any) {
+        toast.error(error.message || "Failed to assign role");
+      } finally {
+        setAssigning(false);
+      }
+    });
   };
 
-  const removeMember = async (memberId: string) => {
-    setRemovingId(memberId);
-    try {
-      const { data, error } = await supabase.functions.invoke(`welfare-members?member_id=${memberId}`, { method: 'DELETE' });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success("Member removed");
-      onRoleAssigned();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to remove member");
-    } finally {
-      setRemovingId(null);
-    }
+  const removeMember = (memberId: string) => {
+    requirePin(async () => {
+      setRemovingId(memberId);
+      try {
+        const { data, error } = await supabase.functions.invoke(`welfare-members?member_id=${memberId}`, { method: 'DELETE' });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        toast.success("Member removed");
+        onRoleAssigned();
+      } catch (error: any) {
+        toast.error(error.message || "Failed to remove member");
+      } finally {
+        setRemovingId(null);
+      }
+    });
   };
 
-  const requestFeeChange = async () => {
+  const requestFeeChange = () => {
     const v = Number(feeInput);
     if (!Number.isFinite(v) || v < 0 || v > 100000) {
       toast.error('Enter a value between 0 and 100,000');
       return;
     }
-    setSubmittingFee(true);
-    try {
-      const { data, error } = await supabase.functions.invoke(`welfare-crud/${welfareId}`, {
-        method: 'PUT',
-        body: { registration_fee: v },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success('Change requested. A second executive must approve.');
-      setFeeInput('');
-      onRoleAssigned();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to request change');
-    } finally {
-      setSubmittingFee(false);
-    }
+    requirePin(async () => {
+      setSubmittingFee(true);
+      try {
+        const { data, error } = await supabase.functions.invoke(`welfare-crud/${welfareId}`, {
+          method: 'PUT',
+          body: { registration_fee: v },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        toast.success('Change requested. A second executive must approve.');
+        setFeeInput('');
+        onRoleAssigned();
+      } catch (e: any) {
+        toast.error(e.message || 'Failed to request change');
+      } finally {
+        setSubmittingFee(false);
+      }
+    });
   };
 
-  const approveFeeChange = async () => {
-    setSubmittingFee(true);
-    try {
-      const { data, error } = await supabase.functions.invoke(`welfare-crud/${welfareId}`, {
-        method: 'PUT',
-        body: { approve_registration_fee: true },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success('Registration fee updated.');
-      onRoleAssigned();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to approve');
-    } finally {
-      setSubmittingFee(false);
-    }
+  const approveFeeChange = () => {
+    requirePin(async () => {
+      setSubmittingFee(true);
+      try {
+        const { data, error } = await supabase.functions.invoke(`welfare-crud/${welfareId}`, {
+          method: 'PUT',
+          body: { approve_registration_fee: true },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        toast.success('Registration fee updated.');
+        onRoleAssigned();
+      } catch (e: any) {
+        toast.error(e.message || 'Failed to approve');
+      } finally {
+        setSubmittingFee(false);
+      }
+    });
   };
 
   const canManageFee = isExecutive || isChairman;
