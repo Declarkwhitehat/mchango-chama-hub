@@ -96,7 +96,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             phone: target.phone,
-            message: `PAMOJA NOVA: Your account verified status has been removed.${reason ? ` Reason: ${reason}.` : ''} Contact support for details.`,
+            message: `Your account verified status has been removed.${reason ? ` Reason: ${reason}.` : ''} Contact support 0755991325.`,
             eventType: 'verification_revoked',
           }),
         });
