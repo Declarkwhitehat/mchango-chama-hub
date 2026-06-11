@@ -117,6 +117,13 @@ export const TwoFactorVerification = ({ userId, onVerified, onCancel }: TwoFacto
             Back to login
           </Button>
         </div>
+
+        <p className="text-center text-xs text-muted-foreground border-t pt-3">
+          Locked out of your account? Call customer care:{" "}
+          <a href="tel:+254755991325" className="font-semibold text-primary underline">
+            0755 991 325
+          </a>
+        </p>
       </CardContent>
     </Card>
   );

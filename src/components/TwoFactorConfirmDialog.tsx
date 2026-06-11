@@ -125,6 +125,13 @@ export const TwoFactorConfirmDialog = ({
           >
             {useBackupCode ? "Use authenticator code" : "Use backup code instead"}
           </Button>
+
+          <p className="text-center text-xs text-muted-foreground">
+            Locked out? Call customer care:{" "}
+            <a href="tel:+254755991325" className="font-semibold text-primary underline">
+              0755 991 325
+            </a>
+          </p>
         </div>
       </DialogContent>
     </Dialog>

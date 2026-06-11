@@ -128,7 +128,7 @@ export const WelfareExecutiveChangeBanner = ({ welfareId, onCooldownActive }: Pr
 
         <div className="flex items-center gap-2 p-2 rounded-md bg-muted border text-sm">
           <Phone className="h-4 w-4" />
-          <span>If this looks suspicious, <strong>contact customer care immediately</strong>.</span>
+          <span>If this looks suspicious, contact customer care: <a href="tel:+254755991325" className="font-bold underline">0755 991 325</a></span>
         </div>
       </AlertDescription>
     </Alert>
