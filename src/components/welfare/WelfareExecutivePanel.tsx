@@ -25,6 +25,7 @@ interface Props {
 
 export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman, isExecutive = false, isAdmin = false, onRoleAssigned }: Props) => {
   const { user } = useAuth();
+  const { showPin, requirePin, onVerified, onOpenChange: onPinDialogChange } = usePinVerification();
   const [assigning, setAssigning] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [feeInput, setFeeInput] = useState<string>('');
