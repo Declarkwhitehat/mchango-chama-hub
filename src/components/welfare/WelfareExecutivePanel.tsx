@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Crown, BookOpen, Landmark, UserCheck, UserMinus, Loader2, ChevronDown, Wallet, Clock, Send } from "lucide-react";
+import { usePinVerification } from "@/hooks/usePinVerification";
+import { PinEntryDialog } from "@/components/PinEntryDialog";
 
 interface Props {
   members: any[];
