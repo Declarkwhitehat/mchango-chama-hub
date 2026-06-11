@@ -370,6 +370,13 @@ export const WelfareExecutivePanel = ({ members, welfareId, welfare, isChairman,
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+      <PinEntryDialog
+        open={showPin}
+        onOpenChange={onPinDialogChange}
+        onVerified={onVerified}
+        title="Confirm with PIN"
+        description="Enter your 5-digit PIN to change executive roles or registration fee."
+      />
     </Card>
   );
 };
