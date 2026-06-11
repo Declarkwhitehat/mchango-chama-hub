@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
             .insert({ member_id: memberId, cycle_id: cycle.id, reminder_type: "sms_6h" });
 
           if (!dupErr) {
-            const message = `Pamoja Nova: ${fullName.split(" ")[0]}, your KES ${Number(chama.contribution_amount).toLocaleString()} for "${chama.name}" is due by ${deadlineText} today. Pay now or you will be removed.`.slice(0, 160);
+            const message = `${fullName.split(" ")[0]}, your KES ${Number(chama.contribution_amount).toLocaleString()} for "${chama.name}" is due by ${deadlineText} today. Pay now or you will be removed.`.slice(0, 160);
 
             try {
               const { error: smsErr } = await supabase.functions.invoke("send-transactional-sms", {
