@@ -413,9 +413,11 @@ serve(async (req) => {
 
         const amountStr = `KES ${transactionAmount.toFixed(2)}`;
         const balanceLine = (withdrawal.mchango_id && remainingBalance !== null)
-          ? `\nBalance: KES ${remainingBalance.toFixed(2)}`
+          ? ` Balance: KES ${remainingBalance.toFixed(2)}.`
           : '';
-        const successMessage = `You have received ${amountStr} from ${sourceType} "${sourceName}". Mpesa Ref: ${transactionId}.${balanceLine}`;
+        const refLine = transactionId ? ` Mpesa Ref: ${transactionId}.` : '';
+        const sourceLabel = `${sourceName} ${sourceType.toLowerCase()}`;
+        const successMessage = `Confirmed you have received ${amountStr} from ${sourceLabel}.${refLine}${balanceLine} Sisi tuko pamoja, je wewe?`;
         await sendSMS(recipientPhone, successMessage);
       }
 
