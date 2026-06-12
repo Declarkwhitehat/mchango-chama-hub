@@ -12,25 +12,15 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    console.log('Running chama auto-cleanup check...');
+    // DEPRECATED: 40%-rejoin deletion has been replaced by chama-auto-restart's
+    // auto-continue model. Debt-free members continue automatically; debtors are
+    // removed individually. This cron is now a no-op kept for backward compatibility.
+    console.log('chama-auto-cleanup: deprecated 40%-rejoin path is a no-op.');
+    return new Response(JSON.stringify({
+      message: 'Deprecated — auto-continue handles chama lifecycle now',
+      processed: 0,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    // Find chamas with cycle_complete status where last_cycle_completed_at > 24 hours ago
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-    const { data: completedChamas, error: fetchError } = await supabase
-      .from('chama')
-      .select('id, name, last_cycle_completed_at, group_code')
-      .eq('status', 'cycle_complete')
-      .lt('last_cycle_completed_at', twentyFourHoursAgo);
-
-    if (fetchError) throw fetchError;
-
-    if (!completedChamas || completedChamas.length === 0) {
-      console.log('No chamas eligible for auto-cleanup');
-      return new Response(JSON.stringify({ message: 'No chamas to clean up', processed: 0 }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
 
     let deletedCount = 0;
 
