@@ -185,6 +185,14 @@ const ChamaCreate = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <Alert className="mb-4 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-sm">
+                <strong>Manager advisory:</strong> Only invite people you personally know and trust.
+                A chama pools real money — members who can't be reached or refuse to pay can cause losses
+                and disputes. Your reputation as manager depends on the people you bring in.
+              </AlertDescription>
+            </Alert>
             <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="name">Group Name *</Label>

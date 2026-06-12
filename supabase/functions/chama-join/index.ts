@@ -305,17 +305,10 @@ serve(async (req) => {
         });
       }
 
-      // Allow joining for 'pending' (not started) and 'cycle_complete' (ended) chamas
-      // Block joining for 'active' (in progress), 'completed', and 'deleted' chamas
-      if (chama.status === 'active') {
-        return new Response(JSON.stringify({ 
-          error: 'Chama already started',
-          details: 'This chama has already started and is no longer accepting new members. New members can only join before the chama starts or after it ends.'
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      // Allow joining for 'pending', 'active' (mid-stream), and 'cycle_complete'.
+      // Active-chama joiners stay 'inactive' until first payment (auto-removal guard handles non-payers).
+      // Block 'completed' and 'deleted'.
+
 
       if (chama.status === 'completed' || chama.status === 'deleted') {
         return new Response(JSON.stringify({ 

@@ -67,15 +67,15 @@ Deno.serve(async (req) => {
 
       let message: string;
       if (debtorIds.has(member.id)) {
-        // This member owes other members money — remind them
+        // Debtor — warned they'll be removed in 24h if dues aren't cleared
         const owed = (outstandingDebts || [])
           .filter((d: any) => d.member_id === member.id)
           .reduce((s: number, d: any) => s + Number(d.principal_remaining || 0) + Number(d.penalty_remaining || 0), 0);
-        message = `"${chama.name}" cycle is closed but you still owe KES ${owed.toFixed(0)} to other members. Pay via Paybill 4015351, Account ${member.member_code} to clear your debt. STOP 4569*5#`;
+        message = `"${chama.name}" cycle closed. You still owe KES ${owed.toFixed(0)}. Clear via Paybill 4015351, Account ${member.member_code} within 24h or you will be auto-removed when the chama continues. STOP 4569*5#`;
       } else if (allFullyPaid) {
-        message = `"${chama.name}" cycle is complete. All members paid and all payouts settled. To rejoin a new cycle contact ${managerProfile?.full_name || 'your manager'} (${managerProfile?.phone || 'in app'}). Member ID: ${member.member_code}. STOP 4569*5#`;
+        message = `"${chama.name}" cycle is complete. All payouts settled. The chama will automatically continue into a new cycle in 24h — no rejoin needed. Member ID: ${member.member_code}. STOP 4569*5#`;
       } else {
-        message = `"${chama.name}" cycle ended. Some payments are still pending and shortchanged members will be settled as debts are cleared. Member ID: ${member.member_code}. STOP 4569*5#`;
+        message = `"${chama.name}" cycle closed. Debt-free members will automatically continue into a new cycle in 24h. Member ID: ${member.member_code}. STOP 4569*5#`;
       }
 
       try {
