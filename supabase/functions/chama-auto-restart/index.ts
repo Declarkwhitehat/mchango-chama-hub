@@ -31,22 +31,21 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    console.log('Running chama auto-restart check...');
+    console.log('Running chama auto-continue check...');
 
-    // Find chamas with cycle_complete status where last_cycle_completed_at > 48 hours ago
-    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    // 24h grace window after cycle close so debtors get a chance to settle
+    const graceCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const { data: completedChamas, error: fetchError } = await supabase
       .from('chama')
       .select('*')
       .eq('status', 'cycle_complete')
-      .lt('last_cycle_completed_at', fortyEightHoursAgo);
+      .lt('last_cycle_completed_at', graceCutoff);
 
     if (fetchError) throw fetchError;
 
     if (!completedChamas || completedChamas.length === 0) {
-      console.log('No chamas eligible for auto-restart');
-      return new Response(JSON.stringify({ message: 'No chamas to restart', processed: 0 }), {
+      return new Response(JSON.stringify({ message: 'No chamas to continue', processed: 0 }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -54,37 +53,64 @@ Deno.serve(async (req) => {
     let restartedCount = 0;
 
     for (const chama of completedChamas) {
-      console.log(`Checking chama "${chama.name}" (${chama.id}) for auto-restart...`);
+      console.log(`Checking chama "${chama.name}" (${chama.id}) for auto-continue...`);
 
-      // Count approved rejoin requests
-      const { data: approvedRequests, error: reqError } = await supabase
-        .from('chama_rejoin_requests')
-        .select('*, profiles!chama_rejoin_requests_user_id_fkey(*)')
+      // 1) Load all approved members
+      const { data: allMembers, error: memErr } = await supabase
+        .from('chama_members')
+        .select('id, user_id, is_manager, profiles!chama_members_user_id_fkey(phone, full_name)')
         .eq('chama_id', chama.id)
-        .eq('status', 'approved');
+        .eq('approval_status', 'approved')
+        .neq('status', 'removed');
 
-      if (reqError) {
-        console.error(`Error fetching rejoin requests for ${chama.id}:`, reqError);
+      if (memErr || !allMembers || allMembers.length === 0) {
+        console.log(`Skipping ${chama.id}: no members`);
         continue;
+      }
+
+      // 2) Identify members with outstanding debts → auto-remove
+      const { data: debts } = await supabase
+        .from('chama_member_debts')
+        .select('member_id')
+        .eq('chama_id', chama.id)
+        .in('status', ['outstanding', 'partial']);
+
+      const debtorMemberIds = new Set((debts || []).map((d: any) => d.member_id));
+      const cleanMembers = allMembers.filter((m: any) => !debtorMemberIds.has(m.id));
+      const removedMembers = allMembers.filter((m: any) => debtorMemberIds.has(m.id));
+
+      // 3) Mark debtor members as removed
+      if (removedMembers.length > 0) {
+        await supabase
+          .from('chama_members')
+          .update({ status: 'removed', removed_at: new Date().toISOString(), removal_reason: 'unpaid_debt_cycle_end' })
+          .in('id', removedMembers.map((m: any) => m.id));
+
+        // Notify removed debtors
+        for (const m of removedMembers) {
+          const profile: any = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+          if (!profile?.phone) continue;
+          const message = `You have been removed from "${chama.name}" because outstanding debts were not cleared by the end of the cycle. Pay your dues to rejoin in future. STOP 4569*5#`;
+          try {
+            await supabase.functions.invoke('send-transactional-sms', {
+              body: { phone: profile.phone, message, eventType: 'chama_member_removed_debt' }
+            });
+          } catch (_e) { /* ignore */ }
+        }
       }
 
       const minMembers = chama.min_members || 2;
-
-      if (!approvedRequests || approvedRequests.length < minMembers) {
-        console.log(`Chama "${chama.name}": ${approvedRequests?.length || 0}/${minMembers} approved, not enough to restart`);
+      if (cleanMembers.length < minMembers) {
+        console.log(`Chama "${chama.name}": only ${cleanMembers.length} debt-free members (need ${minMembers}). Leaving in cycle_complete.`);
         continue;
       }
 
-      console.log(`Auto-restarting chama "${chama.name}" with ${approvedRequests.length} members`);
-
-      // ========== CLEAN UP OLD CYCLE DATA ==========
+      // 4) Clean prior-cycle transactional data, but PRESERVE clean members
       const { data: oldCycles } = await supabase
         .from('contribution_cycles')
         .select('id')
         .eq('chama_id', chama.id);
-
-      const oldCycleIds = oldCycles?.map(c => c.id) || [];
-
+      const oldCycleIds = oldCycles?.map((c: any) => c.id) || [];
       if (oldCycleIds.length > 0) {
         await supabase.from('member_cycle_payments').delete().in('cycle_id', oldCycleIds);
       }
@@ -93,80 +119,34 @@ Deno.serve(async (req) => {
       await supabase.from('payout_skips').delete().eq('chama_id', chama.id);
       await supabase.from('contribution_cycles').delete().eq('chama_id', chama.id);
 
-      // Delete old members
-      await supabase
-        .from('chama_members')
-        .delete()
-        .eq('chama_id', chama.id)
-        .in('status', ['active', 'removed', 'inactive']);
-
-      // Find the manager (original creator or first approved)
-      const managerId = chama.created_by;
-
-      // Create random order
-      const memberCount = approvedRequests.length;
-      const randomIndices = shuffleArray([...Array(memberCount)].map((_, i) => i + 1));
-
-      // Ensure manager gets position in the shuffle
-      const managerReqIdx = approvedRequests.findIndex(r => r.user_id === managerId);
-      if (managerReqIdx !== -1) {
-        const managerPos = randomIndices.indexOf(1);
-        [randomIndices[managerReqIdx], randomIndices[managerPos]] = 
-          [randomIndices[managerPos], randomIndices[managerReqIdx]];
-      }
-
-      // Generate unique member codes
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      const existingCodes = new Set<string>();
-      const memberCodes: string[] = [];
-      for (let i = 0; i < approvedRequests.length; i++) {
-        let code = '';
-        for (let attempt = 0; attempt < 20; attempt++) {
-          let suffix = '';
-          for (let j = 0; j < 4; j++) {
-            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-          }
-          code = (chama.group_code || '') + suffix;
-          if (!existingCodes.has(code)) {
-            existingCodes.add(code);
-            break;
-          }
-        }
-        memberCodes.push(code);
-      }
-
-      // Create new members
-      const newMembers = approvedRequests.map((r: any, idx: number) => ({
-        chama_id: chama.id,
-        user_id: r.user_id,
-        order_index: randomIndices[idx],
-        is_manager: r.user_id === managerId,
-        status: 'active',
-        approval_status: 'approved',
-        member_code: memberCodes[idx],
-        missed_payments_count: 0,
-        balance_deficit: 0,
-        balance_credit: 0,
-        total_contributed: 0,
-        carry_forward_credit: 0,
-        next_cycle_credit: 0
+      // 5) Reshuffle payout order for the continuing members
+      const randomOrder = shuffleArray(cleanMembers);
+      const updates = randomOrder.map((m: any, idx: number) => ({
+        id: m.id,
+        order_index: idx + 1,
       }));
 
-      const { data: insertedMembers, error: insertError } = await supabase
-        .from('chama_members')
-        .insert(newMembers)
-        .select('*, profiles!chama_members_user_id_fkey(*)');
-
-      if (insertError) {
-        console.error(`Error inserting members for ${chama.id}:`, insertError);
-        continue;
+      for (const u of updates) {
+        await supabase
+          .from('chama_members')
+          .update({
+            order_index: u.order_index,
+            missed_payments_count: 0,
+            balance_deficit: 0,
+            balance_credit: 0,
+            total_contributed: 0,
+            carry_forward_credit: 0,
+            next_cycle_credit: 0,
+            status: 'active',
+          })
+          .eq('id', u.id);
       }
 
-      // Reset chama to brand new
+      // 6) Reset chama to active and bump round
       await supabase
         .from('chama')
         .update({
-          current_cycle_round: 1,
+          current_cycle_round: (chama.current_cycle_round || 1) + 1,
           accepting_rejoin_requests: false,
           status: 'active',
           start_date: new Date().toISOString(),
@@ -174,53 +154,38 @@ Deno.serve(async (req) => {
           total_commission_paid: 0,
           available_balance: 0,
           total_withdrawn: 0,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', chama.id);
 
-      // Clean up rejoin requests
-      await supabase
-        .from('chama_rejoin_requests')
-        .delete()
-        .eq('chama_id', chama.id);
+      // Drop any stale rejoin requests (no longer required)
+      await supabase.from('chama_rejoin_requests').delete().eq('chama_id', chama.id);
 
-      // Send SMS notifications
+      // 7) SMS the continuing members
       const cycleLength = getCycleLengthInDays(chama.contribution_frequency, chama.every_n_days_count);
-
-      if (insertedMembers) {
-        const smsPromises = insertedMembers
-          .sort((a: any, b: any) => a.order_index - b.order_index)
-          .map(async (member: any) => {
-            const payoutDate = new Date();
-            payoutDate.setDate(payoutDate.getDate() + (member.order_index - 1) * cycleLength);
-
-            const message = `🔄 Your chama "${chama.name}" has automatically restarted with ${insertedMembers.length} members! You're member #${member.order_index}. Payout date: ${payoutDate.toLocaleDateString()}. KES ${chama.contribution_amount} ${chama.contribution_frequency}. 🎯`;
-
-            try {
-              await supabase.functions.invoke('send-transactional-sms', {
-                body: { phone: member.profiles.phone, message, eventType: 'chama_auto_restarted' }
-              });
-            } catch (err) {
-              console.error(`Failed SMS to ${member.profiles.phone}:`, err);
-            }
+      for (const m of randomOrder) {
+        const profile: any = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+        if (!profile?.phone) continue;
+        const pos = updates.find((u) => u.id === m.id)?.order_index || 1;
+        const payoutDate = new Date();
+        payoutDate.setDate(payoutDate.getDate() + (pos - 1) * cycleLength);
+        const message = `"${chama.name}" has automatically continued into a new cycle. You are member #${pos}. Payout date: ${payoutDate.toLocaleDateString()}. Contribute KES ${chama.contribution_amount} ${chama.contribution_frequency}. STOP 4569*5#`;
+        try {
+          await supabase.functions.invoke('send-transactional-sms', {
+            body: { phone: profile.phone, message, eventType: 'chama_auto_continued' }
           });
-
-        await Promise.all(smsPromises);
+        } catch (_e) { /* ignore */ }
       }
 
       restartedCount++;
-      console.log(`Successfully auto-restarted chama "${chama.name}"`);
+      console.log(`Auto-continued "${chama.name}" with ${cleanMembers.length} members, removed ${removedMembers.length} debtors.`);
     }
 
-    console.log(`Auto-restart complete. Restarted ${restartedCount} chamas.`);
-
-    return new Response(JSON.stringify({ 
-      message: 'Auto-restart complete',
+    return new Response(JSON.stringify({
+      message: 'Auto-continue complete',
       checked: completedChamas.length,
-      restarted: restartedCount 
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      restarted: restartedCount,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     console.error('Error in chama-auto-restart:', error);
