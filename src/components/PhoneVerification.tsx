@@ -10,6 +10,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { sendOTP, verifyOTP } from "@/utils/smsService";
 import { Loader2 } from "lucide-react";
+import { normalizePhone, isValidKenyanPhone, formatPhoneDisplay } from "@/utils/phoneUtils";
 
 interface PhoneVerificationProps {
   phone: string;
@@ -31,14 +32,19 @@ export const PhoneVerification = ({
   const { toast } = useToast();
 
   const handleSendOTP = async () => {
-    if (!phone || !/^\+\d{10,15}$/.test(phone)) {
+    if (!phone || !isValidKenyanPhone(phone)) {
       toast({
         title: "Invalid Phone Number",
-        description: "Please enter a valid phone number in international format (e.g., +254712345678)",
+        description: "Enter a valid Kenyan number (e.g. 0712345678 or +254712345678)",
         variant: "destructive",
       });
       return;
     }
+
+    // Normalize before sending so downstream always receives +254…
+    const display = formatPhoneDisplay(phone);
+    if (display !== phone) onPhoneChange(display);
+
 
     setLoading(true);
     const result = await sendOTP(phone);
@@ -72,8 +78,9 @@ export const PhoneVerification = ({
     }
   };
 
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
+  const handleVerifyOTP = async (codeOverride?: string) => {
+    const code = (codeOverride ?? otp).trim();
+    if (code.length !== 6) {
       toast({
         title: "Invalid OTP",
         description: "Please enter a 6-digit code",
@@ -83,7 +90,7 @@ export const PhoneVerification = ({
     }
 
     setLoading(true);
-    const result = await verifyOTP(phone, otp, userId);
+    const result = await verifyOTP(phone, code, userId);
     setLoading(false);
 
     if (result.success) {
@@ -101,6 +108,15 @@ export const PhoneVerification = ({
       setOtp("");
     }
   };
+
+  // Auto-submit when 6 digits are entered (typed or autofilled from SMS)
+  const handleOtpChange = (value: string) => {
+    setOtp(value);
+    if (value.length === 6 && !loading) {
+      handleVerifyOTP(value);
+    }
+  };
+
 
   const formatCountdown = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -140,7 +156,7 @@ export const PhoneVerification = ({
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Enter phone number in international format (e.g., +254712345678)
+          Accepts 0712345678, 0112345678, or +254712345678
         </p>
       </div>
 
@@ -152,7 +168,8 @@ export const PhoneVerification = ({
               <InputOTP
                 maxLength={6}
                 value={otp}
-                onChange={(value) => setOtp(value)}
+                onChange={handleOtpChange}
+                autoFocus
               >
                 <InputOTPGroup>
                   <InputOTPSlot index={0} />
@@ -169,12 +186,15 @@ export const PhoneVerification = ({
                 Code expires in {formatCountdown(countdown)}
               </p>
             )}
+            <p className="text-xs text-center text-muted-foreground">
+              We'll verify automatically once you enter all 6 digits
+            </p>
           </div>
 
           <div className="flex gap-2">
             <Button
               type="button"
-              onClick={handleVerifyOTP}
+              onClick={() => handleVerifyOTP()}
               disabled={loading || otp.length !== 6}
               className="flex-1"
             >

@@ -19,7 +19,7 @@ const identifierSchema = z.object({
       (val) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (emailRegex.test(val)) return true;
-        const phoneRegex = /^(\+?\d{10,15}|0\d{9}|[17]\d{8,9})$/;
+        const phoneRegex = /^(\+?254[17]\d{8}|0[17]\d{8}|[17]\d{8})$/;
         return phoneRegex.test(val.replace(/\s/g, ''));
       },
       { message: "Must be a valid email or phone number" }
@@ -141,19 +141,20 @@ const ForgotPassword = () => {
     }
   };
 
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
+  const handleVerifyOTP = async (codeOverride?: string) => {
+    const code = (codeOverride ?? otp).trim();
+    if (code.length !== 6) {
       toast.error("Please enter a 6-digit OTP");
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke('verify-otp', {
-        body: { 
+        body: {
           phone: normalizedPhone,
-          otp 
+          otp: code,
         }
       });
 
@@ -168,6 +169,13 @@ const ForgotPassword = () => {
       toast.error("Failed to verify OTP");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOtpChange = (value: string) => {
+    setOtp(value);
+    if (value.length === 6 && !isLoading) {
+      handleVerifyOTP(value);
     }
   };
 
@@ -292,7 +300,8 @@ const ForgotPassword = () => {
                   <InputOTP
                     maxLength={6}
                     value={otp}
-                    onChange={setOtp}
+                    onChange={handleOtpChange}
+                    autoFocus
                   >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} />
@@ -304,8 +313,11 @@ const ForgotPassword = () => {
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  We'll verify automatically once you enter all 6 digits
+                </p>
                 <Button
-                  onClick={handleVerifyOTP}
+                  onClick={() => handleVerifyOTP()}
                   variant="hero"
                   className="w-full"
                   disabled={isLoading || otp.length !== 6}
