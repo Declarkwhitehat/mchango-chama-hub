@@ -16,8 +16,9 @@ export const TwoFactorVerification = ({ userId, onVerified, onCancel }: TwoFacto
   const [isVerifying, setIsVerifying] = useState(false);
   const [useBackupCode, setUseBackupCode] = useState(false);
 
-  const handleVerify = async () => {
-    if (!code.trim()) {
+  const handleVerify = async (codeOverride?: string) => {
+    const submitted = (codeOverride ?? code).trim();
+    if (!submitted) {
       toast.error("Please enter a code");
       return;
     }
