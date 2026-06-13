@@ -19,7 +19,7 @@ const identifierSchema = z.object({
       (val) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (emailRegex.test(val)) return true;
-        const phoneRegex = /^(\+?\d{10,15}|0\d{9}|[17]\d{8,9})$/;
+        const phoneRegex = /^(\+?254[17]\d{8}|0[17]\d{8}|[17]\d{8})$/;
         return phoneRegex.test(val.replace(/\s/g, ''));
       },
       { message: "Must be a valid email or phone number" }
