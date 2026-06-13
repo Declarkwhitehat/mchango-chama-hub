@@ -37,7 +37,7 @@ export const TwoFactorVerification = ({ userId, onVerified, onCancel }: TwoFacto
         body: JSON.stringify({
           action: 'verify-login',
           userId,
-          token: code.trim(),
+          token: submitted,
         }),
       });
 
