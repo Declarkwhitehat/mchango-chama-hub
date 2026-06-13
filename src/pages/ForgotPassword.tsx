@@ -300,7 +300,8 @@ const ForgotPassword = () => {
                   <InputOTP
                     maxLength={6}
                     value={otp}
-                    onChange={setOtp}
+                    onChange={handleOtpChange}
+                    autoFocus
                   >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} />
@@ -312,8 +313,11 @@ const ForgotPassword = () => {
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  We'll verify automatically once you enter all 6 digits
+                </p>
                 <Button
-                  onClick={handleVerifyOTP}
+                  onClick={() => handleVerifyOTP()}
                   variant="hero"
                   className="w-full"
                   disabled={isLoading || otp.length !== 6}
