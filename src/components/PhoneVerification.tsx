@@ -156,7 +156,7 @@ export const PhoneVerification = ({
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Enter phone number in international format (e.g., +254712345678)
+          Accepts 0712345678, 0112345678, or +254712345678
         </p>
       </div>
 
@@ -168,7 +168,8 @@ export const PhoneVerification = ({
               <InputOTP
                 maxLength={6}
                 value={otp}
-                onChange={(value) => setOtp(value)}
+                onChange={handleOtpChange}
+                autoFocus
               >
                 <InputOTPGroup>
                   <InputOTPSlot index={0} />
@@ -185,12 +186,15 @@ export const PhoneVerification = ({
                 Code expires in {formatCountdown(countdown)}
               </p>
             )}
+            <p className="text-xs text-center text-muted-foreground">
+              We'll verify automatically once you enter all 6 digits
+            </p>
           </div>
 
           <div className="flex gap-2">
             <Button
               type="button"
-              onClick={handleVerifyOTP}
+              onClick={() => handleVerifyOTP()}
               disabled={loading || otp.length !== 6}
               className="flex-1"
             >
