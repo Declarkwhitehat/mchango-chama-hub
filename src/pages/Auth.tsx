@@ -53,18 +53,19 @@ const signupSchema = z.object({
   full_name: z.string().min(2, "Full name is required").max(100),
   id_number: z.string().min(5, "Valid ID number is required").max(50),
   phone: z.string()
-    .min(10, "Phone number is required")
+    .min(9, "Phone number is required")
     .transform((val) => {
-      const cleaned = val.replace(/\s/g, '');
-      if (cleaned.startsWith('07') || cleaned.startsWith('01')) {
-        return '+254' + cleaned.slice(1);
-      }
-      if (cleaned.startsWith('7') || cleaned.startsWith('1')) {
-        return '+254' + cleaned;
-      }
+      const cleaned = val.replace(/\s|-/g, '');
+      // 07XXXXXXXX or 01XXXXXXXX -> +2547XXXXXXXX / +2541XXXXXXXX
+      if (/^0[17]\d{8}$/.test(cleaned)) return '+254' + cleaned.slice(1);
+      // 7XXXXXXXX or 1XXXXXXXX (no leading zero) -> +254...
+      if (/^[17]\d{8}$/.test(cleaned)) return '+254' + cleaned;
+      // 254XXXXXXXXX (no plus)
+      if (/^254[17]\d{8}$/.test(cleaned)) return '+' + cleaned;
+      // +254XXXXXXXXX already
       return cleaned;
     })
-    .refine((val) => /^\+254\d{9}$/.test(val), "Phone must be a valid Kenyan number (e.g., 0712345678 or +254712345678)")
+    .refine((val) => /^\+254[17]\d{8}$/.test(val), "Enter a valid Kenyan number (e.g. 0712345678, 0112345678, +254712345678)")
     .refine((val) => isSafaricomNumber(val), "Only Safaricom numbers are accepted for M-Pesa payouts"),
   email: z.string().email("Invalid email address").max(255),
   password: z
