@@ -10,6 +10,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { sendOTP, verifyOTP } from "@/utils/smsService";
 import { Loader2 } from "lucide-react";
+import { normalizePhone, isValidKenyanPhone, formatPhoneDisplay } from "@/utils/phoneUtils";
 
 interface PhoneVerificationProps {
   phone: string;
