@@ -78,14 +78,7 @@ const KYCUpload = () => {
 
       if (backError) throw backError;
 
-      // Get public URLs
-      const { data: frontUrl } = supabase.storage
-        .from('id-documents')
-        .getPublicUrl(frontPath);
-
-      const { data: backUrl } = supabase.storage
-        .from('id-documents')
-        .getPublicUrl(backPath);
+      
 
       // Update profile with KYC submission
       const { error: updateError } = await supabase
