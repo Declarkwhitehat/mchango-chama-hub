@@ -98,9 +98,16 @@ export const TwoFactorConfirmDialog = ({
           <Input
             type="text"
             inputMode={useBackupCode ? "text" : "numeric"}
+            autoComplete={useBackupCode ? "off" : "one-time-code"}
             placeholder={useBackupCode ? "XXXX-XXXX" : "000000"}
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setCode(v);
+              if (!useBackupCode && v.replace(/\D/g, '').length === 6 && !isVerifying) {
+                handleVerify(v);
+              }
+            }}
             maxLength={useBackupCode ? 9 : 6}
             className="text-center text-lg tracking-widest"
             onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
@@ -108,7 +115,7 @@ export const TwoFactorConfirmDialog = ({
           />
 
           <Button
-            onClick={handleVerify}
+            onClick={() => handleVerify()}
             disabled={isVerifying || !code.trim()}
             className="w-full"
           >
