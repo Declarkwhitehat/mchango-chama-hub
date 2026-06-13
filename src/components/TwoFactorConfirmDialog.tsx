@@ -55,7 +55,7 @@ export const TwoFactorConfirmDialog = ({
         body: JSON.stringify({
           action: 'verify-login',
           userId: session.user.id,
-          token: code.trim(),
+          token: submitted,
         }),
       });
 
