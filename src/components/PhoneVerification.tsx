@@ -78,8 +78,9 @@ export const PhoneVerification = ({
     }
   };
 
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
+  const handleVerifyOTP = async (codeOverride?: string) => {
+    const code = (codeOverride ?? otp).trim();
+    if (code.length !== 6) {
       toast({
         title: "Invalid OTP",
         description: "Please enter a 6-digit code",
@@ -89,7 +90,7 @@ export const PhoneVerification = ({
     }
 
     setLoading(true);
-    const result = await verifyOTP(phone, otp, userId);
+    const result = await verifyOTP(phone, code, userId);
     setLoading(false);
 
     if (result.success) {
@@ -107,6 +108,15 @@ export const PhoneVerification = ({
       setOtp("");
     }
   };
+
+  // Auto-submit when 6 digits are entered (typed or autofilled from SMS)
+  const handleOtpChange = (value: string) => {
+    setOtp(value);
+    if (value.length === 6 && !loading) {
+      handleVerifyOTP(value);
+    }
+  };
+
 
   const formatCountdown = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
