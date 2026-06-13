@@ -1012,10 +1012,19 @@ const Auth = () => {
                           name="phone"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Phone Number</FormLabel>
+                              <FormLabel>Phone Number (Safaricom)</FormLabel>
                               <FormControl>
-                                <Input placeholder="+254712345678" {...field} />
+                                <Input
+                                  type="tel"
+                                  inputMode="tel"
+                                  autoComplete="tel"
+                                  placeholder="0712345678 or +254712345678"
+                                  {...field}
+                                />
                               </FormControl>
+                              <p className="text-xs text-muted-foreground">
+                                Accepts 07XX, 01XX, 7XX, 1XX, 254… or +254…
+                              </p>
                               <FormMessage />
                             </FormItem>
                           )}
