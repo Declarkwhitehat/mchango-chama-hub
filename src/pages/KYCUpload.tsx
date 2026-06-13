@@ -84,8 +84,9 @@ const KYCUpload = () => {
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
-          id_front_url: frontUrl.publicUrl,
-          id_back_url: backUrl.publicUrl,
+          id_front_url: frontPath,
+          id_back_url: backPath,
+          kyc_status: 'pending',
           kyc_submitted_at: new Date().toISOString(),
         })
         .eq('id', user.id);
