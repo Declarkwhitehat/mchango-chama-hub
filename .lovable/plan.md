@@ -1,59 +1,46 @@
-## Root cause found
+## Goal
+Make signup phone entry flexible and the OTP step frictionless.
 
-- **Chama set / W9BQM0003** had a pending overpayment wallet row of **KES 19** created on **06/06/2026 22:02 EAT**.
-- Cycle #2 already existed, but wallet application only runs when a **new cycle is created**.
-- When cycle #2 closed on **08/06/2026 22:00 EAT**, `daily-payout-cron` did **not** apply pending wallet rows before checking unpaid members.
-- The member was marked as missed, then after the chama became `cycle_complete`, `chama-wallet-sweep` swept the wallet and sent it back to the member instead of using it for the missed cycle.
-- The cycle-complete SMS still hardcodes `Pamojanova:` in `chama-cycle-complete`, causing long messages.
-- Chama payout SMS depends on a callback SMS path plus older direct SMS helpers; the completion path exists, but needs hardening/logging and coverage for wallet sweep / normal chama payouts.
+## 1. Accept multiple phone formats during account creation
+Today signup forces strict `+2547XXXXXXXX`. Update the signup form (and any related validators) to also accept:
+- `07XXXXXXXX` / `01XXXXXXXX` (Kenyan local)
+- `7XXXXXXXX` / `1XXXXXXXX` (no leading zero)
+- `2547…` / `2541…` (no plus)
+- `+2547…` / `+2541…` (already supported)
 
-## Plan
+Implementation:
+- Reuse the existing `normalizePhone` helper in `src/utils/phoneUtils.ts` (already handles all these → `254XXXXXXXXX`).
+- In the signup page (`src/pages/Auth*` / signup form), replace the strict regex with `isValidKenyanPhone()` for validation, and normalize to `+254…` before submitting to backend / `check_signup_uniqueness` / OTP send.
+- Update the input placeholder + helper text to: "e.g. 0712345678, 0112345678, or +254712345678".
+- Apply the same relaxed validation to `PhoneVerification.tsx` (currently hardcodes `+\d{10,15}` regex).
 
-1. **Centralize wallet application before any payout/missed-payment decision**
-   - Add a reusable backend routine/function to apply pending `chama_overpayment_wallet` and `chama_late_payment_buffer` credits to the oldest open unpaid `member_cycle_payments` rows.
-   - Credits are already net after commission, so compare them against the net cycle target and store a gross-equivalent paid amount without charging commission again.
-   - Consume wallet rows FIFO and mark fully consumed rows `applied` with `applied_to_cycle_id`; keep partial remainders pending.
-   - Increase the chama pool balance by the net credit applied.
+No backend / SMS / RLS changes — server already receives normalized `+254…`.
 
-2. **Call wallet application at every source of truth point**
-   - In `daily-payout-cron`, run the wallet-credit application **immediately after claiming an overdue cycle and before**:
-     - payout eligibility checks
-     - `unpaidMembers` calculation
-     - debt accrual
-     - missed-payment count updates
-     - freeze/removal rules
-   - Keep existing wallet application in `cycle-auto-create` and `daily-cycle-manager`, but replace duplicated logic with the shared routine so daily, weekly, monthly, twice-monthly, and every-N-days schedules behave the same.
-   - Ensure gap-recovery-created cycles also apply wallet credits before being marked missed.
+## 2. Auto-submit OTP when 6 digits entered
+Wherever a 6-digit OTP is entered via `InputOTP`, trigger verification automatically once `value.length === 6` instead of requiring a "Verify" button click. Affected screens:
+- `src/pages/ForgotPassword.tsx` (password reset OTP)
+- `src/components/PhoneVerification.tsx` (phone verification)
+- Signup OTP step (same pattern)
+- `TwoFactorConfirmDialog` / `TwoFactorVerification` (only when in numeric 6-digit mode; backup-code mode stays manual)
 
-3. **Repair the affected Chama set data safely**
-   - Recompute W9BQM0003’s member balance from actual cycle/debt records.
-   - Clear the false missed-payment state created by the wallet timing bug.
-   - Review the already-swept KES 19 wallet payout so historical records remain financially consistent and the beneficiary shortfall is not silently hidden.
+Pattern: in the `onChange` handler, set the value and if `value.length === 6 && !loading`, call the existing verify function. Keep the Verify button visible as a fallback (disabled once auto-fire runs) so users on slow networks still have a recovery path.
 
-4. **Remove `Pamojanova:` from SMS bodies**
-   - Update `chama-cycle-complete` and other chama SMS templates that hardcode the app name in the message body.
-   - Keep sender identity to the SMS provider sender ID instead of wasting message characters.
-   - Preserve required STOP text where already required.
+## 3. Auto-fetch OTP from SMS
+Two layers:
 
-5. **Harden payout transactional SMS**
-   - In `b2c-callback`, ensure successful chama payout completion sends a final SMS like:
-     - `You have received KES 38 from Chama "Chama set". Mpesa Ref: XXXXX.`
-   - Include wallet-sweep and normal chama payout withdrawals.
-   - Add fallback logging when SMS credentials/provider call fails so failed SMS delivery is visible in function logs.
+**a) Web (browser autofill)** — add `autoComplete="one-time-code"` and `inputMode="numeric"` to the OTP input slots. On iOS Safari and Chrome Android this surfaces the SMS code as a keyboard suggestion automatically (no code/permission needed). This is the only viable web path — the WebOTP API only works on https with a domain-bound SMS, which our Onfon templates don't include.
 
-6. **Add automated regression tests**
-   - Add tests for wallet application timing across:
-     - daily
-     - weekly
-     - monthly
-     - twice-monthly
-     - every-N-days
-   - Add a test where a wallet row is created **after** the next cycle already exists but **before** payout processing; payout processing must apply it before marking missed.
-   - Add SMS template tests/assertions to prevent `Pamojanova:` from returning to SMS bodies.
+**b) Native Android (Capacitor)** — install and wire `@capacitor-community/sms-retriever` (or `capacitor-sms-retriever`) so the app listens for the OTP SMS in the background and fills it in. Requirements:
+- Add an app hash to outgoing OTP SMS (11-char hash appended to message) — update the `send-otp` edge function to append the hash when the request comes from the native app (detected via a header like `X-Client-Platform: android`).
+- On the OTP screen, if `Capacitor.isNativePlatform()`, start the retriever on mount, stop on unmount, and feed the parsed code into the same auto-submit flow from step 2.
+- Graceful fallback: if the plugin isn't available or times out (5 min), user still types manually.
 
-## Validation
+iOS does not need a plugin — the `one-time-code` autocomplete already covers it.
 
-- Re-query Chama set after the fix to confirm W9BQM0003 is no longer falsely marked as missed.
-- Confirm pending wallet credit is applied before debt/missed-payment generation.
-- Confirm payout SMS is generated after successful B2C callback.
-- Run targeted edge/function tests for the wallet and SMS paths.
+## Technical details
+- Files to edit: `src/pages/Auth.tsx` (or whichever houses signup), `src/pages/ForgotPassword.tsx`, `src/components/PhoneVerification.tsx`, `src/components/TwoFactorConfirmDialog.tsx`, `src/components/TwoFactorVerification.tsx`, `src/components/ui/input-otp.tsx` (add `autoComplete`/`inputMode` props passthrough), `supabase/functions/send-otp/index.ts` (append app-hash for native).
+- New dep (only if you approve native auto-read): `@capacitor-community/sms-retriever` + `npx cap sync` after build.
+- Memory: add `mem/auth/otp-auto-submit.md` documenting the auto-submit + SMS-retriever rule.
+
+## Open question
+The native SMS-retriever path requires (a) a new Capacitor plugin and (b) an app-hash appended to every OTP SMS (consumes ~12 chars). Do you want me to include the native auto-read, or just do the web autofill + auto-submit (works on iOS + Android Chrome with no plugin, no SMS changes)?
