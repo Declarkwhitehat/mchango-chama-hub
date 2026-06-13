@@ -141,19 +141,20 @@ const ForgotPassword = () => {
     }
   };
 
-  const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
+  const handleVerifyOTP = async (codeOverride?: string) => {
+    const code = (codeOverride ?? otp).trim();
+    if (code.length !== 6) {
       toast.error("Please enter a 6-digit OTP");
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke('verify-otp', {
-        body: { 
+        body: {
           phone: normalizedPhone,
-          otp 
+          otp: code,
         }
       });
 
@@ -168,6 +169,13 @@ const ForgotPassword = () => {
       toast.error("Failed to verify OTP");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOtpChange = (value: string) => {
+    setOtp(value);
+    if (value.length === 6 && !isLoading) {
+      handleVerifyOTP(value);
     }
   };
 
