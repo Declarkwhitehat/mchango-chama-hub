@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_sms_broadcasts: {
+        Row: {
+          admin_user_id: string
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          failed_count: number
+          id: string
+          message: string
+          recipient_count: number
+          segment: string
+          sent_count: number
+          status: string
+        }
+        Insert: {
+          admin_user_id: string
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          failed_count?: number
+          id?: string
+          message: string
+          recipient_count?: number
+          segment: string
+          sent_count?: number
+          status?: string
+        }
+        Update: {
+          admin_user_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          failed_count?: number
+          id?: string
+          message?: string
+          recipient_count?: number
+          segment?: string
+          sent_count?: number
+          status?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1500,6 +1542,7 @@ export type Database = {
           image_url: string | null
           image_url_2: string | null
           image_url_3: string | null
+          is_official: boolean
           is_public: boolean | null
           is_verified: boolean
           managers: string[] | null
@@ -1529,6 +1572,7 @@ export type Database = {
           image_url?: string | null
           image_url_2?: string | null
           image_url_3?: string | null
+          is_official?: boolean
           is_public?: boolean | null
           is_verified?: boolean
           managers?: string[] | null
@@ -1558,6 +1602,7 @@ export type Database = {
           image_url?: string | null
           image_url_2?: string | null
           image_url_3?: string | null
+          is_official?: boolean
           is_public?: boolean | null
           is_verified?: boolean
           managers?: string[] | null
