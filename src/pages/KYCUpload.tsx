@@ -136,6 +136,8 @@ const KYCUpload = () => {
       </div>
     );
   }
+
+  return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center p-4">
       <Card className="max-w-2xl w-full">
         <CardHeader>
