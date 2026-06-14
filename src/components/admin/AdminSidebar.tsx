@@ -187,6 +187,7 @@ export function AdminSidebar() {
     { title: "Document Deletions", url: "/admin/document-deletions", icon: Trash2 },
     { title: "Data Export", url: "/admin/export", icon: Download },
     { title: "SMS Balance", url: "/admin/sms-balance", icon: MessageSquareMore },
+    { title: "SMS Broadcast", url: "/admin/sms-broadcast", icon: MessageSquareMore },
     { title: "Maintenance Mode", url: "/admin/maintenance", icon: Wrench },
   ];
 
