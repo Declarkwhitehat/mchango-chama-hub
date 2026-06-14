@@ -45,25 +45,26 @@ const MchangoExplore = () => {
     try {
       let query = supabase
         .from("mchango")
-        .select("id, title, slug, description, target_amount, current_amount, total_gross_collected, status, end_date, category, image_url, created_at, is_verified")
+        .select("id, title, slug, description, target_amount, current_amount, total_gross_collected, status, end_date, category, image_url, created_at, is_verified, is_official")
         .eq("status", "active")
         .eq("is_public", true);
 
+      // Always pin official (admin-created) campaigns first, then apply sort
       switch (sortBy) {
         case "most-funded":
-          query = query.order("current_amount", { ascending: false });
+          query = query.order("is_official", { ascending: false }).order("current_amount", { ascending: false });
           break;
         case "ending-soon":
-          query = query.not("end_date", "is", null).order("end_date", { ascending: true });
+          query = query.not("end_date", "is", null).order("is_official", { ascending: false }).order("end_date", { ascending: true });
           break;
         default:
-          query = query.order("created_at", { ascending: false });
+          query = query.order("is_official", { ascending: false }).order("created_at", { ascending: false });
       }
 
       const { data, error } = await query.limit(50);
 
       if (error) throw error;
-      setMchangos(data || []);
+      setMchangos((data || []) as unknown as Mchango[]);
     } catch (error) {
       console.error("Error fetching mchangos:", error);
       toast.error("Failed to load campaigns");
