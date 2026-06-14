@@ -8,7 +8,7 @@ import { Upload, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-// KYC ID photos are uploaded at full original quality (no compression) for clarity.
+import { compressImage } from "@/utils/imageCompression";
 
 const KYCUpload = () => {
   const navigate = useNavigate();
@@ -62,25 +62,35 @@ const KYCUpload = () => {
     setUploading(true);
 
     try {
+      // Compress ID images so uploads are fast (≤ ~600KB each) while staying readable.
+      let frontToUpload: File = frontFile;
+      let backToUpload: File = backFile;
+      try {
+        [frontToUpload, backToUpload] = await Promise.all([
+          compressImage(frontFile, { maxBytes: 600 * 1024 }),
+          compressImage(backFile, { maxBytes: 600 * 1024 }),
+        ]);
+      } catch (err) {
+        console.warn("KYC image compression failed, uploading originals", err);
+      }
+
       // Upload front ID
-      const frontPath = `${user.id}/id-front-${Date.now()}.${frontFile.name.split('.').pop()}`;
+      const frontPath = `${user.id}/id-front-${Date.now()}.jpg`;
       const { error: frontError } = await supabase.storage
         .from('id-documents')
-        .upload(frontPath, frontFile);
+        .upload(frontPath, frontToUpload, { upsert: true, contentType: frontToUpload.type || 'image/jpeg' });
 
       if (frontError) throw frontError;
 
       // Upload back ID
-      const backPath = `${user.id}/id-back-${Date.now()}.${backFile.name.split('.').pop()}`;
+      const backPath = `${user.id}/id-back-${Date.now()}.jpg`;
       const { error: backError } = await supabase.storage
         .from('id-documents')
-        .upload(backPath, backFile);
+        .upload(backPath, backToUpload, { upsert: true, contentType: backToUpload.type || 'image/jpeg' });
 
       if (backError) throw backError;
 
-      
-
-      // Update profile with KYC submission
+      // Update profile with KYC submission (allows pending -> resubmit after rejection)
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
@@ -88,6 +98,7 @@ const KYCUpload = () => {
           id_back_url: backPath,
           kyc_status: 'pending',
           kyc_submitted_at: new Date().toISOString(),
+          kyc_rejection_reason: null,
         })
         .eq('id', user.id);
 
@@ -104,8 +115,10 @@ const KYCUpload = () => {
     }
   };
 
-  // Redirect if already submitted
-  if (profile?.kyc_submitted_at) {
+  // Block re-submit only while status is pending or already approved.
+  // Allow re-submit if rejected (or never submitted).
+  const lockedStatus = profile?.kyc_status === 'pending' || profile?.kyc_status === 'approved';
+  if (profile?.kyc_submitted_at && lockedStatus) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
