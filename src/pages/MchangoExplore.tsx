@@ -27,6 +27,7 @@ interface Mchango {
   image_url: string | null;
   created_at: string;
   is_verified: boolean;
+  is_official: boolean;
 }
 
 const MchangoExplore = () => {
