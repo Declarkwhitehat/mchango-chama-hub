@@ -27,6 +27,7 @@ interface Mchango {
   image_url: string | null;
   created_at: string;
   is_verified: boolean;
+  is_official: boolean;
 }
 
 const MchangoExplore = () => {
@@ -44,25 +45,26 @@ const MchangoExplore = () => {
     try {
       let query = supabase
         .from("mchango")
-        .select("id, title, slug, description, target_amount, current_amount, total_gross_collected, status, end_date, category, image_url, created_at, is_verified")
+        .select("id, title, slug, description, target_amount, current_amount, total_gross_collected, status, end_date, category, image_url, created_at, is_verified, is_official")
         .eq("status", "active")
         .eq("is_public", true);
 
+      // Always pin official (admin-created) campaigns first, then apply sort
       switch (sortBy) {
         case "most-funded":
-          query = query.order("current_amount", { ascending: false });
+          query = query.order("is_official", { ascending: false }).order("current_amount", { ascending: false });
           break;
         case "ending-soon":
-          query = query.not("end_date", "is", null).order("end_date", { ascending: true });
+          query = query.not("end_date", "is", null).order("is_official", { ascending: false }).order("end_date", { ascending: true });
           break;
         default:
-          query = query.order("created_at", { ascending: false });
+          query = query.order("is_official", { ascending: false }).order("created_at", { ascending: false });
       }
 
       const { data, error } = await query.limit(50);
 
       if (error) throw error;
-      setMchangos(data || []);
+      setMchangos((data || []) as unknown as Mchango[]);
     } catch (error) {
       console.error("Error fetching mchangos:", error);
       toast.error("Failed to load campaigns");
@@ -183,19 +185,27 @@ const MchangoExplore = () => {
               const daysLeft = getDaysLeft(mchango.end_date);
 
               return (
-                <Card key={mchango.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <Card key={mchango.id} className={`overflow-hidden hover:shadow-lg transition-shadow ${mchango.is_official ? "ring-2 ring-primary/40" : ""}`}>
                   {mchango.image_url && (
-                    <div className="h-40 overflow-hidden">
+                    <div className="h-40 overflow-hidden relative">
                       <img
                         src={mchango.image_url}
                         alt={mchango.title}
                         className="w-full h-full object-cover"
                       />
+                      {mchango.is_official && (
+                        <Badge className="absolute top-2 left-2 bg-primary text-primary-foreground shadow">
+                          Official
+                        </Badge>
+                      )}
                     </div>
                   )}
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-lg line-clamp-2 flex items-center gap-2">
+                      <CardTitle className="text-lg line-clamp-2 flex items-center gap-2 flex-wrap">
+                        {mchango.is_official && !mchango.image_url && (
+                          <Badge className="bg-primary text-primary-foreground">Official</Badge>
+                        )}
                         {mchango.title}
                         {mchango.is_verified && <VerifiedBadge size="sm" />}
                       </CardTitle>
