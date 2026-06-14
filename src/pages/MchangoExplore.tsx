@@ -185,19 +185,27 @@ const MchangoExplore = () => {
               const daysLeft = getDaysLeft(mchango.end_date);
 
               return (
-                <Card key={mchango.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <Card key={mchango.id} className={`overflow-hidden hover:shadow-lg transition-shadow ${mchango.is_official ? "ring-2 ring-primary/40" : ""}`}>
                   {mchango.image_url && (
-                    <div className="h-40 overflow-hidden">
+                    <div className="h-40 overflow-hidden relative">
                       <img
                         src={mchango.image_url}
                         alt={mchango.title}
                         className="w-full h-full object-cover"
                       />
+                      {mchango.is_official && (
+                        <Badge className="absolute top-2 left-2 bg-primary text-primary-foreground shadow">
+                          Official
+                        </Badge>
+                      )}
                     </div>
                   )}
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-lg line-clamp-2 flex items-center gap-2">
+                      <CardTitle className="text-lg line-clamp-2 flex items-center gap-2 flex-wrap">
+                        {mchango.is_official && !mchango.image_url && (
+                          <Badge className="bg-primary text-primary-foreground">Official</Badge>
+                        )}
                         {mchango.title}
                         {mchango.is_verified && <VerifiedBadge size="sm" />}
                       </CardTitle>
