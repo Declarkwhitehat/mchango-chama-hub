@@ -298,6 +298,12 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    if (!preview && (!ONFON_API_KEY || !ONFON_CLIENT_ID || !ONFON_SENDER_ID)) {
+      return new Response(JSON.stringify({ error: "SMS provider credentials are not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const phones = await fetchRecipientPhones(admin, segment);
 
@@ -327,12 +333,15 @@ serve(async (req) => {
 
     let sent = 0;
     let failed = 0;
+    const errors = new Set<string>();
     // Send in small concurrent batches
-    const BATCH = 10;
+    const BATCH = 100;
     for (let i = 0; i < phones.length; i += BATCH) {
       const slice = phones.slice(i, i + BATCH);
-      const results = await Promise.all(slice.map((p) => sendOne(p, finalMessage)));
-      for (const ok of results) ok ? sent++ : failed++;
+      const result = await sendBatch(slice, finalMessage);
+      sent += result.sent;
+      failed += result.failed;
+      if (result.error) errors.add(result.error);
     }
 
     if (logRow?.id) {
@@ -347,10 +356,28 @@ serve(async (req) => {
         .eq("id", logRow.id);
     }
 
-    return new Response(
-      JSON.stringify({ success: true, recipient_count: phones.length, sent, failed }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    if (sent === 0 && failed > 0) {
+      return new Response(JSON.stringify({
+        error: Array.from(errors)[0] || "Onfon rejected all SMS messages",
+        recipient_count: phones.length,
+        sent,
+        failed,
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      recipient_count: phones.length,
+      sent,
+      failed,
+      warning: failed > 0 ? Array.from(errors)[0] || "Some messages failed" : undefined,
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     console.error("admin-sms-broadcast error", (e as Error).message);
     return new Response(JSON.stringify({ error: (e as Error).message }), {
