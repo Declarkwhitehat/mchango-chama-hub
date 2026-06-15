@@ -14,6 +14,18 @@ const ONFON_API_KEY = Deno.env.get("ONFON_API_KEY");
 const ONFON_CLIENT_ID = Deno.env.get("ONFON_CLIENT_ID");
 const ONFON_SENDER_ID = Deno.env.get("ONFON_SENDER_ID");
 
+interface OnfonMessageResult {
+  MessageErrorCode?: string | number | null;
+  MessageErrorDescription?: string | null;
+  MessageId?: string | null;
+}
+
+interface OnfonSMSResponse {
+  ErrorCode?: string | number | null;
+  ErrorDescription?: string | null;
+  Data?: OnfonMessageResult[];
+}
+
 type Segment =
   | "all_users"
   | "kyc_approved"
@@ -46,7 +58,8 @@ const sanitize = (raw: string): string => {
 
 const normalizePhone = (raw: string | null): string | null => {
   if (!raw) return null;
-  let p = String(raw).replace(/\s+/g, "").replace(/^\+/, "");
+  let p = String(raw).replace(/\D/g, "");
+  if (p.startsWith("2540")) p = "254" + p.slice(4);
   if (/^0\d{9}$/.test(p)) p = "254" + p.slice(1);
   if (/^[17]\d{8}$/.test(p)) p = "254" + p;
   if (!/^254[17]\d{8}$/.test(p)) return null;
