@@ -4,9 +4,12 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { supabase } from "./integrations/supabase/client";
+import { installReadableEdgeFunctionErrors } from "./lib/edgeFunctionErrors";
 
 // Ensure React is available globally for hooks resolution in Vite HMR
 (window as any).React = React;
+installReadableEdgeFunctionErrors(supabase);
 
 const container = document.getElementById("root");
 if (!container) throw new Error("Root element not found");

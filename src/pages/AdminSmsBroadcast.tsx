@@ -92,8 +92,9 @@ export default function AdminSmsBroadcast() {
       const d = data as any;
       setLastResult({ sent: d.sent || 0, failed: d.failed || 0, total: d.recipient_count || 0 });
       toast({
-        title: "Broadcast complete",
-        description: `Sent ${d.sent}/${d.recipient_count} (${d.failed} failed).`,
+        title: d.failed > 0 ? "Broadcast partially sent" : "Broadcast complete",
+        description: d.warning || `Sent ${d.sent}/${d.recipient_count} (${d.failed} failed).`,
+        variant: d.failed > 0 ? "destructive" : undefined,
       });
     } catch (e: any) {
       toast({ title: "Broadcast failed", description: e.message, variant: "destructive" });

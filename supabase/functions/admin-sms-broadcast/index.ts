@@ -14,6 +14,18 @@ const ONFON_API_KEY = Deno.env.get("ONFON_API_KEY");
 const ONFON_CLIENT_ID = Deno.env.get("ONFON_CLIENT_ID");
 const ONFON_SENDER_ID = Deno.env.get("ONFON_SENDER_ID");
 
+interface OnfonMessageResult {
+  MessageErrorCode?: string | number | null;
+  MessageErrorDescription?: string | null;
+  MessageId?: string | null;
+}
+
+interface OnfonSMSResponse {
+  ErrorCode?: string | number | null;
+  ErrorDescription?: string | null;
+  Data?: OnfonMessageResult[];
+}
+
 type Segment =
   | "all_users"
   | "kyc_approved"
@@ -46,7 +58,8 @@ const sanitize = (raw: string): string => {
 
 const normalizePhone = (raw: string | null): string | null => {
   if (!raw) return null;
-  let p = String(raw).replace(/\s+/g, "").replace(/^\+/, "");
+  let p = String(raw).replace(/\D/g, "");
+  if (p.startsWith("2540")) p = "254" + p.slice(4);
   if (/^0\d{9}$/.test(p)) p = "254" + p.slice(1);
   if (/^[17]\d{8}$/.test(p)) p = "254" + p;
   if (!/^254[17]\d{8}$/.test(p)) return null;
@@ -160,25 +173,64 @@ function uniqPhones(arr: (string | null | undefined)[] | null | undefined): stri
   return Array.from(set);
 }
 
-async function sendOne(phone: string, message: string): Promise<boolean> {
+const isOnfonSuccessCode = (code: unknown): boolean => code === 0 || code === "0" || code === "000";
+
+const providerMessage = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed && trimmed.toLowerCase() !== "null" ? trimmed : undefined;
+};
+
+async function sendBatch(phones: string[], message: string): Promise<{ sent: number; failed: number; error?: string }> {
   try {
+    if (!ONFON_API_KEY || !ONFON_CLIENT_ID || !ONFON_SENDER_ID) {
+      return { sent: 0, failed: phones.length, error: "SMS provider credentials are not configured" };
+    }
+
+    const numbers = phones.map((p) => normalizePhone(p)).filter((p): p is string => !!p).join(",");
+    if (!numbers) return { sent: 0, failed: phones.length, error: "No valid 254 phone numbers found" };
+
     const res = await fetch("https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accesskey: ONFON_CLIENT_ID || "" },
+      headers: { "Content-Type": "application/json", AccessKey: ONFON_CLIENT_ID, Accesskey: ONFON_CLIENT_ID },
       body: JSON.stringify({
         SenderId: ONFON_SENDER_ID,
-        MessageParameters: [{ Number: phone, Text: message }],
+        IsUnicode: false,
+        IsFlash: false,
+        MessageParameters: [{ Number: numbers, Text: message }],
         ApiKey: ONFON_API_KEY,
         ClientId: ONFON_CLIENT_ID,
       }),
     });
-    const json = await res.json().catch(() => ({}));
-    const ok = res.ok && (json?.ErrorCode === 0 || json?.ErrorCode === "0" || json?.ErrorCode === "000");
-    if (!ok) console.error("Onfon send failed", phone, json);
-    return ok;
+    const raw = await res.text();
+    let json: OnfonSMSResponse | null = null;
+    try {
+      json = raw ? JSON.parse(raw) : null;
+    } catch (_error) {
+      json = null;
+    }
+
+    const firstMessage = Array.isArray(json?.Data) ? json?.Data?.[0] : undefined;
+    const messageAccepted =
+      firstMessage?.MessageErrorCode === undefined ||
+      firstMessage?.MessageErrorCode === null ||
+      firstMessage?.MessageErrorCode === "" ||
+      isOnfonSuccessCode(firstMessage.MessageErrorCode);
+    const ok = res.ok && isOnfonSuccessCode(json?.ErrorCode) && messageAccepted;
+
+    if (ok) return { sent: phones.length, failed: 0 };
+
+    const error =
+      providerMessage(firstMessage?.MessageErrorDescription) ||
+      providerMessage(json?.ErrorDescription) ||
+      raw ||
+      `Onfon rejected the SMS request with HTTP ${res.status}`;
+    console.error("Onfon broadcast failed", { status: res.status, error, numbers });
+    return { sent: 0, failed: phones.length, error };
   } catch (e) {
-    console.error("Onfon send error", phone, (e as Error).message);
-    return false;
+    const error = (e as Error).message || "Unable to reach Onfon SMS service";
+    console.error("Onfon broadcast error", error);
+    return { sent: 0, failed: phones.length, error };
   }
 }
 
@@ -246,6 +298,12 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    if (!preview && (!ONFON_API_KEY || !ONFON_CLIENT_ID || !ONFON_SENDER_ID)) {
+      return new Response(JSON.stringify({ error: "SMS provider credentials are not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const phones = await fetchRecipientPhones(admin, segment);
 
@@ -275,12 +333,15 @@ serve(async (req) => {
 
     let sent = 0;
     let failed = 0;
+    const errors = new Set<string>();
     // Send in small concurrent batches
-    const BATCH = 10;
+    const BATCH = 100;
     for (let i = 0; i < phones.length; i += BATCH) {
       const slice = phones.slice(i, i + BATCH);
-      const results = await Promise.all(slice.map((p) => sendOne(p, finalMessage)));
-      for (const ok of results) ok ? sent++ : failed++;
+      const result = await sendBatch(slice, finalMessage);
+      sent += result.sent;
+      failed += result.failed;
+      if (result.error) errors.add(result.error);
     }
 
     if (logRow?.id) {
@@ -295,10 +356,28 @@ serve(async (req) => {
         .eq("id", logRow.id);
     }
 
-    return new Response(
-      JSON.stringify({ success: true, recipient_count: phones.length, sent, failed }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    if (sent === 0 && failed > 0) {
+      return new Response(JSON.stringify({
+        error: Array.from(errors)[0] || "Onfon rejected all SMS messages",
+        recipient_count: phones.length,
+        sent,
+        failed,
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      recipient_count: phones.length,
+      sent,
+      failed,
+      warning: failed > 0 ? Array.from(errors)[0] || "Some messages failed" : undefined,
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     console.error("admin-sms-broadcast error", (e as Error).message);
     return new Response(JSON.stringify({ error: (e as Error).message }), {
