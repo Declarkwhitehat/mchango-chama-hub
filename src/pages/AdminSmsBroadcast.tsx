@@ -52,7 +52,12 @@ const invokeSmsBroadcast = async (body: Record<string, unknown>) => {
   });
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
   if (!res.ok || data?.error) throw new Error(data?.details || data?.error || text || `SMS request failed (${res.status})`);
   return data;
 };
