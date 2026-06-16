@@ -201,7 +201,7 @@ async function sendBatch(phones: string[], message: string): Promise<SendBatchRe
         SenderId: ONFON_SENDER_ID,
         IsUnicode: false,
         IsFlash: false,
-        MessageParameters: numbers.map((number) => ({ Number: number, Text: message })),
+        MessageParameters: [{ Number: numbers.join(","), Text: message }],
         ApiKey: ONFON_API_KEY,
         ClientId: ONFON_CLIENT_ID,
       }),
@@ -217,7 +217,17 @@ async function sendBatch(phones: string[], message: string): Promise<SendBatchRe
     const data = Array.isArray(json?.Data) ? json.Data : [];
     const requestAccepted = res.ok && isOnfonSuccessCode(json?.ErrorCode);
     if (requestAccepted) {
-      if (!data.length) return { sent: numbers.length, failed: 0 };
+      if (data.length <= 1) {
+        const first = data[0];
+        const firstAccepted = !first ||
+          first.MessageErrorCode === undefined ||
+          first.MessageErrorCode === null ||
+          first.MessageErrorCode === "" ||
+          isOnfonSuccessCode(first.MessageErrorCode);
+        return firstAccepted
+          ? { sent: numbers.length, failed: 0 }
+          : { sent: 0, failed: numbers.length, error: providerMessage(first.MessageErrorDescription) || "Onfon rejected the SMS numbers" };
+      }
 
       const accepted = data.filter((item) => (
         item.MessageErrorCode === undefined ||
