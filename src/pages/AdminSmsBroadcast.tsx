@@ -36,6 +36,32 @@ const SEGMENTS: { value: string; label: string; description: string }[] = [
 
 const TAGLINE = "sisi tuko pamoja, je wewe?";
 
+const invokeSmsBroadcast = async (body: Record<string, unknown>) => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error("Please sign in again before sending SMS.");
+
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-sms-broadcast`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok || data?.error) throw new Error(data?.details || data?.error || text || `SMS request failed (${res.status})`);
+  return data;
+};
+
 export default function AdminSmsBroadcast() {
   const [segment, setSegment] = useState<string>("all_users");
   const [message, setMessage] = useState("");
@@ -57,11 +83,8 @@ export default function AdminSmsBroadcast() {
     setPreviewing(true);
     setPreviewCount(null);
     try {
-      const { data, error } = await supabase.functions.invoke("admin-sms-broadcast", {
-        body: { segment, preview: true },
-      });
-      if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message);
-      setPreviewCount((data as any).recipient_count ?? 0);
+      const data = await invokeSmsBroadcast({ segment, preview: true });
+      setPreviewCount(data.recipient_count ?? 0);
     } catch (e: any) {
       toast({ title: "Preview failed", description: e.message, variant: "destructive" });
     } finally {
@@ -85,11 +108,7 @@ export default function AdminSmsBroadcast() {
     setSending(true);
     setLastResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke("admin-sms-broadcast", {
-        body: { segment, message, appendTagline, preview: false },
-      });
-      if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message);
-      const d = data as any;
+      const d = await invokeSmsBroadcast({ segment, message, appendTagline, preview: false });
       setLastResult({ sent: d.sent || 0, failed: d.failed || 0, total: d.recipient_count || 0 });
       toast({
         title: d.failed > 0 ? "Broadcast partially sent" : "Broadcast complete",

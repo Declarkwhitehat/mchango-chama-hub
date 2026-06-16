@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -13,6 +14,7 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const ONFON_API_KEY = Deno.env.get("ONFON_API_KEY");
 const ONFON_CLIENT_ID = Deno.env.get("ONFON_CLIENT_ID");
 const ONFON_SENDER_ID = Deno.env.get("ONFON_SENDER_ID");
+const ONFON_ACCESS_KEY = Deno.env.get("ONFON_ACCESS_KEY") || ONFON_CLIENT_ID;
 
 interface OnfonMessageResult {
   MessageErrorCode?: string | number | null;
@@ -25,6 +27,8 @@ interface OnfonSMSResponse {
   ErrorDescription?: string | null;
   Data?: OnfonMessageResult[];
 }
+
+type SendBatchResult = { sent: number; failed: number; error?: string };
 
 type Segment =
   | "all_users"
@@ -67,7 +71,7 @@ const normalizePhone = (raw: string | null): string | null => {
 };
 
 async function fetchRecipientPhones(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
   segment: Segment,
 ): Promise<string[]> {
   let ids: string[] | null = null;
@@ -181,23 +185,23 @@ const providerMessage = (value: unknown): string | undefined => {
   return trimmed && trimmed.toLowerCase() !== "null" ? trimmed : undefined;
 };
 
-async function sendBatch(phones: string[], message: string): Promise<{ sent: number; failed: number; error?: string }> {
+async function sendBatch(phones: string[], message: string): Promise<SendBatchResult> {
   try {
-    if (!ONFON_API_KEY || !ONFON_CLIENT_ID || !ONFON_SENDER_ID) {
+    if (!ONFON_API_KEY || !ONFON_CLIENT_ID || !ONFON_SENDER_ID || !ONFON_ACCESS_KEY) {
       return { sent: 0, failed: phones.length, error: "SMS provider credentials are not configured" };
     }
 
-    const numbers = phones.map((p) => normalizePhone(p)).filter((p): p is string => !!p).join(",");
-    if (!numbers) return { sent: 0, failed: phones.length, error: "No valid 254 phone numbers found" };
+    const numbers = phones.map((p) => normalizePhone(p)).filter((p): p is string => !!p);
+    if (!numbers.length) return { sent: 0, failed: phones.length, error: "No valid 254 phone numbers found" };
 
     const res = await fetch("https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS", {
       method: "POST",
-      headers: { "Content-Type": "application/json", AccessKey: ONFON_CLIENT_ID, Accesskey: ONFON_CLIENT_ID },
+      headers: { "Content-Type": "application/json", AccessKey: ONFON_ACCESS_KEY, Accesskey: ONFON_ACCESS_KEY },
       body: JSON.stringify({
         SenderId: ONFON_SENDER_ID,
         IsUnicode: false,
         IsFlash: false,
-        MessageParameters: [{ Number: numbers, Text: message }],
+        MessageParameters: [{ Number: numbers.join(","), Text: message }],
         ApiKey: ONFON_API_KEY,
         ClientId: ONFON_CLIENT_ID,
       }),
@@ -210,23 +214,44 @@ async function sendBatch(phones: string[], message: string): Promise<{ sent: num
       json = null;
     }
 
-    const firstMessage = Array.isArray(json?.Data) ? json?.Data?.[0] : undefined;
-    const messageAccepted =
-      firstMessage?.MessageErrorCode === undefined ||
-      firstMessage?.MessageErrorCode === null ||
-      firstMessage?.MessageErrorCode === "" ||
-      isOnfonSuccessCode(firstMessage.MessageErrorCode);
-    const ok = res.ok && isOnfonSuccessCode(json?.ErrorCode) && messageAccepted;
+    const data = Array.isArray(json?.Data) ? json.Data : [];
+    const requestAccepted = res.ok && isOnfonSuccessCode(json?.ErrorCode);
+    if (requestAccepted) {
+      if (data.length <= 1) {
+        const first = data[0];
+        const firstAccepted = !first ||
+          first.MessageErrorCode === undefined ||
+          first.MessageErrorCode === null ||
+          first.MessageErrorCode === "" ||
+          isOnfonSuccessCode(first.MessageErrorCode);
+        return firstAccepted
+          ? { sent: numbers.length, failed: 0 }
+          : { sent: 0, failed: numbers.length, error: providerMessage(first.MessageErrorDescription) || "Onfon rejected the SMS numbers" };
+      }
 
-    if (ok) return { sent: phones.length, failed: 0 };
+      const accepted = data.filter((item) => (
+        item.MessageErrorCode === undefined ||
+        item.MessageErrorCode === null ||
+        item.MessageErrorCode === "" ||
+        isOnfonSuccessCode(item.MessageErrorCode)
+      )).length;
+      const rejected = Math.max(numbers.length - accepted, 0);
+      return {
+        sent: accepted,
+        failed: rejected,
+        error: rejected > 0
+          ? data.map((item) => providerMessage(item.MessageErrorDescription)).find(Boolean) || "Some numbers were rejected by Onfon"
+          : undefined,
+      };
+    }
 
     const error =
-      providerMessage(firstMessage?.MessageErrorDescription) ||
+      data.map((item) => providerMessage(item.MessageErrorDescription)).find(Boolean) ||
       providerMessage(json?.ErrorDescription) ||
       raw ||
       `Onfon rejected the SMS request with HTTP ${res.status}`;
-    console.error("Onfon broadcast failed", { status: res.status, error, numbers });
-    return { sent: 0, failed: phones.length, error };
+    console.error("Onfon broadcast failed", { status: res.status, error, numbersCount: numbers.length });
+    return { sent: 0, failed: numbers.length, error };
   } catch (e) {
     const error = (e as Error).message || "Unable to reach Onfon SMS service";
     console.error("Onfon broadcast error", error);
@@ -314,6 +339,13 @@ serve(async (req) => {
       });
     }
 
+    if (phones.length === 0) {
+      return new Response(JSON.stringify({ error: "No recipients with valid 254 phone numbers found for this segment", recipient_count: 0 }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const finalMessage = appendTagline && !message.toLowerCase().includes("sisi tuko pamoja")
       ? `${message}\n${TAGLINE}`
       : message;
@@ -334,8 +366,8 @@ serve(async (req) => {
     let sent = 0;
     let failed = 0;
     const errors = new Set<string>();
-    // Send in small concurrent batches
-    const BATCH = 100;
+    // Onfon handles bulk requests reliably in packets of 20 numbers.
+    const BATCH = 20;
     for (let i = 0; i < phones.length; i += BATCH) {
       const slice = phones.slice(i, i + BATCH);
       const result = await sendBatch(slice, finalMessage);
@@ -351,6 +383,7 @@ serve(async (req) => {
           sent_count: sent,
           failed_count: failed,
           status: failed === 0 ? "completed" : sent > 0 ? "partial" : "failed",
+          error: Array.from(errors)[0] || null,
           completed_at: new Date().toISOString(),
         })
         .eq("id", logRow.id);
