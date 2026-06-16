@@ -328,6 +328,13 @@ serve(async (req) => {
       });
     }
 
+    if (phones.length === 0) {
+      return new Response(JSON.stringify({ error: "No recipients with valid 254 phone numbers found for this segment", recipient_count: 0 }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const finalMessage = appendTagline && !message.toLowerCase().includes("sisi tuko pamoja")
       ? `${message}\n${TAGLINE}`
       : message;
@@ -348,8 +355,8 @@ serve(async (req) => {
     let sent = 0;
     let failed = 0;
     const errors = new Set<string>();
-    // Send in small concurrent batches
-    const BATCH = 100;
+    // Onfon handles bulk requests reliably in packets of 20 numbers.
+    const BATCH = 20;
     for (let i = 0; i < phones.length; i += BATCH) {
       const slice = phones.slice(i, i + BATCH);
       const result = await sendBatch(slice, finalMessage);
@@ -365,6 +372,7 @@ serve(async (req) => {
           sent_count: sent,
           failed_count: failed,
           status: failed === 0 ? "completed" : sent > 0 ? "partial" : "failed",
+          error: Array.from(errors)[0] || null,
           completed_at: new Date().toISOString(),
         })
         .eq("id", logRow.id);
