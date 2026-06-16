@@ -184,14 +184,14 @@ const providerMessage = (value: unknown): string | undefined => {
   return trimmed && trimmed.toLowerCase() !== "null" ? trimmed : undefined;
 };
 
-async function sendOne(phone: string, message: string): Promise<SendBatchResult> {
+async function sendBatch(phones: string[], message: string): Promise<SendBatchResult> {
   try {
     if (!ONFON_API_KEY || !ONFON_CLIENT_ID || !ONFON_SENDER_ID || !ONFON_ACCESS_KEY) {
-      return { sent: 0, failed: 1, error: "SMS provider credentials are not configured" };
+      return { sent: 0, failed: phones.length, error: "SMS provider credentials are not configured" };
     }
 
-    const number = normalizePhone(phone);
-    if (!number) return { sent: 0, failed: 1, error: "No valid 254 phone number found" };
+    const numbers = phones.map((p) => normalizePhone(p)).filter((p): p is string => !!p);
+    if (!numbers.length) return { sent: 0, failed: phones.length, error: "No valid 254 phone numbers found" };
 
     const res = await fetch("https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS", {
       method: "POST",
@@ -200,7 +200,7 @@ async function sendOne(phone: string, message: string): Promise<SendBatchResult>
         SenderId: ONFON_SENDER_ID,
         IsUnicode: false,
         IsFlash: false,
-        MessageParameters: [{ Number: number, Text: message }],
+        MessageParameters: numbers.map((number) => ({ Number: number, Text: message })),
         ApiKey: ONFON_API_KEY,
         ClientId: ONFON_CLIENT_ID,
       }),
@@ -213,50 +213,39 @@ async function sendOne(phone: string, message: string): Promise<SendBatchResult>
       json = null;
     }
 
-    const firstMessage = Array.isArray(json?.Data) ? json?.Data?.[0] : undefined;
-    const messageAccepted =
-      firstMessage?.MessageErrorCode === undefined ||
-      firstMessage?.MessageErrorCode === null ||
-      firstMessage?.MessageErrorCode === "" ||
-      isOnfonSuccessCode(firstMessage.MessageErrorCode);
-    const ok = res.ok && isOnfonSuccessCode(json?.ErrorCode) && messageAccepted;
+    const data = Array.isArray(json?.Data) ? json.Data : [];
+    const requestAccepted = res.ok && isOnfonSuccessCode(json?.ErrorCode);
+    if (requestAccepted) {
+      if (!data.length) return { sent: numbers.length, failed: 0 };
 
-    if (ok) return { sent: 1, failed: 0 };
+      const accepted = data.filter((item) => (
+        item.MessageErrorCode === undefined ||
+        item.MessageErrorCode === null ||
+        item.MessageErrorCode === "" ||
+        isOnfonSuccessCode(item.MessageErrorCode)
+      )).length;
+      const rejected = Math.max(numbers.length - accepted, 0);
+      return {
+        sent: accepted,
+        failed: rejected,
+        error: rejected > 0
+          ? data.map((item) => providerMessage(item.MessageErrorDescription)).find(Boolean) || "Some numbers were rejected by Onfon"
+          : undefined,
+      };
+    }
 
     const error =
-      providerMessage(firstMessage?.MessageErrorDescription) ||
+      data.map((item) => providerMessage(item.MessageErrorDescription)).find(Boolean) ||
       providerMessage(json?.ErrorDescription) ||
       raw ||
       `Onfon rejected the SMS request with HTTP ${res.status}`;
-    console.error("Onfon broadcast failed", { status: res.status, error, number });
-    return { sent: 0, failed: 1, error };
+    console.error("Onfon broadcast failed", { status: res.status, error, numbersCount: numbers.length });
+    return { sent: 0, failed: numbers.length, error };
   } catch (e) {
     const error = (e as Error).message || "Unable to reach Onfon SMS service";
     console.error("Onfon broadcast error", error);
-    return { sent: 0, failed: 1, error };
+    return { sent: 0, failed: phones.length, error };
   }
-}
-
-async function sendBatch(phones: string[], message: string): Promise<SendBatchResult> {
-  if (!phones.length) return { sent: 0, failed: 0 };
-
-  const results = await Promise.allSettled(phones.map((phone) => sendOne(phone, message)));
-  let sent = 0;
-  let failed = 0;
-  const errors = new Set<string>();
-
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      sent += result.value.sent;
-      failed += result.value.failed;
-      if (result.value.error) errors.add(result.value.error);
-    } else {
-      failed += 1;
-      errors.add(result.reason?.message || "Unable to send SMS");
-    }
-  }
-
-  return { sent, failed, error: Array.from(errors)[0] };
 }
 
 serve(async (req) => {
