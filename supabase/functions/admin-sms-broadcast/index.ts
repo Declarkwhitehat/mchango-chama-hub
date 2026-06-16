@@ -13,6 +13,7 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const ONFON_API_KEY = Deno.env.get("ONFON_API_KEY");
 const ONFON_CLIENT_ID = Deno.env.get("ONFON_CLIENT_ID");
 const ONFON_SENDER_ID = Deno.env.get("ONFON_SENDER_ID");
+const ONFON_ACCESS_KEY = Deno.env.get("ONFON_ACCESS_KEY") || ONFON_CLIENT_ID;
 
 interface OnfonMessageResult {
   MessageErrorCode?: string | number | null;
@@ -25,6 +26,8 @@ interface OnfonSMSResponse {
   ErrorDescription?: string | null;
   Data?: OnfonMessageResult[];
 }
+
+type SendBatchResult = { sent: number; failed: number; error?: string };
 
 type Segment =
   | "all_users"
