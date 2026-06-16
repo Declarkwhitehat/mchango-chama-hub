@@ -70,7 +70,7 @@ const normalizePhone = (raw: string | null): string | null => {
 };
 
 async function fetchRecipientPhones(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
   segment: Segment,
 ): Promise<string[]> {
   let ids: string[] | null = null;
