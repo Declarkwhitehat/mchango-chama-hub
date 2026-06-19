@@ -2,10 +2,58 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, RefreshCw, Clock } from "lucide-react";
+import { Trash2, RefreshCw, Clock, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+
+const KycAutoCleanupCard = () => {
+  const [running, setRunning] = useState(false);
+  const run = async () => {
+    try {
+      setRunning(true);
+      const { data, error } = await supabase.functions.invoke("kyc-auto-cleanup");
+      if (error) throw error;
+      toast({
+        title: "KYC Auto-Cleanup Done",
+        description: `Scanned ${data?.scanned ?? 0}, reminders ${data?.reminders_sent ?? 0}, deleted ${data?.deleted ?? 0}, skipped ${data?.skipped ?? 0}`,
+      });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to run", variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  };
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <ShieldAlert className="h-5 w-5" />
+              KYC Auto-Cleanup
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Reminds unverified users every 72h and removes accounts not KYC-verified within 14 days
+            </CardDescription>
+          </div>
+          <Badge variant="secondary">Every 6 hours</Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-end">
+          <Button variant="default" size="sm" onClick={run} disabled={running}>
+            {running ? (
+              <><RefreshCw className="h-4 w-4 mr-1 animate-spin" />Running...</>
+            ) : (
+              <><Trash2 className="h-4 w-4 mr-1" />Run Now</>
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 interface CleanupStatus {
   job_name: string;
