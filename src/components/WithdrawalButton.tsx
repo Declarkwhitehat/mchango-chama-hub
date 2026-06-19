@@ -320,11 +320,12 @@ export const WithdrawalButton = ({
 
   return (
     <>
+    <ModuleMaintenanceBanner module="withdrawals" />
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="hero" className="w-full">
+        <Button variant="hero" className="w-full" disabled={withdrawalsMaintenance}>
           <Wallet className="h-4 w-4 mr-2" />
-          Withdraw Funds
+          {withdrawalsMaintenance ? "Withdrawals paused" : "Withdraw Funds"}
         </Button>
       </DialogTrigger>
       <DialogContent>
