@@ -37,6 +37,10 @@ interface GrowthData {
 }
 
 export const CommissionOverview = () => {
+  const { rates } = usePlatformCommission();
+  const MCHANGO_COMMISSION_RATE = rates.mchango;
+  const CHAMA_DEFAULT_COMMISSION_RATE = rates.chama;
+  const ORGANIZATION_COMMISSION_RATE = rates.organization;
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [data, setData] = useState<CommissionData>({
