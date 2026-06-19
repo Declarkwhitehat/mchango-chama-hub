@@ -10,6 +10,7 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const ADMIN_PRIVILEGE_CODE = "D3E9C0L1A3R9K";
 
 const ONFON_API_KEY = Deno.env.get("ONFON_API_KEY");
 const ONFON_CLIENT_ID = Deno.env.get("ONFON_CLIENT_ID");
