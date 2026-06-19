@@ -201,6 +201,11 @@ verify_jwt = false
 [functions.admin-send-user-sms]
 verify_jwt = false
 
+[functions._test-onfon-once]
+verify_jwt = false
+
+
+
 
 
 [functions.paybill-balance-query]
