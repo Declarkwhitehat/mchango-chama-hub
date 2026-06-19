@@ -53,27 +53,28 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
+    console.log("[admin-send-user-sms] authHeader present:", !!authHeader, "token length:", token?.length || 0);
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Not signed in. Please log in again." }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: isAdmin } = await admin.rpc("has_role", {
+    const { data: userData, error: userErr } = await admin.auth.getUser(token);
+    console.log("[admin-send-user-sms] getUser err:", userErr?.message, "user:", userData?.user?.id);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Session expired. Please log in again." }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
       _user_id: userData.user.id, _role: "admin",
     });
+    console.log("[admin-send-user-sms] isAdmin:", isAdmin, "roleErr:", roleErr?.message);
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden - admin only" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
