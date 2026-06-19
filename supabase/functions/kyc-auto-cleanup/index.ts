@@ -118,8 +118,37 @@ async function softDeleteUser(admin: any, userId: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  let force = false;
+  try {
+    const body = await req.json();
+    if (body && typeof body === "object") force = !!body.force;
+  } catch (_) { /* cron sends empty body */ }
+
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const now = Date.now();
+
+  // Enforce 36-hour cadence for cron invocations (cron can't express "every 36h" directly)
+  if (!force) {
+    try {
+      const { data: lastRun } = await admin
+        .from("kyc_cleanup_runs")
+        .select("created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lastRun && lastRun.created_at) {
+        const hoursSince = (now - new Date(lastRun.created_at).getTime()) / HOURS;
+        if (hoursSince < 36) {
+          return new Response(
+            JSON.stringify({ success: true, skipped: true, reason: "36h_cooldown", hours_since_last_run: Math.round(hoursSince * 10) / 10 }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("[kyc-auto-cleanup] failed to check last run", (e as Error).message);
+    }
+  }
 
   const stats = { scanned: 0, reminders_sent: 0, deleted: 0, skipped: 0, errors: 0 };
 
@@ -199,6 +228,13 @@ serve(async (req) => {
         stats.errors++;
         console.error(`[kyc-auto-cleanup] error for ${p.id}`, (e as Error).message);
       }
+    }
+
+    // Record successful run (best-effort)
+    try {
+      await admin.from("kyc_cleanup_runs").insert({ triggered_by: force ? "manual" : "cron", stats });
+    } catch (e) {
+      console.warn("[kyc-auto-cleanup] failed to record run", (e as Error).message);
     }
 
     console.log("[kyc-auto-cleanup] done", stats);
