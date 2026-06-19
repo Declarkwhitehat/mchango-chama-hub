@@ -39,7 +39,7 @@ const KycAutoCleanupCard = () => {
               Reminds unverified users every 72h and removes accounts not KYC-verified within 14 days
             </CardDescription>
           </div>
-          <Badge variant="secondary">Every 6 hours</Badge>
+          <Badge variant="secondary">Every 36 hours</Badge>
         </div>
       </CardHeader>
       <CardContent>
