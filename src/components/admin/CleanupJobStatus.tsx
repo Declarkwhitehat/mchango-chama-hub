@@ -12,11 +12,13 @@ const KycAutoCleanupCard = () => {
   const run = async () => {
     try {
       setRunning(true);
-      const { data, error } = await supabase.functions.invoke("kyc-auto-cleanup");
+      const { data, error } = await supabase.functions.invoke("kyc-auto-cleanup", { body: { force: true } });
       if (error) throw error;
       toast({
         title: "KYC Auto-Cleanup Done",
-        description: `Scanned ${data?.scanned ?? 0}, reminders ${data?.reminders_sent ?? 0}, deleted ${data?.deleted ?? 0}, skipped ${data?.skipped ?? 0}`,
+        description: data?.skipped && data?.reason === "36h_cooldown"
+          ? `Skipped: ${data.hours_since_last_run}h since last run (36h cooldown)`
+          : `Scanned ${data?.scanned ?? 0}, reminders ${data?.reminders_sent ?? 0}, deleted ${data?.deleted ?? 0}, skipped ${data?.skipped ?? 0}`,
       });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to run", variant: "destructive" });
@@ -37,7 +39,7 @@ const KycAutoCleanupCard = () => {
               Reminds unverified users every 72h and removes accounts not KYC-verified within 14 days
             </CardDescription>
           </div>
-          <Badge variant="secondary">Every 6 hours</Badge>
+          <Badge variant="secondary">Every 36 hours</Badge>
         </div>
       </CardHeader>
       <CardContent>

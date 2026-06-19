@@ -1526,6 +1526,27 @@ export type Database = {
         }
         Relationships: []
       }
+      kyc_cleanup_runs: {
+        Row: {
+          created_at: string
+          id: string
+          stats: Json | null
+          triggered_by: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          stats?: Json | null
+          triggered_by?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          stats?: Json | null
+          triggered_by?: string
+        }
+        Relationships: []
+      }
       kyc_reminders_sent: {
         Row: {
           bucket: number
