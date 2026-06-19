@@ -56,14 +56,14 @@ export const ChamaPaymentForm = ({
   // (check_member_schedule_eligibility). This guarantees the pre-filled value
   // matches what the server will accept and prevents the "non-2xx" error
   // when the member has missed prior cycles.
-  const netCycleTarget = contributionAmount * (1 - commissionRate);
+  const netCycleTarget = contributionAmount * (1 - effectiveCommissionRate);
   const fallbackNetStillNeeded = Math.max(0, netCycleTarget - walletCredit);
   // selfOutstandingNet is GROSS owed across unpaid cycles minus wallet credit (already net),
   // converted back to gross by dividing by (1 - rate). When the RPC hasn't loaded yet,
   // fall back to the single-cycle calculation.
   const selfRequiredAmount = selfOutstandingNet !== null
     ? (selfOutstandingNet > 0 ? Math.ceil(selfOutstandingNet) : 0)
-    : (fallbackNetStillNeeded > 0 ? Math.ceil(fallbackNetStillNeeded / (1 - commissionRate)) : 0);
+    : (fallbackNetStillNeeded > 0 ? Math.ceil(fallbackNetStillNeeded / (1 - effectiveCommissionRate)) : 0);
 
   // Target required amount when paying for another — RPC returns gross directly,
   // matching the server validator's `required` value (same source as self).
@@ -138,7 +138,7 @@ export const ChamaPaymentForm = ({
         loading: true,
         netOutstanding: prev?.netOutstanding ?? 0,
         paidThisCycle: prev?.paidThisCycle ?? 0,
-        cycleNetTarget: prev?.cycleNetTarget ?? contributionAmount * (1 - commissionRate),
+        cycleNetTarget: prev?.cycleNetTarget ?? contributionAmount * (1 - effectiveCommissionRate),
         fullyPaid: false,
       }));
 
@@ -159,7 +159,7 @@ export const ChamaPaymentForm = ({
 
       // Current cycle paid/required (for the display strip)
       let paidThisCycle = 0;
-      let cycleNetTarget = contributionAmount * (1 - commissionRate);
+      let cycleNetTarget = contributionAmount * (1 - effectiveCommissionRate);
       const todayIso = new Date().toISOString();
       const { data: unpaid } = await supabase
         .from('member_cycle_payments')
@@ -192,7 +192,7 @@ export const ChamaPaymentForm = ({
         loading: false,
         netOutstanding: 0,
         paidThisCycle: 0,
-        cycleNetTarget: contributionAmount * (1 - commissionRate),
+        cycleNetTarget: contributionAmount * (1 - effectiveCommissionRate),
         fullyPaid: false,
       });
     }
