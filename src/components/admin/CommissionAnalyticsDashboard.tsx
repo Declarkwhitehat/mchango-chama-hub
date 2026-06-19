@@ -23,12 +23,10 @@ import {
   startOfWeek, endOfWeek, isWithinInterval
 } from "date-fns";
 import {
-  MCHANGO_COMMISSION_RATE,
-  CHAMA_DEFAULT_COMMISSION_RATE,
   CHAMA_LATE_COMMISSION_RATE,
-  ORGANIZATION_COMMISSION_RATE,
   formatCommissionPercentage
 } from "@/utils/commissionCalculator";
+import { usePlatformCommission } from "@/hooks/usePlatformCommission";
 import jsPDF from "jspdf";
 import { MpesaFeeSummary } from "./MpesaFeeSummary";
 
