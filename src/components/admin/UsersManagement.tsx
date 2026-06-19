@@ -12,6 +12,7 @@ import { getReadableEdgeFunctionError } from "@/lib/edgeFunctionErrors";
 import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key, Trash2, RotateCcw, AlertTriangle, BadgeCheck, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, differenceInDays } from "date-fns";
+import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
 interface User {
   id: string;
@@ -32,6 +33,7 @@ const ADMIN_PRIVILEGE_CODE = "D3E9C0L1A3R9K";
 
 export const UsersManagement = () => {
   const navigate = useNavigate();
+  const { isSuperAdmin } = useIsSuperAdmin();
   const [users, setUsers] = useState<User[]>([]);
   const [userRoles, setUserRoles] = useState<Record<string, UserRole[]>>({});
   const [loading, setLoading] = useState(true);
@@ -477,15 +479,17 @@ export const UsersManagement = () => {
                       View Details
                     </Button>
                     {isDeleted ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRestoreClick(user)}
-                        disabled={restoring}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Restore
-                      </Button>
+                      isSuperAdmin && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRestoreClick(user)}
+                          disabled={restoring}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Restore
+                        </Button>
+                      )
                     ) : (
                       <>
                         <Button
@@ -496,26 +500,28 @@ export const UsersManagement = () => {
                           <MessageSquare className="h-4 w-4 mr-1" />
                           Send SMS
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => isAdmin ? removeAdminRole(user.id) : handleMakeAdminClick(user.id)}
-                          disabled={processing === user.id}
-                        >
-                          {processing === user.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : isAdmin ? (
-                            <>
-                              <ShieldOff className="h-4 w-4 mr-1" />
-                              Remove Admin
-                            </>
-                          ) : (
-                            <>
-                              <Shield className="h-4 w-4 mr-1" />
-                              Make Admin
-                            </>
-                          )}
-                        </Button>
+                        {isSuperAdmin && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => isAdmin ? removeAdminRole(user.id) : handleMakeAdminClick(user.id)}
+                            disabled={processing === user.id}
+                          >
+                            {processing === user.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : isAdmin ? (
+                              <>
+                                <ShieldOff className="h-4 w-4 mr-1" />
+                                Remove Admin
+                              </>
+                            ) : (
+                              <>
+                                <Shield className="h-4 w-4 mr-1" />
+                                Make Admin
+                              </>
+                            )}
+                          </Button>
+                        )}
                         {user.is_verified && (
                           <Button
                             size="sm"
@@ -528,15 +534,17 @@ export const UsersManagement = () => {
                             Remove Verified
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDeleteClick(user)}
-                          disabled={deleting}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
-                        </Button>
+                        {isSuperAdmin && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteClick(user)}
+                            disabled={deleting}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>
