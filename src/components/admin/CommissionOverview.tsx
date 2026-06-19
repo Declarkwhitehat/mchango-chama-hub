@@ -8,13 +8,8 @@ import { toast } from "@/hooks/use-toast";
 import { DollarSign, TrendingUp, Loader2, Users, Heart, Percent, ArrowUpRight, ArrowDownRight, Calendar, BarChart3, Building2 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from "date-fns";
-import { 
-  MCHANGO_COMMISSION_RATE, 
-  CHAMA_DEFAULT_COMMISSION_RATE,
-  formatCommissionPercentage 
-} from "@/utils/commissionCalculator";
-
-const ORGANIZATION_COMMISSION_RATE = 0.05; // 5% for organizations
+import { formatCommissionPercentage } from "@/utils/commissionCalculator";
+import { usePlatformCommission } from "@/hooks/usePlatformCommission";
 
 interface CommissionData {
   mchangoCommission: number;
@@ -42,6 +37,10 @@ interface GrowthData {
 }
 
 export const CommissionOverview = () => {
+  const { rates } = usePlatformCommission();
+  const MCHANGO_COMMISSION_RATE = rates.mchango;
+  const CHAMA_DEFAULT_COMMISSION_RATE = rates.chama;
+  const ORGANIZATION_COMMISSION_RATE = rates.organization;
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [data, setData] = useState<CommissionData>({

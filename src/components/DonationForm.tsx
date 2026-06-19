@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, TrendingDown, Wallet } from "lucide-react";
-import { MCHANGO_COMMISSION_RATE, calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
+import { calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
+import { usePlatformCommission } from "@/hooks/usePlatformCommission";
 import { normalizePhone, isValidKenyanPhone } from "@/utils/phoneUtils";
 
 interface DonationFormProps {
@@ -24,6 +25,8 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const { rates } = usePlatformCommission();
+  const MCHANGO_COMMISSION_RATE = rates.mchango;
   
   // Form state
   const [amount, setAmount] = useState("");

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { getPlatformMinimums } from "../_shared/getPlatformMinimums.ts";
 import { createNotification, notifyAllAdmins, NotificationTemplates } from "../_shared/notifications.ts";
+import { getCommissionRate } from "../_shared/getCommissionRate.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -606,7 +607,7 @@ serve(async (req) => {
           max_members: maxMembers,
           is_public: body.is_public !== undefined ? body.is_public : true,
           payout_order: body.payout_order || 'join_date',
-          commission_rate: body.commission_rate || 0.05,
+          commission_rate: typeof body.commission_rate === 'number' ? body.commission_rate : await getCommissionRate(supabaseClient, 'chama'),
           whatsapp_link: body.whatsapp_link,
           created_by: user.id,
           status: 'pending',

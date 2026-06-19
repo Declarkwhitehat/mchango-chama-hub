@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ interface RateSetting {
 }
 
 const AdminCommissionConfig = () => {
+  const queryClient = useQueryClient();
   const [rates, setRates] = useState<RateSetting[]>([
     { key: "commission_rate_chama", label: "Chama", description: "On-time contribution commission", rate: 5 },
     { key: "commission_rate_mchango", label: "Mchango (Campaigns)", description: "Campaign donation commission", rate: 7 },
@@ -191,6 +193,7 @@ const AdminCommissionConfig = () => {
         },
       });
 
+      queryClient.invalidateQueries({ queryKey: ["platform-commission-rates"] });
       toast({ title: "Saved", description: "Platform settings updated successfully" });
     } catch (err: any) {
       console.error(err);
