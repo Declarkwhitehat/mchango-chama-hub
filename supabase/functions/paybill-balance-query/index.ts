@@ -40,9 +40,9 @@ serve(async (req) => {
       });
     }
     const { data: roleRow } = await supabaseAdmin
-      .from('user_roles').select('role').eq('user_id', userId).eq('role', 'admin').maybeSingle();
+      .from('user_roles').select('role').eq('user_id', userId).eq('role', 'super_admin').maybeSingle();
     if (!roleRow) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      return new Response(JSON.stringify({ error: 'Forbidden - super admin only' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -97,6 +97,20 @@ serve(async (req) => {
       originator_conversation_id: result.OriginatorConversationID,
       queried_by: userId,
     });
+
+    // Audit super-admin action
+    try {
+      await supabaseAdmin.from('admin_action_log').insert({
+        actor_user_id: userId,
+        actor_email: userData?.user?.email ?? null,
+        action_key: 'paybill.balance_query',
+        target_type: 'shortcode',
+        target_id: shortcode,
+        metadata: { conversation_id: result.ConversationID },
+        ip_address: req.headers.get('x-forwarded-for') || null,
+        user_agent: req.headers.get('user-agent') || null,
+      });
+    } catch (_) { /* best effort */ }
 
     return new Response(JSON.stringify({
       success: true,
