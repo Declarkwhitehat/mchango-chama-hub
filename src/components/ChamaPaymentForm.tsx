@@ -38,6 +38,7 @@ export const ChamaPaymentForm = ({
   onPaymentSuccess 
 }: ChamaPaymentFormProps) => {
   const navigate = useNavigate();
+  const { inMaintenance: chamaMaintenance } = useIsModuleInMaintenance("chama");
   const { rates } = usePlatformCommission();
   const effectiveCommissionRate = commissionRate ?? rates.chama;
   const [paymentType, setPaymentType] = useState<"self" | "other">("self");
