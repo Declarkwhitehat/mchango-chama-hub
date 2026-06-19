@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key, Trash2, RotateCcw, AlertTriangle, BadgeCheck } from "lucide-react";
+import { getReadableEdgeFunctionError } from "@/lib/edgeFunctionErrors";
+import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key, Trash2, RotateCcw, AlertTriangle, BadgeCheck, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, differenceInDays } from "date-fns";
 
