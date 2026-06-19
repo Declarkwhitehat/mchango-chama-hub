@@ -54,6 +54,39 @@ export const UsersManagement = () => {
   const [pendingRestoreUser, setPendingRestoreUser] = useState<User | null>(null);
   const [restoreCodeError, setRestoreCodeError] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [smsTarget, setSmsTarget] = useState<User | null>(null);
+  const [smsMessage, setSmsMessage] = useState("");
+  const [smsSending, setSmsSending] = useState(false);
+
+  const handleSendSmsClick = (user: User) => {
+    setSmsTarget(user);
+    setSmsMessage("");
+    setSmsDialogOpen(true);
+  };
+
+  const confirmSendSms = async () => {
+    if (!smsTarget || !smsMessage.trim()) return;
+    setSmsSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-send-user-sms", {
+        body: { user_id: smsTarget.id, phone: smsTarget.phone, message: smsMessage.trim() },
+      });
+      if (error) {
+        const msg = await getReadableEdgeFunctionError(error, "Failed to send SMS");
+        throw new Error(msg);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: "SMS sent", description: `Delivered to ${(data as any)?.recipient || smsTarget.phone}` });
+      setSmsDialogOpen(false);
+      setSmsTarget(null);
+      setSmsMessage("");
+    } catch (e: any) {
+      toast({ title: "Could not send SMS", description: e.message || "Please try again", variant: "destructive" });
+    } finally {
+      setSmsSending(false);
+    }
+  };
 
   useEffect(() => {
     fetchUsers();
