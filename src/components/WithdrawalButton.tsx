@@ -39,6 +39,7 @@ export const WithdrawalButton = ({
   onSuccess 
 }: WithdrawalButtonProps) => {
   const navigate = useNavigate();
+  const { inMaintenance: withdrawalsMaintenance } = useIsModuleInMaintenance("withdrawals");
   const { minWithdrawal } = usePlatformMinimums();
   const [isOpen, setIsOpen] = useState(false);
   const [notes, setNotes] = useState("");
