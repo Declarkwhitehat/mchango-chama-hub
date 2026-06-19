@@ -25,6 +25,8 @@ export const DonationForm = ({ mchangoId, mchangoTitle, onSuccess }: DonationFor
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const { rates } = usePlatformCommission();
+  const MCHANGO_COMMISSION_RATE = rates.mchango;
   
   // Form state
   const [amount, setAmount] = useState("");

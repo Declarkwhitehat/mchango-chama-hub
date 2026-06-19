@@ -23,6 +23,8 @@ interface OverpaymentWalletProps {
 export function OverpaymentWallet({ chamaId, memberId, contributionAmount }: OverpaymentWalletProps) {
   const [entries, setEntries] = useState<WalletEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const { rates } = usePlatformCommission();
+  const CHAMA_DEFAULT_COMMISSION_RATE = rates.chama;
 
   useEffect(() => {
     loadWallet();

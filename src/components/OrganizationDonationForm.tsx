@@ -22,6 +22,8 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const { rates } = usePlatformCommission();
+  const ORGANIZATION_COMMISSION_RATE = rates.organization;
   
   const [amount, setAmount] = useState("");
   const [displayName, setDisplayName] = useState("");
