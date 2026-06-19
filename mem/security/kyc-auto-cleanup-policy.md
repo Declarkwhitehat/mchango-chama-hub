@@ -3,7 +3,7 @@ name: KYC Auto-Cleanup Policy
 description: 14-day auto-deletion of accounts that never complete KYC, with SMS reminders every 72h
 type: feature
 ---
-Edge function `kyc-auto-cleanup` runs every 6 hours via pg_cron (`kyc-auto-cleanup-6h`).
+Edge function `kyc-auto-cleanup` is invoked by pg_cron job `kyc-auto-cleanup-36h` every 12 hours (`0 */12 * * *`), but the function self-throttles via the `kyc_cleanup_runs` table to only execute once per 36 hours (effective cadence = 36h). Manual admin "Run Now" invocations pass `{ force: true }` to bypass the throttle.
 
 For each profile where `kyc_status != 'approved'` AND `deleted_at IS NULL` AND `created_at <= now()-72h`:
 
