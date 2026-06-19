@@ -10,7 +10,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, CreditCard, Users, Phone } from "lucide-react";
-import { CHAMA_DEFAULT_COMMISSION_RATE, CHAMA_LATE_COMMISSION_RATE, calculateAmountToPay } from "@/utils/commissionCalculator";
+import { CHAMA_LATE_COMMISSION_RATE, calculateAmountToPay } from "@/utils/commissionCalculator";
+import { usePlatformCommission } from "@/hooks/usePlatformCommission";
 import { AmountToPayCard } from "@/components/chama/AmountToPayCard";
 import { PaymentAllocationPreview } from "@/components/chama/PaymentAllocationPreview";
 import { NextPaymentTimer } from "@/components/chama/NextPaymentTimer";
@@ -29,12 +30,14 @@ export const ChamaPaymentForm = ({
   chamaId, 
   currentMemberId, 
   contributionAmount,
-  commissionRate = CHAMA_DEFAULT_COMMISSION_RATE,
+  commissionRate,
   missedCycles = 0,
   currentCycleDue = true,
   onPaymentSuccess 
 }: ChamaPaymentFormProps) => {
   const navigate = useNavigate();
+  const { rates } = usePlatformCommission();
+  const effectiveCommissionRate = commissionRate ?? rates.chama;
   const [paymentType, setPaymentType] = useState<"self" | "other">("self");
   const [targetMemberId, setTargetMemberId] = useState(currentMemberId);
   const [walletCredit, setWalletCredit] = useState(0);
