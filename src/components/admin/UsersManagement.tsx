@@ -69,8 +69,14 @@ export const UsersManagement = () => {
     if (!smsTarget || !smsMessage.trim()) return;
     setSmsSending(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) {
+        throw new Error("Your session expired. Please log out and sign back in.");
+      }
       const { data, error } = await supabase.functions.invoke("admin-send-user-sms", {
         body: { user_id: smsTarget.id, phone: smsTarget.phone, message: smsMessage.trim() },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (error) {
         const msg = await getReadableEdgeFunctionError(error, "Failed to send SMS");
