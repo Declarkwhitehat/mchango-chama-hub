@@ -201,8 +201,6 @@ verify_jwt = false
 [functions.admin-send-user-sms]
 verify_jwt = false
 
-[functions.test-onfon-once]
-verify_jwt = false
 
 
 
