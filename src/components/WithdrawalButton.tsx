@@ -17,6 +17,8 @@ import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 import { PinEntryDialog } from "@/components/PinEntryDialog";
 import { usePlatformMinimums } from "@/hooks/usePlatformMinimums";
 import { getMpesaTransactionFee } from "@/utils/mpesaTransactionFee";
+import { ModuleMaintenanceBanner } from "@/components/ModuleMaintenanceBanner";
+import { useIsModuleInMaintenance } from "@/hooks/useMaintenanceModules";
 
 interface WithdrawalButtonProps {
   chamaId?: string;

@@ -10,6 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Loader2, Send, CheckCircle2 } from "lucide-react";
 import { getMpesaTransactionFee } from "@/utils/mpesaTransactionFee";
+import { ModuleMaintenanceBanner } from "@/components/ModuleMaintenanceBanner";
+import { useIsModuleInMaintenance } from "@/hooks/useMaintenanceModules";
 
 interface Props {
   welfareId: string;
@@ -19,6 +21,9 @@ interface Props {
 
 export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onRequested }: Props) => {
   const { user } = useAuth();
+  const { inMaintenance: welfareMaintenance } = useIsModuleInMaintenance("welfare");
+  const { inMaintenance: withdrawalsMaintenance } = useIsModuleInMaintenance("withdrawals");
+  const blocked = welfareMaintenance || withdrawalsMaintenance;
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [category, setCategory] = useState("");
@@ -160,6 +165,8 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {welfareMaintenance && <ModuleMaintenanceBanner module="welfare" />}
+        {withdrawalsMaintenance && <ModuleMaintenanceBanner module="withdrawals" />}
         <p className="text-sm text-muted-foreground">Available: <strong>KES {availableBalance.toLocaleString()}</strong></p>
 
         <div className="space-y-2">
@@ -224,7 +231,7 @@ export const WelfareWithdrawalRequest = ({ welfareId, availableBalance, onReques
           );
         })()}
 
-        <Button onClick={handleRequest} disabled={loading || !resolvedRecipient} className="w-full">
+        <Button onClick={handleRequest} disabled={loading || !resolvedRecipient || blocked} className="w-full">
           {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
           Submit for Approval
         </Button>

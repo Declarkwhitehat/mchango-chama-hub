@@ -10,6 +10,8 @@ import { Loader2, Wallet, Smartphone, CheckCircle, XCircle, Clock, Search, UserC
 import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { normalizePhone, isValidKenyanPhone } from "@/utils/phoneUtils";
 import { useAuth } from "@/contexts/AuthContext";
+import { ModuleMaintenanceBanner } from "@/components/ModuleMaintenanceBanner";
+import { useIsModuleInMaintenance } from "@/hooks/useMaintenanceModules";
 
 interface Props {
   welfareId: string;
@@ -24,6 +26,7 @@ type PaymentStatus = "idle" | "sending" | "prompted" | "checking" | "success" | 
 
 export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contributionAmount, paybillAccountId, onContributed }: Props) => {
   const { user, profile } = useAuth();
+  const { inMaintenance: welfareMaintenance } = useIsModuleInMaintenance("welfare");
   const [amount, setAmount] = useState(contributionAmount > 0 ? String(contributionAmount) : "");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [name, setName] = useState(profile?.full_name || "");
@@ -288,6 +291,7 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
 
   return (
     <div className="space-y-4">
+      <ModuleMaintenanceBanner module="welfare" />
       {/* Member ID for offline payments - always show so members know their correct account */}
       {memberCode && (
         <CopyableUniqueId label="Your Member ID (Account Number)" uniqueId={memberCode} />
@@ -445,7 +449,7 @@ export const WelfareContributionForm = ({ welfareId, memberId, memberCode, contr
 
           <Button
             onClick={handleStkPush}
-            disabled={isProcessing || !phone || !amount || !name.trim() || (payForOther && !selectedRecipient)}
+            disabled={isProcessing || !phone || !amount || !name.trim() || (payForOther && !selectedRecipient) || welfareMaintenance}
             className="w-full"
           >
             {isProcessing ? (
