@@ -177,20 +177,28 @@ const AdminCommissionConfig = () => {
         .upsert(minimumUpserts, { onConflict: "setting_key" });
       if (minError) throw minError;
 
+      const commissionPayload = {
+        ...Object.fromEntries(rates.map(r => [r.key, r.rate / 100])),
+        verification_fee: verificationFee,
+        user_verification_fee: accountVerificationFee,
+        min_chama_contribution: minChamaContribution,
+        min_withdrawal_chama: minWithdrawalChama,
+        min_withdrawal_mchango: minWithdrawalMchango,
+        min_withdrawal_welfare: minWithdrawalWelfare,
+      };
+
       // Log audit
       await supabase.from("audit_logs").insert({
         table_name: "platform_settings",
         action: "platform_settings_updated",
         user_id: user?.id,
-        new_values: {
-          ...Object.fromEntries(rates.map(r => [r.key, r.rate / 100])),
-          verification_fee: verificationFee,
-          user_verification_fee: accountVerificationFee,
-          min_chama_contribution: minChamaContribution,
-          min_withdrawal_chama: minWithdrawalChama,
-          min_withdrawal_mchango: minWithdrawalMchango,
-          min_withdrawal_welfare: minWithdrawalWelfare,
-        },
+        new_values: commissionPayload,
+      });
+
+      const { logAdminAction } = await import("@/lib/logAdminAction");
+      await logAdminAction("commission.config_update", {
+        targetType: "platform_settings",
+        metadata: commissionPayload,
       });
 
       queryClient.invalidateQueries({ queryKey: ["platform-commission-rates"] });
