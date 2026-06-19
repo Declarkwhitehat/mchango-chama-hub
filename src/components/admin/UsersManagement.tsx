@@ -713,6 +713,44 @@ export const UsersManagement = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Send SMS Dialog */}
+      <AlertDialog open={smsDialogOpen} onOpenChange={setSmsDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Send SMS to {smsTarget?.full_name}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="text-sm">
+                  Sending to <span className="font-mono">{smsTarget?.phone}</span> via Onfon.
+                  Emojis and special characters will be stripped automatically.
+                </p>
+                <Textarea
+                  placeholder="Type your message here..."
+                  value={smsMessage}
+                  onChange={(e) => setSmsMessage(e.target.value)}
+                  rows={5}
+                  maxLength={480}
+                />
+                <p className="text-xs text-muted-foreground text-right">{smsMessage.length}/480</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={smsSending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmSendSms(); }}
+              disabled={!smsMessage.trim() || smsSending}
+            >
+              {smsSending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Send SMS
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
