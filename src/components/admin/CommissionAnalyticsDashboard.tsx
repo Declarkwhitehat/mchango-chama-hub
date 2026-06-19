@@ -78,6 +78,9 @@ interface TrendPoint {
 const COLORS = ["#ec4899", "#3b82f6", "#a855f7", "#10b981"];
 
 export const CommissionAnalyticsDashboard = () => {
+  const { rates } = usePlatformCommission();
+  const MCHANGO_COMMISSION_RATE = rates.mchango;
+  const ORGANIZATION_COMMISSION_RATE = rates.organization;
   const [loading, setLoading] = useState(true);
   const [ledgerData, setLedgerData] = useState<LedgerEntry[]>([]);
   const [summary, setSummary] = useState<SummaryData>({
