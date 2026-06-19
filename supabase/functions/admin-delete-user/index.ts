@@ -35,15 +35,15 @@ serve(async (req) => {
       });
     }
 
-    const { data: adminRole } = await supabaseAdmin
+    const { data: superAdminRole } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', callerData.user.id)
-      .eq('role', 'admin')
+      .eq('role', 'super_admin')
       .maybeSingle();
 
-    if (!adminRole) {
-      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+    if (!superAdminRole) {
+      return new Response(JSON.stringify({ error: 'Super admin access required' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -229,6 +229,20 @@ serve(async (req) => {
     } catch (e) {
       console.log('Warning: Failed to create audit log');
     }
+
+    // Admin action log
+    try {
+      await supabaseAdmin.from('admin_action_log').insert({
+        actor_user_id: callerData.user.id,
+        actor_email: callerData.user.email ?? null,
+        action_key: `user.${action === 'hard_delete' ? 'hard_delete' : action === 'restore' ? 'restore' : 'soft_delete'}`,
+        target_type: 'user',
+        target_id: user_id,
+        metadata: { reason: body.reason || null },
+        ip_address: req.headers.get('x-forwarded-for') || null,
+        user_agent: req.headers.get('user-agent') || null,
+      });
+    } catch (_) { /* best effort */ }
 
     console.log(`User ${user_id} soft-deleted by admin ${callerData.user.id}`);
 
