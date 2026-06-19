@@ -190,5 +190,7 @@ export const CleanupJobStatus = () => {
         )}
       </CardContent>
     </Card>
+    <KycAutoCleanupCard />
+    </>
   );
 };
