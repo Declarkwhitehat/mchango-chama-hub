@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
 interface MenuItem {
   title: string;
@@ -57,6 +58,7 @@ interface MenuItem {
 export function AdminSidebar() {
   const { open } = useSidebar();
   const navigate = useNavigate();
+  const { isSuperAdmin } = useIsSuperAdmin();
   const [pendingKyc, setPendingKyc] = useState(0);
   const [pendingWithdrawals, setPendingWithdrawals] = useState(0);
   const [pendingCallbacks, setPendingCallbacks] = useState(0);
@@ -138,7 +140,7 @@ export function AdminSidebar() {
     { title: "Account Verifications", url: "/admin/account-verifications", icon: BadgeCheck },
   ];
 
-  const financialItems: MenuItem[] = [
+  const financialItemsAll: MenuItem[] = [
     { title: "Revenue", url: "/admin/revenue", icon: TrendingUp },
     { title: "Transactions", url: "/admin/transactions", icon: DollarSign },
     { 
@@ -160,6 +162,17 @@ export function AdminSidebar() {
     { title: "Payment Search", url: "/admin/payment-search", icon: Search },
     { title: "Paybill Balance", url: "/admin/paybill-balance", icon: Wallet },
   ];
+  const superAdminOnlyFinancialUrls = new Set([
+    "/admin/revenue",
+    "/admin/commission-analytics",
+    "/admin/commission-config",
+    "/admin/ledger",
+    "/admin/payment-config",
+    "/admin/paybill-balance",
+  ]);
+  const financialItems = isSuperAdmin
+    ? financialItemsAll
+    : financialItemsAll.filter((i) => !superAdminOnlyFinancialUrls.has(i.url));
 
   const supportItems: MenuItem[] = [
     { 
@@ -181,7 +194,7 @@ export function AdminSidebar() {
     },
   ];
 
-  const systemItems: MenuItem[] = [
+  const systemItemsAll: MenuItem[] = [
     { title: "Audit Logs", url: "/admin/audit", icon: FileText },
     { title: "Verify Document", url: "/admin/documents", icon: FileText },
     { title: "Document Deletions", url: "/admin/document-deletions", icon: Trash2 },
@@ -190,6 +203,15 @@ export function AdminSidebar() {
     { title: "SMS Broadcast", url: "/admin/sms-broadcast", icon: MessageSquareMore },
     { title: "Maintenance Mode", url: "/admin/maintenance", icon: Wrench },
   ];
+  const superAdminOnlySystemUrls = new Set([
+    "/admin/audit",
+    "/admin/sms-balance",
+    "/admin/sms-broadcast",
+    "/admin/maintenance",
+  ]);
+  const systemItems = isSuperAdmin
+    ? systemItemsAll
+    : systemItemsAll.filter((i) => !superAdminOnlySystemUrls.has(i.url));
 
   const renderMenuItem = (item: MenuItem) => {
     const content = (
