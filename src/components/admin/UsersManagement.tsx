@@ -485,6 +485,14 @@ export const UsersManagement = () => {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => handleSendSmsClick(user)}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          Send SMS
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => isAdmin ? removeAdminRole(user.id) : handleMakeAdminClick(user.id)}
                           disabled={processing === user.id}
                         >
