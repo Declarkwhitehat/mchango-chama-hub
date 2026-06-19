@@ -1526,6 +1526,27 @@ export type Database = {
         }
         Relationships: []
       }
+      kyc_reminders_sent: {
+        Row: {
+          bucket: number
+          id: string
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          bucket: number
+          id?: string
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          bucket?: number
+          id?: string
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mchango: {
         Row: {
           available_balance: number | null

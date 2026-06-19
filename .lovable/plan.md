@@ -1,47 +1,70 @@
-## Make admin's commission settings the single source of truth
+## Goal
 
-Today admin can change commission percentages in **Admin → Commission Config**, but most of the app still uses hardcoded constants:
+Automatically delete accounts that haven't completed KYC verification 2 weeks after signup, and send SMS + push reminders every 72 hours during that window.
 
-| Surface | Currently uses | Honors admin setting? |
-|---|---|---|
-| Mchango payment callback | `getCommissionRate('mchango')` from `platform_settings` | ✅ Yes |
-| Organization payment callback | `getCommissionRate('organization')` from `platform_settings` | ✅ Yes |
-| Chama payment callback | Per-chama `commission_rate` column | ⚠️ Frozen at chama creation |
-| Welfare payment callback | Per-welfare `commission_rate` column | ⚠️ Frozen at welfare creation |
-| New chama creation (`chama-crud`) | Hardcoded `0.05` fallback | ❌ Ignores admin |
-| New welfare creation (`welfare-crud`) | DB column default | ❌ Ignores admin |
-| Donation forms (Mchango/Org) | Imported constants `MCHANGO_COMMISSION_RATE` etc. | ❌ Static UI |
-| `OverpaymentWallet` info text | `CHAMA_DEFAULT_COMMISSION_RATE` | ❌ Static |
-| `CommissionOverview` / `CommissionAnalyticsDashboard` | Constants | ❌ Static math + labels |
+## Behavior
 
-### Goal
-When the admin saves a new commission rate, every new payment, every form preview, and every analytics figure uses that rate immediately. Existing chamas/welfares keep their stored rate (members agreed to it at creation) — only new groups inherit the admin's current setting.
+For each profile where `kyc_status != 'approved'` AND `deleted_at IS NULL` AND no admin/super_admin role:
 
-### Changes
+- **Reminders at 72h, 144h, 216h, 288h after signup (4 reminders)** — SMS + in-app notification telling the user how many days remain until auto-deletion and a link to upload KYC.
+- **Auto-delete at 14 days (336h) after signup** — soft-delete the profile (`deleted_at`, `deletion_reason='kyc_not_verified_14d'`), set memberships to `left`, ban the auth user (reusing the same soft-delete pattern as `delete-my-account`).
 
-**1. Frontend hook (new)** — `src/hooks/usePlatformCommission.ts`
-- Fetches all four keys (`commission_rate_chama|mchango|organization|welfare`) from `platform_settings` in one query.
-- Returns `{ chama, mchango, organization, welfare, isLoading }`, with the existing constants as fallback if the row is missing.
-- Cached via React Query (5 min stale time) so admin changes propagate quickly without spamming requests.
+Safeguards (skip auto-delete, still allowed to remind):
+- User has admin/super_admin role
+- User has any pending/approved/processing withdrawal
+- User manages an active or pending chama
+- KYC submitted and pending admin review (`kyc_status = 'pending'`) — pause the clock; only delete if still not approved 14d after submission
 
-**2. Frontend forms — read live rate via hook**
-- `src/components/DonationForm.tsx` → mchango rate
-- `src/components/OrganizationDonationForm.tsx` → organization rate
-- `src/components/chama/OverpaymentWallet.tsx` → chama rate (display copy only)
-- `src/components/ChamaPaymentForm.tsx` → keep prop-driven per-chama rate (don't override existing chamas), but use the hook as default when no rate is supplied.
+## Implementation
 
-**3. Admin dashboards — live rate**
-- `src/components/admin/CommissionOverview.tsx` and `CommissionAnalyticsDashboard.tsx`: replace constant multipliers and label text with values from the hook so analytics and the rate badges always reflect the latest admin setting.
+### 1. New edge function: `kyc-auto-cleanup`
+`supabase/functions/kyc-auto-cleanup/index.ts` — cron-invoked, service-role.
 
-**4. Backend — new groups inherit admin's current rate**
-- `supabase/functions/chama-crud/index.ts`: when `body.commission_rate` is absent, fetch `commission_rate_chama` via the existing `getCommissionRate()` helper instead of falling back to `0.05`.
-- `supabase/functions/welfare-crud/index.ts`: same treatment using `commission_rate_welfare`.
+Logic:
+```
+fetch profiles where kyc_status != 'approved' AND deleted_at IS NULL
+  AND created_at <= now() - 72h
+for each:
+  hoursSinceSignup = (now - created_at) / 3600
+  if hoursSinceSignup >= 336 and safe_to_delete(user):
+     soft-delete + ban (mirrors delete-my-account flow)
+     send final SMS "Account removed"
+  else:
+     bucket = floor(hoursSinceSignup / 72)  // 1,2,3,4
+     if bucket not already sent (tracked in new table):
+        send SMS + create notification
+        record reminder in kyc_reminders_sent
+```
 
-No DB schema changes. No existing chama/welfare rates are modified (those stay locked to what members agreed to). Payments to existing groups continue to use their stored rate; payments to mchango/organizations already track admin's live rate (already correct in code).
+### 2. New tracking table
+`kyc_reminders_sent (user_id, bucket smallint, sent_at)` with unique `(user_id, bucket)` so reminders don't double-fire. Grants for `service_role`; RLS enabled, no client policies needed.
 
-### Verification
-1. In Admin → Commission Config, change Mchango from 7% → 8%, save.
-2. Open the donate dialog on any Mchango — preview text and commission line should show 8% immediately.
-3. Create a new chama after changing chama rate — `chama.commission_rate` row reflects the new value.
-4. Admin → Commission Overview cards and analytics show new rates.
-5. Revert to original rate; verify it propagates back the same way.
+### 3. Cron schedule
+pg_cron job invoking `kyc-auto-cleanup` every 6 hours (via `supabase--insert`, not migration — contains project URL/anon key).
+
+### 4. SMS templates (GSM-7 safe, no emojis, per project memory)
+- 72h: `Hi {name}, verify your KYC within {daysLeft} days or your PAMOJA NOVA account will be removed. Upload: pamojanova.com/kyc`
+- Final (delete): `Your PAMOJA NOVA account was removed because KYC was not completed within 14 days. Sign up again anytime.`
+
+### 5. Admin visibility
+Add a small "KYC Auto-Cleanup" status card in `src/components/admin/CleanupJobStatus.tsx` showing last run + counts (reuse pattern from `chama-auto-cleanup`).
+
+### 6. Memory
+Save `mem://security/kyc-auto-cleanup-policy.md` documenting the 14-day window, 72h reminder cadence, exclusions, and add a Core line to the index.
+
+## Files
+
+**New**
+- `supabase/functions/kyc-auto-cleanup/index.ts`
+- `mem://security/kyc-auto-cleanup-policy.md`
+
+**Edited**
+- `src/components/admin/CleanupJobStatus.tsx` (add status row)
+- `mem://index.md` (reference + Core line)
+
+**Migration** — create `kyc_reminders_sent` table + grants + RLS.
+**Insert (not migration)** — pg_cron schedule for `kyc-auto-cleanup` every 6 hours.
+
+## Verification
+
+After build: manually invoke `kyc-auto-cleanup` via `supabase--curl_edge_functions`, confirm reminder row appears for a test profile older than 72h, confirm a profile older than 14d gets soft-deleted (on staging only — production safeguarded by the existing exclusions).
