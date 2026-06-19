@@ -3,11 +3,12 @@ import { Header } from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Send, Users, AlertTriangle } from "lucide-react";
+import { Loader2, Send, Users, AlertTriangle, Shield, Lock, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -20,6 +21,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+const ADMIN_PRIVILEGE_CODE = "D3E9C0L1A3R9K";
 
 const SEGMENTS: { value: string; label: string; description: string }[] = [
   { value: "all_users", label: "All registered users", description: "Every profile with a phone number." },
@@ -48,7 +51,7 @@ const invokeSmsBroadcast = async (body: Record<string, unknown>) => {
       apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, privilege_code: ADMIN_PRIVILEGE_CODE }),
   });
 
   const text = await res.text();
@@ -63,6 +66,13 @@ const invokeSmsBroadcast = async (body: Record<string, unknown>) => {
 };
 
 export default function AdminSmsBroadcast() {
+  // Privilege-code gate (matches AdminPaybillBalance / AdminCommissionAnalytics pattern)
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [code, setCode] = useState("");
+  const [unlockError, setUnlockError] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [showCode, setShowCode] = useState(false);
+
   const [segment, setSegment] = useState<string>("all_users");
   const [message, setMessage] = useState("");
   const [appendTagline, setAppendTagline] = useState(true);
@@ -78,6 +88,17 @@ export default function AdminSmsBroadcast() {
     : message;
   const charCount = previewMessage.length;
   const smsParts = Math.max(1, Math.ceil(charCount / 160));
+
+  const handleUnlock = () => {
+    if (code === ADMIN_PRIVILEGE_CODE) {
+      setIsUnlocked(true);
+      setUnlockError(false);
+    } else {
+      setUnlockError(true);
+      setAttempts((p) => p + 1);
+      setCode("");
+    }
+  };
 
   const handlePreview = async () => {
     setPreviewing(true);
@@ -121,6 +142,64 @@ export default function AdminSmsBroadcast() {
       setSending(false);
     }
   };
+
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container max-w-lg mx-auto px-4 py-8">
+          <Card className="border-2 border-destructive/30">
+            <CardHeader className="text-center space-y-3">
+              <div className="mx-auto h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                <Shield className="h-8 w-8 text-destructive" />
+              </div>
+              <CardTitle className="text-2xl">SMS Broadcast</CardTitle>
+              <CardDescription className="text-base">
+                Bulk SMS sending is a sensitive operation. Enter the admin privilege code to continue.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type={showCode ? "text" : "password"}
+                  placeholder="Enter privilege code"
+                  value={code}
+                  onChange={(e) => { setCode(e.target.value); setUnlockError(false); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
+                  className={`pl-10 pr-10 ${unlockError ? "border-destructive" : ""}`}
+                  disabled={attempts >= 5}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCode(!showCode)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showCode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {unlockError && (
+                <div className="flex items-center gap-2 text-destructive text-sm">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>Invalid privilege code. {5 - attempts} attempts remaining.</span>
+                </div>
+              )}
+              {attempts >= 5 && (
+                <div className="text-destructive text-sm text-center font-medium">
+                  Too many failed attempts. Please contact the system administrator.
+                </div>
+              )}
+              <Button onClick={handleUnlock} className="w-full" disabled={!code || attempts >= 5}>
+                <Shield className="h-4 w-4 mr-2" />
+                Unlock SMS Broadcast
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
