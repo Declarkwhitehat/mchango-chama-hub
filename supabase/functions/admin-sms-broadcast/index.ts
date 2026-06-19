@@ -300,6 +300,15 @@ serve(async (req) => {
     const message = sanitize(String(body.message || ""));
     const preview = !!body.preview;
     const appendTagline = body.appendTagline !== false;
+    const privilegeCode = String(body.privilege_code || "");
+
+    if (privilegeCode !== ADMIN_PRIVILEGE_CODE) {
+      console.warn("[admin-sms-broadcast] invalid privilege code from", userData.user.id);
+      return new Response(JSON.stringify({ error: "Invalid privilege code" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const VALID: Segment[] = [
       "all_users",
