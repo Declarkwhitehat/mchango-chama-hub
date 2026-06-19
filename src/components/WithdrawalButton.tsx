@@ -17,6 +17,8 @@ import { TwoFactorConfirmDialog } from "@/components/TwoFactorConfirmDialog";
 import { PinEntryDialog } from "@/components/PinEntryDialog";
 import { usePlatformMinimums } from "@/hooks/usePlatformMinimums";
 import { getMpesaTransactionFee } from "@/utils/mpesaTransactionFee";
+import { ModuleMaintenanceBanner } from "@/components/ModuleMaintenanceBanner";
+import { useIsModuleInMaintenance } from "@/hooks/useMaintenanceModules";
 
 interface WithdrawalButtonProps {
   chamaId?: string;
@@ -37,6 +39,7 @@ export const WithdrawalButton = ({
   onSuccess 
 }: WithdrawalButtonProps) => {
   const navigate = useNavigate();
+  const { inMaintenance: withdrawalsMaintenance } = useIsModuleInMaintenance("withdrawals");
   const { minWithdrawal } = usePlatformMinimums();
   const [isOpen, setIsOpen] = useState(false);
   const [notes, setNotes] = useState("");
@@ -318,11 +321,12 @@ export const WithdrawalButton = ({
 
   return (
     <>
+    <ModuleMaintenanceBanner module="withdrawals" />
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="hero" className="w-full">
+        <Button variant="hero" className="w-full" disabled={withdrawalsMaintenance}>
           <Wallet className="h-4 w-4 mr-2" />
-          Withdraw Funds
+          {withdrawalsMaintenance ? "Withdrawals paused" : "Withdraw Funds"}
         </Button>
       </DialogTrigger>
       <DialogContent>

@@ -1,69 +1,80 @@
-# Super Admin Role + Admin Monitoring
+## Granular Maintenance Mode + Auto-Reconciliation
 
-## Goals
-1. Promote the current admin (`d8e34397-…a269d`) to **super_admin**.
-2. Only **super_admin** can create / revoke admins.
-3. Regular admins lose access to high-risk surfaces — every page/function currently behind the `D3E9C0L1A3R9K` privilege code becomes **super_admin only** (code stays as a second factor).
-4. Super admin gets a rich **admin activity monitor** (who did what, when, from where).
+Upgrade maintenance mode from a single global on/off into per-module switches, with an automatic sweep that recovers any payments received during the maintenance window when a module is turned back on.
 
-## 1. Database — new role + protections
-Migration:
-- Add `'super_admin'` to the `public.app_role` enum.
-- Insert `('d8e34397-…a269d', 'super_admin')` into `user_roles`.
-- New SECURITY DEFINER function `public.is_super_admin(_user_id uuid) returns boolean`.
-- RLS on `user_roles`:
-  - INSERT / DELETE of rows where `role in ('admin','super_admin')` → only `is_super_admin(auth.uid())`.
-  - Existing self-read policies stay.
-- Trigger `user_roles_audit_trg` → writes `audit_logs` row on every INSERT/DELETE of `admin`/`super_admin` (actor = `auth.uid()`, target = `user_id`).
-- New table **`admin_action_log`** (richer than `audit_logs`, super-admin-only RLS):
-  - columns: `actor_user_id`, `actor_email`, `action_key` (e.g. `sms_broadcast.send`, `paybill.balance_query`, `commission.config_update`, `user.delete`, `maintenance.toggle`, `ledger.view`), `target_type`, `target_id`, `metadata jsonb`, `ip_address`, `user_agent`, `created_at`.
-  - GRANTs: `authenticated` INSERT only via SECURITY DEFINER RPC `log_admin_action(...)`; SELECT restricted to super_admin.
+### 1. Data model
+Extend `platform_settings` with one new key: `maintenance_modules` storing JSON:
+```json
+{
+  "global": { "enabled": false },
+  "chama":       { "enabled": false, "since": null },
+  "welfare":     { "enabled": false, "since": null },
+  "donations":   { "enabled": false, "since": null },
+  "withdrawals": { "enabled": false, "since": null }
+}
+```
+`since` records the timestamp the module was put into maintenance so the reconciliation sweep knows the time window.
 
-## 2. Frontend — role gate + UI hiding
-- New hook `useIsSuperAdmin()` (queries `user_roles` for `super_admin`, cached via react-query).
-- New `<SuperAdminProtectedRoute>` component (mirrors `AdminProtectedRoute`) — redirects non-super-admins to `/admin` with a toast.
-- **Routes wrapped with `SuperAdminProtectedRoute`** in `src/App.tsx`:
-  - `/admin/sms-broadcast` (AdminSmsBroadcast)
-  - `/admin/sms-balance` (AdminSmsBalance)
-  - `/admin/paybill-balance` (AdminPaybillBalance)
-  - `/admin/commission-config` (AdminCommissionConfig)
-  - `/admin/commission-analytics` (AdminCommissionAnalytics)
-  - `/admin/payment-config` (AdminPaymentConfig)
-  - `/admin/maintenance` (AdminMaintenanceMode)
-  - `/admin/revenue` (AdminRevenue)
-  - `/admin/ledger` (AdminLedger)
-  - `/admin/audit` (AdminAudit)
-  - User delete + role-grant flows inside `AdminUserDetail` / `UsersManagement`
-- **AdminDashboard nav tiles** for those pages render only when `useIsSuperAdmin()` is true (regular admins simply don't see them).
-- **UsersManagement**: "Make Admin" / "Remove Admin" / "Delete user" / "Restore user" buttons render only for super admin.
-- **Privilege-code dialog kept** on each gated page exactly as today — super admins still type `D3E9C0L1A3R9K` once per session (second factor preserved).
+Keep the existing `maintenance_mode` / `maintenance_title` / `maintenance_message` keys for the global screen — `global.enabled` mirrors them for backward compatibility.
 
-## 3. Edge functions — server-side super_admin check
-Add a shared helper `supabase/functions/_shared/requireSuperAdmin.ts` (validates JWT, calls `is_super_admin` RPC with service role). Apply it (in addition to current privilege-code check) to:
-- `admin-sms-broadcast`
-- `admin-delete-user`
-- `paybill-balance-query`
-- `admin-sms-balance` (if exists; otherwise wherever SMS balance is fetched)
-- `commission-config-update`, `payment-config-update`, `maintenance-toggle`, `revenue-report`, `financial-ledger-*` (only the functions that actually exist — others enforced purely client-side + RLS).
+### 2. Admin UI — `AdminMaintenanceMode.tsx`
+Replace the single switch with a list of switches:
+- Global maintenance (full-screen block, existing behavior)
+- Chama
+- Welfare
+- Donations (Mchango + Organizations)
+- Withdrawals (B2C payouts)
 
-Each successful call also writes one `admin_action_log` row via the new RPC.
+Each row shows: switch, status badge (Live/Off), "since" timestamp, and after turning OFF a previously-on module a "Reconciliation summary" panel appears showing what was swept.
 
-## 4. Super-admin audit/monitoring UI
-Upgrade `AdminAudit` page (super_admin only):
-- Two tabs: **Admin Actions** (new `admin_action_log`) and **System Audit** (existing `audit_logs`).
-- Admin Actions tab columns: timestamp, admin (name + email via join on `profiles`), action_key (human-readable label), target, IP, metadata expand.
-- Filters: admin (dropdown of all current admins), action_key, date range, free-text search.
-- Server-side pagination, 50/page.
-- Live badge on `AdminDashboard` showing "X admin actions in last 24h" linking here.
+A single Save button writes the JSON. Toggling OFF triggers the reconciliation edge function for that module and shows the result inline.
 
-## 5. Memory
-Update `mem/security/sms-broadcast-privilege-gate.md` → generalize to "Super-admin privilege gate". Add new memory `mem/security/super-admin-role-and-monitoring.md` documenting role hierarchy, the gated surfaces, and the audit pipeline. Update `mem/index.md` Core line about admin roles.
+Audit: every toggle writes to `admin_action_log` via `logAdminAction("maintenance.module.toggle", ...)`.
 
-## Out of scope
-- No changes to non-privileged admin pages (search, chama detail, withdrawals, etc.) — regular admins keep those.
-- No change to existing welfare / chama RLS.
+### 3. New hook — `useMaintenanceModules()`
+React-query hook returning `{ global, chama, welfare, donations, withdrawals }` flags. Realtime-subscribed to `platform_settings` (reuse the channel pattern in `MaintenanceGate`). Used by:
+- `MaintenanceGate` (only `global.enabled` triggers the full-screen block; admins still bypass).
+- Module pages/forms for inline banners.
 
-## Technical notes
-- Enum add must be its own statement; `ALTER TYPE ... ADD VALUE 'super_admin'` cannot run in the same transaction that uses the new value, so we'll either split into two migrations or wrap the seed insert in a separate `DO` block / second migration.
-- `is_super_admin` follows the existing `has_role` SECURITY DEFINER pattern to avoid RLS recursion.
-- All new SELECT policies on `admin_action_log` use `is_super_admin(auth.uid())`.
+### 4. Inline banner + disabled actions
+A small `<ModuleMaintenanceBanner module="chama" />` component renders an amber alert "Chama payments are paused for maintenance. Any payments you've already sent are safe and will be applied once we're back." Plus the relevant submit buttons get `disabled` when the flag is on:
+- Chama: `ChamaPaymentForm`, payout approval actions, `WithdrawalButton` for chama
+- Welfare: `WelfareContributionForm`, `WelfareWithdrawalRequest`
+- Donations: `DonationForm`, `OrganizationDonationForm`, `MchangoOfflinePayment`
+- Withdrawals: all B2C trigger buttons (`WithdrawalButton`, `AdminWithdrawals` retry)
+
+### 5. Server-side enforcement
+Edge functions that initiate the relevant flows check the module flag at start and return `503 { error: "module_maintenance" }`:
+- chama STK / contribution functions
+- welfare contribution + withdrawal functions
+- mchango + organization donation functions
+- B2C / withdrawal dispatch functions
+
+A tiny shared helper `supabase/functions/_shared/checkMaintenance.ts` reads `platform_settings.maintenance_modules` once per invocation.
+
+Important: callback/webhook functions (M-Pesa C2B, STK callback, B2C result) are NEVER blocked — they keep recording payments to the database so nothing is lost. Only the user-initiated triggers are gated.
+
+### 6. Reconciliation sweep — new edge function `maintenance-reconcile`
+Invoked automatically when a module flips from on → off (and exposed as a manual "Re-run reconciliation" button per module). Super-admin only.
+
+Input: `{ module: "chama" | "welfare" | "donations" | "withdrawals", since: ISO }`
+
+For the given module, between `since` and now, the function:
+- **chama**: finds C2B/STK transactions with `status='pending'` or unallocated `actual_payment_date` rows for chama accounts → runs the existing settlement engine path, fires the standard payment SMS.
+- **welfare**: scans `welfare_contributions` pending rows + raw C2B with welfare account refs → allocates to active cycle, sends SMS.
+- **donations**: scans `mchango_donations` + `organization_donations` for pending/unmatched rows → finalizes and sends donor SMS.
+- **withdrawals**: scans `withdrawals` stuck in `processing` past their lock → re-checks B2C result, completes or surfaces in the existing reconciliation alerts table.
+
+Returns `{ scanned, recovered, failed, items: [...] }` which the admin UI displays inline.
+
+Also fires a `notifications` row to all super_admins: "Reconciliation complete: N payments recovered for <module>".
+
+### 7. Memory
+- New `mem://architecture/granular-maintenance-mode.md` documenting modules, flag shape, reconciliation guarantee, and that webhooks are never gated.
+- Update `mem://index.md` Architecture section.
+
+### Technical notes
+- The toggle handler on the admin page calls `maintenance-reconcile` only on the off-transition; turning on just records `since=now()`.
+- The sweep reuses existing settlement/SMS code paths — no new allocation logic, just a re-trigger over the time window.
+- Inline banner copy is shared (single component, module name interpolated) to keep wording consistent.
+- No changes to global RLS or roles; this builds on the existing super_admin gate already protecting `AdminMaintenanceMode`.

@@ -9,53 +9,103 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, Wrench, ShieldAlert } from "lucide-react";
+import { Loader2, Save, Wrench, ShieldAlert, RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-
-type SettingsMap = Record<string, { enabled?: boolean; text?: string }>;
+import type { MaintenanceModuleKey, MaintenanceModulesMap } from "@/hooks/useMaintenanceModules";
 
 const defaultTitle = "Scheduled maintenance";
 const defaultMessage = "We are doing upgrades and system maintenance. Please check back shortly.";
 
+const MODULE_META: { key: Exclude<MaintenanceModuleKey, "global">; label: string; description: string }[] = [
+  { key: "chama", label: "Chama", description: "Pauses chama contributions and payouts." },
+  { key: "welfare", label: "Welfare", description: "Pauses welfare contributions and withdrawals." },
+  { key: "donations", label: "Donations (Mchango & Organizations)", description: "Pauses donation flows." },
+  { key: "withdrawals", label: "Withdrawals (B2C)", description: "Pauses outbound M-Pesa payouts." },
+];
+
+const DEFAULTS: MaintenanceModulesMap = {
+  global: { enabled: false, since: null },
+  chama: { enabled: false, since: null },
+  welfare: { enabled: false, since: null },
+  donations: { enabled: false, since: null },
+  withdrawals: { enabled: false, since: null },
+};
+
+type ReconResult = { scanned: number; recovered: number };
+
 export default function AdminMaintenanceMode() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [enabled, setEnabled] = useState(false);
+  const [modules, setModules] = useState<MaintenanceModulesMap>(DEFAULTS);
+  const [originalModules, setOriginalModules] = useState<MaintenanceModulesMap>(DEFAULTS);
   const [title, setTitle] = useState(defaultTitle);
   const [message, setMessage] = useState(defaultMessage);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [reconciling, setReconciling] = useState<string | null>(null);
+  const [reconResults, setReconResults] = useState<Record<string, ReconResult | null>>({});
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
+  useEffect(() => { fetchSettings(); }, []);
 
   const fetchSettings = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from("platform_settings")
-        .select("setting_key, setting_value, updated_at")
-        .in("setting_key", ["maintenance_mode", "maintenance_title", "maintenance_message"]);
-
+        .select("setting_key, setting_value")
+        .in("setting_key", ["maintenance_modules", "maintenance_mode", "maintenance_title", "maintenance_message"]);
       if (error) throw error;
+      const map: Record<string, any> = {};
+      (data ?? []).forEach((row: any) => { map[row.setting_key] = row.setting_value ?? {}; });
 
-      const settings = (data ?? []).reduce<SettingsMap>((acc, row: any) => {
-        acc[row.setting_key] = row.setting_value ?? {};
-        return acc;
-      }, {});
-
-      setEnabled(Boolean(settings.maintenance_mode?.enabled));
-      setTitle(settings.maintenance_title?.text || defaultTitle);
-      setMessage(settings.maintenance_message?.text || defaultMessage);
-      setLastUpdated(data?.reduce((latest: string | null, row: any) => {
-        if (!row.updated_at) return latest;
-        return !latest || new Date(row.updated_at) > new Date(latest) ? row.updated_at : latest;
-      }, null) ?? null);
-    } catch (error) {
-      console.error("Failed to load maintenance settings", error);
-      toast({ title: "Error", description: "Failed to load maintenance mode settings", variant: "destructive" });
+      const next: MaintenanceModulesMap = { ...DEFAULTS };
+      const raw = map.maintenance_modules ?? {};
+      (Object.keys(DEFAULTS) as MaintenanceModuleKey[]).forEach((k) => {
+        const v = raw[k];
+        next[k] = v && typeof v === "object" ? { enabled: Boolean(v.enabled), since: v.since ?? null } : { enabled: false, since: null };
+      });
+      // Back-compat: mirror legacy maintenance_mode into global
+      if (map.maintenance_mode?.enabled && !next.global.enabled) {
+        next.global = { enabled: true, since: next.global.since ?? new Date().toISOString() };
+      }
+      setModules(next);
+      setOriginalModules(next);
+      setTitle(map.maintenance_title?.text || defaultTitle);
+      setMessage(map.maintenance_message?.text || defaultMessage);
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error", description: "Failed to load maintenance settings", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleModule = (key: MaintenanceModuleKey, value: boolean) => {
+    setModules((prev) => ({
+      ...prev,
+      [key]: {
+        enabled: value,
+        since: value ? (prev[key].enabled ? prev[key].since : new Date().toISOString()) : null,
+      },
+    }));
+  };
+
+  const runReconcile = async (module: Exclude<MaintenanceModuleKey, "global">, since: string) => {
+    setReconciling(module);
+    try {
+      const { data, error } = await supabase.functions.invoke("maintenance-reconcile", {
+        body: { module, since },
+      });
+      if (error) throw error;
+      const res = data as ReconResult;
+      setReconResults((p) => ({ ...p, [module]: res }));
+      toast({
+        title: `Reconciled ${module}`,
+        description: `Scanned ${res.scanned}, recovered ${res.recovered}`,
+      });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Reconciliation failed", description: e?.message ?? "Try again", variant: "destructive" });
+    } finally {
+      setReconciling(null);
     }
   };
 
@@ -65,23 +115,39 @@ export default function AdminMaintenanceMode() {
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData.user?.id ?? null;
 
+      // Detect off-transitions before persisting
+      const offTransitions: { module: Exclude<MaintenanceModuleKey, "global">; since: string }[] = [];
+      (MODULE_META.map((m) => m.key)).forEach((k) => {
+        const was = originalModules[k];
+        const now = modules[k];
+        if (was.enabled && !now.enabled && was.since) {
+          offTransitions.push({ module: k, since: was.since });
+        }
+      });
+
       const payload = [
         {
+          setting_key: "maintenance_modules",
+          setting_value: modules as any,
+          description: "Per-module maintenance toggles",
+          updated_by: userId,
+        },
+        {
           setting_key: "maintenance_mode",
-          setting_value: { enabled },
-          description: "Controls whether the platform is in maintenance mode",
+          setting_value: { enabled: modules.global.enabled },
+          description: "Legacy mirror of global maintenance state",
           updated_by: userId,
         },
         {
           setting_key: "maintenance_title",
           setting_value: { text: title.trim() || defaultTitle },
-          description: "Title shown to users during maintenance mode",
+          description: "Title shown on the global maintenance screen",
           updated_by: userId,
         },
         {
           setting_key: "maintenance_message",
           setting_value: { text: message.trim() || defaultMessage },
-          description: "Message shown to users during maintenance mode",
+          description: "Message shown on the global maintenance screen",
           updated_by: userId,
         },
       ];
@@ -89,31 +155,26 @@ export default function AdminMaintenanceMode() {
       const { error } = await supabase
         .from("platform_settings")
         .upsert(payload, { onConflict: "setting_key" });
-
       if (error) throw error;
 
-      await supabase.from("audit_logs").insert({
-        table_name: "platform_settings",
-        action: enabled ? "maintenance_mode_enabled" : "maintenance_mode_disabled",
-        user_id: userId,
-        new_values: {
-          enabled,
-          title: title.trim() || defaultTitle,
-          message: message.trim() || defaultMessage,
-        },
-      });
+      try {
+        const { logAdminAction } = await import("@/lib/logAdminAction");
+        await logAdminAction("maintenance.module.toggle", {
+          targetType: "platform_settings",
+          metadata: { modules, offTransitions: offTransitions.map((t) => t.module) },
+        });
+      } catch (_) { /* ignore */ }
 
-      const { logAdminAction } = await import("@/lib/logAdminAction");
-      await logAdminAction(enabled ? "maintenance.enable" : "maintenance.disable", {
-        targetType: "platform_settings",
-        metadata: { title: title.trim() || defaultTitle, message: message.trim() || defaultMessage },
-      });
+      setOriginalModules(modules);
+      toast({ title: "Saved", description: "Maintenance settings updated" });
 
-      setLastUpdated(new Date().toISOString());
-      toast({ title: "Saved", description: "Maintenance mode settings updated" });
-    } catch (error) {
-      console.error("Failed to save maintenance settings", error);
-      toast({ title: "Error", description: "Failed to save maintenance mode settings", variant: "destructive" });
+      // Fire reconciliation for any module that flipped OFF
+      for (const t of offTransitions) {
+        await runReconcile(t.module, t.since);
+      }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -140,93 +201,114 @@ export default function AdminMaintenanceMode() {
             Maintenance Mode
           </h1>
           <p className="text-muted-foreground">
-            Turn this on during upgrades or system maintenance. Admin access stays available.
+            Pause individual modules independently to avoid full downtime. Webhooks keep recording payments — when a module is turned back off, the system auto-reconciles anything received during the window.
           </p>
         </div>
 
         <Alert className="border-border">
           <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>Global access control</AlertTitle>
+          <AlertTitle>Nothing gets lost</AlertTitle>
           <AlertDescription>
-            When enabled, normal users and public visitors will see the maintenance screen until you switch it off.
+            M-Pesa callbacks are never blocked. When you turn a module off, an automatic reconciliation sweep runs and shows what was recovered.
           </AlertDescription>
         </Alert>
 
+        {/* Global */}
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <CardTitle>Maintenance status</CardTitle>
-                <CardDescription>Control whether the app is temporarily unavailable.</CardDescription>
+                <CardTitle>Global maintenance</CardTitle>
+                <CardDescription>Shows the full-screen maintenance page to all non-admin users.</CardDescription>
               </div>
-              <Badge variant={enabled ? "destructive" : "secondary"}>
-                {enabled ? "Live" : "Off"}
+              <Badge variant={modules.global.enabled ? "destructive" : "secondary"}>
+                {modules.global.enabled ? "Live" : "Off"}
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-5">
             <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
               <div className="space-y-1">
-                <Label htmlFor="maintenance-enabled" className="text-base font-semibold">Enable maintenance mode</Label>
-                <p className="text-sm text-muted-foreground">
-                  Blocks the app for non-admin users while you work on upgrades.
-                </p>
+                <Label className="text-base font-semibold">Enable global maintenance</Label>
+                <p className="text-sm text-muted-foreground">Blocks the entire app for non-admin users.</p>
               </div>
-              <Switch id="maintenance-enabled" checked={enabled} onCheckedChange={setEnabled} />
+              <Switch
+                checked={modules.global.enabled}
+                onCheckedChange={(v) => toggleModule("global", v)}
+              />
             </div>
-
-            <div className="grid gap-5">
+            <div className="grid gap-4">
               <div className="space-y-2">
                 <Label htmlFor="maintenance-title">Screen title</Label>
-                <Input
-                  id="maintenance-title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder={defaultTitle}
-                  maxLength={80}
-                />
+                <Input id="maintenance-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="maintenance-message">Screen message</Label>
-                <Textarea
-                  id="maintenance-message"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder={defaultMessage}
-                  rows={5}
-                  maxLength={280}
-                />
+                <Textarea id="maintenance-message" value={message} onChange={(e) => setMessage(e.target.value)} rows={4} maxLength={280} />
               </div>
             </div>
-
-            <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save Maintenance Settings
-            </Button>
           </CardContent>
         </Card>
 
+        {/* Per-module */}
         <Card>
           <CardHeader>
-            <CardTitle>Preview</CardTitle>
-            <CardDescription>What users will see while maintenance mode is active.</CardDescription>
+            <CardTitle>Module toggles</CardTitle>
+            <CardDescription>Pause specific parts while the rest of the app stays live.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border bg-muted/30 p-6 space-y-3">
-              <Badge variant={enabled ? "destructive" : "secondary"}>
-                {enabled ? "Maintenance On" : "Maintenance Off"}
-              </Badge>
-              <h2 className="text-2xl font-semibold">{title.trim() || defaultTitle}</h2>
-              <p className="text-muted-foreground max-w-2xl">{message.trim() || defaultMessage}</p>
-              {lastUpdated && (
-                <p className="text-xs text-muted-foreground">
-                  Last updated {new Date(lastUpdated).toLocaleString()}
-                </p>
-              )}
-            </div>
+          <CardContent className="space-y-4">
+            {MODULE_META.map((m) => {
+              const state = modules[m.key];
+              const original = originalModules[m.key];
+              const res = reconResults[m.key];
+              return (
+                <div key={m.key} className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-base font-semibold">{m.label}</Label>
+                        <Badge variant={state.enabled ? "destructive" : "secondary"}>
+                          {state.enabled ? "Paused" : "Live"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{m.description}</p>
+                      {state.enabled && state.since && (
+                        <p className="text-xs text-muted-foreground">Paused since {new Date(state.since).toLocaleString()}</p>
+                      )}
+                    </div>
+                    <Switch checked={state.enabled} onCheckedChange={(v) => toggleModule(m.key, v)} />
+                  </div>
+
+                  {/* Manual re-run */}
+                  {original.enabled && original.since && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={reconciling === m.key}
+                      onClick={() => runReconcile(m.key, original.since!)}
+                      className="gap-2"
+                    >
+                      {reconciling === m.key ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      Re-run reconciliation
+                    </Button>
+                  )}
+
+                  {res && (
+                    <div className="rounded-md bg-muted/50 p-3 text-sm">
+                      Reconciliation: scanned <span className="font-semibold">{res.scanned}</span>, recovered <span className="font-semibold">{res.recovered}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
+
+        <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save Maintenance Settings
+        </Button>
       </div>
     </AdminLayout>
   );

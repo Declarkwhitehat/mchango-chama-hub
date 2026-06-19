@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { isModuleInMaintenance, maintenanceResponse } from "../_shared/checkMaintenance.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,6 +68,11 @@ serve(async (req) => {
     const { withdrawal_id, phone_number, amount } = body;
 
     console.log('Processing B2C payout:', { withdrawal_id, phone_number, amount });
+
+    if (await isModuleInMaintenance('withdrawals')) {
+      return maintenanceResponse('withdrawals', corsHeaders);
+    }
+
 
     if (!withdrawal_id || !phone_number || !amount) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {

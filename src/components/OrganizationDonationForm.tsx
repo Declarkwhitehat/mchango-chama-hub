@@ -11,6 +11,8 @@ import { Loader2, TrendingDown, Wallet, Heart } from "lucide-react";
 import { calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
 import { usePlatformCommission } from "@/hooks/usePlatformCommission";
 import { normalizePhone, isValidKenyanPhone } from "@/utils/phoneUtils";
+import { ModuleMaintenanceBanner } from "@/components/ModuleMaintenanceBanner";
+import { useIsModuleInMaintenance } from "@/hooks/useMaintenanceModules";
 
 interface OrganizationDonationFormProps {
   organizationId: string;
@@ -20,6 +22,7 @@ interface OrganizationDonationFormProps {
 
 export const OrganizationDonationForm = ({ organizationId, organizationName, onSuccess }: OrganizationDonationFormProps) => {
   const { user, profile } = useAuth();
+  const { inMaintenance: donationsMaintenance } = useIsModuleInMaintenance("donations");
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const { rates } = usePlatformCommission();
@@ -183,6 +186,7 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
         </div>
       </CardHeader>
       <CardContent>
+        <ModuleMaintenanceBanner module="donations" className="mb-4" />
         <form onSubmit={handleDonate} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="amount">Amount (KES)</Label>
@@ -279,7 +283,7 @@ export const OrganizationDonationForm = ({ organizationId, organizationName, onS
             </Label>
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || donationsMaintenance}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

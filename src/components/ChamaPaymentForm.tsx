@@ -15,6 +15,8 @@ import { usePlatformCommission } from "@/hooks/usePlatformCommission";
 import { AmountToPayCard } from "@/components/chama/AmountToPayCard";
 import { PaymentAllocationPreview } from "@/components/chama/PaymentAllocationPreview";
 import { NextPaymentTimer } from "@/components/chama/NextPaymentTimer";
+import { ModuleMaintenanceBanner } from "@/components/ModuleMaintenanceBanner";
+import { useIsModuleInMaintenance } from "@/hooks/useMaintenanceModules";
 
 interface ChamaPaymentFormProps {
   chamaId: string;
@@ -36,6 +38,7 @@ export const ChamaPaymentForm = ({
   onPaymentSuccess 
 }: ChamaPaymentFormProps) => {
   const navigate = useNavigate();
+  const { inMaintenance: chamaMaintenance } = useIsModuleInMaintenance("chama");
   const { rates } = usePlatformCommission();
   const effectiveCommissionRate = commissionRate ?? rates.chama;
   const [paymentType, setPaymentType] = useState<"self" | "other">("self");
@@ -461,6 +464,7 @@ export const ChamaPaymentForm = ({
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <ModuleMaintenanceBanner module="chama" className="mb-4" />
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-3">
             <Label>Payment Type</Label>
@@ -615,7 +619,7 @@ export const ChamaPaymentForm = ({
 
           <Button 
             type="submit" 
-            disabled={isLoading || paymentStatus !== "idle"} 
+            disabled={isLoading || paymentStatus !== "idle" || chamaMaintenance} 
             className="w-full"
           >
             {isLoading ? (
