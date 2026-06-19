@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createNotification, notifyAllAdmins, NotificationTemplates } from "../_shared/notifications.ts";
+import { getCommissionRate } from "../_shared/getCommissionRate.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -137,6 +138,7 @@ serve(async (req) => {
       const slug = name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/-+$/, '') + '-' + Math.random().toString(36).substring(2, 6);
 
       // Use supabaseAdmin to bypass RLS KYC requirement
+      const adminWelfareRate = await getCommissionRate(supabaseAdmin, 'welfare');
       const { data, error } = await supabaseAdmin
         .from('welfares')
         .insert({
@@ -148,6 +150,7 @@ serve(async (req) => {
           whatsapp_link: whatsapp_link || null,
           min_contribution_period_months: min_contribution_period_months || 3,
           registration_fee: regFee,
+          commission_rate: adminWelfareRate,
         })
         .select()
         .single();
