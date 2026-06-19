@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key, Trash2, RotateCcw, AlertTriangle, BadgeCheck } from "lucide-react";
+import { getReadableEdgeFunctionError } from "@/lib/edgeFunctionErrors";
+import { Search, Shield, ShieldOff, Loader2, ExternalLink, Key, Trash2, RotateCcw, AlertTriangle, BadgeCheck, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, differenceInDays } from "date-fns";
 
@@ -52,6 +54,39 @@ export const UsersManagement = () => {
   const [pendingRestoreUser, setPendingRestoreUser] = useState<User | null>(null);
   const [restoreCodeError, setRestoreCodeError] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [smsTarget, setSmsTarget] = useState<User | null>(null);
+  const [smsMessage, setSmsMessage] = useState("");
+  const [smsSending, setSmsSending] = useState(false);
+
+  const handleSendSmsClick = (user: User) => {
+    setSmsTarget(user);
+    setSmsMessage("");
+    setSmsDialogOpen(true);
+  };
+
+  const confirmSendSms = async () => {
+    if (!smsTarget || !smsMessage.trim()) return;
+    setSmsSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-send-user-sms", {
+        body: { user_id: smsTarget.id, phone: smsTarget.phone, message: smsMessage.trim() },
+      });
+      if (error) {
+        const msg = await getReadableEdgeFunctionError(error, "Failed to send SMS");
+        throw new Error(msg);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: "SMS sent", description: `Delivered to ${(data as any)?.recipient || smsTarget.phone}` });
+      setSmsDialogOpen(false);
+      setSmsTarget(null);
+      setSmsMessage("");
+    } catch (e: any) {
+      toast({ title: "Could not send SMS", description: e.message || "Please try again", variant: "destructive" });
+    } finally {
+      setSmsSending(false);
+    }
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -450,6 +485,14 @@ export const UsersManagement = () => {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => handleSendSmsClick(user)}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          Send SMS
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => isAdmin ? removeAdminRole(user.id) : handleMakeAdminClick(user.id)}
                           disabled={processing === user.id}
                         >
@@ -666,6 +709,44 @@ export const UsersManagement = () => {
             >
               {restoring ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
               Restore Account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Send SMS Dialog */}
+      <AlertDialog open={smsDialogOpen} onOpenChange={setSmsDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Send SMS to {smsTarget?.full_name}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="text-sm">
+                  Sending to <span className="font-mono">{smsTarget?.phone}</span> via Onfon.
+                  Emojis and special characters will be stripped automatically.
+                </p>
+                <Textarea
+                  placeholder="Type your message here..."
+                  value={smsMessage}
+                  onChange={(e) => setSmsMessage(e.target.value)}
+                  rows={5}
+                  maxLength={480}
+                />
+                <p className="text-xs text-muted-foreground text-right">{smsMessage.length}/480</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={smsSending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmSendSms(); }}
+              disabled={!smsMessage.trim() || smsSending}
+            >
+              {smsSending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Send SMS
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
