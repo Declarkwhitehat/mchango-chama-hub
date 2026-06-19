@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Wallet, ArrowRight, Clock, CheckCircle2 } from "lucide-react";
-import { CHAMA_DEFAULT_COMMISSION_RATE } from "@/utils/commissionCalculator";
+import { usePlatformCommission } from "@/hooks/usePlatformCommission";
 
 interface WalletEntry {
   id: string;

@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, TrendingDown, Wallet, Heart } from "lucide-react";
-import { ORGANIZATION_COMMISSION_RATE, calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
+import { calculateCommission, calculateNetBalance } from "@/utils/commissionCalculator";
+import { usePlatformCommission } from "@/hooks/usePlatformCommission";
 import { normalizePhone, isValidKenyanPhone } from "@/utils/phoneUtils";
 
 interface OrganizationDonationFormProps {
