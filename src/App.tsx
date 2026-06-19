@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminProtectedRoute } from "./components/AdminProtectedRoute";
+import { SuperAdminProtectedRoute } from "./components/SuperAdminProtectedRoute";
 
 import { ChatSupport } from "./components/ChatSupport";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -181,29 +182,29 @@ const AppContent = () => {
             <Route path="/admin/organization/:organizationId" element={<AdminProtectedRoute><AdminOrganizationDetail /></AdminProtectedRoute>} />
             <Route path="/admin/welfares" element={<AdminProtectedRoute><AdminWelfares /></AdminProtectedRoute>} />
             <Route path="/admin/callbacks" element={<AdminProtectedRoute><AdminCallbacks /></AdminProtectedRoute>} />
-            <Route path="/admin/audit" element={<AdminProtectedRoute><AdminAudit /></AdminProtectedRoute>} />
+            <Route path="/admin/audit" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminAudit /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
             <Route path="/admin/search" element={<AdminProtectedRoute><AdminSearch /></AdminProtectedRoute>} />
             <Route path="/admin/export" element={<AdminProtectedRoute><AdminExport /></AdminProtectedRoute>} />
-            <Route path="/admin/payment-config" element={<AdminProtectedRoute><AdminPaymentConfig /></AdminProtectedRoute>} />
-            <Route path="/admin/ledger" element={<AdminProtectedRoute><AdminLedger /></AdminProtectedRoute>} />
+            <Route path="/admin/payment-config" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminPaymentConfig /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
+            <Route path="/admin/ledger" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminLedger /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
             <Route path="/admin/verification-requests" element={<AdminProtectedRoute><AdminVerificationRequests /></AdminProtectedRoute>} />
-            <Route path="/admin/commission-analytics" element={<AdminProtectedRoute><AdminCommissionAnalytics /></AdminProtectedRoute>} />
+            <Route path="/admin/commission-analytics" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminCommissionAnalytics /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
             <Route path="/admin/payment-search" element={<AdminProtectedRoute><AdminMpesaSearch /></AdminProtectedRoute>} />
             <Route path="/admin/fraud-monitoring" element={<AdminProtectedRoute><AdminFraudMonitoring /></AdminProtectedRoute>} />
             <Route path="/admin/fraud-user/:userId" element={<AdminProtectedRoute><AdminFraudUserDetail /></AdminProtectedRoute>} />
             <Route path="/admin/fraud-config" element={<AdminProtectedRoute><AdminFraudConfig /></AdminProtectedRoute>} />
             <Route path="/admin/payout-approvals" element={<AdminProtectedRoute><AdminPayoutApprovals /></AdminProtectedRoute>} />
-            <Route path="/admin/revenue" element={<AdminProtectedRoute><AdminRevenue /></AdminProtectedRoute>} />
+            <Route path="/admin/revenue" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminRevenue /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
             <Route path="/admin/welfare-executive-changes" element={<AdminProtectedRoute><AdminWelfareExecutiveChanges /></AdminProtectedRoute>} />
             <Route path="/admin/documents" element={<AdminProtectedRoute><AdminDocuments /></AdminProtectedRoute>} />
-            <Route path="/admin/commission-config" element={<AdminProtectedRoute><AdminCommissionConfig /></AdminProtectedRoute>} />
+            <Route path="/admin/commission-config" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminCommissionConfig /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
             <Route path="/admin/super-managers" element={<AdminProtectedRoute><AdminSuperManagers /></AdminProtectedRoute>} />
             <Route path="/admin/document-deletions" element={<AdminProtectedRoute><AdminDocumentDeletions /></AdminProtectedRoute>} />
             <Route path="/admin/account-verifications" element={<AdminProtectedRoute><AdminAccountVerifications /></AdminProtectedRoute>} />
-            <Route path="/admin/maintenance" element={<AdminProtectedRoute><AdminMaintenanceMode /></AdminProtectedRoute>} />
-            <Route path="/admin/sms-balance" element={<AdminProtectedRoute><AdminSmsBalance /></AdminProtectedRoute>} />
-            <Route path="/admin/sms-broadcast" element={<AdminProtectedRoute><AdminSmsBroadcast /></AdminProtectedRoute>} />
-            <Route path="/admin/paybill-balance" element={<AdminProtectedRoute><AdminPaybillBalance /></AdminProtectedRoute>} />
+            <Route path="/admin/maintenance" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminMaintenanceMode /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
+            <Route path="/admin/sms-balance" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminSmsBalance /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
+            <Route path="/admin/sms-broadcast" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminSmsBroadcast /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
+            <Route path="/admin/paybill-balance" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminPaybillBalance /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
             <Route path="/account/verify" element={<ProtectedRoute><AccountVerification /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
