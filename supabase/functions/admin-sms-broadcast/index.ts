@@ -283,13 +283,12 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
+    const { data: isSuperAdmin } = await admin.rpc("is_super_admin", {
       _user_id: userData.user.id,
-      _role: "admin",
     });
-    console.log("[admin-sms-broadcast] isAdmin:", isAdmin, "roleErr:", roleErr?.message);
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Forbidden - admin only" }), {
+    console.log("[admin-sms-broadcast] isSuperAdmin:", isSuperAdmin);
+    if (!isSuperAdmin) {
+      return new Response(JSON.stringify({ error: "Forbidden - super admin only" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -399,6 +398,18 @@ serve(async (req) => {
         })
         .eq("id", logRow.id);
     }
+
+    // Audit super-admin action
+    await admin.from("admin_action_log").insert({
+      actor_user_id: userData.user.id,
+      actor_email: userData.user.email ?? null,
+      action_key: "sms_broadcast.send",
+      target_type: "segment",
+      target_id: segment,
+      metadata: { recipient_count: phones.length, sent, failed },
+      ip_address: req.headers.get("x-forwarded-for") || null,
+      user_agent: req.headers.get("user-agent") || null,
+    });
 
     if (sent === 0 && failed > 0) {
       return new Response(JSON.stringify({

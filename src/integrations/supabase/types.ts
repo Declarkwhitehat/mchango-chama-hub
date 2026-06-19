@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_action_log: {
+        Row: {
+          action_key: string
+          actor_email: string | null
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          metadata: Json
+          target_id: string | null
+          target_type: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action_key: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          target_id?: string | null
+          target_type?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action_key?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          target_id?: string | null
+          target_type?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       admin_sms_broadcasts: {
         Row: {
           admin_user_id: string
@@ -4213,6 +4252,7 @@ export type Database = {
         Args: { _group_id: string; _user_id: string }
         Returns: boolean
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_welfare_chairman: {
         Args: { _user_id: string; _welfare_id: string }
         Returns: boolean
@@ -4224,6 +4264,17 @@ export type Database = {
       is_welfare_secretary: {
         Args: { _user_id: string; _welfare_id: string }
         Returns: boolean
+      }
+      log_admin_action: {
+        Args: {
+          _action_key: string
+          _ip_address?: string
+          _metadata?: Json
+          _target_id?: string
+          _target_type?: string
+          _user_agent?: string
+        }
+        Returns: string
       }
       process_withdrawal_completion: {
         Args: {
@@ -4277,7 +4328,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "super_admin"
       chama_status:
         | "active"
         | "inactive"
@@ -4426,7 +4477,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "super_admin"],
       chama_status: [
         "active",
         "inactive",

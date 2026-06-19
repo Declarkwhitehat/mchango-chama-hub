@@ -103,6 +103,12 @@ export default function AdminMaintenanceMode() {
         },
       });
 
+      const { logAdminAction } = await import("@/lib/logAdminAction");
+      await logAdminAction(enabled ? "maintenance.enable" : "maintenance.disable", {
+        targetType: "platform_settings",
+        metadata: { title: title.trim() || defaultTitle, message: message.trim() || defaultMessage },
+      });
+
       setLastUpdated(new Date().toISOString());
       toast({ title: "Saved", description: "Maintenance mode settings updated" });
     } catch (error) {
