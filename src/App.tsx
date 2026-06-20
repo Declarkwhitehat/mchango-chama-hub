@@ -97,13 +97,27 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30 * 1000,            // 30s – fresher data, especially after returning to the app
       gcTime: 10 * 60 * 1000,           // 10 min – keep unused cache entries
-      refetchOnWindowFocus: true,       // refetch when tab/app regains focus
+      refetchOnWindowFocus: false,      // avoid thundering-herd refetches when many tabs/apps wake
       refetchOnMount: true,
-      retry: 1,                          // single retry on failure
-      refetchOnReconnect: 'always',      // refetch after offline→online
+      // Exponential backoff with jitter; don't retry on 4xx (client) errors.
+      retry: (failureCount, error: any) => {
+        const status = error?.status ?? error?.statusCode ?? error?.response?.status;
+        if (typeof status === "number" && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 15000) + Math.floor(Math.random() * 500),
+      refetchOnReconnect: 'always',     // refetch after offline→online
+      networkMode: 'offlineFirst',
+    },
+    mutations: {
+      retry: 0,
+      networkMode: 'offlineFirst',
     },
   },
 });
+
 
 
 const PageLoader = () => (

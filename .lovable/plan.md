@@ -1,80 +1,89 @@
-## Granular Maintenance Mode + Auto-Reconciliation
 
-Upgrade maintenance mode from a single global on/off into per-module switches, with an automatic sweep that recovers any payments received during the maintenance window when a module is turned back on.
+# Resilience & Scale Hardening Plan (target: 100k RPM)
 
-### 1. Data model
-Extend `platform_settings` with one new key: `maintenance_modules` storing JSON:
-```json
-{
-  "global": { "enabled": false },
-  "chama":       { "enabled": false, "since": null },
-  "welfare":     { "enabled": false, "since": null },
-  "donations":   { "enabled": false, "since": null },
-  "withdrawals": { "enabled": false, "since": null }
-}
-```
-`since` records the timestamp the module was put into maintenance so the reconciliation sweep knows the time window.
+Goal: native APK + website remain responsive and never hard-crash under sustained 100k requests/minute (~1,667 RPS) bursts. Focus on (1) preventing client crashes, (2) shrinking backend load per request, (3) absorbing spikes gracefully, (4) observability so we catch regressions early.
 
-Keep the existing `maintenance_mode` / `maintenance_title` / `maintenance_message` keys for the global screen — `global.enabled` mirrors them for backward compatibility.
+---
 
-### 2. Admin UI — `AdminMaintenanceMode.tsx`
-Replace the single switch with a list of switches:
-- Global maintenance (full-screen block, existing behavior)
-- Chama
-- Welfare
-- Donations (Mchango + Organizations)
-- Withdrawals (B2C payouts)
+## 1. Backend capacity (Lovable Cloud / Postgres)
 
-Each row shows: switch, status badge (Live/Off), "since" timestamp, and after turning OFF a previously-on module a "Reconciliation summary" panel appears showing what was swept.
+1.1 **Upgrade the Lovable Cloud instance** — the default compute cannot sustain 1.6k RPS of authenticated PostgREST + Edge Function traffic. User action: Backend → Advanced settings → Upgrade instance to a larger tier. I'll surface a "View Backend" CTA after the plan ships.
 
-A single Save button writes the JSON. Toggling OFF triggers the reconciliation edge function for that module and shows the result inline.
+1.2 **Connection pooling discipline** — audit every Edge Function for `createClient` calls inside request handlers; move to module-scope singletons so PgBouncer connections aren't churned. Add a shared `getServiceClient()` helper in `supabase/functions/_shared/`.
 
-Audit: every toggle writes to `admin_action_log` via `logAdminAction("maintenance.module.toggle", ...)`.
+1.3 **Slow-query sweep** — run `supabase--slow_queries`, add missing composite indexes for the hottest paths: chama_contributions(chama_id, created_at), welfare_contributions(welfare_id, created_at), donations(mchango_id, created_at), withdrawals(user_id, status), audit_logs(user_id, created_at).
 
-### 3. New hook — `useMaintenanceModules()`
-React-query hook returning `{ global, chama, welfare, donations, withdrawals }` flags. Realtime-subscribed to `platform_settings` (reuse the channel pattern in `MaintenanceGate`). Used by:
-- `MaintenanceGate` (only `global.enabled` triggers the full-screen block; admins still bypass).
-- Module pages/forms for inline banners.
+1.4 **Cache hot reads at the edge** — short TTL (10–30s) in-memory cache inside Edge Functions for read-mostly endpoints (platform_settings, maintenance_modules, commission config, paybill config). Reduces 90%+ of repeated Postgres hits.
 
-### 4. Inline banner + disabled actions
-A small `<ModuleMaintenanceBanner module="chama" />` component renders an amber alert "Chama payments are paused for maintenance. Any payments you've already sent are safe and will be applied once we're back." Plus the relevant submit buttons get `disabled` when the flag is on:
-- Chama: `ChamaPaymentForm`, payout approval actions, `WithdrawalButton` for chama
-- Welfare: `WelfareContributionForm`, `WelfareWithdrawalRequest`
-- Donations: `DonationForm`, `OrganizationDonationForm`, `MchangoOfflinePayment`
-- Withdrawals: all B2C trigger buttons (`WithdrawalButton`, `AdminWithdrawals` retry)
+---
 
-### 5. Server-side enforcement
-Edge functions that initiate the relevant flows check the module flag at start and return `503 { error: "module_maintenance" }`:
-- chama STK / contribution functions
-- welfare contribution + withdrawal functions
-- mchango + organization donation functions
-- B2C / withdrawal dispatch functions
+## 2. Client-side crash prevention
 
-A tiny shared helper `supabase/functions/_shared/checkMaintenance.ts` reads `platform_settings.maintenance_modules` once per invocation.
+2.1 **Global ErrorBoundary already exists** — extend it to (a) report to a lightweight `client-error-log` edge function (sampled at 1%), (b) auto-retry chunk-load errors once (`ChunkLoadError` → `window.location.reload()`).
 
-Important: callback/webhook functions (M-Pesa C2B, STK callback, B2C result) are NEVER blocked — they keep recording payments to the database so nothing is lost. Only the user-initiated triggers are gated.
+2.2 **Route-level Suspense boundaries** — wrap each lazy route in App.tsx with its own Suspense + ErrorBoundary so one page failure can't blank the whole shell.
 
-### 6. Reconciliation sweep — new edge function `maintenance-reconcile`
-Invoked automatically when a module flips from on → off (and exposed as a manual "Re-run reconciliation" button per module). Super-admin only.
+2.3 **React Query hardening** — set global defaults: `retry: 2 with exponential backoff`, `staleTime: 30s`, `gcTime: 5min`, `refetchOnWindowFocus: false`, `networkMode: 'offlineFirst'`. Stops thundering-herd refetches.
 
-Input: `{ module: "chama" | "welfare" | "donations" | "withdrawals", since: ISO }`
+2.4 **Request deduplication & throttling** — wrap supabase calls in a thin client that:
+- coalesces identical in-flight reads
+- debounces user-triggered mutations (already partially via `useDebounceAction`)
+- aborts via `AbortController` when component unmounts.
 
-For the given module, between `since` and now, the function:
-- **chama**: finds C2B/STK transactions with `status='pending'` or unallocated `actual_payment_date` rows for chama accounts → runs the existing settlement engine path, fires the standard payment SMS.
-- **welfare**: scans `welfare_contributions` pending rows + raw C2B with welfare account refs → allocates to active cycle, sends SMS.
-- **donations**: scans `mchango_donations` + `organization_donations` for pending/unmatched rows → finalizes and sends donor SMS.
-- **withdrawals**: scans `withdrawals` stuck in `processing` past their lock → re-checks B2C result, completes or surfaces in the existing reconciliation alerts table.
+2.5 **Memory leak audit** — kill setInterval/realtime subscriptions left mounted (notifications, chat, maintenance modules hook). Verify every `supabase.channel(...)` has a `removeChannel` cleanup.
 
-Returns `{ scanned, recovered, failed, items: [...] }` which the admin UI displays inline.
+---
 
-Also fires a `notifications` row to all super_admins: "Reconciliation complete: N payments recovered for <module>".
+## 3. Network resilience
 
-### 7. Memory
-- New `mem://architecture/granular-maintenance-mode.md` documenting modules, flag shape, reconciliation guarantee, and that webhooks are never gated.
-- Update `mem://index.md` Architecture section.
+3.1 **Exponential backoff + jitter** on all retries (login, OTP, STK, withdrawals). Add a shared `retryWithBackoff(fn, {retries, baseMs, jitter})` in `src/utils/retryHelpers.ts` (extend existing file).
 
-### Technical notes
-- The toggle handler on the admin page calls `maintenance-reconcile` only on the off-transition; turning on just records `since=now()`.
-- The sweep reuses existing settlement/SMS code paths — no new allocation logic, just a re-trigger over the time window.
-- Inline banner copy is shared (single component, module name interpolated) to keep wording consistent.
-- No changes to global RLS or roles; this builds on the existing super_admin gate already protecting `AdminMaintenanceMode`.
+3.2 **Offline queue for mutations** — capacitor app: queue write actions (contribution submit, chat send) when offline, flush on reconnect using `useNetworkStatus`.
+
+3.3 **Graceful 429/503 handling** — when Edge Functions return rate-limit or module-maintenance errors, show a non-blocking toast + auto-retry after `Retry-After` header, never throw to ErrorBoundary.
+
+3.4 **CDN-style asset caching** — confirm `vite build` outputs hashed filenames; add long `Cache-Control: immutable` via Vercel headers config for `/assets/*`. Reduces origin load drastically on cold loads.
+
+---
+
+## 4. Rate limiting & abuse control (server)
+
+4.1 **Per-IP + per-user soft limits** at Edge Function layer using existing `rate_limit_attempts` table (already used by `login`, `send-otp`). Extend to: `payment-stk-push`, `b2c-payout`, `maintenance-reconcile`, `admin-sms-broadcast`. Reject with 429 + Retry-After before doing DB work.
+
+4.2 **Idempotency keys** on all financial mutations (already in place for settlement; add to STK initiation) so accidental client retries don't double-charge.
+
+---
+
+## 5. Observability
+
+5.1 **Lightweight client telemetry** — sampled error + slow-render reporter posting to a new `client-telemetry` edge function (fire-and-forget, `keepalive: true`).
+
+5.2 **Edge function structured logs** — standardize `console.log(JSON.stringify({fn, event, latencyMs, status}))` for grep-ability in logs UI.
+
+5.3 **Health dashboard panel** in `AdminDashboard.tsx` showing: DB connection saturation, recent 5xx rate, slowest endpoints (read from `supabase--db_health` style RPC).
+
+---
+
+## 6. Load test & verify
+
+6.1 Document a k6 / autocannon script in `LOAD_TEST.md` targeting public read endpoints + STK init at 1,667 RPS for 5 minutes; record p50/p95/p99 + error rate.
+
+6.2 Acceptance criteria: zero unhandled client exceptions, <1% 5xx, p95 < 800 ms on reads, no PgBouncer saturation > 80%.
+
+---
+
+## Files to touch (high-level)
+
+- **New**: `supabase/functions/_shared/getServiceClient.ts`, `supabase/functions/_shared/edgeCache.ts`, `supabase/functions/client-telemetry/index.ts`, `src/lib/queryClient.ts` (centralize React Query defaults), `src/lib/supabaseSafeCall.ts`, `LOAD_TEST.md`, migration adding composite indexes.
+- **Edit**: `src/App.tsx` (per-route Suspense + ErrorBoundary), `src/components/ErrorBoundary.tsx` (chunk-error reload + telemetry), `src/main.tsx` (queryClient defaults), `src/hooks/useMaintenanceModules.ts` and other realtime hooks (cleanup), `src/utils/retryHelpers.ts`, edge functions listed in §1.2 and §4.1, `src/pages/AdminDashboard.tsx`.
+- **User-action prompt**: upgrade Lovable Cloud instance size (cannot be done from code).
+
+---
+
+## Out of scope (call out to user)
+
+- Horizontal scaling beyond the largest Lovable Cloud tier (would need migration to dedicated infra).
+- M-Pesa Daraja's own rate limits — Safaricom caps STK throughput independently; we can queue but not exceed their quota.
+- Native APK crashes caused by device OS killing background processes (Android OEM-specific).
+
+Approve and I'll execute in this order: capacity & indexes → client resilience → rate limiting → telemetry → load test doc.
