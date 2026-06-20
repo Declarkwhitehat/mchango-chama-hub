@@ -8,6 +8,20 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
+const CHUNK_RELOAD_KEY = "__chunk_reload_attempt__";
+
+function isChunkLoadError(error: Error | null): boolean {
+  if (!error) return false;
+  const msg = (error.message || "").toLowerCase();
+  return (
+    error.name === "ChunkLoadError" ||
+    msg.includes("loading chunk") ||
+    msg.includes("loading css chunk") ||
+    msg.includes("failed to fetch dynamically imported module") ||
+    msg.includes("importing a module script failed")
+  );
+}
+
 export class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   ErrorBoundaryState
@@ -23,10 +37,56 @@ export class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("ErrorBoundary caught:", error, errorInfo);
+
+    // Auto-recover from stale-bundle chunk load errors (post-deploy hash mismatch).
+    // Only try once per session to avoid reload loops.
+    if (isChunkLoadError(error) && typeof window !== "undefined") {
+      try {
+        const attempted = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+        if (!attempted) {
+          sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+          window.location.reload();
+          return;
+        }
+      } catch {
+        // sessionStorage unavailable — fall through to UI
+      }
+    }
+
+    // Fire-and-forget sampled telemetry (1% of errors) to keep load minimal.
+    try {
+      if (Math.random() < 0.01 && typeof navigator !== "undefined" && "sendBeacon" in navigator) {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/client-telemetry`;
+        const blob = new Blob(
+          [
+            JSON.stringify({
+              type: "error",
+              name: error.name,
+              message: (error.message || "").slice(0, 500),
+              stack: (error.stack || "").slice(0, 1000),
+              url: window.location.href,
+              ua: navigator.userAgent.slice(0, 200),
+              ts: Date.now(),
+            }),
+          ],
+          { type: "application/json" }
+        );
+        navigator.sendBeacon(url, blob);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   handleRetry = () => {
     this.setState({ hasError: false, error: null });
+  };
+
+  handleHardReload = () => {
+    try {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    } catch {}
+    window.location.href = "/";
   };
 
   render() {
@@ -44,7 +104,7 @@ export class ErrorBoundary extends React.Component<
               </p>
               <div className="flex gap-2 justify-center">
                 <Button onClick={this.handleRetry}>Try Again</Button>
-                <Button variant="outline" onClick={() => window.location.href = "/"}>
+                <Button variant="outline" onClick={this.handleHardReload}>
                   Go Home
                 </Button>
               </div>

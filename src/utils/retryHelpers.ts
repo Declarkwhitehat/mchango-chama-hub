@@ -23,8 +23,11 @@ export function calculateBackoffDelay(
   config: RetryConfig = DEFAULT_RETRY_CONFIG
 ): number {
   const exponentialDelay = config.baseDelay * Math.pow(2, attemptNumber);
-  return Math.min(exponentialDelay, config.maxDelay);
+  const capped = Math.min(exponentialDelay, config.maxDelay);
+  // Full jitter: random value in [0, capped] avoids thundering herd on shared failures.
+  return Math.floor(Math.random() * capped);
 }
+
 
 /**
  * Sleep for a specified duration
