@@ -205,6 +205,11 @@ export const UsersManagement = () => {
 
       if (error) throw error;
 
+      try {
+        const { logAdminAction } = await import("@/lib/logAdminAction");
+        await logAdminAction("admin.role.revoke", { targetType: "user", targetId: userId });
+      } catch (_) { /* ignore */ }
+
       toast({ title: "Success", description: "Admin role removed" });
       await fetchUsers();
     } catch (error: any) {
