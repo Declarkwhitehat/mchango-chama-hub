@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Handshake } from "lucide-react";
 
 const SPLASH_TEXT = "sisi tuko pamoja je wewe?";
-const TYPING_SPEED = 90;
-const HOLD_DURATION = 1400;
+const TYPING_SPEED = 35;       // was 90ms — ~2.2s shaved off
+const HOLD_DURATION = 350;      // was 1400ms
+
 
 const LETTER_COLORS = [
   "hsl(142, 76%, 46%)",  // green
@@ -32,7 +33,7 @@ const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
       setPhase("holding");
       const t = setTimeout(() => {
         setPhase("fading");
-        setTimeout(onComplete, 700);
+        setTimeout(onComplete, 300); // was 700
       }, HOLD_DURATION);
       return () => clearTimeout(t);
     }
@@ -40,9 +41,19 @@ const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
     return () => clearTimeout(t);
   }, [charCount, onComplete]);
 
+  // Tap-to-skip: low-network users can dismiss the splash instantly.
+  const handleSkip = () => {
+    setPhase("fading");
+    setTimeout(onComplete, 200);
+  };
+
+
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-700 ${
+      onClick={handleSkip}
+      role="button"
+      aria-label="Skip splash screen"
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-300 cursor-pointer ${
         phase === "fading" ? "opacity-0 scale-110" : "opacity-100 scale-100"
       }`}
       style={{
@@ -50,6 +61,7 @@ const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
         transitionProperty: "opacity, transform",
       }}
     >
+
       {/* Glow rings */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div

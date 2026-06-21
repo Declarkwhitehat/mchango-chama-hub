@@ -3,9 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
     <title>Pamojanova — Chama, Mchango & Welfare Platform Kenya</title>
     <meta name="description" content="Kenya's trusted platform for online Chamas, Mchango campaigns, welfare groups & organizations. Secure M-Pesa contributions & rotating savings." />
     <meta name="author" content="Pamojanova" />
@@ -17,9 +14,12 @@
     <!-- Performance: preconnect to backend origin to reduce LCP delay -->
     <link rel="preconnect" href="https://ahhcbwbvueimezmtftte.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://ahhcbwbvueimezmtftte.supabase.co" />
+    <!-- Preconnect to self so first JS chunk fetch reuses the TLS handshake -->
+    <link rel="preconnect" href="https://pamojanova.com" crossorigin />
 
     <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+
 
     <!-- Open Graph -->
     <meta property="og:title" content="Pamojanova — Chama, Mchango & Welfare Platform Kenya" />
@@ -100,21 +100,23 @@
     }
     </script>
 
-    <!-- Clean up any leftover service workers -->
+    <!-- One-time cleanup of any legacy service workers from the old PWA.
+         Runs only once per device; skipping on subsequent loads keeps
+         webview HTTP cache intact for fast native cold-starts on low networks. -->
     <script>
       (function() {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(regs) {
-            regs.forEach(function(reg) { reg.unregister(); });
-          });
-        }
-        if ('caches' in window) {
-          caches.keys().then(function(names) {
-            names.forEach(function(name) { caches.delete(name); });
-          });
-        }
+        try {
+          if (localStorage.getItem('__sw_cleanup_done_v2') === '1') return;
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(reg) { reg.unregister(); });
+            }).catch(function() {});
+          }
+          localStorage.setItem('__sw_cleanup_done_v2', '1');
+        } catch (e) {}
       })();
     </script>
+
 
     <!-- Prevent theme flash -->
     <script>
