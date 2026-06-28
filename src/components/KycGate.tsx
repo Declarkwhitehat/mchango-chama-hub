@@ -23,8 +23,46 @@ interface KycGateProps {
  *  - rejected                   -> red card with reason + resubmit CTA
  */
 export const KycGate = ({ children, featureLabel }: KycGateProps) => {
-  const { profile, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
+
+  // Signed-out users hitting a create page directly (deep link / refresh).
+  // Show a clear log-in card instead of bouncing them silently.
+  if (!loading && !user) {
+    return (
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle>Please log in to continue</CardTitle>
+              <CardDescription>
+                You need to be logged in to create a {featureLabel}.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Log in or create an account, then come back here to set up your {featureLabel}.
+          </p>
+          <Button
+            onClick={() => {
+              try {
+                sessionStorage.setItem("postLoginRedirect", window.location.pathname);
+              } catch { /* noop */ }
+              navigate("/auth");
+            }}
+            className="w-full sm:w-auto"
+          >
+            Log in / Sign up
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Profile not loaded yet — show a lightweight inline loader.
   if (loading || !profile) {

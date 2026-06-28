@@ -74,6 +74,13 @@ export const ProtectedRoute = ({ children, requireKYC = false }: ProtectedRouteP
         redirectAttemptRef.current++;
       }
       lastRedirectRef.current = now;
+      // Remember where the user was trying to go so /auth can send them back.
+      try {
+        const path = location.pathname + location.search;
+        if (path && path !== "/auth") {
+          sessionStorage.setItem("postLoginRedirect", path);
+        }
+      } catch { /* noop */ }
       navigate("/auth", { replace: true });
       return;
     }
