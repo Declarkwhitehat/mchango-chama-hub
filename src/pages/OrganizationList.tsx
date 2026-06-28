@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { SEO } from "@/components/SEO";
+import { guardCreateAction } from "@/lib/requireAuthAndKyc";
 
 const PAGE_SIZE = 20;
 
