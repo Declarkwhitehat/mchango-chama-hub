@@ -380,6 +380,18 @@ const Auth = () => {
     }
   }, [watchedSignupPhone]);
 
+  // Consume any pending post-login redirect set by ProtectedRoute / guard helpers.
+  const consumePostLoginRedirect = (): string | null => {
+    try {
+      const path = sessionStorage.getItem("postLoginRedirect");
+      if (path && path !== "/auth") {
+        sessionStorage.removeItem("postLoginRedirect");
+        return path;
+      }
+    } catch { /* noop */ }
+    return null;
+  };
+
   const [didRedirect, setDidRedirect] = useState(false);
   useEffect(() => {
     if (!user) return;
@@ -391,11 +403,13 @@ const Auth = () => {
         const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
         if (cancelled) return;
         setDidRedirect(true);
-        navigate(data ? "/admin" : "/", { replace: true });
+        const returnTo = consumePostLoginRedirect();
+        navigate(data ? "/admin" : (returnTo ?? "/"), { replace: true });
       } catch {
         if (cancelled) return;
         setDidRedirect(true);
-        navigate("/", { replace: true });
+        const returnTo = consumePostLoginRedirect();
+        navigate(returnTo ?? "/", { replace: true });
       }
     })();
     return () => { cancelled = true; };
