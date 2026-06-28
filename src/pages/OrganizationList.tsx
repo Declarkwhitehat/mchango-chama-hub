@@ -126,7 +126,7 @@ const OrganizationList = () => {
           <p className="text-muted-foreground max-w-2xl mx-auto">Discover and support verified churches, schools, orphanages, NGOs and other organizations making a difference in their communities.</p>
           <div className="flex items-center justify-center gap-3">
             <ShareMenu url={publicShareUrl} title="Support Organizations" text="Discover and support verified organizations on Pamoja Nova" label="Share Public Link" />
-            {user && profile?.kyc_status === 'approved' && <Button onClick={() => navigate('/organizations/create')} className="gap-2"><Plus className="h-4 w-4" />Register Organization</Button>}
+            <Button onClick={() => guardCreateAction({ user, profile, featureLabel: 'organization', navigate, intendedPath: '/organizations/create' }) && navigate('/organizations/create')} className="gap-2"><Plus className="h-4 w-4" />Register Organization</Button>
           </div>
         </div>
 
@@ -145,7 +145,7 @@ const OrganizationList = () => {
             <CardContent className="py-12 text-center">
               <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">{searchQuery || categoryFilter !== "all" ? "No organizations match your search" : "No organizations available yet"}</p>
-              {user && profile?.kyc_status === 'approved' && <Button onClick={() => navigate('/organizations/create')} className="mt-4 gap-2"><Plus className="h-4 w-4" />Register the First Organization</Button>}
+              <Button onClick={() => guardCreateAction({ user, profile, featureLabel: 'organization', navigate, intendedPath: '/organizations/create' }) && navigate('/organizations/create')} className="mt-4 gap-2"><Plus className="h-4 w-4" />Register the First Organization</Button>
             </CardContent>
           </Card>
         ) : (
