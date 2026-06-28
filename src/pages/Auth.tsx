@@ -333,7 +333,7 @@ const Auth = () => {
         const result = await authenticate(storedIdentifier);
         if (result.success) {
           toast.success('Welcome back!');
-          navigate('/', { replace: true });
+          navigate(consumePostLoginRedirect() ?? '/', { replace: true });
         } else {
           setBiometricCancelled(true);
           toast.error('Fingerprint authentication failed. Please use your password.');
@@ -479,7 +479,7 @@ const Auth = () => {
             if (isNative && nativeBiometricConfigured) {
               await storeNativeBiometricSession();
             }
-            navigate("/", { replace: true });
+            navigate(consumePostLoginRedirect() ?? "/", { replace: true });
           }
         }
       }
@@ -748,9 +748,9 @@ const Auth = () => {
         await storeNativeBiometricSession();
       }
 
-      navigate("/", { replace: true });
+      navigate(consumePostLoginRedirect() ?? "/", { replace: true });
     } else {
-      navigate("/", { replace: true });
+      navigate(consumePostLoginRedirect() ?? "/", { replace: true });
     }
   };
 
