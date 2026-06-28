@@ -1,89 +1,51 @@
+## Goal
+Make create-flows clearly communicate requirements across the whole platform:
+1. If the user is **not logged in** and taps any "Create" action (New Campaign, New Chama, Register Org, New Welfare, plus any create button/link), show a friendly prompt telling them to log in, then navigate to `/auth` and return them to the create page after login.
+2. If the user is **logged in but KYC is not approved**, always show a clear message stating KYC verification is required for that specific action, with a direct button to `/kyc-upload` (or the right status: pending / rejected / not submitted) — never a silent block or a redirect to a blank screen.
 
-# Resilience & Scale Hardening Plan (target: 100k RPM)
+This must be consistent everywhere: FAB menu, Home page CTAs, list pages ("Create Chama", "Create Welfare", "Start Campaign", "Register Organization"), and the create pages themselves.
 
-Goal: native APK + website remain responsive and never hard-crash under sustained 100k requests/minute (~1,667 RPS) bursts. Focus on (1) preventing client crashes, (2) shrinking backend load per request, (3) absorbing spikes gracefully, (4) observability so we catch regressions early.
+## Changes
 
----
+### 1. New shared helper: `src/lib/requireAuthAndKyc.ts`
+A single function `guardCreateAction({ user, profile, featureLabel, navigate, intendedPath })` that:
+- If no `user`: `toast.info("Please log in to create a <featureLabel>")`, store `intendedPath` in `sessionStorage` as `postLoginRedirect`, navigate to `/auth`. Return `false`.
+- If `profile.kyc_status !== 'approved'`: `toast.warning` with the exact reason ("Verify your identity first to create a <featureLabel>" / "Your KYC is under review" / "Your KYC was rejected — please resubmit"), navigate to `/kyc-upload` (or `/profile` when pending). Return `false`.
+- Else return `true`.
 
-## 1. Backend capacity (Lovable Cloud / Postgres)
+### 2. `FloatingActionMenu.tsx`
+- Remove the current hard hide based on `profile?.kyc_status !== "approved"`. Instead, always show the FAB for logged-in OR logged-out users (still hidden on admin/auth/create paths).
+- For logged-out users: tapping any action calls the guard → toast + redirect to `/auth`.
+- For logged-in but un-KYC'd users: tapping any action calls the guard → toast naming the specific feature ("You need verified KYC to create a Chama") + redirect to `/kyc-upload`.
 
-1.1 **Upgrade the Lovable Cloud instance** — the default compute cannot sustain 1.6k RPS of authenticated PostgREST + Edge Function traffic. User action: Backend → Advanced settings → Upgrade instance to a larger tier. I'll surface a "View Backend" CTA after the plan ships.
+### 3. `KycGate.tsx`
+- Add a logged-out state branch: if `!user`, render a card "Please log in to create a <featureLabel>" with a "Log in" button that navigates to `/auth` and stores the return path. This way users who deep-link to `/chama/create`, `/welfare/create`, `/mchango/create`, `/organizations/create` while logged out get a clear page instead of a generic redirect.
+- Keep all existing KYC states (approved, pending, rejected, not_submitted) untouched — they already say the right things.
 
-1.2 **Connection pooling discipline** — audit every Edge Function for `createClient` calls inside request handlers; move to module-scope singletons so PgBouncer connections aren't churned. Add a shared `getServiceClient()` helper in `supabase/functions/_shared/`.
+### 4. `ProtectedRoute.tsx`
+- When redirecting unauthenticated users to `/auth`, store `location.pathname` in `sessionStorage.postLoginRedirect` so post-login can return them to the create page they were trying to reach.
 
-1.3 **Slow-query sweep** — run `supabase--slow_queries`, add missing composite indexes for the hottest paths: chama_contributions(chama_id, created_at), welfare_contributions(welfare_id, created_at), donations(mchango_id, created_at), withdrawals(user_id, status), audit_logs(user_id, created_at).
+### 5. `Auth` page (`src/pages/Auth.tsx` — read first)
+- After successful login, if `sessionStorage.postLoginRedirect` exists, consume it and `navigate(returnTo)` instead of the default landing.
 
-1.4 **Cache hot reads at the edge** — short TTL (10–30s) in-memory cache inside Edge Functions for read-mostly endpoints (platform_settings, maintenance_modules, commission config, paybill config). Reduces 90%+ of repeated Postgres hits.
+### 6. Audit and wire the guard on every "Create" entry point
+Scan and update these surfaces to use `guardCreateAction` (or to be wrapped by `KycGate`) so behavior is uniform:
+- `src/pages/Home.tsx` — quick-action create buttons
+- `src/pages/ChamaList.tsx` — "Create Chama" button
+- `src/pages/WelfareList.tsx` — "Create Welfare" button
+- `src/pages/MchangoList.tsx` and `MchangoExplore.tsx` — "Start Campaign" button
+- `src/pages/OrganizationList.tsx` — "Register Organization" button
+- `FloatingActionMenu.tsx` — as above
 
----
+On each, the button stays visible; click runs the guard so the user always receives a clear message.
 
-## 2. Client-side crash prevention
+## What stays the same
+- KYC rules, who can create, edge functions, DB — unchanged.
+- Create-page forms themselves — unchanged; only their gate wrappers improve.
+- Admin / auth routes — unaffected.
 
-2.1 **Global ErrorBoundary already exists** — extend it to (a) report to a lightweight `client-error-log` edge function (sampled at 1%), (b) auto-retry chunk-load errors once (`ChunkLoadError` → `window.location.reload()`).
-
-2.2 **Route-level Suspense boundaries** — wrap each lazy route in App.tsx with its own Suspense + ErrorBoundary so one page failure can't blank the whole shell.
-
-2.3 **React Query hardening** — set global defaults: `retry: 2 with exponential backoff`, `staleTime: 30s`, `gcTime: 5min`, `refetchOnWindowFocus: false`, `networkMode: 'offlineFirst'`. Stops thundering-herd refetches.
-
-2.4 **Request deduplication & throttling** — wrap supabase calls in a thin client that:
-- coalesces identical in-flight reads
-- debounces user-triggered mutations (already partially via `useDebounceAction`)
-- aborts via `AbortController` when component unmounts.
-
-2.5 **Memory leak audit** — kill setInterval/realtime subscriptions left mounted (notifications, chat, maintenance modules hook). Verify every `supabase.channel(...)` has a `removeChannel` cleanup.
-
----
-
-## 3. Network resilience
-
-3.1 **Exponential backoff + jitter** on all retries (login, OTP, STK, withdrawals). Add a shared `retryWithBackoff(fn, {retries, baseMs, jitter})` in `src/utils/retryHelpers.ts` (extend existing file).
-
-3.2 **Offline queue for mutations** — capacitor app: queue write actions (contribution submit, chat send) when offline, flush on reconnect using `useNetworkStatus`.
-
-3.3 **Graceful 429/503 handling** — when Edge Functions return rate-limit or module-maintenance errors, show a non-blocking toast + auto-retry after `Retry-After` header, never throw to ErrorBoundary.
-
-3.4 **CDN-style asset caching** — confirm `vite build` outputs hashed filenames; add long `Cache-Control: immutable` via Vercel headers config for `/assets/*`. Reduces origin load drastically on cold loads.
-
----
-
-## 4. Rate limiting & abuse control (server)
-
-4.1 **Per-IP + per-user soft limits** at Edge Function layer using existing `rate_limit_attempts` table (already used by `login`, `send-otp`). Extend to: `payment-stk-push`, `b2c-payout`, `maintenance-reconcile`, `admin-sms-broadcast`. Reject with 429 + Retry-After before doing DB work.
-
-4.2 **Idempotency keys** on all financial mutations (already in place for settlement; add to STK initiation) so accidental client retries don't double-charge.
-
----
-
-## 5. Observability
-
-5.1 **Lightweight client telemetry** — sampled error + slow-render reporter posting to a new `client-telemetry` edge function (fire-and-forget, `keepalive: true`).
-
-5.2 **Edge function structured logs** — standardize `console.log(JSON.stringify({fn, event, latencyMs, status}))` for grep-ability in logs UI.
-
-5.3 **Health dashboard panel** in `AdminDashboard.tsx` showing: DB connection saturation, recent 5xx rate, slowest endpoints (read from `supabase--db_health` style RPC).
-
----
-
-## 6. Load test & verify
-
-6.1 Document a k6 / autocannon script in `LOAD_TEST.md` targeting public read endpoints + STK init at 1,667 RPS for 5 minutes; record p50/p95/p99 + error rate.
-
-6.2 Acceptance criteria: zero unhandled client exceptions, <1% 5xx, p95 < 800 ms on reads, no PgBouncer saturation > 80%.
-
----
-
-## Files to touch (high-level)
-
-- **New**: `supabase/functions/_shared/getServiceClient.ts`, `supabase/functions/_shared/edgeCache.ts`, `supabase/functions/client-telemetry/index.ts`, `src/lib/queryClient.ts` (centralize React Query defaults), `src/lib/supabaseSafeCall.ts`, `LOAD_TEST.md`, migration adding composite indexes.
-- **Edit**: `src/App.tsx` (per-route Suspense + ErrorBoundary), `src/components/ErrorBoundary.tsx` (chunk-error reload + telemetry), `src/main.tsx` (queryClient defaults), `src/hooks/useMaintenanceModules.ts` and other realtime hooks (cleanup), `src/utils/retryHelpers.ts`, edge functions listed in §1.2 and §4.1, `src/pages/AdminDashboard.tsx`.
-- **User-action prompt**: upgrade Lovable Cloud instance size (cannot be done from code).
-
----
-
-## Out of scope (call out to user)
-
-- Horizontal scaling beyond the largest Lovable Cloud tier (would need migration to dedicated infra).
-- M-Pesa Daraja's own rate limits — Safaricom caps STK throughput independently; we can queue but not exceed their quota.
-- Native APK crashes caused by device OS killing background processes (Android OEM-specific).
-
-Approve and I'll execute in this order: capacity & indexes → client resilience → rate limiting → telemetry → load test doc.
+## UX summary the customer will see
+- Not logged in + tap Create → toast "Please log in to create a Chama" → `/auth` → after login, returns to `/chama/create`.
+- Logged in, no KYC + tap Create → toast "Verify your identity first to create a Chama" → `/kyc-upload`.
+- Logged in, KYC pending + tap Create → toast "Your KYC is under review" → stays/visits profile, no blank page.
+- Logged in, KYC approved → create page loads normally.
