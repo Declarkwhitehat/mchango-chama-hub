@@ -55,6 +55,7 @@ export function ChatSupport() {
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [showCallbackForm, setShowCallbackForm] = useState(false);
+  const [showEndChatConfirm, setShowEndChatConfirm] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
