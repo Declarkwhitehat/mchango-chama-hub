@@ -2,6 +2,17 @@ import { useState, useRef, useEffect } from 'react';
 import { X, Languages, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import chatBotAvatar from '@/assets/chat-bot-avatar.jpg';
 import { ChatMessage } from './ChatMessage';
 import { CallbackForm } from './CallbackForm';
@@ -44,6 +55,7 @@ export function ChatSupport() {
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [showCallbackForm, setShowCallbackForm] = useState(false);
+  const [showEndChatConfirm, setShowEndChatConfirm] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -231,6 +243,7 @@ export function ChatSupport() {
   };
 
   const handleEndChat = async () => {
+    setShowEndChatConfirm(false);
     try {
       await supabase.from('chat_messages').delete().eq('session_id', sessionId);
     } catch (e) {
@@ -250,7 +263,7 @@ export function ChatSupport() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 z-50 h-11 w-11 rounded-full overflow-hidden shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 touch-manipulation border-2 border-primary/30"
+          className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 z-[100] h-11 w-11 rounded-full overflow-hidden shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 touch-manipulation border-2 border-primary/30"
           aria-label="Open chat"
         >
           <img src={chatBotAvatar} alt="Chat" className="h-full w-full object-cover" />
@@ -260,7 +273,7 @@ export function ChatSupport() {
       {/* Chat Window */}
       {isOpen && (
         <Card
-          className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-screen max-md:bottom-0 max-md:right-0 max-md:left-0 max-md:top-0 max-md:rounded-none"
+          className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-[100] md:w-[400px] md:h-[600px] max-md:w-screen max-md:bottom-0 max-md:right-0 max-md:left-0 max-md:top-0 max-md:rounded-none"
           style={keyboardOffset > 0 ? { height: `calc(100dvh - ${keyboardOffset}px)`, maxHeight: `calc(100dvh - ${keyboardOffset}px)` } : { height: typeof window !== 'undefined' && window.innerWidth < 768 ? '100dvh' : undefined }}
         >
 
@@ -274,14 +287,37 @@ export function ChatSupport() {
                 <h3 className="font-semibold text-sm">AI Assistant</h3>
                 <p className="text-xs text-primary-foreground/70">Online • Ready to help</p>
               </div>
-              <button
-                onClick={handleEndChat}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive text-destructive-foreground shadow hover:bg-destructive/90 active:scale-95 transition-all touch-manipulation text-xs font-medium"
-                aria-label="End chat"
-              >
-                <X className="h-3.5 w-3.5" />
-                End Chat
-              </button>
+              <AlertDialog open={showEndChatConfirm} onOpenChange={setShowEndChatConfirm}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="min-h-[40px] min-w-[40px] px-2.5 py-2 gap-1.5 rounded-full text-xs font-semibold shadow-md active:scale-95 transition-transform"
+                    aria-label="End chat"
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="hidden sm:inline">End Chat</span>
+                    <span className="sm:hidden">End</span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>End this chat?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will clear your current conversation. You can start a fresh chat anytime.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setShowEndChatConfirm(false)}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleEndChat}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      End Chat
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
             <div className="flex items-center gap-2 px-4 pb-2">
               <Languages className="h-3 w-3" />
