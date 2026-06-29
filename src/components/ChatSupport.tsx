@@ -290,37 +290,13 @@ export function ChatSupport() {
                 <h3 className="font-semibold text-sm">AI Assistant</h3>
                 <p className="text-xs text-primary-foreground/70">Online • Ready to help</p>
               </div>
-              <AlertDialog open={showEndChatConfirm} onOpenChange={setShowEndChatConfirm}>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="min-h-[40px] min-w-[40px] px-2.5 py-2 gap-1.5 rounded-full text-xs font-semibold shadow-md active:scale-95 transition-transform"
-                    aria-label="End chat"
-                  >
-                    <X className="h-4 w-4" />
-                    <span className="hidden sm:inline">End Chat</span>
-                    <span className="sm:hidden">End</span>
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>End this chat?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will clear your current conversation. You can start a fresh chat anytime.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setShowEndChatConfirm(false)}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleEndChat}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      End Chat
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="h-9 w-9 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 flex items-center justify-center transition-colors"
+                aria-label="Close chat"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
             <div className="flex items-center gap-2 px-4 pb-2">
               <Languages className="h-3 w-3" />
