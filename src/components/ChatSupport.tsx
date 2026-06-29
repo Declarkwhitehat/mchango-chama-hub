@@ -243,6 +243,7 @@ export function ChatSupport() {
   };
 
   const handleEndChat = async () => {
+    setShowEndChatConfirm(false);
     try {
       await supabase.from('chat_messages').delete().eq('session_id', sessionId);
     } catch (e) {
