@@ -1,51 +1,35 @@
-## Goal
-Make create-flows clearly communicate requirements across the whole platform:
-1. If the user is **not logged in** and taps any "Create" action (New Campaign, New Chama, Register Org, New Welfare, plus any create button/link), show a friendly prompt telling them to log in, then navigate to `/auth` and return them to the create page after login.
-2. If the user is **logged in but KYC is not approved**, always show a clear message stating KYC verification is required for that specific action, with a direct button to `/kyc-upload` (or the right status: pending / rejected / not submitted) — never a silent block or a redirect to a blank screen.
+## Problem
+On Android, typed text in the customer-care chat input is not visible. The soft keyboard overlaps the input, and the textarea/input doesn't scroll or resize correctly so the caret sits below the visible area.
 
-This must be consistent everywhere: FAB menu, Home page CTAs, list pages ("Create Chama", "Create Welfare", "Start Campaign", "Register Organization"), and the create pages themselves.
+## Root cause
+`src/components/ChatSupport.tsx` currently uses a `visualViewport` listener that shrinks the card via `calc(100dvh - keyboardHeight)`, but:
+- It's a single-line `<Input>` whose caret can still be hidden behind the keyboard on Android WebView because the parent card height is set, not the input position.
+- No `scrollIntoView` is run when the viewport actually resizes (only on focus, with a fixed 300ms delay that fires before the keyboard finishes animating).
+- The messages `ScrollArea` doesn't recompute, so the input row can be pushed off-screen inside the flex container.
+- No `enterkeyhint`, `inputMode`, or `autoComplete` hints; font-size <16px can also trigger Android zoom that hides the field.
 
-## Changes
+## Fix plan (frontend only, `src/components/ChatSupport.tsx`)
 
-### 1. New shared helper: `src/lib/requireAuthAndKyc.ts`
-A single function `guardCreateAction({ user, profile, featureLabel, navigate, intendedPath })` that:
-- If no `user`: `toast.info("Please log in to create a <featureLabel>")`, store `intendedPath` in `sessionStorage` as `postLoginRedirect`, navigate to `/auth`. Return `false`.
-- If `profile.kyc_status !== 'approved'`: `toast.warning` with the exact reason ("Verify your identity first to create a <featureLabel>" / "Your KYC is under review" / "Your KYC was rejected — please resubmit"), navigate to `/kyc-upload` (or `/profile` when pending). Return `false`.
-- Else return `true`.
+1. **Reliable viewport tracking**
+   - Keep the `visualViewport` listener but also handle `scroll` events on it (Android fires scroll, not just resize, when the keyboard opens).
+   - Store `keyboardHeight` and apply it as `paddingBottom` on the input container (sticky bottom) instead of only shrinking the card. This guarantees the input row floats above the keyboard regardless of flex math.
 
-### 2. `FloatingActionMenu.tsx`
-- Remove the current hard hide based on `profile?.kyc_status !== "approved"`. Instead, always show the FAB for logged-in OR logged-out users (still hidden on admin/auth/create paths).
-- For logged-out users: tapping any action calls the guard → toast + redirect to `/auth`.
-- For logged-in but un-KYC'd users: tapping any action calls the guard → toast naming the specific feature ("You need verified KYC to create a Chama") + redirect to `/kyc-upload`.
+2. **Keep input visible**
+   - On every `visualViewport` resize/scroll event AND on input `focus`, call `inputRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })` inside a `requestAnimationFrame` (not a hard 300ms timer).
+   - Also re-scroll the messages list to bottom whenever keyboard height changes so the latest message + input stay in view.
 
-### 3. `KycGate.tsx`
-- Add a logged-out state branch: if `!user`, render a card "Please log in to create a <featureLabel>" with a "Log in" button that navigates to `/auth` and stores the return path. This way users who deep-link to `/chama/create`, `/welfare/create`, `/mchango/create`, `/organizations/create` while logged out get a clear page instead of a generic redirect.
-- Keep all existing KYC states (approved, pending, rejected, not_submitted) untouched — they already say the right things.
+3. **Prevent Android zoom / caret hiding**
+   - Force input `font-size: 16px` (Tailwind `text-base`) so Android WebView does not auto-zoom on focus (auto-zoom is what most often hides the caret).
+   - Add `enterKeyHint="send"`, `inputMode="text"`, `autoComplete="off"`, `autoCorrect="off"`, `autoCapitalize="sentences"` for predictable keyboard behavior.
 
-### 4. `ProtectedRoute.tsx`
-- When redirecting unauthenticated users to `/auth`, store `location.pathname` in `sessionStorage.postLoginRedirect` so post-login can return them to the create page they were trying to reach.
+4. **Layout hardening**
+   - Wrap input row in a `sticky bottom-0 bg-background` container with `pb-[env(safe-area-inset-bottom)]` so it never gets clipped by the gesture bar.
+   - Use `min-h-0` on the flex children that contain the `ScrollArea` so the input row is never pushed out of the card.
+   - Replace fixed `h-[500px]` with `h-[100dvh] max-md:h-[100dvh] md:h-[600px]` and a proper `flex-col` so the input always has a reserved slot at the bottom.
 
-### 5. `Auth` page (`src/pages/Auth.tsx` — read first)
-- After successful login, if `sessionStorage.postLoginRedirect` exists, consume it and `navigate(returnTo)` instead of the default landing.
+5. **No behavior change elsewhere**
+   - Header, End Chat button, message rendering, and chat session logic stay exactly as they are.
 
-### 6. Audit and wire the guard on every "Create" entry point
-Scan and update these surfaces to use `guardCreateAction` (or to be wrapped by `KycGate`) so behavior is uniform:
-- `src/pages/Home.tsx` — quick-action create buttons
-- `src/pages/ChamaList.tsx` — "Create Chama" button
-- `src/pages/WelfareList.tsx` — "Create Welfare" button
-- `src/pages/MchangoList.tsx` and `MchangoExplore.tsx` — "Start Campaign" button
-- `src/pages/OrganizationList.tsx` — "Register Organization" button
-- `FloatingActionMenu.tsx` — as above
-
-On each, the button stays visible; click runs the guard so the user always receives a clear message.
-
-## What stays the same
-- KYC rules, who can create, edge functions, DB — unchanged.
-- Create-page forms themselves — unchanged; only their gate wrappers improve.
-- Admin / auth routes — unaffected.
-
-## UX summary the customer will see
-- Not logged in + tap Create → toast "Please log in to create a Chama" → `/auth` → after login, returns to `/chama/create`.
-- Logged in, no KYC + tap Create → toast "Verify your identity first to create a Chama" → `/kyc-upload`.
-- Logged in, KYC pending + tap Create → toast "Your KYC is under review" → stays/visits profile, no blank page.
-- Logged in, KYC approved → create page loads normally.
+## Verification
+- Build typecheck.
+- Drive Playwright at 412×915 (Android viewport), focus the input, simulate keyboard height via `page.evaluate` on `visualViewport`, screenshot to confirm caret + typed text remain visible above the keyboard region.
