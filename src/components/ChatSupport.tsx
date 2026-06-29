@@ -66,23 +66,26 @@ export function ChatSupport() {
     if (!isOpen) return;
     const vv = (window as any).visualViewport as VisualViewport | undefined;
     if (!vv) return;
+    let raf = 0;
     const handler = () => {
       const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
       setKeyboardOffset(offset);
-      // Keep latest message + input visible
-      setTimeout(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
         messagesEndRef.current?.scrollIntoView({ block: 'end' });
-        inputRef.current?.scrollIntoView({ block: 'center' });
-      }, 50);
+        inputRef.current?.scrollIntoView({ block: 'end' });
+      });
     };
     vv.addEventListener('resize', handler);
     vv.addEventListener('scroll', handler);
     handler();
     return () => {
+      cancelAnimationFrame(raf);
       vv.removeEventListener('resize', handler);
       vv.removeEventListener('scroll', handler);
     };
   }, [isOpen]);
+
 
   useEffect(() => {
     const loadChatHistory = async () => {
