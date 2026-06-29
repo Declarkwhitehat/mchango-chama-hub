@@ -382,15 +382,21 @@ export function ChatSupport() {
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSendMessage(); } }}
                   onFocus={() => {
-                    setTimeout(() => {
-                      inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                    }, 300);
+                    requestAnimationFrame(() => {
+                      inputRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+                    });
                   }}
+                  enterKeyHint="send"
+                  inputMode="text"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="sentences"
                   placeholder="Type your message..."
                   disabled={isStreaming}
-                  className="flex-1 px-3 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-primary bg-background text-base"
+                  style={{ fontSize: '16px' }}
+                  className="flex-1 px-3 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
                 />
                 <Button 
                   size="icon"
@@ -402,6 +408,7 @@ export function ChatSupport() {
                 </Button>
               </div>
             </div>
+
           )}
         </Card>
       )}
