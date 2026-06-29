@@ -18,6 +18,7 @@ import { ChatMessage } from './ChatMessage';
 import { CallbackForm } from './CallbackForm';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 interface Message {
   role: 'user' | 'assistant';
