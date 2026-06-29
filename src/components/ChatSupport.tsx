@@ -336,7 +336,7 @@ export function ChatSupport() {
               onCancel={() => setShowCallbackForm(false)}
             />
           ) : (
-            <div className="p-3 border-t flex-shrink-0 bg-background" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+            <div className="p-3 border-t flex-shrink-0 bg-background sticky bottom-0" style={{ paddingBottom: keyboardOffset > 0 ? '0.75rem' : 'max(0.75rem, env(safe-area-inset-bottom))' }}>
               <div className="flex gap-2">
                 <input
                   ref={inputRef}
