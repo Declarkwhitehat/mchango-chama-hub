@@ -59,30 +59,47 @@ export function ChatSupport() {
   const [currentQuestion, setCurrentQuestion] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [mobileViewport, setMobileViewport] = useState<{ height: number; top: number } | null>(null);
 
   // Track Android/iOS soft keyboard via visualViewport so input stays visible
   useEffect(() => {
     if (!isOpen) return;
-    const vv = (window as any).visualViewport as VisualViewport | undefined;
-    if (!vv) return;
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    if (!isMobile) {
+      setMobileViewport(null);
+      return;
+    }
+    const vv = window.visualViewport;
     let raf = 0;
+    let scrollTimer = 0;
     const handler = () => {
-      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      setKeyboardOffset(offset);
+      const visibleHeight = Math.floor(vv?.height ?? window.innerHeight);
+      const visibleTop = Math.floor(vv?.offsetTop ?? 0);
+      setMobileViewport({ height: visibleHeight, top: visibleTop });
       cancelAnimationFrame(raf);
+      window.clearTimeout(scrollTimer);
       raf = requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({ block: 'end' });
-        inputRef.current?.scrollIntoView({ block: 'end' });
+        messagesEndRef.current?.scrollIntoView({ block: 'nearest' });
+        inputRef.current?.scrollIntoView({ block: 'nearest' });
+        scrollTimer = window.setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ block: 'nearest' });
+          inputRef.current?.scrollIntoView({ block: 'nearest' });
+        }, 260);
       });
     };
-    vv.addEventListener('resize', handler);
-    vv.addEventListener('scroll', handler);
+    vv?.addEventListener('resize', handler);
+    vv?.addEventListener('scroll', handler);
+    window.addEventListener('resize', handler);
+    window.addEventListener('orientationchange', handler);
     handler();
     return () => {
       cancelAnimationFrame(raf);
-      vv.removeEventListener('resize', handler);
-      vv.removeEventListener('scroll', handler);
+      window.clearTimeout(scrollTimer);
+      vv?.removeEventListener('resize', handler);
+      vv?.removeEventListener('scroll', handler);
+      window.removeEventListener('resize', handler);
+      window.removeEventListener('orientationchange', handler);
+      setMobileViewport(null);
     };
   }, [isOpen]);
 
@@ -276,8 +293,8 @@ export function ChatSupport() {
       {/* Chat Window */}
       {isOpen && (
         <Card
-          className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-[100] md:w-[400px] md:h-[600px] max-md:w-screen max-md:bottom-0 max-md:right-0 max-md:left-0 max-md:top-0 max-md:rounded-none"
-          style={keyboardOffset > 0 ? { height: `calc(100dvh - ${keyboardOffset}px)`, maxHeight: `calc(100dvh - ${keyboardOffset}px)` } : { height: typeof window !== 'undefined' && window.innerWidth < 768 ? '100dvh' : undefined }}
+          className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col overflow-hidden shadow-2xl z-[100] md:w-[400px] md:h-[600px] max-md:w-screen max-md:bottom-auto max-md:right-0 max-md:left-0 max-md:top-0 max-md:rounded-none max-md:h-[100dvh] max-md:max-h-[100dvh]"
+          style={mobileViewport ? { height: `${mobileViewport.height}px`, maxHeight: `${mobileViewport.height}px`, top: `${mobileViewport.top}px` } : undefined}
         >
 
           {/* Header */}
@@ -314,7 +331,7 @@ export function ChatSupport() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 overscroll-contain">
             {isLoading ? (
               <div className="flex justify-center items-center h-full">
                 <div className="flex gap-2">
@@ -385,8 +402,8 @@ export function ChatSupport() {
               onCancel={() => setShowCallbackForm(false)}
             />
           ) : (
-            <div className="p-3 border-t flex-shrink-0 bg-background sticky bottom-0" style={{ paddingBottom: keyboardOffset > 0 ? '0.75rem' : 'max(0.75rem, env(safe-area-inset-bottom))' }}>
-              <div className="flex gap-2">
+            <div className="p-3 border-t flex-shrink-0 bg-background" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+              <div className="flex min-h-11 items-center gap-2">
                 <input
                   ref={inputRef}
                   type="text"
@@ -394,9 +411,10 @@ export function ChatSupport() {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSendMessage(); } }}
                   onFocus={() => {
-                    requestAnimationFrame(() => {
-                      inputRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
-                    });
+                    window.setTimeout(() => {
+                      messagesEndRef.current?.scrollIntoView({ block: 'nearest' });
+                      inputRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }, 120);
                   }}
                   enterKeyHint="send"
                   inputMode="text"
@@ -406,13 +424,13 @@ export function ChatSupport() {
                   placeholder="Type your message..."
                   disabled={isStreaming}
                   style={{ fontSize: '16px' }}
-                  className="flex-1 px-3 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
+                  className="h-11 min-h-11 flex-1 rounded-full border bg-background px-4 py-2 text-foreground caret-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <Button 
                   size="icon"
                   onClick={handleSendMessage}
                   disabled={!inputValue.trim() || isStreaming}
-                  className="h-10 w-10 rounded-full flex-shrink-0"
+                  className="h-11 w-11 rounded-full flex-shrink-0"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
