@@ -277,6 +277,11 @@ export function ChatSupport() {
     setMessages([{ role: 'assistant', content: LANGUAGE_GREETINGS[language], timestamp: new Date() }]);
     setShowCallbackForm(false);
     setIsOpen(false);
+    const origin = originRouteRef.current;
+    originRouteRef.current = null;
+    if (origin && origin !== window.location.pathname + window.location.search) {
+      navigate(origin);
+    }
   };
 
 
