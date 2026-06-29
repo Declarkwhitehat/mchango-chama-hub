@@ -1,23 +1,16 @@
-## Plan
+## Goal
+When the user clicks **End Chat** in the customer care bot, clear the chat session and return them to the page they were on before opening the chat (e.g., Dashboard).
 
-1. **Fix the chat window sizing on native mobile**
-   - Replace the current `height: 100dvh - keyboardOffset` approach with a safer layout that uses the visible viewport height directly.
-   - Keep the chat panel pinned above the Android keyboard instead of letting the keyboard cover the input area.
+## Changes
+**File:** `src/components/ChatSupport.tsx`
 
-2. **Make the input row always visible while typing**
-   - Ensure the input container is fixed at the bottom of the chat panel and never hidden behind the keyboard.
-   - Add stable height/min-height rules so the text field does not collapse or expand incorrectly.
-   - Keep the send button visible and aligned with the input.
+1. When the chat is opened (`setIsOpen(true)`), capture the current location (`window.location.pathname + search`) into a ref `originRouteRef`.
+2. In the End Chat confirm handler:
+   - Clear messages, `chat-session-id`, and any draft input (already done).
+   - Close the chat panel (`setIsOpen(false)`).
+   - If the user has navigated elsewhere while chatting, use `react-router`'s `useNavigate` to navigate back to `originRouteRef.current`. If they're still on the same route, just close the panel.
+3. The header **X** (Close) stays as-is — it only collapses without clearing or navigating.
 
-3. **Improve keyboard focus behavior**
-   - On input focus and viewport resize, scroll the messages area and the input into view after the keyboard animation finishes.
-   - Avoid automatic layout jumps that push the typed text under the keyboard prediction bar.
-
-4. **Preserve current chat behavior**
-   - Keep End Chat centered above the input.
-   - Keep message deletion when End Chat is confirmed.
-   - Keep existing greeting, language selector, callback form, and send-message logic unchanged.
-
-5. **Verify with mobile simulation**
-   - Test the chat at a narrow Android-like viewport.
-   - Confirm typed text remains visible in the input, the send button remains clickable, and End Chat stays above the input.
+## Notes
+- Chat is a global floating widget, so "going back" means restoring the route active at the moment the chat was opened, not browser `history.back()` (which could leave the app).
+- No backend or business logic changes.

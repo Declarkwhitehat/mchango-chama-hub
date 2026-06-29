@@ -18,6 +18,7 @@ import { ChatMessage } from './ChatMessage';
 import { CallbackForm } from './CallbackForm';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -59,6 +60,8 @@ export function ChatSupport() {
   const [currentQuestion, setCurrentQuestion] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const originRouteRef = useRef<string | null>(null);
+  const navigate = useNavigate();
   const [mobileViewport, setMobileViewport] = useState<{ height: number; top: number } | null>(null);
 
   // Track Android/iOS soft keyboard via visualViewport so input stays visible
@@ -274,6 +277,11 @@ export function ChatSupport() {
     setMessages([{ role: 'assistant', content: LANGUAGE_GREETINGS[language], timestamp: new Date() }]);
     setShowCallbackForm(false);
     setIsOpen(false);
+    const origin = originRouteRef.current;
+    originRouteRef.current = null;
+    if (origin && origin !== window.location.pathname + window.location.search) {
+      navigate(origin);
+    }
   };
 
 
@@ -282,7 +290,10 @@ export function ChatSupport() {
       {/* Chat trigger — bottom-right, minimal */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            originRouteRef.current = window.location.pathname + window.location.search;
+            setIsOpen(true);
+          }}
           className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 z-[100] h-11 w-11 rounded-full overflow-hidden shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 touch-manipulation border-2 border-primary/30"
           aria-label="Open chat"
         >
