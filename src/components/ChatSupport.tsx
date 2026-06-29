@@ -342,6 +342,40 @@ export function ChatSupport() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* End Chat — centered between messages and input */}
+          <div className="flex justify-center py-2 flex-shrink-0 bg-background border-t border-b">
+            <AlertDialog open={showEndChatConfirm} onOpenChange={setShowEndChatConfirm}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="min-h-[44px] px-5 py-2 rounded-full text-xs font-semibold shadow-md active:scale-95 transition-transform"
+                  aria-label="End chat"
+                >
+                  <X className="h-4 w-4 mr-1.5" />
+                  End Chat
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>End this chat?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will clear your current conversation. You can start a fresh chat anytime.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setShowEndChatConfirm(false)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleEndChat}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    End Chat
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+
           {/* Input */}
           {showCallbackForm ? (
             <CallbackForm 
