@@ -47,6 +47,30 @@ export function ChatSupport() {
   const [currentQuestion, setCurrentQuestion] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  // Track Android/iOS soft keyboard via visualViewport so input stays visible
+  useEffect(() => {
+    if (!isOpen) return;
+    const vv = (window as any).visualViewport as VisualViewport | undefined;
+    if (!vv) return;
+    const handler = () => {
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardOffset(offset);
+      // Keep latest message + input visible
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ block: 'end' });
+        inputRef.current?.scrollIntoView({ block: 'center' });
+      }, 50);
+    };
+    vv.addEventListener('resize', handler);
+    vv.addEventListener('scroll', handler);
+    handler();
+    return () => {
+      vv.removeEventListener('resize', handler);
+      vv.removeEventListener('scroll', handler);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     const loadChatHistory = async () => {
