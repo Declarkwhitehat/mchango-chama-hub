@@ -206,6 +206,20 @@ export function ChatSupport() {
     saveMessage(successMessage);
   };
 
+  const handleEndChat = async () => {
+    try {
+      await supabase.from('chat_messages').delete().eq('session_id', sessionId);
+    } catch (e) {
+      console.error('Error clearing chat:', e);
+    }
+    localStorage.removeItem('chat-session-id');
+    setInputValue('');
+    setMessages([{ role: 'assistant', content: LANGUAGE_GREETINGS[language], timestamp: new Date() }]);
+    setShowCallbackForm(false);
+    setIsOpen(false);
+  };
+
+
   return (
     <>
       {/* Chat trigger — bottom-right, minimal */}
