@@ -2,17 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { X, Languages, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import chatBotAvatar from '@/assets/chat-bot-avatar.jpg';
 import { ChatMessage } from './ChatMessage';
 import { CallbackForm } from './CallbackForm';
@@ -32,16 +21,18 @@ const LANGUAGE_GREETINGS = {
   sheng: 'Vipi! 👋 Niko hapa ku-help na maswali zote za Chama Groups, Mchango Campaigns, na Organizations. Naweza ku-help aje leo?\n\n💡 Unataka kuongelesha na mse? Niambie tu nita-arrange callback!',
 };
 
+const createChatSessionId = () => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
 export function ChatSupport() {
   const [isOpen, setIsOpen] = useState(false);
   const [language, setLanguage] = useState<'english' | 'swahili' | 'sheng'>(() => {
     const saved = localStorage.getItem('chat-language');
     return (saved as 'english' | 'swahili' | 'sheng') || 'english';
   });
-  const [sessionId] = useState<string>(() => {
+  const [sessionId, setSessionId] = useState<string>(() => {
     const saved = localStorage.getItem('chat-session-id');
     if (saved) return saved;
-    const newId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newId = createChatSessionId();
     localStorage.setItem('chat-session-id', newId);
     return newId;
   });
@@ -56,7 +47,6 @@ export function ChatSupport() {
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [showCallbackForm, setShowCallbackForm] = useState(false);
-  const [showEndChatConfirm, setShowEndChatConfirm] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -266,13 +256,14 @@ export function ChatSupport() {
   };
 
   const handleEndChat = async () => {
-    setShowEndChatConfirm(false);
     try {
       await supabase.from('chat_messages').delete().eq('session_id', sessionId);
     } catch (e) {
       console.error('Error clearing chat:', e);
     }
-    localStorage.removeItem('chat-session-id');
+    const freshSessionId = createChatSessionId();
+    localStorage.setItem('chat-session-id', freshSessionId);
+    setSessionId(freshSessionId);
     setInputValue('');
     setMessages([{ role: 'assistant', content: LANGUAGE_GREETINGS[language], timestamp: new Date() }]);
     setShowCallbackForm(false);
@@ -372,36 +363,16 @@ export function ChatSupport() {
 
           {/* End Chat — centered between messages and input */}
           <div className="flex justify-center py-2 flex-shrink-0 bg-background border-t border-b">
-            <AlertDialog open={showEndChatConfirm} onOpenChange={setShowEndChatConfirm}>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="min-h-[44px] px-5 py-2 rounded-full text-xs font-semibold shadow-md active:scale-95 transition-transform"
-                  aria-label="End chat"
-                >
-                  <X className="h-4 w-4 mr-1.5" />
-                  End Chat
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>End this chat?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will clear your current conversation. You can start a fresh chat anytime.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setShowEndChatConfirm(false)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleEndChat}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    End Chat
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleEndChat}
+              className="min-h-[44px] px-5 py-2 rounded-full text-xs font-semibold shadow-md active:scale-95 transition-transform"
+              aria-label="End chat"
+            >
+              <X className="h-4 w-4 mr-1.5" />
+              End Chat
+            </Button>
           </div>
 
           {/* Input */}
