@@ -102,7 +102,32 @@ export const ProtectedRoute = ({ children, requireKYC = false }: ProtectedRouteP
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full rounded-lg border bg-card p-6 text-center space-y-4 shadow-sm">
+          <h2 className="text-lg font-semibold">Please log in to continue</h2>
+          <p className="text-sm text-muted-foreground">
+            You need to be logged in to view this page. Log in or create an account to continue.
+          </p>
+          <button
+            onClick={() => {
+              try {
+                const path = location.pathname + location.search;
+                if (path && path !== "/auth") {
+                  sessionStorage.setItem("postLoginRedirect", path);
+                }
+              } catch { /* noop */ }
+              navigate("/auth");
+            }}
+            className="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            Log in / Sign up
+          </button>
+        </div>
+      </div>
+    );
+  }
   // KYC gating is now handled inside the page via <KycGate />, so we always
   // render children here once auth + PIN checks pass.
   if (!pinChecked && location.pathname !== '/pin-setup') {
