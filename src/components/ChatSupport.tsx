@@ -290,7 +290,10 @@ export function ChatSupport() {
       {/* Chat trigger — bottom-right, minimal */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            originRouteRef.current = window.location.pathname + window.location.search;
+            setIsOpen(true);
+          }}
           className="fixed bottom-[calc(var(--bottom-nav-offset)+16px)] right-4 z-[100] h-11 w-11 rounded-full overflow-hidden shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 touch-manipulation border-2 border-primary/30"
           aria-label="Open chat"
         >
