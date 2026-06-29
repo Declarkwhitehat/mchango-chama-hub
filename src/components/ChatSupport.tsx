@@ -60,6 +60,8 @@ export function ChatSupport() {
   const [currentQuestion, setCurrentQuestion] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const originRouteRef = useRef<string | null>(null);
+  const navigate = useNavigate();
   const [mobileViewport, setMobileViewport] = useState<{ height: number; top: number } | null>(null);
 
   // Track Android/iOS soft keyboard via visualViewport so input stays visible
