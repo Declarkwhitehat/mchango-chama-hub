@@ -259,7 +259,10 @@ export function ChatSupport() {
 
       {/* Chat Window */}
       {isOpen && (
-        <Card className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-screen max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:bottom-0 max-md:right-0 max-md:left-0 max-md:top-0 max-md:rounded-none">
+        <Card
+          className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-screen max-md:bottom-0 max-md:right-0 max-md:left-0 max-md:top-0 max-md:rounded-none"
+          style={keyboardOffset > 0 ? { height: `calc(100dvh - ${keyboardOffset}px)`, maxHeight: `calc(100dvh - ${keyboardOffset}px)` } : { height: typeof window !== 'undefined' && window.innerWidth < 768 ? '100dvh' : undefined }}
+        >
 
           {/* Header */}
           <div className="border-b bg-primary text-primary-foreground rounded-t-lg max-md:rounded-none pt-3 flex-shrink-0">
