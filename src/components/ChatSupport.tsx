@@ -235,18 +235,8 @@ export function ChatSupport() {
 
       {/* Chat Window */}
       {isOpen && (
-        <Card className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-[calc(100vw-1rem)] max-md:h-[calc(100vh-1rem)] max-md:bottom-0 max-md:right-0 max-md:rounded-none">
-          {/* Floating close button - bottom center for easy thumb reach */}
-          <button
-            onClick={() => setIsOpen(false)}
-            className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-6 py-3 rounded-full bg-destructive text-destructive-foreground shadow-lg hover:bg-destructive/90 active:scale-95 transition-all touch-manipulation"
-            aria-label="End chat"
-          >
-            <X className="h-4 w-4" />
-            <span className="text-sm font-medium">End Chat</span>
-          </button>
-
         <Card className="fixed bottom-4 right-4 w-[360px] h-[600px] flex flex-col shadow-2xl z-50 md:w-[400px] md:h-[600px] max-md:w-screen max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:bottom-0 max-md:right-0 max-md:left-0 max-md:top-0 max-md:rounded-none">
+
           {/* Header */}
           <div className="border-b bg-primary text-primary-foreground rounded-t-lg max-md:rounded-none pt-3 flex-shrink-0">
             <div className="flex items-center gap-3 px-4 pb-2">
