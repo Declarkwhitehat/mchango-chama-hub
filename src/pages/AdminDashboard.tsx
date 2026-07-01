@@ -12,6 +12,8 @@ import {
   PhoneCall,
   CreditCard,
   RefreshCw,
+  TrendingUp,
+
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -42,7 +44,9 @@ const AdminDashboard = () => {
     recentTransactions: 0,
     pendingExecChanges: 0,
     activeAccounts: 0,
+    pendingLimitRequests: 0,
   });
+
 
   const fetchDashboardData = useCallback(async (isAutoRefresh = false) => {
     try {
@@ -62,7 +66,9 @@ const AdminDashboard = () => {
         execChangesResult,
         earningsResult,
         activeAccountsResult,
+        limitReqResult,
       ] = await Promise.all([
+
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved'),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'pending').not('kyc_submitted_at', 'is', null),
@@ -76,7 +82,9 @@ const AdminDashboard = () => {
         // FIX: Use company_earnings only — financial_ledger was causing double-count
         supabase.from('company_earnings').select('amount'),
         supabase.from('chama_members').select('user_id', { count: 'exact', head: false }).eq('status', 'active').not('user_id', 'is', null),
+        (supabase as any).from('daily_limit_increase_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ]);
+
 
       // FIX: Revenue from company_earnings only (single source of truth)
       const totalPlatformRevenue = earningsResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
@@ -102,7 +110,9 @@ const AdminDashboard = () => {
         recentTransactions: transactionsResult.count || 0,
         pendingExecChanges: execChangesResult.count || 0,
         activeAccounts: uniqueUserIds.size,
+        pendingLimitRequests: (limitReqResult as any)?.count || 0,
       });
+
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
       toast({
@@ -127,7 +137,7 @@ const AdminDashboard = () => {
   }, [fetchDashboardData]);
 
   const totalActiveGroups = stats.activeChamas + stats.activeOrganizations + stats.activeWelfares;
-  const hasAlerts = stats.pendingKyc > 0 || stats.pendingWithdrawals > 0 || stats.pendingCallbacks > 0 || stats.pendingExecChanges > 0;
+  const hasAlerts = stats.pendingKyc > 0 || stats.pendingWithdrawals > 0 || stats.pendingCallbacks > 0 || stats.pendingExecChanges > 0 || stats.pendingLimitRequests > 0;
 
   if (loading) {
     return (
@@ -226,7 +236,19 @@ const AdminDashboard = () => {
                    {stats.pendingExecChanges} exec changes pending
                  </Button>
                )}
+               {stats.pendingLimitRequests > 0 && (
+                 <Button
+                   size="sm"
+                   variant="outline"
+                   className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                   onClick={() => navigate("/admin/daily-limit-requests")}
+                 >
+                   <TrendingUp className="h-3.5 w-3.5" />
+                   {stats.pendingLimitRequests} limit request{stats.pendingLimitRequests === 1 ? "" : "s"} pending
+                 </Button>
+               )}
             </div>
+
           </div>
         )}
 
