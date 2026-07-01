@@ -1,71 +1,38 @@
+## Goal
+Block screenshots and screen recording on the native Android app for the Profile, Login, and Signup pages, and show a friendly toast when the user tries.
 
-## Feature: Daily M-Pesa Limit Increase Request (KES 150,000 → up to 500,000)
+## Approach
 
-Users can request a temporary/permanent daily payout limit increase from their Profile. Admin reviews with full context and approves or rejects.
+**1. Install Capacitor Privacy Screen plugin**
+Use `@capacitor-community/privacy-screen` (or `capacitor-plugin-screenshot` prevention) — sets Android's `FLAG_SECURE` on the window, which:
+- Blacks out the screen in the app switcher
+- Blocks screenshots (system shows "Can't take screenshot due to security policy")
+- Blocks screen recording
 
-### 1. Database (migration)
+**2. Create a `useScreenshotGuard` hook** (`src/hooks/useScreenshotGuard.ts`)
+- On mount: call `PrivacyScreen.enable()` (native only, no-op on web)
+- On unmount: call `PrivacyScreen.disable()`
+- Listen to Android's screenshot-attempt broadcast (via `App` plugin's `pause`/media observer where available) → show a friendly toast:
+  > "🔒 For your security, screenshots are disabled on this page."
 
-**New table `daily_limit_increase_requests`:**
-- `user_id` (uuid, FK auth.users)
-- `current_limit` (numeric, default 150000)
-- `requested_limit` (numeric, 150001–500000)
-- `reason` (text, 20–500 chars)
-- `status` (text: `pending` | `approved` | `rejected`)
-- `otp_verified_at` (timestamptz)
-- `admin_notes` (text)
-- `reviewed_by` (uuid)
-- `reviewed_at` (timestamptz)
-- `expires_at` (timestamptz, default now()+30 days when approved)
-- `created_at`, `updated_at`
-- GRANTs to `authenticated` + `service_role`
-- RLS: users read/insert their own; admins read/update all
+**3. Wire the hook into 3 pages only**
+- `src/pages/Auth.tsx` (login/signup)
+- `src/pages/Profile.tsx`
+- Any signup-specific page if separate
 
-**Add to `profiles`:**
-- `custom_daily_limit` (numeric, nullable) — set on approval
-- `custom_daily_limit_expires_at` (timestamptz, nullable)
+**4. Fallback toast trigger**
+Android doesn't fire a reliable "screenshot taken" event when FLAG_SECURE is on (system blocks it silently). We'll:
+- Rely on the OS's own "Can't take screenshot" system message (standard Android behavior)
+- Additionally, on `visibilitychange` / app resume after a quick blur, show the friendly toast as a soft reminder that screenshots are disabled here
 
-### 2. Backend edge functions
+**5. Web / PWA behavior**
+- Hook becomes a no-op on web (Capacitor platform check), so browser users are unaffected
 
-- **`request-daily-limit-increase`** — validates OTP (reuse existing `otp_verifications` flow with purpose `daily_limit_increase`), enforces one pending request per user, inserts row, notifies admin via existing notification/SMS pipeline.
-- **`admin-daily-limit-decision`** — super-admin/admin gated; approves (writes `custom_daily_limit` + `expires_at`) or rejects with notes; logs to `admin_action_log`; SMS user via Onfon.
+## Files touched
+- `package.json` — add plugin
+- `src/hooks/useScreenshotGuard.ts` — new
+- `src/pages/Auth.tsx` — add hook
+- `src/pages/Profile.tsx` — add hook
 
-### 3. Frontend — user side (`src/pages/Profile.tsx` or new component)
-
-Add card **"Daily Payout Limit"** showing current effective limit. Button **"Request Increase"** opens dialog:
-1. Slider/input 150,001–500,000
-2. Reason textarea (min 20 chars)
-3. Send OTP to registered phone → enter 6-digit code
-4. Submit → shows pending badge until admin decides
-
-Uses existing OTP infra (`otp-send` / `otp-verify` functions).
-
-### 4. Frontend — admin side (new page `src/pages/AdminDailyLimitRequests.tsx`)
-
-New sidebar item under Admin. Each request card shows:
-- User profile: name, phone, current phone-change history (query `customer_callbacks` for "Payment Method Change Request" entries by this user)
-- Phone number age (last updated_at on `profiles.phone`)
-- KYC status + verification tier
-- Requested amount, reason
-- **Latest 10 transactions** (query `withdrawals` + `contributions` + `mchango_donations` for user_id, sorted desc)
-- Trust score if available (`member_trust_scores`)
-- Approve / Reject buttons with optional notes + validity duration (30/60/90 days or permanent)
-
-Route wired in `src/App.tsx` behind `AdminProtectedRoute`.
-
-### 5. Enforcement
-
-Update `PAYMENT_METHOD_LIMITS` usage: withdrawal path reads effective limit = `profiles.custom_daily_limit` if not expired, else 150,000. Applied in:
-- `src/components/WithdrawalButton.tsx` / withdrawal edge function limit check
-- `PaymentMethodsManager.tsx` display
-
-### 6. Notifications
-
-- On submit → admin push + in-app notification
-- On decision → user SMS + in-app notification with reason
-
-### Not changed
-- Bank account limit stays 500k
-- No change to payment number change flow
-- No change to KYC or verification flows
-
-Please confirm and I'll implement.
+## Post-implementation note to user
+After merging, they'll need to `git pull` and run `npx cap sync android` to pick up the new native plugin before rebuilding the APK.
