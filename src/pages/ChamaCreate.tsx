@@ -75,8 +75,8 @@ const ChamaCreate = () => {
         setIsLoading(false);
         return;
       }
-      if (rawName.length === 0 || rawName.length > 16) {
-        toast({ title: "Invalid name", description: "Chama name must be 1–16 characters.", variant: "destructive" });
+      if (rawName.length === 0 || rawName.length > 30) {
+        toast({ title: "Invalid name", description: "Chama name must be 1–30 characters.", variant: "destructive" });
         setIsLoading(false);
         return;
       }
@@ -201,9 +201,9 @@ const ChamaCreate = () => {
                   name="name"
                   placeholder="e.g., Mama Mboga SHG"
                   required
-                  maxLength={16}
+                  maxLength={30}
                 />
-                <p className="text-xs text-muted-foreground">Max 16 characters. Letters, numbers, spaces only — no emojis.</p>
+                <p className="text-xs text-muted-foreground">Max 30 characters. Letters, numbers, spaces only — no emojis.</p>
               </div>
 
               <div className="space-y-2">
