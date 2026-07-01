@@ -1,88 +1,71 @@
-## Goal
 
-Let a Mchango creator delete their own campaign once it has 0 days left. If the campaign still holds funds, those funds sweep to company revenue, and every such sweep (from campaigns or deleted user accounts) is tracked on a new Admin dashboard.
+## Feature: Daily M-Pesa Limit Increase Request (KES 150,000 → up to 500,000)
 
-## 1. Database (single migration)
+Users can request a temporary/permanent daily payout limit increase from their Profile. Admin reviews with full context and approves or rejects.
 
-**New table `abandoned_funds_ledger`** — the single source of truth for money forfeited to the company from deletions.
+### 1. Database (migration)
 
-Columns:
-- `source_type` ('mchango' | 'welfare' | 'chama' | 'user_account')
-- `source_id` (uuid, nullable — original entity may be gone)
-- `source_name` (text — snapshot of title/name)
-- `owner_user_id` (uuid, nullable), `owner_name`, `owner_phone`, `owner_email` (snapshots)
-- `gross_amount`, `commission_taken`, `net_swept_to_revenue`
-- `reason` ('creator_deleted_expired_campaign' | 'account_deleted_with_balance' | 'admin_deleted')
-- `metadata` jsonb (campaign target, days_expired, related receipts)
-- `swept_at`, `swept_by`
-- Standard timestamps
+**New table `daily_limit_increase_requests`:**
+- `user_id` (uuid, FK auth.users)
+- `current_limit` (numeric, default 150000)
+- `requested_limit` (numeric, 150001–500000)
+- `reason` (text, 20–500 chars)
+- `status` (text: `pending` | `approved` | `rejected`)
+- `otp_verified_at` (timestamptz)
+- `admin_notes` (text)
+- `reviewed_by` (uuid)
+- `reviewed_at` (timestamptz)
+- `expires_at` (timestamptz, default now()+30 days when approved)
+- `created_at`, `updated_at`
+- GRANTs to `authenticated` + `service_role`
+- RLS: users read/insert their own; admins read/update all
 
-Grants: `authenticated` SELECT-nothing (RLS locks it), `service_role` ALL. Only super_admin can read via policy `has_role(auth.uid(),'super_admin') OR has_role(auth.uid(),'admin')`.
+**Add to `profiles`:**
+- `custom_daily_limit` (numeric, nullable) — set on approval
+- `custom_daily_limit_expires_at` (timestamptz, nullable)
 
-**RPC `sweep_mchango_to_revenue(p_mchango_id, p_reason)`** (SECURITY DEFINER):
-- Locks the mchango row
-- Reads `available_balance`
-- Inserts a `company_earnings` row (type `abandoned_funds`) for the balance
-- Inserts `financial_ledger` entry (transaction_type `abandoned_sweep`, gross=commission=amount, net=0 to satisfy integrity trigger — or use a dedicated type exempted from the check; will exempt `abandoned_sweep`)
-- Inserts `abandoned_funds_ledger` row with snapshots
-- Zeros `mchango.current_amount` and `available_balance`
-- Returns the ledger row id
+### 2. Backend edge functions
 
-Adjust `validate_financial_ledger_integrity` to skip `abandoned_sweep`.
+- **`request-daily-limit-increase`** — validates OTP (reuse existing `otp_verifications` flow with purpose `daily_limit_increase`), enforces one pending request per user, inserts row, notifies admin via existing notification/SMS pipeline.
+- **`admin-daily-limit-decision`** — super-admin/admin gated; approves (writes `custom_daily_limit` + `expires_at`) or rejects with notes; logs to `admin_action_log`; SMS user via Onfon.
 
-## 2. Edge function: `mchango-creator-delete`
+### 3. Frontend — user side (`src/pages/Profile.tsx` or new component)
 
-New function (verify_jwt=false, in-code JWT validation like other admin funcs).
+Add card **"Daily Payout Limit"** showing current effective limit. Button **"Request Increase"** opens dialog:
+1. Slider/input 150,001–500,000
+2. Reason textarea (min 20 chars)
+3. Send OTP to registered phone → enter 6-digit code
+4. Submit → shows pending badge until admin decides
 
-Input: `{ mchango_id, confirm_title }`
+Uses existing OTP infra (`otp-send` / `otp-verify` functions).
 
-Flow:
-1. Auth user; load mchango.
-2. Assert `created_by = user.id`.
-3. Assert `end_date <= now()` (0 days left / expired).
-4. Assert `confirm_title.trim().toLowerCase() === title.trim().toLowerCase()`.
-5. Block if any pending withdrawals exist.
-6. If `available_balance > 0`: call `sweep_mchango_to_revenue`.
-7. Hard-delete related rows the existing admin delete already handles (donations, transactions, payouts, withdrawals) then delete the mchango.
-8. Notify creator (SMS + in-app) that campaign was deleted and, if applicable, the swept amount.
-9. Log via `logAdminAction`-equivalent server-side write to `admin_action_log` with `actor=creator`.
+### 4. Frontend — admin side (new page `src/pages/AdminDailyLimitRequests.tsx`)
 
-## 3. Existing account-deletion flow
+New sidebar item under Admin. Each request card shows:
+- User profile: name, phone, current phone-change history (query `customer_callbacks` for "Payment Method Change Request" entries by this user)
+- Phone number age (last updated_at on `profiles.phone`)
+- KYC status + verification tier
+- Requested amount, reason
+- **Latest 10 transactions** (query `withdrawals` + `contributions` + `mchango_donations` for user_id, sorted desc)
+- Trust score if available (`member_trust_scores`)
+- Approve / Reject buttons with optional notes + validity duration (30/60/90 days or permanent)
 
-`self-delete-account` edge function (already exists per memory): before deletion, sum any remaining balances the user owns (wallet credits, unwithdrawn mchango/welfare/chama balances they solely control). For each non-zero balance, insert `abandoned_funds_ledger` row (`reason='account_deleted_with_balance'`) and route funds to `company_earnings`. Same treatment when an admin deletes a user with balances.
+Route wired in `src/App.tsx` behind `AdminProtectedRoute`.
 
-## 4. Frontend — creator delete UI
+### 5. Enforcement
 
-**`src/pages/MchangoDetail.tsx`** (creator view): when `end_date` has passed and viewer is creator, show a red "Delete Campaign" card.
+Update `PAYMENT_METHOD_LIMITS` usage: withdrawal path reads effective limit = `profiles.custom_daily_limit` if not expired, else 150,000. Applied in:
+- `src/components/WithdrawalButton.tsx` / withdrawal edge function limit check
+- `PaymentMethodsManager.tsx` display
 
-Clicking opens an `AlertDialog`:
-- If `available_balance > 0`, prominent amber warning: "This campaign still holds KES X. Deleting it will forfeit these funds to platform revenue. This cannot be undone."
-- Text input: "Type the exact campaign title to confirm"
-- Delete button disabled until input matches title (case-insensitive trim)
-- On confirm: call `mchango-creator-delete`, toast result (including swept amount), navigate to `/mchango`.
+### 6. Notifications
 
-## 5. Admin dashboard — Abandoned Funds page
+- On submit → admin push + in-app notification
+- On decision → user SMS + in-app notification with reason
 
-**New route** `/admin/abandoned-funds` (super_admin + admin), sidebar entry under Financial section.
+### Not changed
+- Bank account limit stays 500k
+- No change to payment number change flow
+- No change to KYC or verification flows
 
-**New page `AdminAbandonedFunds.tsx`**:
-- Summary cards: Total Swept (all-time), This Month, Count by reason
-- Filters: source_type, reason, date range, search by owner name/phone
-- Table: Date | Source (type + name) | Owner (name + phone) | Amount | Reason | Details drawer
-- Details drawer shows metadata json, related receipts, original entity id
-- CSV export button
-
-Data via new edge function `admin-abandoned-funds-list` (paginated, super_admin/admin gated) or direct table query using RLS.
-
-## 6. Safeguards
-
-- Sweep runs inside a single transaction (RPC) so partial failure never leaves half-swept money.
-- Duplicate protection: unique index `(source_type, source_id, reason)` where `source_id IS NOT NULL` to prevent double-sweep of the same entity.
-- Never sweep if there are pending/processing withdrawals — surface a clear error to the creator.
-- `abandoned_sweep` transactions excluded from user-facing reports.
-
-## Technical notes
-
-- Reuses existing patterns: `logAdminAction`, `SuperAdminProtectedRoute`, edge function auth pattern, Onfon SMS notifier, `AlertDialog` + typed-confirmation.
-- No schema changes to `mchango`; only additive tables + RPC.
-- Ledger integrity trigger updated to exempt `abandoned_sweep` (gross=amount, net=0, commission=amount is the semantic — full amount recognized as company revenue).
+Please confirm and I'll implement.
