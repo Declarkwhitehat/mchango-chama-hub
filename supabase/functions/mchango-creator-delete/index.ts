@@ -139,7 +139,8 @@ serve(async (req) => {
     // Audit trail
     try {
       await admin.from("admin_action_log").insert({
-        actor_id: userData.user.id,
+        actor_user_id: userData.user.id,
+        actor_email: userData.user.email,
         action_key: "mchango.creator_delete_expired",
         target_type: "mchango",
         target_id: mchangoId,
