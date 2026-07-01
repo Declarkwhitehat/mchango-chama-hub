@@ -41,8 +41,8 @@ serve(async (req) => {
     const phone = String(body?.phone ?? "").trim();
     const otp = String(body?.otp ?? "").trim();
 
-    if (!Number.isFinite(requested_limit) || requested_limit <= 150000 || requested_limit > 500000) {
-      return new Response(JSON.stringify({ error: "Requested limit must be between KES 150,001 and 500,000" }), {
+    if (!Number.isFinite(requested_limit) || requested_limit < 150000 || requested_limit > 500000) {
+      return new Response(JSON.stringify({ error: "Requested limit must be between KES 150,000 and 500,000" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -51,8 +51,13 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (!phone || !/^\d{4}$|^\d{6}$/.test(otp)) {
-      return new Response(JSON.stringify({ error: "Invalid OTP" }), {
+    if (!phone) {
+      return new Response(JSON.stringify({ error: "Phone number is required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!/^\d{6}$/.test(otp)) {
+      return new Response(JSON.stringify({ error: "OTP must be 6 digits" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

@@ -102,11 +102,25 @@ export const DailyLimitIncreaseCard = ({ userPhone }: Props) => {
 
     setSubmitting(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Please sign in again");
+
       const { data, error } = await supabase.functions.invoke("request-daily-limit-increase", {
         body: { requested_limit: requested, reason: reason.trim(), phone: userPhone, otp: code },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
-      if (error) throw error;
+      if (error) {
+        const ctx: any = (error as any).context;
+        let msg = error.message || "Failed to submit request";
+        try {
+          if (ctx && typeof ctx.text === "function") {
+            const parsed = JSON.parse(await ctx.text());
+            if (parsed?.error) msg = parsed.error;
+          }
+        } catch {}
+        throw new Error(msg);
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success("Request submitted. Admin will review shortly.");
       setOpen(false);
