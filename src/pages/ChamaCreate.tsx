@@ -75,8 +75,8 @@ const ChamaCreate = () => {
         setIsLoading(false);
         return;
       }
-      if (rawName.length === 0 || rawName.length > 16) {
-        toast({ title: "Invalid name", description: "Chama name must be 1–16 characters.", variant: "destructive" });
+      if (rawName.length === 0 || rawName.length > 30) {
+        toast({ title: "Invalid name", description: "Chama name must be 1–30 characters.", variant: "destructive" });
         setIsLoading(false);
         return;
       }
