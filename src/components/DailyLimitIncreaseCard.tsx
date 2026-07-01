@@ -220,22 +220,32 @@ export const DailyLimitIncreaseCard = ({ userPhone }: Props) => {
                 <Label>Enter OTP to submit</Label>
                 <Input
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={6}
                   placeholder="6-digit code"
                   value={otp}
                   disabled={submitting}
                   onChange={(e) => {
-                    const v = e.target.value.replace(/\D/g, "");
+                    const v = e.target.value.replace(/\D/g, "").slice(0, 6);
                     setOtp(v);
                     if (v.length === 6 && !submitting) {
                       handleSubmit(v);
                     }
                   }}
                 />
-                <p className="text-[11px] text-muted-foreground">Your request is sent automatically once you enter all 6 digits.</p>
-                <Button variant="link" size="sm" className="h-auto p-0" onClick={handleSendOtp} disabled={sendingOtp || submitting}>
-                  Resend OTP
+                <Button
+                  className="w-full"
+                  onClick={() => handleSubmit()}
+                  disabled={submitting || otp.length !== 6}
+                >
+                  {submitting ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting…</>) : "Submit Request"}
                 </Button>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-muted-foreground">Auto-submits when 6 digits entered.</p>
+                  <Button variant="link" size="sm" className="h-auto p-0" onClick={handleSendOtp} disabled={sendingOtp || submitting}>
+                    Resend OTP
+                  </Button>
+                </div>
               </div>
             )}
 
