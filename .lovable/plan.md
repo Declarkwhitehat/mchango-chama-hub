@@ -1,38 +1,28 @@
-## Goal
-Block screenshots and screen recording on the native Android app for the Profile, Login, and Signup pages, and show a friendly toast when the user tries.
+## Problem
 
-## Approach
+When the user finishes entering the OTP, the client throws "Failed to send a request to the Edge Function". That specific error from `supabase.functions.invoke` means the request never reached a working function (CORS/preflight failure or the function is not currently deployed) — not a JSON error from our code.
 
-**1. Install Capacitor Privacy Screen plugin**
-Use `@capacitor-community/privacy-screen` (or `capacitor-plugin-screenshot` prevention) — sets Android's `FLAG_SECURE` on the window, which:
-- Blacks out the screen in the app switcher
-- Blocks screenshots (system shows "Can't take screenshot due to security policy")
-- Blocks screen recording
+The `request-daily-limit-increase` function was added recently and has never been re-deployed after the last edits, so the live version is either missing or stale. There are also two smaller correctness issues that will bite us right after we get the call through.
 
-**2. Create a `useScreenshotGuard` hook** (`src/hooks/useScreenshotGuard.ts`)
-- On mount: call `PrivacyScreen.enable()` (native only, no-op on web)
-- On unmount: call `PrivacyScreen.disable()`
-- Listen to Android's screenshot-attempt broadcast (via `App` plugin's `pause`/media observer where available) → show a friendly toast:
-  > "🔒 For your security, screenshots are disabled on this page."
+## Fix
 
-**3. Wire the hook into 3 pages only**
-- `src/pages/Auth.tsx` (login/signup)
-- `src/pages/Profile.tsx`
-- Any signup-specific page if separate
+1. **Force a fresh deploy** of `request-daily-limit-increase` so the current code is live.
+2. **Tighten server validation** so it matches the UI:
+   - Accept `requested_limit` in the inclusive range `150000 … 500000` (currently rejects exactly 150,000 with a confusing 400).
+   - Simplify the OTP check to strictly 6 digits (`/^\d{6}$/`) — the current `\d{4}|\d{6}` regex is a leftover and misleading.
+   - Return a clear 400 when `phone` is missing instead of the generic "Invalid OTP".
+3. **Guarantee CORS on every path** (including thrown errors) so the browser never converts a real JSON error into the generic "Failed to send a request…" message. The handler already does this; I'll double-check the OPTIONS response uses `200` with the standard header set used across the project.
+4. **Client-side safety net** in `DailyLimitIncreaseCard.tsx`:
+   - Before invoking, `await supabase.auth.getSession()` and pass the access token explicitly in `headers` (same pattern we used for `admin-send-user-sms` to fix the native 401).
+   - Surface the real server `error` string in the toast instead of the generic invoke message.
 
-**4. Fallback toast trigger**
-Android doesn't fire a reliable "screenshot taken" event when FLAG_SECURE is on (system blocks it silently). We'll:
-- Rely on the OS's own "Can't take screenshot" system message (standard Android behavior)
-- Additionally, on `visibilitychange` / app resume after a quick blur, show the friendly toast as a soft reminder that screenshots are disabled here
+## Verification
 
-**5. Web / PWA behavior**
-- Hook becomes a no-op on web (Capacitor platform check), so browser users are unaffected
+- Re-deploy, then from the running preview submit a request with amount 300,000 and a valid OTP for `0707874790`.
+- Confirm in edge-function logs that the function boots and returns 200, and that a row lands in `daily_limit_increase_requests` with `status = 'pending'`.
+- Confirm the toast now shows the real reason (e.g. "Invalid or expired OTP") when a wrong code is entered, instead of the fetch-level error.
 
 ## Files touched
-- `package.json` — add plugin
-- `src/hooks/useScreenshotGuard.ts` — new
-- `src/pages/Auth.tsx` — add hook
-- `src/pages/Profile.tsx` — add hook
 
-## Post-implementation note to user
-After merging, they'll need to `git pull` and run `npx cap sync android` to pick up the new native plugin before rebuilding the APK.
+- `supabase/functions/request-daily-limit-increase/index.ts` — validation + CORS tidy-up, then deploy.
+- `src/components/DailyLimitIncreaseCard.tsx` — attach session token to invoke, better error surfacing.
