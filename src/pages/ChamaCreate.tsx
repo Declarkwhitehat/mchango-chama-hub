@@ -201,9 +201,9 @@ const ChamaCreate = () => {
                   name="name"
                   placeholder="e.g., Mama Mboga SHG"
                   required
-                  maxLength={16}
+                  maxLength={30}
                 />
-                <p className="text-xs text-muted-foreground">Max 16 characters. Letters, numbers, spaces only — no emojis.</p>
+                <p className="text-xs text-muted-foreground">Max 30 characters. Letters, numbers, spaces only — no emojis.</p>
               </div>
 
               <div className="space-y-2">
