@@ -129,6 +129,31 @@ serve(async (req) => {
       await admin.from("notifications").insert(rows);
     }
 
+    // Transactional SMS to requester
+    try {
+      const ONFON_API_KEY = Deno.env.get("ONFON_API_KEY");
+      const ONFON_CLIENT_ID = Deno.env.get("ONFON_CLIENT_ID");
+      const ONFON_SENDER_ID = Deno.env.get("ONFON_SENDER_ID");
+      if (ONFON_API_KEY && ONFON_CLIENT_ID && ONFON_SENDER_ID) {
+        const normalized = (phone.startsWith("+") ? phone.slice(1) : phone).replace(/\D/g, "");
+        const reqNo = String(inserted.id).replace(/-/g, "").slice(-8).toUpperCase();
+        const text = `PAMOJA NOVA: Limit request #${reqNo} for KES ${requested_limit.toLocaleString()} received. You will be notified once approved or rejected.`;
+        await fetch("https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            SenderId: ONFON_SENDER_ID,
+            IsUnicode: false, IsFlash: false,
+            MessageParameters: [{ Number: normalized, Text: text }],
+            ApiKey: ONFON_API_KEY, ClientId: ONFON_CLIENT_ID,
+          }),
+        });
+      }
+    } catch (smsErr) {
+      console.error("SMS send failed", smsErr);
+    }
+
+
     return new Response(JSON.stringify({ success: true, request: inserted }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
