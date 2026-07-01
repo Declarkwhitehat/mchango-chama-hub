@@ -98,6 +98,8 @@ export default function AdminDailyLimitRequests() {
     if (!selected) return;
     setActing(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
       const { data, error } = await supabase.functions.invoke("admin-daily-limit-decision", {
         body: {
           request_id: selected.id,
@@ -105,8 +107,9 @@ export default function AdminDailyLimitRequests() {
           admin_notes: notes || null,
           validity_days: decision === "approve" ? days : 0,
         },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (error) throw error;
+      if (error) throw new Error(error.message || "Failed to process");
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(`Request ${decision === "approve" ? "approved" : "rejected"}`);
       setSelected(null);
