@@ -1363,6 +1363,54 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_limit_increase_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          current_limit: number
+          expires_at: string | null
+          id: string
+          otp_verified_at: string | null
+          reason: string
+          requested_limit: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          current_limit?: number
+          expires_at?: string | null
+          id?: string
+          otp_verified_at?: string | null
+          reason: string
+          requested_limit: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          current_limit?: number
+          expires_at?: string | null
+          id?: string
+          otp_verified_at?: string | null
+          reason?: string
+          requested_limit?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       device_tokens: {
         Row: {
           created_at: string
@@ -2702,6 +2750,8 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          custom_daily_limit: number | null
+          custom_daily_limit_expires_at: string | null
           deleted_at: string | null
           deleted_by: string | null
           deletion_reason: string | null
@@ -2735,6 +2785,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_daily_limit?: number | null
+          custom_daily_limit_expires_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           deletion_reason?: string | null
@@ -2768,6 +2820,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_daily_limit?: number | null
+          custom_daily_limit_expires_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           deletion_reason?: string | null
