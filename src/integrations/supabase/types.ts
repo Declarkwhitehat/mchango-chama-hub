@@ -1776,6 +1776,35 @@ export type Database = {
           },
         ]
       }
+      mchango_expiry_reminders_sent: {
+        Row: {
+          campaign_id: string
+          id: string
+          reminder_type: string
+          sent_at: string
+        }
+        Insert: {
+          campaign_id: string
+          id?: string
+          reminder_type: string
+          sent_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          id?: string
+          reminder_type?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mchango_expiry_reminders_sent_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "mchango"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_cycle_payments: {
         Row: {
           amount_due: number
