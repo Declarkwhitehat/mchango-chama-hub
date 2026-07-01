@@ -60,16 +60,17 @@ export default function AdminDailyLimitRequests() {
     setNotes(""); setDays(30);
     setCtxLoading(true);
     try {
+      const sb = supabase as any;
       const [{ data: profile }, { data: phoneChanges }, { data: wds }, { data: contribs }, { data: donations }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", r.user_id).maybeSingle(),
-        supabase.from("customer_callbacks").select("id, created_at, question")
+        sb.from("profiles").select("*").eq("id", r.user_id).maybeSingle(),
+        sb.from("customer_callbacks").select("id, created_at, question")
           .ilike("question", "%Payment Method Change Request%")
-          .contains("conversation_history", [{ user_id: r.user_id }] as any),
-        supabase.from("withdrawals").select("net_amount, requested_at, status")
+          .contains("conversation_history", [{ user_id: r.user_id }]),
+        sb.from("withdrawals").select("net_amount, requested_at, status")
           .eq("user_id", r.user_id).order("requested_at", { ascending: false }).limit(10),
-        supabase.from("contributions").select("amount, created_at, status")
+        sb.from("contributions").select("amount, created_at, status")
           .eq("user_id", r.user_id).order("created_at", { ascending: false }).limit(10),
-        supabase.from("mchango_donations").select("amount, created_at, status")
+        sb.from("mchango_donations").select("amount, created_at, status")
           .eq("donor_user_id", r.user_id).order("created_at", { ascending: false }).limit(10),
       ]);
 
