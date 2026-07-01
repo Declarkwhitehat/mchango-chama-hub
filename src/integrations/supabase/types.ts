@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      abandoned_funds_ledger: {
+        Row: {
+          commission_taken: number
+          created_at: string
+          gross_amount: number
+          id: string
+          metadata: Json
+          net_swept_to_revenue: number
+          owner_email: string | null
+          owner_name: string | null
+          owner_phone: string | null
+          owner_user_id: string | null
+          reason: string
+          source_id: string | null
+          source_name: string | null
+          source_type: string
+          swept_at: string
+          swept_by: string | null
+        }
+        Insert: {
+          commission_taken?: number
+          created_at?: string
+          gross_amount?: number
+          id?: string
+          metadata?: Json
+          net_swept_to_revenue?: number
+          owner_email?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
+          owner_user_id?: string | null
+          reason: string
+          source_id?: string | null
+          source_name?: string | null
+          source_type: string
+          swept_at?: string
+          swept_by?: string | null
+        }
+        Update: {
+          commission_taken?: number
+          created_at?: string
+          gross_amount?: number
+          id?: string
+          metadata?: Json
+          net_swept_to_revenue?: number
+          owner_email?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
+          owner_user_id?: string | null
+          reason?: string
+          source_id?: string | null
+          source_name?: string | null
+          source_type?: string
+          swept_at?: string
+          swept_by?: string | null
+        }
+        Relationships: []
+      }
       admin_action_log: {
         Row: {
           action_key: string
@@ -4333,6 +4390,10 @@ export type Database = {
       }
       reserve_signup_identity: {
         Args: { p_email: string; p_id_number: string; p_phone: string }
+        Returns: Json
+      }
+      sweep_mchango_to_revenue: {
+        Args: { p_actor?: string; p_mchango_id: string; p_reason: string }
         Returns: Json
       }
       try_unfreeze_chama_member: {

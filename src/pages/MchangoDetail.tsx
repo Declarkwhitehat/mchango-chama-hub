@@ -19,6 +19,7 @@ import { WithdrawalHistory } from "@/components/WithdrawalHistory";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { ExtendCampaignDays } from "@/components/mchango/ExtendCampaignDays";
+import { DeleteExpiredCampaignCard } from "@/components/mchango/DeleteExpiredCampaignCard";
 import { CopyableUniqueId } from "@/components/CopyableUniqueId";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
@@ -425,6 +426,15 @@ const MchangoDetail = () => {
                   campaignId={campaign.id}
                   currentEndDate={campaign.end_date}
                   onSuccess={fetchCampaign}
+                />
+              )}
+
+              {/* Delete Campaign - Only for creator once expired */}
+              {isCreator && isExpired && (
+                <DeleteExpiredCampaignCard
+                  campaignId={campaign.id}
+                  campaignTitle={campaign.title}
+                  availableBalance={Number(campaign.available_balance ?? campaign.current_amount ?? 0)}
                 />
               )}
 
