@@ -84,25 +84,28 @@ export const DailyLimitIncreaseCard = ({ userPhone }: Props) => {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (otpCode?: string) => {
+    const code = otpCode ?? otp;
     const requested = Number(amount);
-    if (!Number.isFinite(requested) || requested <= 150000 || requested > 500000) {
-      toast.error("Enter an amount between 150,001 and 500,000");
+    if (!Number.isFinite(requested) || requested < 150000 || requested > 500000) {
+      toast.error("Enter an amount between 150,000 and 500,000");
       return;
     }
     if (reason.trim().length < 20) {
       toast.error("Please provide a reason (at least 20 characters)");
       return;
     }
-    if (!otp) {
-      toast.error("Enter the OTP");
+    if (!code || code.length !== 6) {
+      toast.error("Enter the 6-digit OTP");
       return;
     }
+
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("request-daily-limit-increase", {
-        body: { requested_limit: requested, reason: reason.trim(), phone: userPhone, otp },
+        body: { requested_limit: requested, reason: reason.trim(), phone: userPhone, otp: code },
       });
+
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success("Request submitted. Admin will review shortly.");
@@ -187,13 +190,14 @@ export const DailyLimitIncreaseCard = ({ userPhone }: Props) => {
               <Label>Requested daily limit (KES)</Label>
               <Input
                 type="number"
-                min={150001}
+                min={150000}
                 max={500000}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
-              <p className="text-[11px] text-muted-foreground">Between 150,001 and 500,000</p>
+              <p className="text-[11px] text-muted-foreground">Between 150,000 and 500,000</p>
             </div>
+
             <div className="space-y-1.5">
               <Label>Why do you need this increase?</Label>
               <Textarea
@@ -213,15 +217,23 @@ export const DailyLimitIncreaseCard = ({ userPhone }: Props) => {
               </Button>
             ) : (
               <div className="space-y-1.5">
-                <Label>Enter OTP</Label>
+                <Label>Enter OTP to submit</Label>
                 <Input
                   inputMode="numeric"
                   maxLength={6}
                   placeholder="6-digit code"
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  disabled={submitting}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, "");
+                    setOtp(v);
+                    if (v.length === 6 && !submitting) {
+                      handleSubmit(v);
+                    }
+                  }}
                 />
-                <Button variant="link" size="sm" className="h-auto p-0" onClick={handleSendOtp} disabled={sendingOtp}>
+                <p className="text-[11px] text-muted-foreground">Your request is sent automatically once you enter all 6 digits.</p>
+                <Button variant="link" size="sm" className="h-auto p-0" onClick={handleSendOtp} disabled={sendingOtp || submitting}>
                   Resend OTP
                 </Button>
               </div>
@@ -234,12 +246,11 @@ export const DailyLimitIncreaseCard = ({ userPhone }: Props) => {
             </Alert>
 
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button className="flex-1" onClick={handleSubmit} disabled={submitting || !otpSent}>
-                {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Submit
+              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)} disabled={submitting}>
+                {submitting ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting…</>) : "Cancel"}
               </Button>
             </div>
+
           </div>
         </DialogContent>
       </Dialog>
