@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PaymentMethodsManager } from "@/components/PaymentMethodsManager";
+import { DailyLimitIncreaseCard } from "@/components/DailyLimitIncreaseCard";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -231,6 +232,10 @@ const Profile = () => {
             />
           </CardContent>
         </Card>
+
+        {/* Daily Limit Increase */}
+        <DailyLimitIncreaseCard userPhone={profile.phone ?? null} />
+
 
         {/* Account actions */}
         <Card>

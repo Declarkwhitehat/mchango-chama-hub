@@ -139,14 +139,28 @@ serve(async (req) => {
         });
       }
 
-      // Payment method transaction limits
+      // Payment method transaction limits (default)
       const TRANSACTION_LIMITS: Record<string, number> = {
         'mpesa': 150000,
         'airtel_money': 150000,
         'bank_account': 500000
       };
 
-      const dailyLimit = TRANSACTION_LIMITS[defaultPaymentMethod.method_type];
+      let dailyLimit = TRANSACTION_LIMITS[defaultPaymentMethod.method_type];
+
+      // Honor admin-approved custom daily limit (mpesa/airtel only; bank already 500k)
+      if (defaultPaymentMethod.method_type === 'mpesa' || defaultPaymentMethod.method_type === 'airtel_money') {
+        const { data: profRow } = await supabaseClient
+          .from('profiles')
+          .select('custom_daily_limit, custom_daily_limit_expires_at')
+          .eq('id', user.id)
+          .maybeSingle();
+        const custom = (profRow as any)?.custom_daily_limit;
+        const expiry = (profRow as any)?.custom_daily_limit_expires_at;
+        const active = custom && (!expiry || new Date(expiry).getTime() > Date.now());
+        if (active) dailyLimit = Math.max(dailyLimit, Number(custom));
+      }
+
 
       // Commission is already deducted at payment time, so withdrawal is full amount.
       // M-PESA B2C transaction fee is deducted from the amount the recipient receives,

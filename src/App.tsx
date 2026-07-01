@@ -74,6 +74,7 @@ const AdminOrganizations = lazy(() => import("./pages/AdminOrganizations"));
 const AdminOrganizationDetail = lazy(() => import("./pages/AdminOrganizationDetail"));
 const AdminLedger = lazy(() => import("./pages/AdminLedger"));
 const AdminAbandonedFunds = lazy(() => import("./pages/AdminAbandonedFunds"));
+const AdminDailyLimitRequests = lazy(() => import("./pages/AdminDailyLimitRequests"));
 const AdminVerificationRequests = lazy(() => import("./pages/AdminVerificationRequests"));
 const AdminCommissionAnalytics = lazy(() => import("./pages/AdminCommissionAnalytics"));
 const AdminMpesaSearch = lazy(() => import("./pages/AdminMpesaSearch"));
@@ -211,6 +212,7 @@ const AppContent = () => {
             <Route path="/admin/payout-approvals" element={<AdminProtectedRoute><AdminPayoutApprovals /></AdminProtectedRoute>} />
             <Route path="/admin/revenue" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminRevenue /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
             <Route path="/admin/abandoned-funds" element={<AdminProtectedRoute><AdminAbandonedFunds /></AdminProtectedRoute>} />
+            <Route path="/admin/daily-limit-requests" element={<AdminProtectedRoute><AdminDailyLimitRequests /></AdminProtectedRoute>} />
             <Route path="/admin/welfare-executive-changes" element={<AdminProtectedRoute><AdminWelfareExecutiveChanges /></AdminProtectedRoute>} />
             <Route path="/admin/documents" element={<AdminProtectedRoute><AdminDocuments /></AdminProtectedRoute>} />
             <Route path="/admin/commission-config" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminCommissionConfig /></SuperAdminProtectedRoute></AdminProtectedRoute>} />

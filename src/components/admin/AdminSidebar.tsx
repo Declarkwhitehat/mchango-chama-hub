@@ -162,6 +162,7 @@ export function AdminSidebar() {
     { title: "Payment Search", url: "/admin/payment-search", icon: Search },
     { title: "Paybill Balance", url: "/admin/paybill-balance", icon: Wallet },
     { title: "Abandoned Funds", url: "/admin/abandoned-funds", icon: Wallet },
+    { title: "Daily Limit Requests", url: "/admin/daily-limit-requests", icon: TrendingUp },
   ];
   const superAdminOnlyFinancialUrls = new Set([
     "/admin/revenue",
