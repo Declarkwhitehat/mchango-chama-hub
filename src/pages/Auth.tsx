@@ -87,7 +87,10 @@ const signupSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
 
+import { useScreenshotGuard } from "@/hooks/useScreenshotGuard";
+
 const Auth = () => {
+  useScreenshotGuard();
   const navigate = useNavigate();
   const location = useLocation();
   // Intentionally ignored: after login users must always land on /home (or /admin).

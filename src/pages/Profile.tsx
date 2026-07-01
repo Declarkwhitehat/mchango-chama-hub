@@ -14,8 +14,10 @@ import { PaymentMethodsManager } from "@/components/PaymentMethodsManager";
 import { DailyLimitIncreaseCard } from "@/components/DailyLimitIncreaseCard";
 import { useNativeBiometrics } from "@/hooks/useNativeBiometrics";
 import { supabase } from "@/integrations/supabase/client";
+import { useScreenshotGuard } from "@/hooks/useScreenshotGuard";
 
 const Profile = () => {
+  useScreenshotGuard();
   const navigate = useNavigate();
   const { profile, signOut, lockApp, refreshProfile } = useAuth();
   const { isNativeApp: isNative } = useNativeBiometrics();
