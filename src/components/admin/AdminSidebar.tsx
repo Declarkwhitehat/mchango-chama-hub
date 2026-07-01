@@ -65,10 +65,14 @@ export function AdminSidebar() {
   const [pendingVerifications, setPendingVerifications] = useState(0);
   const [pendingPayoutApprovals, setPendingPayoutApprovals] = useState(0);
   const [pendingExecChanges, setPendingExecChanges] = useState(0);
+  const [pendingLimitRequests, setPendingLimitRequests] = useState(0);
 
   useEffect(() => {
     fetchPendingCounts();
+    const t = setInterval(fetchPendingCounts, 30000);
+    return () => clearInterval(t);
   }, []);
+
 
   const fetchPendingCounts = async () => {
     const { count: kycCount } = await supabase
@@ -102,13 +106,20 @@ export function AdminSidebar() {
       .select('*', { count: 'exact', head: true })
       .eq('admin_decision', 'pending');
 
+    const { count: limitReqCount } = await (supabase as any)
+      .from('daily_limit_increase_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
     setPendingKyc(kycCount || 0);
     setPendingWithdrawals(withdrawalsCount || 0);
     setPendingCallbacks(callbacksCount || 0);
     setPendingVerifications(verificationsCount || 0);
     setPendingPayoutApprovals(payoutApprovalsCount || 0);
     setPendingExecChanges(execChangesCount || 0);
+    setPendingLimitRequests(limitReqCount || 0);
   };
+
 
   const mainMenuItems: MenuItem[] = [
     { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
@@ -162,7 +173,7 @@ export function AdminSidebar() {
     { title: "Payment Search", url: "/admin/payment-search", icon: Search },
     { title: "Paybill Balance", url: "/admin/paybill-balance", icon: Wallet },
     { title: "Abandoned Funds", url: "/admin/abandoned-funds", icon: Wallet },
-    { title: "Daily Limit Requests", url: "/admin/daily-limit-requests", icon: TrendingUp },
+    { title: "Daily Limit Requests", url: "/admin/daily-limit-requests", icon: TrendingUp, badge: pendingLimitRequests > 0 ? pendingLimitRequests : null },
   ];
   const superAdminOnlyFinancialUrls = new Set([
     "/admin/revenue",
