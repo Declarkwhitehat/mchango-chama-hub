@@ -44,7 +44,7 @@ export default function AdminDailyLimitRequests() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("daily_limit_increase_requests")
       .select("*")
       .order("created_at", { ascending: false })

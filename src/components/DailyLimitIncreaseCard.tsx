@@ -40,13 +40,14 @@ export const DailyLimitIncreaseCard = ({ userPhone }: Props) => {
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    const sb = supabase as any;
     const [{ data: reqs }, { data: prof }] = await Promise.all([
-      supabase.from("daily_limit_increase_requests")
+      sb.from("daily_limit_increase_requests")
         .select("id,requested_limit,status,admin_notes,expires_at,created_at,reviewed_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1),
-      supabase.from("profiles")
+      sb.from("profiles")
         .select("custom_daily_limit,custom_daily_limit_expires_at")
         .eq("id", user.id)
         .maybeSingle(),
