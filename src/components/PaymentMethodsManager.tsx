@@ -88,7 +88,12 @@ export const PaymentMethodsManager = ({ userName, onUpdate }: PaymentMethodsMana
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription className="text-sm">
-          <strong>Daily Transaction Limit:</strong> M-Pesa: KES {PAYMENT_METHOD_LIMITS.mpesa.daily_limit.toLocaleString()}
+          <strong>Daily Transaction Limit:</strong> M-Pesa: KES {(customLimit ?? PAYMENT_METHOD_LIMITS.mpesa.daily_limit).toLocaleString()}
+          {customLimit && (
+            <span className="ml-1 text-xs text-muted-foreground">
+              (approved{customLimitExpiresAt ? ` · valid until ${new Date(customLimitExpiresAt).toLocaleDateString()}` : ""})
+            </span>
+          )}
         </AlertDescription>
       </Alert>
 
