@@ -118,7 +118,7 @@ export const PaymentMethodsManager = ({ userName, onUpdate }: PaymentMethodsMana
                   {userPhone || "Phone not set"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Daily Limit: KES {PAYMENT_METHOD_LIMITS.mpesa.daily_limit.toLocaleString()}
+                  Daily Limit: KES {(customLimit ?? PAYMENT_METHOD_LIMITS.mpesa.daily_limit).toLocaleString()}
                 </p>
               </div>
             </div>
