@@ -28,15 +28,21 @@ export const PaymentMethodsManager = ({ userName, onUpdate }: PaymentMethodsMana
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch user phone
+      // Fetch user phone + custom daily limit
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('phone')
+        .select('phone, custom_daily_limit, custom_daily_limit_expires_at')
         .eq('id', user.id)
         .single();
 
       if (profileError) throw profileError;
       setUserPhone(profile?.phone || null);
+      const exp = (profile as any)?.custom_daily_limit_expires_at
+        ? new Date((profile as any).custom_daily_limit_expires_at).getTime()
+        : null;
+      const active = (profile as any)?.custom_daily_limit && (!exp || exp > Date.now());
+      setCustomLimit(active ? Number((profile as any).custom_daily_limit) : null);
+      setCustomLimitExpiresAt(active ? (profile as any).custom_daily_limit_expires_at : null);
 
       // Check for pending payment change requests
       const { data: pendingRequests } = await supabase
