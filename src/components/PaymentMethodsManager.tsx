@@ -17,6 +17,8 @@ interface PaymentMethodsManagerProps {
 export const PaymentMethodsManager = ({ userName, onUpdate }: PaymentMethodsManagerProps) => {
   const [loading, setLoading] = useState(true);
   const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [customLimit, setCustomLimit] = useState<number | null>(null);
+  const [customLimitExpiresAt, setCustomLimitExpiresAt] = useState<string | null>(null);
   const [showChangeRequest, setShowChangeRequest] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const { refreshProfile } = useAuth();
