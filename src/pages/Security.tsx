@@ -24,8 +24,10 @@ import {
   hardLogoutStorage,
 } from "@/lib/secureStorage";
 import { format } from "date-fns";
+import { useScreenshotGuard } from "@/hooks/useScreenshotGuard";
 
 const Security = () => {
+  useScreenshotGuard();
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
