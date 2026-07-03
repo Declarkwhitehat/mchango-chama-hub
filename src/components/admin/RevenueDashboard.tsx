@@ -55,6 +55,7 @@ const SOURCE_COLORS: Record<string, string> = {
   overpayment_wallet: "hsl(280, 60%, 55%)",
   carry_forward: "hsl(220, 50%, 55%)",
   late_buffer: "hsl(50, 80%, 45%)",
+  abandoned_funds: "hsl(354, 65%, 40%)",
   other: "hsl(0, 0%, 55%)",
 };
 
@@ -72,8 +73,10 @@ const SOURCE_LABELS: Record<string, string> = {
   overpayment_wallet: "Overpayment Wallet Commission",
   carry_forward: "Carry-Forward Adjustments",
   late_buffer: "Late Payment Buffer",
+  abandoned_funds: "Deleted Account Funds",
   other: "Other Earnings",
 };
+
 
 // Earnings sources whose commission is ALREADY recorded in financial_ledger
 // (they were inserted as paired rows by contributions-crud). Excluded from
@@ -108,6 +111,8 @@ const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
   account_verification_fee: "verification_fee",
   welfareverificationfee: "verification_fee",
   welfare_verification_fee: "verification_fee",
+  entityverificationfee: "verification_fee",
+  entity_verification_fee: "verification_fee",
   mpesa_b2c_revenue: "mpesa_b2c_revenue",
   mpesab2crevenue: "mpesa_b2c_revenue",
   loan_fees: "loan_fees",
@@ -121,7 +126,10 @@ const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
   carryforward: "carry_forward",
   late_buffer: "late_buffer",
   latebuffer: "late_buffer",
+  abandoned_funds: "abandoned_funds",
+  abandonedfunds: "abandoned_funds",
 };
+
 const humanizeSource = (raw: string) =>
   String(raw || "other")
     .replace(/[_-]+/g, " ")
@@ -681,18 +689,27 @@ export function RevenueDashboard() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Source Breakdown</CardTitle>
-            {!loading && sourceBreakdown.length > 0 && (
-              reconciliation.matches ? (
-                <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-600/40">
-                  <CheckCircle2 className="h-3 w-3" /> Reconciled
-                </Badge>
-              ) : (
-                <Badge variant="destructive" className="gap-1" title={`Breakdown ${fmtKES(reconciliation.breakdownSum)} vs Total ${fmtKES(kpis.totalRevenue)} — diff ${fmtKES(reconciliation.diff)}`}>
-                  <AlertTriangle className="h-3 w-3" /> Mismatch {fmtKES(reconciliation.diff)}
-                </Badge>
-              )
-            )}
+            <div className="flex items-center gap-2">
+              <a
+                href="/admin/abandoned-funds"
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Deleted account ledger →
+              </a>
+              {!loading && sourceBreakdown.length > 0 && (
+                reconciliation.matches ? (
+                  <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-600/40">
+                    <CheckCircle2 className="h-3 w-3" /> Reconciled
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="gap-1" title={`Breakdown ${fmtKES(reconciliation.breakdownSum)} vs Total ${fmtKES(kpis.totalRevenue)} — diff ${fmtKES(reconciliation.diff)}`}>
+                    <AlertTriangle className="h-3 w-3" /> Mismatch {fmtKES(reconciliation.diff)}
+                  </Badge>
+                )
+              )}
+            </div>
           </CardHeader>
+
           <CardContent>
             <Table>
               <TableHeader>
