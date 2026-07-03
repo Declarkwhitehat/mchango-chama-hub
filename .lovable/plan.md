@@ -1,39 +1,35 @@
-# Fix: Creator Delete Campaign — 500 Error on Sweep
+## Goal
+Make the admin Revenue Dashboard show **Deleted Account Funds** as a first-class source, and tighten reconciliation so every revenue stream (commission, verification fees, withdrawal fees, abandoned funds, etc.) is counted exactly once and matches its underlying ledger.
 
-## Root cause
-Edge function `mchango-creator-delete` sweeps remaining campaign balance into `company_earnings` with `source='abandoned_funds'`. The DB check constraint `company_earnings_source_check` does not allow that value, so the insert fails:
+## Changes
 
-```
-new row for relation "company_earnings" violates check constraint "company_earnings_source_check"
-```
+### 1. Add "Deleted Account Funds" to Breakdown by Source
+File: `src/components/admin/RevenueDashboard.tsx`
 
-The sweep aborts → function returns 500 → UI shows "edge function returned a non-2xx".
+- Add `abandoned_funds` to `SOURCE_COLORS` (distinct red/brown tone) and `SOURCE_LABELS` ("Deleted Account Funds").
+- Add mapping entries in `EARNINGS_SOURCE_TO_BUCKET` for `abandoned_funds` and camelCase variant so it always lands in the dedicated bucket instead of the generic fallback.
+- Include the bucket in the pie chart, stacked-source chart, and the source filter dropdown.
 
-Allowed values today: `commission`, `verification_fee`, `account_verification_fee`, `mpesa_b2c_revenue`, `loan_fees`, `withdrawal_fees`, `chama_withdrawal`, `mchango_withdrawal`, `organization_withdrawal`, `welfare_withdrawal`, `other` (plus camelCase duplicates).
+### 2. Add a KPI tile for Deleted Account revenue
+Same file. New small card next to Verification Fees showing:
+- Total swept from deleted accounts in the selected period
+- Count of deletions
+- Comparison delta vs. previous period
+Source: `company_earnings` rows with `source = 'abandoned_funds'` (already fetched — just a new memoized total).
 
-## Fix (single migration)
-Extend the check constraint to include `abandoned_funds`:
+### 3. Reconciliation audit pass (accuracy, no double counting)
+Same file.
+- Confirm `abandoned_funds` is NOT in `LEDGER_DUPLICATED_EARNINGS` (it isn't today) so it counts once via `company_earnings`.
+- Verify verification-fee variants all normalise to the same bucket (already handled) — add missing `entityVerificationFee` / `entity_verification_fee` aliases if they appear in data.
+- Add a lightweight cross-check line under the totals: "Ledger commission + Company earnings fees = Displayed total" so any future drift is visible.
 
-```sql
-ALTER TABLE public.company_earnings
-  DROP CONSTRAINT company_earnings_source_check;
+### 4. Surface the abandoned-funds ledger link
+Under the new tile, add a "View details" link to `/admin/abandoned-funds` so the breakdown card is auditable back to the per-deletion rows.
 
-ALTER TABLE public.company_earnings
-  ADD CONSTRAINT company_earnings_source_check
-  CHECK (source = ANY (ARRAY[
-    'COMMISSION','commission',
-    'verificationFee','verification_fee',
-    'accountVerificationFee','account_verification_fee',
-    'mpesa_b2c_revenue','loan_fees','withdrawal_fees',
-    'chama_withdrawal','mchango_withdrawal',
-    'organization_withdrawal','welfare_withdrawal',
-    'abandoned_funds',
-    'other'
-  ]));
-```
+## Out of scope (call out, don't build)
+- No new sweep code paths. Only the existing `mchango-creator-delete` sweeps to `abandoned_funds`. Self-account-deletion today does not sweep balances because it already blocks users who hold funds / manage groups. If you want deleted-user residual balances swept automatically as well, that's a separate follow-up.
 
-No code change to the edge function needed — it already writes `abandoned_funds` (matching the ledger/policy memory).
-
-## Verify
-- Retry deleting the expired campaign that failed (Hezron Mwita se...). Expect success toast with swept KES amount.
-- Confirm a row appears in `/admin/abandoned-funds` and in `company_earnings` with `source='abandoned_funds'`.
+## Verification
+1. Open `/admin/revenue`. "Deleted Account Funds" appears in the pie chart, stacked chart, and source filter.
+2. Delete an expired test campaign with a balance. The KPI tile increases by the swept amount and the new row appears in `/admin/abandoned-funds`.
+3. Sum of per-source buckets equals the "Total Revenue" KPI (no double counting).
