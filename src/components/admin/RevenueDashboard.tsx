@@ -111,6 +111,8 @@ const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
   account_verification_fee: "verification_fee",
   welfareverificationfee: "verification_fee",
   welfare_verification_fee: "verification_fee",
+  entityverificationfee: "verification_fee",
+  entity_verification_fee: "verification_fee",
   mpesa_b2c_revenue: "mpesa_b2c_revenue",
   mpesab2crevenue: "mpesa_b2c_revenue",
   loan_fees: "loan_fees",
@@ -124,7 +126,10 @@ const EARNINGS_SOURCE_TO_BUCKET: Record<string, string> = {
   carryforward: "carry_forward",
   late_buffer: "late_buffer",
   latebuffer: "late_buffer",
+  abandoned_funds: "abandoned_funds",
+  abandonedfunds: "abandoned_funds",
 };
+
 const humanizeSource = (raw: string) =>
   String(raw || "other")
     .replace(/[_-]+/g, " ")
