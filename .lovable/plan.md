@@ -1,20 +1,39 @@
-## Diagnosis
+# Fix: Creator Delete Campaign — 500 Error on Sweep
 
-Your request is safely in the database as `pending` — I confirmed one row exists for your user. RLS policies allow every admin/super_admin to read it, and the review page at `/admin/daily-limit-requests` (already wired to `AdminProtectedRoute`) queries this table correctly. So nothing is broken on the backend or in the page itself.
+## Root cause
+Edge function `mchango-creator-delete` sweeps remaining campaign balance into `company_earnings` with `source='abandoned_funds'`. The DB check constraint `company_earnings_source_check` does not allow that value, so the insert fails:
 
-The real problem is discoverability: the admin has to know to click **"Daily Limit Requests"** buried in the sidebar. There is no dashboard tile, no badge count, and no push toward it when a new request comes in — so it feels like nothing happened.
+```
+new row for relation "company_earnings" violates check constraint "company_earnings_source_check"
+```
 
-## Plan
+The sweep aborts → function returns 500 → UI shows "edge function returned a non-2xx".
 
-1. **Admin sidebar badge** — In `src/components/admin/AdminSidebar.tsx`, fetch `count` of `daily_limit_increase_requests` where `status = 'pending'` on mount + every 30s, and render a small red pill next to the "Daily Limit Requests" item when count > 0.
+Allowed values today: `commission`, `verification_fee`, `account_verification_fee`, `mpesa_b2c_revenue`, `loan_fees`, `withdrawal_fees`, `chama_withdrawal`, `mchango_withdrawal`, `organization_withdrawal`, `welfare_withdrawal`, `other` (plus camelCase duplicates).
 
-2. **Admin dashboard tile** — In `src/pages/AdminDashboard.tsx`, add a "Pending Daily-Limit Requests" quick-stat card (same style as the other pending-action cards) linking to `/admin/daily-limit-requests`. Uses the same count query.
+## Fix (single migration)
+Extend the check constraint to include `abandoned_funds`:
 
-3. **Notification bell deep-link** — Ensure the in-app notification inserted by `request-daily-limit-increase` (title "Daily Limit Increase Request") routes admins to `/admin/daily-limit-requests` when clicked. Update `NotificationBell.tsx` routing map if the title/type isn't already handled.
+```sql
+ALTER TABLE public.company_earnings
+  DROP CONSTRAINT company_earnings_source_check;
 
-4. **Verify end-to-end** — After the changes, log in as admin, confirm:
-   - Sidebar shows badge "1"
-   - Dashboard tile shows "1 pending"
-   - Clicking either lands on the page and the existing request is visible in the Pending tab.
+ALTER TABLE public.company_earnings
+  ADD CONSTRAINT company_earnings_source_check
+  CHECK (source = ANY (ARRAY[
+    'COMMISSION','commission',
+    'verificationFee','verification_fee',
+    'accountVerificationFee','account_verification_fee',
+    'mpesa_b2c_revenue','loan_fees','withdrawal_fees',
+    'chama_withdrawal','mchango_withdrawal',
+    'organization_withdrawal','welfare_withdrawal',
+    'abandoned_funds',
+    'other'
+  ]));
+```
 
-No schema changes, no edge-function changes — this is purely UI plumbing so admins can't miss a request again.
+No code change to the edge function needed — it already writes `abandoned_funds` (matching the ledger/policy memory).
+
+## Verify
+- Retry deleting the expired campaign that failed (Hezron Mwita se...). Expect success toast with swept KES amount.
+- Confirm a row appears in `/admin/abandoned-funds` and in `company_earnings` with `source='abandoned_funds'`.
