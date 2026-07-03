@@ -1,0 +1,2 @@
+ALTER TABLE public.company_earnings DROP CONSTRAINT company_earnings_source_check;
+ALTER TABLE public.company_earnings ADD CONSTRAINT company_earnings_source_check CHECK (source = ANY (ARRAY['COMMISSION'::text,'commission'::text,'verificationFee'::text,'verification_fee'::text,'accountVerificationFee'::text,'account_verification_fee'::text,'mpesa_b2c_revenue'::text,'loan_fees'::text,'withdrawal_fees'::text,'chama_withdrawal'::text,'mchango_withdrawal'::text,'organization_withdrawal'::text,'welfare_withdrawal'::text,'abandoned_funds'::text,'other'::text]));
