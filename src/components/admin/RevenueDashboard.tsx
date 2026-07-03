@@ -55,6 +55,7 @@ const SOURCE_COLORS: Record<string, string> = {
   overpayment_wallet: "hsl(280, 60%, 55%)",
   carry_forward: "hsl(220, 50%, 55%)",
   late_buffer: "hsl(50, 80%, 45%)",
+  abandoned_funds: "hsl(354, 65%, 40%)",
   other: "hsl(0, 0%, 55%)",
 };
 
@@ -72,8 +73,10 @@ const SOURCE_LABELS: Record<string, string> = {
   overpayment_wallet: "Overpayment Wallet Commission",
   carry_forward: "Carry-Forward Adjustments",
   late_buffer: "Late Payment Buffer",
+  abandoned_funds: "Deleted Account Funds",
   other: "Other Earnings",
 };
+
 
 // Earnings sources whose commission is ALREADY recorded in financial_ledger
 // (they were inserted as paired rows by contributions-crud). Excluded from
