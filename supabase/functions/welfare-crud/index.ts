@@ -177,7 +177,7 @@ serve(async (req) => {
           .eq('id', userData.user.id)
           .maybeSingle();
         if (creatorPhone?.phone) {
-          const message = `Pamojanova: Your Welfare "${data.name}" has been created. Group code: ${data.group_code}. Share it to invite members.\nSTOP 4569*5#`;
+          const message = `Your Welfare "${data.name}" has been created. Group code: ${data.group_code}. Share it to invite members.\nSTOP 4569*5#`;
           await supabaseAdmin.functions.invoke('send-transactional-sms', {
             body: { phone: creatorPhone.phone, message, eventType: 'welfare_created' },
           });

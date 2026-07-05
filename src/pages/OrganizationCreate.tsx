@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle, X, Youtube, ImagePlus, Building2, Globe, MapPin, Phone, Mail } from "lucide-react";
 import { compressImage, formatFileSize } from "@/utils/imageCompression";
+import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
 import { KycGate } from "@/components/KycGate";
 
 const OrganizationCreate = () => {
@@ -196,6 +197,24 @@ const OrganizationCreate = () => {
       supabase.functions.invoke('notify-admin-verified-create', {
         body: { entity_type: 'organization', entity_id: data.id, entity_name: data.name },
       }).catch(() => {});
+
+      // SMS confirmation to creator
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('phone')
+          .eq('id', userCheck.user.id)
+          .maybeSingle();
+        if (profile?.phone) {
+          await sendTransactionalSMS(
+            profile.phone,
+            SMS_TEMPLATES.organizationCreated(data.name),
+            'organization_created'
+          );
+        }
+      } catch (smsErr) {
+        console.warn('Organization SMS failed (non-fatal):', smsErr);
+      }
 
       toast.success("Organization registered successfully!");
       navigate(`/organizations/${data.slug}`);

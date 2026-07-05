@@ -129,6 +129,12 @@ export const SMS_TEMPLATES = {
   mchangoCreated: (mchangoTitle: string) =>
     `Your campaign "${mchangoTitle}" is now live. Share it to start receiving donations.${STOP_LINE}`,
 
+  welfareCreated: (welfareName: string, groupCode: string) =>
+    `Your Welfare "${welfareName}" has been created. Group code: ${groupCode}. Share it to invite members.${STOP_LINE}`,
+
+  organizationCreated: (orgName: string) =>
+    `Your Organization "${orgName}" has been registered. Complete verification to start receiving donations.${STOP_LINE}`,
+
   passwordReset: (code: string) =>
     `Your password reset code is ${code}. It expires in 10 minutes. Do not share this code with anyone.${STOP_LINE}`,
 
