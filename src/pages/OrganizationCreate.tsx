@@ -198,6 +198,24 @@ const OrganizationCreate = () => {
         body: { entity_type: 'organization', entity_id: data.id, entity_name: data.name },
       }).catch(() => {});
 
+      // SMS confirmation to creator
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('phone')
+          .eq('id', userCheck.user.id)
+          .maybeSingle();
+        if (profile?.phone) {
+          await sendTransactionalSMS(
+            profile.phone,
+            SMS_TEMPLATES.organizationCreated(data.name),
+            'organization_created'
+          );
+        }
+      } catch (smsErr) {
+        console.warn('Organization SMS failed (non-fatal):', smsErr);
+      }
+
       toast.success("Organization registered successfully!");
       navigate(`/organizations/${data.slug}`);
     } catch (error: any) {
