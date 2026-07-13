@@ -1,13 +1,23 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, Search, Loader2, Users, Eye, Snowflake, CheckCircle } from "lucide-react";
+import { Shield, Search, Loader2, Eye, Snowflake, CheckCircle, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -18,6 +28,12 @@ const AdminWelfares = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; welfare: any | null; confirmText: string }>({
+    open: false,
+    welfare: null,
+    confirmText: "",
+  });
+  const [processing, setProcessing] = useState<string | null>(null);
 
   useEffect(() => {
     fetchWelfares();
@@ -60,7 +76,7 @@ const AdminWelfares = () => {
   };
 
   const handleUnverify = async (welfare: any) => {
-    if (!welfare.is_verified) return; // Can only unverify — verification requires a customer request
+    if (!welfare.is_verified) return;
     try {
       const { error } = await supabase
         .from('welfares')
@@ -72,6 +88,35 @@ const AdminWelfares = () => {
       fetchWelfares();
     } catch (e: any) {
       toast.error("Failed to update welfare");
+    }
+  };
+
+  const deleteWelfare = async (welfareId: string, welfareName: string) => {
+    setProcessing(welfareId);
+    try {
+      // Delete related records first (child tables) — use best-effort deletes
+      await Promise.allSettled([
+        supabase.from("welfare_contributions").delete().eq("welfare_id", welfareId),
+        supabase.from("welfare_contribution_cycles").delete().eq("welfare_id", welfareId),
+        supabase.from("welfare_withdrawal_approvals").delete().eq("welfare_id", welfareId),
+        supabase.from("welfare_leave_requests").delete().eq("welfare_id", welfareId),
+        supabase.from("welfare_executive_changes").delete().eq("welfare_id", welfareId),
+        supabase.from("welfare_registration_credits").delete().eq("welfare_id", welfareId),
+        supabase.from("welfare_members").delete().eq("welfare_id", welfareId),
+        supabase.from("verification_requests").delete().eq("entity_id", welfareId).eq("entity_type", "welfare"),
+      ]);
+
+      const { error } = await supabase.from("welfares").delete().eq("id", welfareId);
+      if (error) throw error;
+
+      toast.success(`"${welfareName}" has been permanently deleted`);
+      setDeleteDialog({ open: false, welfare: null, confirmText: "" });
+      await fetchWelfares();
+    } catch (e: any) {
+      console.error("Error deleting welfare:", e);
+      toast.error(e.message || "Failed to delete welfare");
+    } finally {
+      setProcessing(null);
     }
   };
 
@@ -93,7 +138,6 @@ const AdminWelfares = () => {
           <p className="text-muted-foreground mt-1">Manage all welfare groups on the platform</p>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-4 pb-4">
@@ -121,7 +165,6 @@ const AdminWelfares = () => {
           </Card>
         </div>
 
-        {/* Filters */}
         <Card>
           <CardContent className="pt-4 pb-4">
             <div className="flex flex-col sm:flex-row gap-3">
@@ -148,7 +191,6 @@ const AdminWelfares = () => {
           </CardContent>
         </Card>
 
-        {/* Table */}
         <Card>
           <CardContent className="p-0">
             {loading ? (
@@ -198,7 +240,7 @@ const AdminWelfares = () => {
                         {format(new Date(w.created_at), "MMM d, yyyy")}
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 flex-wrap">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -225,6 +267,15 @@ const AdminWelfares = () => {
                               Unverify
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteDialog({ open: true, welfare: w, confirmText: "" })}
+                            title="Delete welfare"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -235,6 +286,54 @@ const AdminWelfares = () => {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => !open && setDeleteDialog({ open: false, welfare: null, confirmText: "" })}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Welfare Group?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  You are about to <strong>permanently delete</strong> the welfare{" "}
+                  <strong>"{deleteDialog.welfare?.name}"</strong>. All members, contributions, cycles, withdrawal
+                  approvals and related records will be removed. This cannot be undone.
+                </p>
+                {Number(deleteDialog.welfare?.available_balance || 0) > 0 && (
+                  <p className="text-destructive font-medium">
+                    Warning: This welfare has a balance of KES{" "}
+                    {Number(deleteDialog.welfare?.available_balance || 0).toLocaleString()}.
+                  </p>
+                )}
+                <p>Type <strong>DELETE</strong> to confirm:</p>
+                <Input
+                  value={deleteDialog.confirmText}
+                  onChange={(e) => setDeleteDialog({ ...deleteDialog, confirmText: e.target.value })}
+                  placeholder="Type DELETE"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteDialog.welfare && deleteWelfare(deleteDialog.welfare.id, deleteDialog.welfare.name)}
+              disabled={deleteDialog.confirmText !== "DELETE" || processing === deleteDialog.welfare?.id}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {processing === deleteDialog.welfare?.id ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Deleting...
+                </>
+              ) : (
+                "Delete Permanently"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 };
