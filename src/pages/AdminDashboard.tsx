@@ -65,7 +65,10 @@ const AdminDashboard = () => {
         transactionsResult,
         execChangesResult,
         earningsResult,
-        activeAccountsResult,
+        activeChamaMembersResult,
+        activeWelfareMembersResult,
+        mchangoCreatorsResult,
+        organizationCreatorsResult,
         limitReqResult,
       ] = await Promise.all([
 
@@ -81,7 +84,10 @@ const AdminDashboard = () => {
         supabase.from('welfare_executive_changes').select('*', { count: 'exact', head: true }).eq('admin_decision', 'pending'),
         // FIX: Use company_earnings only — financial_ledger was causing double-count
         supabase.from('company_earnings').select('amount'),
-        supabase.from('chama_members').select('user_id', { count: 'exact', head: false }).eq('status', 'active').not('user_id', 'is', null),
+        supabase.from('chama_members').select('user_id').eq('status', 'active').not('user_id', 'is', null),
+        supabase.from('welfare_members').select('user_id').eq('status', 'active').not('user_id', 'is', null),
+        supabase.from('mchango').select('user_id').not('user_id', 'is', null),
+        supabase.from('organizations').select('created_by').not('created_by', 'is', null),
         (supabase as any).from('daily_limit_increase_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ]);
 
@@ -89,13 +95,19 @@ const AdminDashboard = () => {
       // FIX: Revenue from company_earnings only (single source of truth)
       const totalPlatformRevenue = earningsResult.data?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
 
-      // Count distinct active users from chama_members
+      // Count distinct users associated with any chama, welfare, mchango, or organization
       const uniqueUserIds = new Set<string>();
-      if (activeAccountsResult.data) {
-        for (const row of activeAccountsResult.data as any[]) {
-          if (row.user_id) uniqueUserIds.add(row.user_id);
+      const addIds = (rows: any[] | null | undefined, key: string) => {
+        if (!rows) return;
+        for (const row of rows) {
+          if (row?.[key]) uniqueUserIds.add(row[key]);
         }
-      }
+      };
+      addIds(activeChamaMembersResult.data as any[], 'user_id');
+      addIds(activeWelfareMembersResult.data as any[], 'user_id');
+      addIds(mchangoCreatorsResult.data as any[], 'user_id');
+      addIds(organizationCreatorsResult.data as any[], 'created_by');
+
 
       setStats({
         totalUsers: usersResult.count || 0,
