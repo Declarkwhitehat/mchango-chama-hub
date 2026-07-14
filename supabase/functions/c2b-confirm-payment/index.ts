@@ -82,41 +82,24 @@ serve(async (req) => {
     
     console.log(`Original account: "${accountNumber}" -> Normalized: "${upperAccountNumber}"`);
 
-    // Check for duplicate payment (same M-Pesa receipt number) across all tables.
-    // CRITICAL: STK Push flows store the receipt in `mpesa_receipt_number` while
-    // C2B/offline flows store it as `payment_reference`. We must check BOTH columns
-    // on EVERY table that records payments — otherwise the same M-Pesa receipt is
-    // recorded twice (once by STK completion, once by C2B confirmation), doubling
-    // the reported amount for the payer.
+    // Check for duplicate payment (same M-Pesa receipt number) across all tables
+    // CRITICAL: Also check contributions.mpesa_receipt_number because STK payments store
+    // the CheckoutRequestID as payment_reference, not the M-Pesa receipt number
     const [
       { data: existingContribution },
       { data: existingContributionByReceipt },
       { data: existingDeposit },
       { data: existingDonation },
-      { data: existingDonationByReceipt },
-      { data: existingOrgDonation },
-      { data: existingOrgDonationByReceipt },
-      { data: existingWelfareContrib },
-      { data: existingWelfareContribByReceipt },
+      { data: existingWelfareContrib }
     ] = await Promise.all([
       supabase.from('contributions').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
       supabase.from('contributions').select('id').eq('mpesa_receipt_number', mpesaReceiptNumber).maybeSingle(),
       supabase.from('saving_deposits').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
       supabase.from('mchango_donations').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
-      supabase.from('mchango_donations').select('id').eq('mpesa_receipt_number', mpesaReceiptNumber).maybeSingle(),
-      supabase.from('organization_donations').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
-      supabase.from('organization_donations').select('id').eq('mpesa_receipt_number', mpesaReceiptNumber).maybeSingle(),
       supabase.from('welfare_contributions').select('id').eq('payment_reference', mpesaReceiptNumber).maybeSingle(),
-      supabase.from('welfare_contributions').select('id').eq('mpesa_receipt_number', mpesaReceiptNumber).maybeSingle(),
     ]);
 
-    if (
-      existingContribution || existingContributionByReceipt ||
-      existingDeposit ||
-      existingDonation || existingDonationByReceipt ||
-      existingOrgDonation || existingOrgDonationByReceipt ||
-      existingWelfareContrib || existingWelfareContribByReceipt
-    ) {
+    if (existingContribution || existingContributionByReceipt || existingDeposit || existingDonation || existingWelfareContrib) {
       console.log('Duplicate payment detected:', mpesaReceiptNumber);
       return new Response(
         JSON.stringify({ 
@@ -128,7 +111,6 @@ serve(async (req) => {
         }
       );
     }
-
 
     // Try to find member in chama first using full member code
     const { data: chamaMemberData } = await supabase
