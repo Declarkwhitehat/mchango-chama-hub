@@ -1,50 +1,42 @@
-# Welfare Overpayment Carry-Forward
+## Policy: No Receipt = No Confirmation
 
-## Goal
-In a welfare group, when the admin opens a new contribution cycle (e.g. KES 80), any member who already overpaid in a previous cycle should automatically show as **100% paid** for the new cycle, until their surplus is used up. Members who paid exactly the required amount stay at 100%. Only genuine shortfalls appear as unpaid/underpaid.
+Enforce site-wide that a payment can only be marked `completed`/`confirmed` when a valid M-Pesa receipt number is attached. Applies to Chama, Welfare, Mchango (campaigns), and Organization donations.
 
-## Current behavior (problem)
-`WelfareCycleStatus.tsx` looks only at `welfare_contributions` rows whose `created_at` falls **inside the active cycle's `start_date`–`end_date` window**. A member who overpaid last cycle (surplus sitting in the group) is shown as "unpaid" for the new cycle even though their credit already covers it.
+### Scope
 
-## New rule (cycle-agnostic credit)
-For each active member, compute:
+All contribution/donation tables:
+- `contributions` (chama)
+- `member_cycle_payments` (chama cycles)
+- `welfare_contributions`
+- `mchango_donations`
+- `organization_donations`
+- `transactions` (STK ledger)
 
-```
-cumulative_paid    = SUM(gross_amount of that member's completed welfare_contributions
-                        across ALL cycles of this welfare, since they joined)
-cumulative_required = SUM(cycle.amount for every cycle whose start_date >= member.joined_at
-                        AND status IN ('active','completed'))
-credit_balance      = cumulative_paid - cumulative_required
-```
+### Enforcement layers
 
-Status for the current active cycle:
-- `credit_balance >= 0` → **Paid (100%)**. If `credit_balance > 0` also show a small "Credit: KES X carried forward" hint.
-- `-cycle.amount < credit_balance < 0` → **Underpaid**, remaining = `-credit_balance`.
-- `credit_balance <= -cycle.amount` → **Unpaid**, owed = `-credit_balance` (may exceed one cycle if they've missed several).
+**1. Database (hard guard, migration)**
+- Add a trigger `enforce_receipt_on_completion()` on each table above.
+- Rule: if `NEW.payment_status` (or `status`) transitions to `completed`/`confirmed`, then `mpesa_receipt_number` (or equivalent receipt column) must be NON-NULL and non-empty. Otherwise `RAISE EXCEPTION 'Payment cannot be confirmed without an M-Pesa receipt'`.
+- Exception whitelist: rows where `payment_method = 'wallet'` (internal overpayment-wallet applications) and `payment_method = 'registration_credit'` — these are internal ledger moves, not deposits. Confirm with user if these should also require a receipt.
+- Trigger fires BEFORE INSERT OR UPDATE.
 
-This makes overpayment automatically satisfy the next cycle(s) without any admin action or DB writes.
+**2. Edge functions (soft guard, fail fast)**
+Audit and patch every function that writes a `completed` row:
+- `mpesa-callback` / `payment-callback` — already sets receipt from Safaricom `MpesaReceiptNumber`; add explicit guard: if missing, mark `failed` instead of `completed`.
+- `welfare-contributions` — currently inserts `payment_status: 'completed'` with only `payment_reference`. Change to insert `pending` unless a real receipt is provided; the M-Pesa callback flips to `completed` once the receipt lands.
+- `chama-contributions`, `mchango-donate`, `organization-donate`, offline-payment reconciliation functions — same pattern.
+- Admin "Force Confirm" / manual reconciliation paths must require an operator-entered receipt number (M-Pesa code) before flipping status.
 
-## Scope of changes (frontend only)
+**3. Admin UI**
+- Any "Mark as paid / Confirm / Force approve" button requires a receipt number input (M-Pesa code, e.g. `TGH…`); disabled until filled.
+- Display receipt on all payment lists; rows without a receipt render as `Pending` even if a legacy record says otherwise.
 
-### `src/components/welfare/WelfareCycleStatus.tsx`
-- Replace the current single-cycle contribution fetch with:
-  1. Fetch **all** cycles for this welfare (`status in ('active','completed')`, ordered by `start_date`).
-  2. Fetch **all completed** `welfare_contributions` for this welfare (member_id, user_id, gross_amount, created_at).
-- For each member, compute `cumulative_paid` and `cumulative_required` per the formula above (respecting the member's `joined_at`/`created_at` so new joiners aren't billed for cycles that ran before they joined).
-- Recompute `paidMembers`, `underpaidMembers`, `unpaidMembers`, and the current-user banner from `credit_balance` instead of in-window sums.
-- In the "All Paid / X unpaid" summary and the collapsibles, show `Credit: KES X` next to members whose `credit_balance > 0`.
-- Keep the existing UI shell, deadline countdown, and copy — only the counting logic changes.
+**4. Backfill / cleanup**
+- One-time report (no auto-mutation) of existing `completed` rows across the 5 tables with NULL/empty receipt. Present count per table so the user decides whether to downgrade to `pending`, delete, or grandfather them.
 
-### `src/components/welfare/WelfareContributionForm.tsx` (light touch)
-- Before submitting, if the member's current `credit_balance` already covers `cycle.amount`, show an inline notice: "You already have KES X credit from previous overpayment — this cycle is covered. You can still contribute extra if you want."
-- Do not block the payment; just inform. No backend change.
+### Open questions before I build
 
-## Non-goals
-- No DB migration, no changes to `welfare_contributions`, no edits to balances, no changes to commission or withdrawal logic.
-- No changes to chama/mchango — welfare only, as requested.
-- Historical rows and admin-facing totals are untouched.
+1. Should `payment_method IN ('wallet','registration_credit','offline_manual')` be exempt from the receipt rule, or must every confirmed row have a receipt (even internal wallet transfers)?
+2. For existing legacy `completed` rows without receipts — grandfather them (rule applies only to new rows), downgrade to `pending`, or just report and let you decide manually?
 
-## Technical notes
-- All logic runs client-side from existing tables (`welfare_contribution_cycles`, `welfare_contributions`, `welfare_members`); no new RPC needed.
-- `gross_amount` is the source of truth for "what the member paid" (matches the existing file's comment).
-- Member join date: use `welfare_members.created_at` (or `joined_at` if present) to avoid billing new members for old cycles.
+I'll wait for these two answers, then ship the migration + edge-function patches + admin UI guard in one pass.
