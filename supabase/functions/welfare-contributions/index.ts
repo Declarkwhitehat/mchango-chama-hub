@@ -141,12 +141,14 @@ serve(async (req) => {
             payment_reference: ref,
             payment_method: payment_method || 'mpesa',
             payment_status: 'completed',
+            mpesa_receipt_number: receiptClean,
             cycle_month: cycleMonth,
             category,
             completed_at: new Date().toISOString(),
           })
           .select()
           .single();
+
         if (insErr) throw insErr;
         await supabaseAdmin.rpc('record_company_earning', {
           p_source: category === 'registration_fee' ? 'welfare_registration' : 'welfare_contribution',
