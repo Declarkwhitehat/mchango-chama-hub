@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, Search, Loader2, Eye, Snowflake, CheckCircle, Trash2 } from "lucide-react";
+import { Shield, Search, Loader2, Eye, Snowflake, CheckCircle, Trash2, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -245,9 +245,19 @@ const AdminWelfares = () => {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => navigate(`/admin/welfare/${w.id}`)}
+                            onClick={() => navigate(`/welfare/${w.id}`)}
+                            title="Open welfare (member view)"
                           >
                             <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => navigate(`/admin/welfare/${w.id}`)}
+                            title="Admin members & % paid"
+                          >
+                            <Users className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
