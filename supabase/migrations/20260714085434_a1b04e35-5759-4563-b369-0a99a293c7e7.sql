@@ -1,0 +1,3 @@
+UPDATE public.profiles SET is_verified = true, verified_at = COALESCE(verified_at, now()), phone_verified = true WHERE id = '88687887-fccc-4c72-8d3a-33771530b1b1';
+UPDATE public.welfares SET is_verified = true, creator_is_verified = true WHERE created_by = '88687887-fccc-4c72-8d3a-33771530b1b1';
+UPDATE public.organizations SET is_verified = true, creator_is_verified = true WHERE created_by = '88687887-fccc-4c72-8d3a-33771530b1b1';
