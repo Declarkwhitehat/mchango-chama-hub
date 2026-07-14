@@ -62,6 +62,7 @@ const AdminTransactions = lazy(() => import("./pages/AdminTransactions"));
 const AdminWithdrawals = lazy(() => import("./pages/AdminWithdrawals"));
 const AdminChamas = lazy(() => import("./pages/AdminChamas"));
 const AdminWelfares = lazy(() => import("./pages/AdminWelfares"));
+const AdminWelfareDetail = lazy(() => import("./pages/AdminWelfareDetail"));
 const AdminChamaDetail = lazy(() => import("./pages/AdminChamaDetail"));
 const AdminCampaigns = lazy(() => import("./pages/AdminCampaigns"));
 const AdminCampaignDetail = lazy(() => import("./pages/AdminCampaignDetail"));
