@@ -61,21 +61,26 @@ const AdminWelfareDetail = () => {
   const rows = useMemo(() => {
     if (!welfare) return [];
     const regFee = Number(welfare.registration_fee || 0);
-    const cycleAmt = Number(welfare.contribution_amount || 0);
     return members.map((m) => {
       const joined = m.joined_at ? new Date(m.joined_at) : null;
+      // Only bill cycles that actually started AFTER (or on) the member joined.
+      // If the manager hasn't opened a new cycle, expected = registration fee only.
       const eligibleCycles = cycles.filter((c) => {
         if (!joined) return true;
         return new Date(c.start_date) >= new Date(joined.toDateString());
       });
       const cyclesRequired = eligibleCycles.reduce((s, c) => s + Number(c.amount || 0), 0);
-      // If no cycles defined yet, fall back to one expected contribution
-      const cycleExpected = eligibleCycles.length > 0 ? cyclesRequired : cycleAmt;
-      const expected = regFee + cycleExpected;
-      const paid = contribs
-        .filter((x) => x.member_id === m.id)
-        .reduce((s, x) => s + Number(x.gross_amount || 0), Number(m.total_contributed || 0) > 0 && contribs.filter((x) => x.member_id === m.id).length === 0 ? Number(m.total_contributed || 0) : 0);
-      const pct = expected > 0 ? Math.min(100, Math.round((paid / expected) * 100)) : (paid > 0 ? 100 : 0);
+      const expected = regFee + cyclesRequired;
+
+      const memberContribs = contribs.filter((x) => x.member_id === m.id);
+      const paidFromContribs = memberContribs.reduce((s, x) => s + Number(x.gross_amount || 0), 0);
+      const paid = paidFromContribs > 0 ? paidFromContribs : Number(m.total_contributed || 0);
+
+      const pct = expected > 0
+        ? (paid >= expected ? 100 : Math.round((paid / expected) * 100))
+        : (paid > 0 ? 100 : 0);
+      const overpaid = expected > 0 && paid > expected ? paid - expected : 0;
+
       return {
         ...m,
         name: m.profiles?.full_name || "Unknown",
@@ -83,9 +88,11 @@ const AdminWelfareDetail = () => {
         paid,
         expected,
         pct,
+        overpaid,
       };
     });
   }, [members, cycles, contribs, welfare]);
+
 
   const filtered = rows.filter((r) => {
     const q = search.toLowerCase().trim();
@@ -179,7 +186,14 @@ const AdminWelfareDetail = () => {
                             <p className="text-xs text-muted-foreground">{r.phone}</p>
                           </TableCell>
                           <TableCell className="font-mono text-xs">{r.member_code}</TableCell>
-                          <TableCell className="text-sm">KES {r.paid.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm">
+                            KES {r.paid.toLocaleString()}
+                            {r.overpaid > 0 && (
+                              <Badge variant="outline" className="ml-2 text-green-700 border-green-500 text-[10px]">
+                                +{r.overpaid.toLocaleString()} credit
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">KES {r.expected.toLocaleString()}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -192,6 +206,7 @@ const AdminWelfareDetail = () => {
                               {r.status}
                             </Badge>
                           </TableCell>
+
                         </TableRow>
                       ))}
                       {filtered.length === 0 && (
