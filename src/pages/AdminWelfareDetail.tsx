@@ -186,7 +186,14 @@ const AdminWelfareDetail = () => {
                             <p className="text-xs text-muted-foreground">{r.phone}</p>
                           </TableCell>
                           <TableCell className="font-mono text-xs">{r.member_code}</TableCell>
-                          <TableCell className="text-sm">KES {r.paid.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm">
+                            KES {r.paid.toLocaleString()}
+                            {r.overpaid > 0 && (
+                              <Badge variant="outline" className="ml-2 text-green-700 border-green-500 text-[10px]">
+                                +{r.overpaid.toLocaleString()} credit
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">KES {r.expected.toLocaleString()}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -199,6 +206,7 @@ const AdminWelfareDetail = () => {
                               {r.status}
                             </Badge>
                           </TableCell>
+
                         </TableRow>
                       ))}
                       {filtered.length === 0 && (
