@@ -1,0 +1,216 @@
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { AdminLayout } from "@/components/admin/AdminLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { ArrowLeft, Loader2, Search, Users } from "lucide-react";
+import { toast } from "sonner";
+
+const AdminWelfareDetail = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [welfare, setWelfare] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [cycles, setCycles] = useState<any[]>([]);
+  const [contribs, setContribs] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        const [w, m, c, ct] = await Promise.all([
+          supabase.from("welfares").select("*").eq("id", id).maybeSingle(),
+          supabase
+            .from("welfare_members")
+            .select("id, member_code, role, status, joined_at, total_contributed, registration_fee_paid, user_id, profiles:user_id(full_name, phone)")
+            .eq("welfare_id", id)
+            .order("member_code"),
+          supabase
+            .from("welfare_contribution_cycles")
+            .select("id, amount, start_date, status")
+            .eq("welfare_id", id)
+            .order("start_date"),
+          supabase
+            .from("welfare_contributions")
+            .select("id, member_id, gross_amount, payment_status")
+            .eq("welfare_id", id)
+            .eq("payment_status", "completed"),
+        ]);
+        if (w.error) throw w.error;
+        setWelfare(w.data);
+        setMembers(m.data || []);
+        setCycles(c.data || []);
+        setContribs(ct.data || []);
+      } catch (e: any) {
+        console.error(e);
+        toast.error("Failed to load welfare");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  const rows = useMemo(() => {
+    if (!welfare) return [];
+    const regFee = Number(welfare.registration_fee || 0);
+    const cycleAmt = Number(welfare.contribution_amount || 0);
+    return members.map((m) => {
+      const joined = m.joined_at ? new Date(m.joined_at) : null;
+      const eligibleCycles = cycles.filter((c) => {
+        if (!joined) return true;
+        return new Date(c.start_date) >= new Date(joined.toDateString());
+      });
+      const cyclesRequired = eligibleCycles.reduce((s, c) => s + Number(c.amount || 0), 0);
+      // If no cycles defined yet, fall back to one expected contribution
+      const cycleExpected = eligibleCycles.length > 0 ? cyclesRequired : cycleAmt;
+      const expected = regFee + cycleExpected;
+      const paid = contribs
+        .filter((x) => x.member_id === m.id)
+        .reduce((s, x) => s + Number(x.gross_amount || 0), Number(m.total_contributed || 0) > 0 && contribs.filter((x) => x.member_id === m.id).length === 0 ? Number(m.total_contributed || 0) : 0);
+      const pct = expected > 0 ? Math.min(100, Math.round((paid / expected) * 100)) : (paid > 0 ? 100 : 0);
+      return {
+        ...m,
+        name: m.profiles?.full_name || "Unknown",
+        phone: m.profiles?.phone || "",
+        paid,
+        expected,
+        pct,
+      };
+    });
+  }, [members, cycles, contribs, welfare]);
+
+  const filtered = rows.filter((r) => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      r.name.toLowerCase().includes(q) ||
+      r.member_code?.toLowerCase().includes(q) ||
+      r.phone?.toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="py-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!welfare) {
+    return (
+      <AdminLayout>
+        <div className="container px-4 py-6 max-w-5xl mx-auto">
+          <p className="text-muted-foreground">Welfare not found.</p>
+          <Button variant="outline" onClick={() => navigate("/admin/welfares")} className="mt-4">
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout>
+      <div className="container px-4 py-6 max-w-6xl mx-auto space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/admin/welfares")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">{welfare.name}</h1>
+            <p className="text-xs text-muted-foreground font-mono">{welfare.group_code}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">Members</p><p className="text-xl font-bold">{members.length}</p></CardContent></Card>
+          <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">Registration Fee</p><p className="text-xl font-bold">KES {Number(welfare.registration_fee || 0).toLocaleString()}</p></CardContent></Card>
+          <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">Cycle Amount</p><p className="text-xl font-bold">KES {Number(welfare.contribution_amount || 0).toLocaleString()}</p></CardContent></Card>
+          <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">Balance</p><p className="text-xl font-bold">KES {Number(welfare.available_balance || 0).toLocaleString()}</p></CardContent></Card>
+        </div>
+
+        <Tabs defaultValue="members">
+          <TabsList>
+            <TabsTrigger value="members"><Users className="h-4 w-4 mr-2" />Members</TabsTrigger>
+          </TabsList>
+          <TabsContent value="members">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Member Contribution Progress</CardTitle>
+                <div className="relative mt-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, member ID, or phone..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Member</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Paid</TableHead>
+                        <TableHead>Expected</TableHead>
+                        <TableHead className="w-[220px]">%</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell>
+                            <p className="text-sm font-medium">{r.name}</p>
+                            <p className="text-xs text-muted-foreground">{r.phone}</p>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">{r.member_code}</TableCell>
+                          <TableCell className="text-sm">KES {r.paid.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">KES {r.expected.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Progress value={r.pct} className="h-2 flex-1" />
+                              <span className="text-xs font-medium w-10 text-right">{r.pct}%</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={r.status === "active" ? "default" : "secondary"} className="text-xs capitalize">
+                              {r.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {filtered.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                            No members found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </AdminLayout>
+  );
+};
+
+export default AdminWelfareDetail;
