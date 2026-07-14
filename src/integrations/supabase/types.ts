@@ -2023,6 +2023,30 @@ export type Database = {
           },
         ]
       }
+      mpesa_receipt_registry: {
+        Row: {
+          amount: number | null
+          created_at: string
+          receipt: string
+          source_id: string | null
+          source_table: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          receipt: string
+          source_id?: string | null
+          source_table: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          receipt?: string
+          source_id?: string | null
+          source_table?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           category: string
