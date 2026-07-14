@@ -47,11 +47,18 @@ serve(async (req) => {
       }
 
       const body = await req.json();
-      const { welfare_id, amount, payment_method, payment_reference } = body;
+      const { welfare_id, amount, payment_method, payment_reference, mpesa_receipt_number } = body;
 
       if (!welfare_id || !amount || amount <= 0) {
         return new Response(JSON.stringify({ error: 'welfare_id and positive amount required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+
+      // Platform-wide policy: no payment is confirmed without an M-Pesa receipt.
+      const receiptClean = typeof mpesa_receipt_number === 'string' ? mpesa_receipt_number.trim() : '';
+      if (!receiptClean) {
+        return new Response(JSON.stringify({ error: 'An M-Pesa receipt number is required to confirm this payment.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
 
       // Select ALL balance fields needed for the update
       const { data: welfare } = await supabaseAdmin
@@ -134,12 +141,14 @@ serve(async (req) => {
             payment_reference: ref,
             payment_method: payment_method || 'mpesa',
             payment_status: 'completed',
+            mpesa_receipt_number: receiptClean,
             cycle_month: cycleMonth,
             category,
             completed_at: new Date().toISOString(),
           })
           .select()
           .single();
+
         if (insErr) throw insErr;
         await supabaseAdmin.rpc('record_company_earning', {
           p_source: category === 'registration_fee' ? 'welfare_registration' : 'welfare_contribution',
