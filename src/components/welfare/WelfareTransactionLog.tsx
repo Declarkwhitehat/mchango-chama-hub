@@ -171,26 +171,60 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
       y += 10;
 
       // Summary
-      const totalAmount = items.reduce((s, i) => s + Number(activeTab === "contributions" ? i.gross_amount : i.amount), 0);
+      const isContribTab = activeTab === "contributions";
+      const totalGross = items.reduce((s, i: any) => s + Number(isContribTab ? i.gross_amount : i.amount), 0);
+      const totalCommission = isContribTab
+        ? items.reduce((s, i: any) => s + Number(i.commission_amount || 0), 0)
+        : 0;
+      const totalNet = isContribTab
+        ? items.reduce((s, i: any) => {
+            const g = Number(i.gross_amount || 0);
+            const c = Number(i.commission_amount || 0);
+            const n = i.net_amount != null ? Number(i.net_amount) : g - c;
+            return s + n;
+          }, 0)
+        : totalGross;
+
       doc.setFont("helvetica", "bold");
-      doc.text(`Total Records: ${items.length}   |   Total Amount: KES ${totalAmount.toLocaleString()}`, m, y);
-      y += 10;
+      doc.text(`Total Records: ${items.length}`, m, y);
+      y += 6;
+      if (isContribTab) {
+        doc.setFont("helvetica", "normal");
+        doc.text(`Total Gross:      KES ${totalGross.toLocaleString()}`, m, y); y += 5;
+        doc.text(`Total Commission: KES ${totalCommission.toLocaleString()}`, m, y); y += 5;
+        doc.setFont("helvetica", "bold");
+        doc.text(`Total Net (credited to balance): KES ${totalNet.toLocaleString()}`, m, y);
+        y += 8;
+      } else {
+        doc.text(`Total Amount: KES ${totalGross.toLocaleString()}`, m, y);
+        y += 8;
+      }
 
       // Table header
       doc.setFillColor(41, 128, 185);
       doc.rect(m, y, pw - 2 * m, 8, "F");
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(9);
-      doc.text("#", m + 2, y + 5.5);
-      doc.text("Name", m + 12, y + 5.5);
-      doc.text("Phone", m + 65, y + 5.5);
-      doc.text("Amount (KES)", m + 105, y + 5.5);
-      doc.text("Date", m + 145, y + 5.5);
+      if (isContribTab) {
+        doc.text("#", m + 2, y + 5.5);
+        doc.text("Name", m + 10, y + 5.5);
+        doc.text("Phone", m + 55, y + 5.5);
+        doc.text("Gross", m + 95, y + 5.5);
+        doc.text("Comm.", m + 118, y + 5.5);
+        doc.text("Net", m + 142, y + 5.5);
+        doc.text("Date", m + 162, y + 5.5);
+      } else {
+        doc.text("#", m + 2, y + 5.5);
+        doc.text("Name", m + 12, y + 5.5);
+        doc.text("Phone", m + 65, y + 5.5);
+        doc.text("Amount (KES)", m + 105, y + 5.5);
+        doc.text("Date", m + 145, y + 5.5);
+      }
       y += 10;
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "normal");
 
-      items.forEach((item, idx) => {
+      items.forEach((item: any, idx) => {
         if (y > 275) {
           doc.addPage();
           y = 20;
@@ -199,22 +233,53 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
           doc.setFillColor(245, 245, 245);
           doc.rect(m, y - 4, pw - 2 * m, 7, "F");
         }
-        const name = activeTab === "contributions"
-          ? (item.welfare_members?.profiles?.full_name || "Member").substring(0, 20)
-          : ((item as any).profiles?.full_name || "Unknown").substring(0, 20);
-        const phone = activeTab === "contributions"
+        const name = isContribTab
+          ? (item.welfare_members?.profiles?.full_name || "Member").substring(0, 18)
+          : (item.profiles?.full_name || "Unknown").substring(0, 18);
+        const phone = isContribTab
           ? (item.welfare_members?.profiles?.phone || "")
-          : ((item as any).profiles?.phone || "");
-        const amount = activeTab === "contributions" ? item.gross_amount : item.amount;
+          : (item.profiles?.phone || "");
 
         doc.setFontSize(8);
-        doc.text(`${idx + 1}`, m + 2, y);
-        doc.text(name, m + 12, y);
-        doc.text(phone, m + 65, y);
-        doc.text(Number(amount).toLocaleString(), m + 105, y);
-        doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 145, y);
+        if (isContribTab) {
+          const gross = Number(item.gross_amount || 0);
+          const commission = Number(item.commission_amount || 0);
+          const net = item.net_amount != null ? Number(item.net_amount) : gross - commission;
+          doc.text(`${idx + 1}`, m + 2, y);
+          doc.text(name, m + 10, y);
+          doc.text(phone, m + 55, y);
+          doc.text(gross.toLocaleString(), m + 95, y);
+          doc.text(commission.toLocaleString(), m + 118, y);
+          doc.text(net.toLocaleString(), m + 142, y);
+          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 162, y);
+        } else {
+          doc.text(`${idx + 1}`, m + 2, y);
+          doc.text(name, m + 12, y);
+          doc.text(phone, m + 65, y);
+          doc.text(Number(item.amount).toLocaleString(), m + 105, y);
+          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 145, y);
+        }
         y += 7;
       });
+
+      // Totals footer row
+      if (y > 270) { doc.addPage(); y = 20; }
+      y += 2;
+      doc.setDrawColor(180);
+      doc.line(m, y, pw - m, y);
+      y += 6;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      if (isContribTab) {
+        doc.text("TOTALS", m + 10, y);
+        doc.text(totalGross.toLocaleString(), m + 95, y);
+        doc.text(totalCommission.toLocaleString(), m + 118, y);
+        doc.text(totalNet.toLocaleString(), m + 142, y);
+      } else {
+        doc.text("TOTAL", m + 12, y);
+        doc.text(totalGross.toLocaleString(), m + 105, y);
+      }
+      doc.setFont("helvetica", "normal");
 
       y += 8;
       doc.setFontSize(7);
