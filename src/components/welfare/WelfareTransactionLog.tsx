@@ -92,6 +92,8 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
 
   const filteredContributions = useMemo(() => {
     let items = filterByDate(contributions);
+    // Exclude failed/rejected from history and reports
+    items = items.filter(c => c.payment_status !== 'failed' && c.payment_status !== 'rejected');
     if (statusFilter !== "all") items = items.filter(c => c.payment_status === statusFilter);
     if (searchPhone) items = items.filter(c => (c.welfare_members?.profiles?.phone || "").includes(searchPhone));
     if (searchName) items = items.filter(c => (c.welfare_members?.profiles?.full_name || "").toLowerCase().includes(searchName.toLowerCase()));
@@ -100,6 +102,8 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
 
   const filteredWithdrawals = useMemo(() => {
     let items = filterByDate(withdrawals);
+    // Exclude failed/rejected from history and reports
+    items = items.filter(w => w.status !== 'failed' && w.status !== 'rejected');
     if (statusFilter !== "all") items = items.filter(w => w.status === statusFilter);
     if (searchName) items = items.filter(w => ((w as any).profiles?.full_name || "").toLowerCase().includes(searchName.toLowerCase()));
     return items;
@@ -342,7 +346,7 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
+                
               </SelectContent>
             </Select>
           </div>
