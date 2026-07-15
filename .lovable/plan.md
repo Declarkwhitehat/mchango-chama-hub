@@ -1,42 +1,38 @@
-## Policy: No Receipt = No Confirmation
+## Goal
 
-Enforce site-wide that a payment can only be marked `completed`/`confirmed` when a valid M-Pesa receipt number is attached. Applies to Chama, Welfare, Mchango (campaigns), and Organization donations.
+Fix the Welfare Contributions Report PDF so the totals reconcile with the welfare balance. Today it only shows a "Total Amount" summed from `gross_amount`, which is why 6,190 on the PDF doesn't match the on-screen balance (balance is net of platform commission).
 
-### Scope
+## Scope
 
-All contribution/donation tables:
-- `contributions` (chama)
-- `member_cycle_payments` (chama cycles)
-- `welfare_contributions`
-- `mchango_donations`
-- `organization_donations`
-- `transactions` (STK ledger)
+Single file: `src/components/welfare/WelfareTransactionLog.tsx` (the generator of the uploaded PDF). No backend / schema changes.
 
-### Enforcement layers
+## Changes
 
-**1. Database (hard guard, migration)**
-- Add a trigger `enforce_receipt_on_completion()` on each table above.
-- Rule: if `NEW.payment_status` (or `status`) transitions to `completed`/`confirmed`, then `mpesa_receipt_number` (or equivalent receipt column) must be NON-NULL and non-empty. Otherwise `RAISE EXCEPTION 'Payment cannot be confirmed without an M-Pesa receipt'`.
-- Exception whitelist: rows where `payment_method = 'wallet'` (internal overpayment-wallet applications) and `payment_method = 'registration_credit'` — these are internal ledger moves, not deposits. Confirm with user if these should also require a receipt.
-- Trigger fires BEFORE INSERT OR UPDATE.
+1. **Header summary line** — replace the single "Total Amount" with three figures:
+   - `Total Gross: KES X`
+   - `Total Commission: KES Y`
+   - `Total Net (credited to balance): KES Z`
 
-**2. Edge functions (soft guard, fail fast)**
-Audit and patch every function that writes a `completed` row:
-- `mpesa-callback` / `payment-callback` — already sets receipt from Safaricom `MpesaReceiptNumber`; add explicit guard: if missing, mark `failed` instead of `completed`.
-- `welfare-contributions` — currently inserts `payment_status: 'completed'` with only `payment_reference`. Change to insert `pending` unless a real receipt is provided; the M-Pesa callback flips to `completed` once the receipt lands.
-- `chama-contributions`, `mchango-donate`, `organization-donate`, offline-payment reconciliation functions — same pattern.
-- Admin "Force Confirm" / manual reconciliation paths must require an operator-entered receipt number (M-Pesa code) before flipping status.
+2. **Table columns (Contributions tab only)** — expand from `Amount` into three narrower columns:
+   - `Gross` (from `gross_amount`)
+   - `Commission` (from `commission_amount`, fallback 0)
+   - `Net` (from `net_amount`, fallback = gross − commission)
+   Keep #, Name, Phone, Date. Adjust column x-offsets so the row fits the page.
 
-**3. Admin UI**
-- Any "Mark as paid / Confirm / Force approve" button requires a receipt number input (M-Pesa code, e.g. `TGH…`); disabled until filled.
-- Display receipt on all payment lists; rows without a receipt render as `Pending` even if a legacy record says otherwise.
+3. **Footer totals row** — bold row under the table repeating the three totals so it's obvious the Net matches the welfare balance.
 
-**4. Backfill / cleanup**
-- One-time report (no auto-mutation) of existing `completed` rows across the 5 tables with NULL/empty receipt. Present count per table so the user decides whether to downgrade to `pending`, delete, or grandfather them.
+4. **Withdrawals tab** — unchanged (already uses `amount`).
 
-### Open questions before I build
+5. **On-screen table** — leave as-is (report is the reconciliation surface); no UI/logic changes elsewhere.
 
-1. Should `payment_method IN ('wallet','registration_credit','offline_manual')` be exempt from the receipt rule, or must every confirmed row have a receipt (even internal wallet transfers)?
-2. For existing legacy `completed` rows without receipts — grandfather them (rule applies only to new rows), downgrade to `pending`, or just report and let you decide manually?
+## Why this resolves the confusion
 
-I'll wait for these two answers, then ship the migration + edge-function patches + admin UI guard in one pass.
+- Gross (6,190) − Commission (≈ 5–7%) = Net credited to the welfare pool.
+- The Net total will equal the contributions portion of the welfare balance, so managers can reconcile at a glance.
+- Registration-fee partial credits (e.g. the KES 30 row) remain visible as gross rows but their commission/net columns will show the actual credited amount.
+
+## Out of scope
+
+- No changes to how commission is calculated or stored.
+- No changes to balance computation.
+- No changes to the Welfare Report component in `WelfareContributionReport.tsx` (already shows gross/commission/net).
