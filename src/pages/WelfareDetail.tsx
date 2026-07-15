@@ -320,8 +320,8 @@ const WelfareDetail = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-muted-foreground">Total Collected (Net)</p>
-              <p className="text-lg font-bold">KES {(Number(welfare.total_gross_collected || 0) - Number(welfare.total_commission_paid || 0)).toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">Total Collected</p>
+              <p className="text-lg font-bold">KES {Number(welfare.total_gross_collected || 0).toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card>
