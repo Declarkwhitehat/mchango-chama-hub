@@ -346,7 +346,7 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
+                
               </SelectContent>
             </Select>
           </div>
