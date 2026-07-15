@@ -1,0 +1,1 @@
+UPDATE public.welfares SET is_verified = true WHERE id = 'cc50f41f-23de-4cdc-a61a-2d7078c8817b';

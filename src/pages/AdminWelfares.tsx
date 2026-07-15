@@ -77,6 +77,18 @@ const AdminWelfares = () => {
 
   const handleUnverify = async (welfare: any) => {
     if (!welfare.is_verified) return;
+    const first = window.confirm(
+      `Remove verified badge from "${welfare.name}"?\n\nThis will unverify the welfare group. Continue?`
+    );
+    if (!first) return;
+    const typed = window.prompt(
+      `To confirm, type the welfare name exactly:\n\n${welfare.name}`
+    );
+    if (typed === null) return;
+    if (typed.trim() !== welfare.name.trim()) {
+      toast.error("Name did not match. Unverify cancelled.");
+      return;
+    }
     try {
       const { error } = await supabase
         .from('welfares')
