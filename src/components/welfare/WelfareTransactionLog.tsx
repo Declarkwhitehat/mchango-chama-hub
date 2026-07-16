@@ -499,7 +499,8 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                     <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">{i + 1}</span>
                     <div>
                       <p className="font-medium text-xs">{c.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{c.phone || "No phone"} · {c.count} payment{c.count > 1 ? "s" : ""}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">{c.memberCode || "—"}</p>
+                      <p className="text-[10px] text-muted-foreground">{displayPhone(c.phone) || "No phone"} · {c.count} payment{c.count > 1 ? "s" : ""}</p>
                     </div>
                   </div>
                   <p className="font-semibold text-xs">KES {c.total.toLocaleString()}</p>
