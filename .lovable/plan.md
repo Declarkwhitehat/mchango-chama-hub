@@ -1,75 +1,74 @@
-## Root cause
+# Hide Phone Numbers in Welfare Views & Statements
 
-Welfare contributions never reach `financial_ledger`, so the admin "Live Data Cross-Verification" shows Welfare ledger = 0 while the live `welfare_contributions` table has real rows. Both online write paths for welfare are missing the ledger insert that Mchango and Organizations already do:
+Show phone numbers as `070******0` (first 3 + masked middle + last 1 digit) to regular members. Only admins/super_admins see the full number. Include Member ID (member_code) alongside so members can still be uniquely identified.
 
-- `supabase/functions/welfare-contributions/index.ts` — the in-app STK / manual recording path. Writes `welfare_contributions`, updates `welfares` balances, calls `record_company_earning`, but never inserts to `financial_ledger`.
-- `supabase/functions/payment-stk-callback/index.ts` (welfare branch, ~lines 393–500) — same gap. Mchango branch (~583) and Organization branch (~760) both insert into `financial_ledger`; the welfare branch does not.
+## Scope
 
-The offline C2B path (`c2b-confirm-payment/index.ts` ~line 991) already inserts a welfare ledger row, which is why some welfare payments may appear and others don't — the mismatch is deterministic per channel.
+Applies to any welfare-context surface where a member's phone appears today:
 
-## Fix
+1. **`src/components/welfare/WelfareTransactionLog.tsx`**
+   - On-screen table (Contributions + Withdrawals tabs): mask phone column; add a **Member ID** column that uses `welfare_members.member_code` for contributions and (best-effort) the payer's welfare member code for withdrawals.
+   - Members summary cards: mask phone.
+   - Detail dialog: mask phone.
+   - PDF export (both contributions and withdrawals sections + detail PDF): mask phone; add Member ID column.
+   - Phone search input: keep working — match against the unmasked value in-memory so admins and non-admins both get results, but never render the raw number for non-admins.
 
-### 1. Add ledger writes on both welfare write paths
+2. **`src/components/welfare/WelfarePaymentLookup.tsx`**
+   - Already shows `member_code` (good). Currently does not display phone — leave as-is, but if we later add contact info, apply the same masking rule.
 
-In `supabase/functions/welfare-contributions/index.ts`, after each `recordRow(...)` succeeds and after the `welfares` balance update, insert a paired `financial_ledger` row using the same shape as the c2b welfare insert:
+3. **`src/components/welfare/WelfareContributionReport.tsx` (PDF statement)**
+   - Already omits phone and already includes `member_code`. No change needed unless we want to explicitly add "Phone" — we won't.
 
-```
-transaction_type: 'contribution'
-source_type: 'welfare'
-source_id: welfare_id
-reference_id: <welfare_contributions.id>
-gross_amount, commission_amount, net_amount, commission_rate
-payer_name / payer_phone: from profile lookup
-description: 'Welfare contribution' or 'Welfare registration fee (10%)'
-```
+Out of scope: chama, mchango, organizations, admin-only pages (`AdminWelfares*`, `AdminWelfareDetail`, etc.) — admins already have full visibility there.
 
-Wrap the insert in a try/catch that `console.error`s but does not fail the contribution (the contribution row is already committed).
+## Admin detection
 
-In `supabase/functions/payment-stk-callback/index.ts` welfare branch, add the same insert right after the `welfares` balance update, mirroring the Mchango/Organization pattern already in the same file.
+Add a small hook `useIsAdmin()` mirroring `useIsSuperAdmin` but checking `role IN ('admin','super_admin')` via two `user_roles` lookups (or a single `.in('role', [...])`). Reuse it in the two welfare components above.
 
-For split payments (registration + contribution from one payment), insert one ledger row per component so `gross × rate = commission` stays valid for the `trg_validate_financial_ledger_integrity` trigger.
+## Masking helper
 
-### 2. Backfill historical welfare contributions
+New util `src/utils/maskPhone.ts`:
 
-One-time migration that inserts a `financial_ledger` row for every `welfare_contributions` row with `payment_status = 'completed'` that has no matching ledger row (match on `reference_id = welfare_contributions.id` AND `source_type = 'welfare'`). Use `category` to decide the description and rate. Wrap in a single transaction; safe to re-run because of the NOT EXISTS guard.
-
-Sketch:
-
-```sql
-INSERT INTO public.financial_ledger
-  (transaction_type, source_type, source_id, reference_id,
-   gross_amount, commission_amount, net_amount, commission_rate,
-   description, created_at)
-SELECT
-  'contribution', 'welfare', wc.welfare_id, wc.id,
-  wc.gross_amount, wc.commission_amount, wc.net_amount,
-  CASE WHEN wc.gross_amount > 0
-       THEN ROUND((wc.commission_amount / wc.gross_amount)::numeric, 4)
-       ELSE 0 END,
-  CASE WHEN wc.category = 'registration_fee'
-       THEN 'Welfare registration fee (backfill)'
-       ELSE 'Welfare contribution (backfill)' END,
-  wc.completed_at
-FROM public.welfare_contributions wc
-WHERE wc.payment_status = 'completed'
-  AND NOT EXISTS (
-    SELECT 1 FROM public.financial_ledger fl
-    WHERE fl.reference_id = wc.id AND fl.source_type = 'welfare'
-  );
+```ts
+export function maskPhone(phone?: string | null): string {
+  if (!phone) return "-";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 5) return "***";
+  const last = digits.slice(-1);
+  // Normalize leading country code 254 -> 0 for display
+  const local = digits.startsWith("254") ? "0" + digits.slice(3) : digits;
+  const prefix = local.slice(0, 3);
+  const middleLen = Math.max(0, local.length - 4);
+  return `${prefix}${"*".repeat(middleLen)}${last}`;
+}
 ```
 
-### 3. Safeguard
+Example: `0707874790` → `070******0`, `+254707874790` → `070******0`.
 
-Both new inserts log any error via `console.error('financial_ledger welfare insert failed', ...)` so it appears in edge function logs, matching the pattern used elsewhere. No new alerting infra beyond existing edge log surfaces.
+## Rendering rule
 
-### 4. Verification
+In each spot that renders a phone:
 
-After deploy + migration, reload the admin dashboard's Live Data Cross-Verification. The Welfare row should show ledger total = live total (variance 0, "Match").
+```tsx
+{isAdmin ? phone : maskPhone(phone)}
+```
 
-## Files touched
+Apply the same conditional inside the jsPDF `doc.text(...)` calls for the PDF exports so downloaded statements are also masked for non-admins.
 
-- `supabase/functions/welfare-contributions/index.ts` — add ledger insert per recorded row
-- `supabase/functions/payment-stk-callback/index.ts` — add ledger insert in welfare branch
-- `supabase/migrations/<new>.sql` — backfill missing welfare ledger rows
+## Technical details
 
-No frontend changes required — the dashboard already reads from `financial_ledger` correctly.
+- No DB or edge function changes — masking is presentation-only. The `welfare_members`/`profiles` join still returns the raw phone (needed so admins see it and so search still works), we just don't render it for non-admins.
+- Member ID column pulls from `welfare_members.member_code`, which is already joined into `contributions` and available via a lookup for `withdrawals` (fall back to `-` when unknown).
+- Search-by-phone continues to filter on the raw digits so results stay consistent between admin and non-admin views.
+
+## Files to change
+
+- add: `src/utils/maskPhone.ts`
+- add: `src/hooks/useIsAdmin.ts`
+- edit: `src/components/welfare/WelfareTransactionLog.tsx` (table, summary, dialog, PDF; add Member ID column)
+
+## Verification
+
+- As a regular welfare member: table, summary, dialog, and downloaded PDF show `070******0` and a visible Member ID column/field.
+- As an admin/super_admin: full phone number remains visible everywhere.
+- Phone search still returns the correct rows for both roles.
