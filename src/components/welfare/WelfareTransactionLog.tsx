@@ -30,6 +30,8 @@ import { Loader2, History, Search, Download, FileText, Eye, Users, Filter, X } f
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { jsPDF } from "jspdf";
 import { toast } from "sonner";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { maskPhone } from "@/utils/maskPhone";
 
 interface Props {
   welfareId: string;
@@ -38,6 +40,8 @@ interface Props {
 type PeriodType = "today" | "week" | "month" | "all";
 
 export const WelfareTransactionLog = ({ welfareId }: Props) => {
+  const { isAdmin } = useIsAdmin();
+  const displayPhone = (p?: string | null) => (isAdmin ? (p || "-") : maskPhone(p));
   const [contributions, setContributions] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,18 +59,29 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
     fetchData();
   }, [welfareId]);
 
+  const [memberCodeByUserId, setMemberCodeByUserId] = useState<Record<string, string>>({});
+
   const fetchData = async () => {
     try {
-      const [contribRes, wdRes] = await Promise.all([
+      const [contribRes, wdRes, membersRes] = await Promise.all([
         supabase.functions.invoke(`welfare-contributions?welfare_id=${welfareId}`, { method: 'GET' }),
         supabase
           .from('withdrawals')
           .select('*, profiles:requested_by(full_name, phone)')
           .eq('welfare_id', welfareId)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('welfare_members')
+          .select('user_id, member_code')
+          .eq('welfare_id', welfareId),
       ]);
       setContributions(contribRes.data?.data || []);
       setWithdrawals(wdRes.data || []);
+      const map: Record<string, string> = {};
+      (membersRes.data || []).forEach((m: any) => {
+        if (m.user_id) map[m.user_id] = m.member_code;
+      });
+      setMemberCodeByUserId(map);
     } catch (e) {
       console.error('Error fetching transactions:', e);
     } finally {
@@ -131,18 +146,19 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
 
   // Contributors summary
   const contributorsSummary = useMemo(() => {
-    const map = new Map<string, { name: string; phone: string; total: number; count: number }>();
+    const map = new Map<string, { name: string; phone: string; memberCode: string; total: number; count: number }>();
     const completed = contributions.filter(c => c.payment_status === 'completed');
     completed.forEach(c => {
       const name = c.welfare_members?.profiles?.full_name || 'Unknown';
       const phone = c.welfare_members?.profiles?.phone || '';
+      const memberCode = c.welfare_members?.member_code || '';
       const key = name + phone;
       const existing = map.get(key);
       if (existing) {
         existing.total += Number(c.gross_amount);
         existing.count += 1;
       } else {
-        map.set(key, { name, phone, total: Number(c.gross_amount), count: 1 });
+        map.set(key, { name, phone, memberCode, total: Number(c.gross_amount), count: 1 });
       }
     });
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
@@ -211,18 +227,20 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
       doc.setFontSize(9);
       if (isContribTab) {
         doc.text("#", m + 2, y + 5.5);
-        doc.text("Name", m + 10, y + 5.5);
-        doc.text("Phone", m + 55, y + 5.5);
-        doc.text("Gross", m + 95, y + 5.5);
-        doc.text("Comm.", m + 118, y + 5.5);
-        doc.text("Net", m + 142, y + 5.5);
-        doc.text("Date", m + 162, y + 5.5);
+        doc.text("Name", m + 8, y + 5.5);
+        doc.text("Member ID", m + 46, y + 5.5);
+        doc.text("Phone", m + 72, y + 5.5);
+        doc.text("Gross", m + 100, y + 5.5);
+        doc.text("Comm.", m + 122, y + 5.5);
+        doc.text("Net", m + 145, y + 5.5);
+        doc.text("Date", m + 165, y + 5.5);
       } else {
         doc.text("#", m + 2, y + 5.5);
-        doc.text("Name", m + 12, y + 5.5);
-        doc.text("Phone", m + 65, y + 5.5);
-        doc.text("Amount (KES)", m + 105, y + 5.5);
-        doc.text("Date", m + 145, y + 5.5);
+        doc.text("Name", m + 10, y + 5.5);
+        doc.text("Member ID", m + 50, y + 5.5);
+        doc.text("Phone", m + 80, y + 5.5);
+        doc.text("Amount (KES)", m + 115, y + 5.5);
+        doc.text("Date", m + 155, y + 5.5);
       }
       y += 10;
       doc.setTextColor(0, 0, 0);
@@ -238,11 +256,15 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
           doc.rect(m, y - 4, pw - 2 * m, 7, "F");
         }
         const name = isContribTab
-          ? (item.welfare_members?.profiles?.full_name || "Member").substring(0, 18)
-          : (item.profiles?.full_name || "Unknown").substring(0, 18);
-        const phone = isContribTab
+          ? (item.welfare_members?.profiles?.full_name || "Member").substring(0, 16)
+          : (item.profiles?.full_name || "Unknown").substring(0, 16);
+        const rawPhone = isContribTab
           ? (item.welfare_members?.profiles?.phone || "")
           : (item.profiles?.phone || "");
+        const phone = isAdmin ? rawPhone : maskPhone(rawPhone);
+        const memberCode = isContribTab
+          ? (item.welfare_members?.member_code || "-")
+          : (memberCodeByUserId[(item as any).requested_by] || "-");
 
         doc.setFontSize(8);
         if (isContribTab) {
@@ -250,18 +272,20 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
           const commission = Number(item.commission_amount || 0);
           const net = item.net_amount != null ? Number(item.net_amount) : gross - commission;
           doc.text(`${idx + 1}`, m + 2, y);
-          doc.text(name, m + 10, y);
-          doc.text(phone, m + 55, y);
-          doc.text(gross.toLocaleString(), m + 95, y);
-          doc.text(commission.toLocaleString(), m + 118, y);
-          doc.text(net.toLocaleString(), m + 142, y);
-          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 162, y);
+          doc.text(name, m + 8, y);
+          doc.text(String(memberCode).substring(0, 12), m + 46, y);
+          doc.text(phone, m + 72, y);
+          doc.text(gross.toLocaleString(), m + 100, y);
+          doc.text(commission.toLocaleString(), m + 122, y);
+          doc.text(net.toLocaleString(), m + 145, y);
+          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 165, y);
         } else {
           doc.text(`${idx + 1}`, m + 2, y);
-          doc.text(name, m + 12, y);
-          doc.text(phone, m + 65, y);
-          doc.text(Number(item.amount).toLocaleString(), m + 105, y);
-          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 145, y);
+          doc.text(name, m + 10, y);
+          doc.text(String(memberCode).substring(0, 12), m + 50, y);
+          doc.text(phone, m + 80, y);
+          doc.text(Number(item.amount).toLocaleString(), m + 115, y);
+          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 155, y);
         }
         y += 7;
       });
@@ -275,13 +299,13 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       if (isContribTab) {
-        doc.text("TOTALS", m + 10, y);
-        doc.text(totalGross.toLocaleString(), m + 95, y);
-        doc.text(totalCommission.toLocaleString(), m + 118, y);
-        doc.text(totalNet.toLocaleString(), m + 142, y);
+        doc.text("TOTALS", m + 8, y);
+        doc.text(totalGross.toLocaleString(), m + 100, y);
+        doc.text(totalCommission.toLocaleString(), m + 122, y);
+        doc.text(totalNet.toLocaleString(), m + 145, y);
       } else {
-        doc.text("TOTAL", m + 12, y);
-        doc.text(totalGross.toLocaleString(), m + 105, y);
+        doc.text("TOTAL", m + 10, y);
+        doc.text(totalGross.toLocaleString(), m + 115, y);
       }
       doc.setFont("helvetica", "normal");
 
@@ -403,6 +427,7 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                 <TableRow>
                   <TableHead className="text-xs">#</TableHead>
                   <TableHead className="text-xs">Name</TableHead>
+                  <TableHead className="text-xs hidden sm:table-cell">Member ID</TableHead>
                   <TableHead className="text-xs hidden sm:table-cell">Phone</TableHead>
                   <TableHead className="text-xs">Amount</TableHead>
                   <TableHead className="text-xs hidden sm:table-cell">Date</TableHead>
@@ -416,16 +441,24 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                   const name = isContrib
                     ? (item.welfare_members?.profiles?.full_name || "Member")
                     : ((item as any).profiles?.full_name || "Unknown");
-                  const phone = isContrib
-                    ? (item.welfare_members?.profiles?.phone || "-")
-                    : ((item as any).profiles?.phone || "-");
+                  const rawPhone = isContrib
+                    ? (item.welfare_members?.profiles?.phone || "")
+                    : ((item as any).profiles?.phone || "");
+                  const phone = displayPhone(rawPhone);
+                  const memberCode = isContrib
+                    ? (item.welfare_members?.member_code || "-")
+                    : (memberCodeByUserId[(item as any).requested_by] || "-");
                   const amount = isContrib ? item.gross_amount : item.amount;
                   const status = isContrib ? item.payment_status : item.status;
 
                   return (
                     <TableRow key={item.id}>
                       <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="text-xs font-medium">{name}</TableCell>
+                      <TableCell className="text-xs font-medium">
+                        {name}
+                        <span className="block sm:hidden text-[10px] text-muted-foreground font-mono">{memberCode}</span>
+                      </TableCell>
+                      <TableCell className="text-xs hidden sm:table-cell text-muted-foreground font-mono">{memberCode}</TableCell>
                       <TableCell className="text-xs hidden sm:table-cell text-muted-foreground">{phone}</TableCell>
                       <TableCell className="text-xs font-medium">KES {Number(amount).toLocaleString()}</TableCell>
                       <TableCell className="text-xs hidden sm:table-cell text-muted-foreground">
@@ -466,7 +499,8 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                     <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">{i + 1}</span>
                     <div>
                       <p className="font-medium text-xs">{c.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{c.phone || "No phone"} · {c.count} payment{c.count > 1 ? "s" : ""}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">{c.memberCode || "—"}</p>
+                      <p className="text-[10px] text-muted-foreground">{displayPhone(c.phone) || "No phone"} · {c.count} payment{c.count > 1 ? "s" : ""}</p>
                     </div>
                   </div>
                   <p className="font-semibold text-xs">KES {c.total.toLocaleString()}</p>
@@ -489,9 +523,12 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                 ["Name", activeTab === "contributions"
                   ? selectedDetail.welfare_members?.profiles?.full_name
                   : (selectedDetail as any).profiles?.full_name || "Unknown"],
-                ["Phone", activeTab === "contributions"
+                ["Member ID", activeTab === "contributions"
+                  ? (selectedDetail.welfare_members?.member_code || "-")
+                  : (memberCodeByUserId[(selectedDetail as any).requested_by] || "-")],
+                ["Phone", displayPhone(activeTab === "contributions"
                   ? selectedDetail.welfare_members?.profiles?.phone
-                  : (selectedDetail as any).profiles?.phone || "-"],
+                  : (selectedDetail as any).profiles?.phone)],
                 ["Gross Amount", `KES ${Number(activeTab === "contributions" ? selectedDetail.gross_amount : selectedDetail.amount).toLocaleString()}`],
                 ...(activeTab === "contributions" ? [
                   ["Commission", `KES ${Number(selectedDetail.commission_amount || 0).toLocaleString()}`],
