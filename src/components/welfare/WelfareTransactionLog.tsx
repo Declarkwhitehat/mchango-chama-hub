@@ -146,18 +146,19 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
 
   // Contributors summary
   const contributorsSummary = useMemo(() => {
-    const map = new Map<string, { name: string; phone: string; total: number; count: number }>();
+    const map = new Map<string, { name: string; phone: string; memberCode: string; total: number; count: number }>();
     const completed = contributions.filter(c => c.payment_status === 'completed');
     completed.forEach(c => {
       const name = c.welfare_members?.profiles?.full_name || 'Unknown';
       const phone = c.welfare_members?.profiles?.phone || '';
+      const memberCode = c.welfare_members?.member_code || '';
       const key = name + phone;
       const existing = map.get(key);
       if (existing) {
         existing.total += Number(c.gross_amount);
         existing.count += 1;
       } else {
-        map.set(key, { name, phone, total: Number(c.gross_amount), count: 1 });
+        map.set(key, { name, phone, memberCode, total: Number(c.gross_amount), count: 1 });
       }
     });
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
