@@ -299,13 +299,13 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       if (isContribTab) {
-        doc.text("TOTALS", m + 10, y);
-        doc.text(totalGross.toLocaleString(), m + 95, y);
-        doc.text(totalCommission.toLocaleString(), m + 118, y);
-        doc.text(totalNet.toLocaleString(), m + 142, y);
+        doc.text("TOTALS", m + 8, y);
+        doc.text(totalGross.toLocaleString(), m + 100, y);
+        doc.text(totalCommission.toLocaleString(), m + 122, y);
+        doc.text(totalNet.toLocaleString(), m + 145, y);
       } else {
-        doc.text("TOTAL", m + 12, y);
-        doc.text(totalGross.toLocaleString(), m + 105, y);
+        doc.text("TOTAL", m + 10, y);
+        doc.text(totalGross.toLocaleString(), m + 115, y);
       }
       doc.setFont("helvetica", "normal");
 
