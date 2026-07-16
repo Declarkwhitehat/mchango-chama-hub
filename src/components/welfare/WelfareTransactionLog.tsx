@@ -523,9 +523,12 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                 ["Name", activeTab === "contributions"
                   ? selectedDetail.welfare_members?.profiles?.full_name
                   : (selectedDetail as any).profiles?.full_name || "Unknown"],
-                ["Phone", activeTab === "contributions"
+                ["Member ID", activeTab === "contributions"
+                  ? (selectedDetail.welfare_members?.member_code || "-")
+                  : (memberCodeByUserId[(selectedDetail as any).requested_by] || "-")],
+                ["Phone", displayPhone(activeTab === "contributions"
                   ? selectedDetail.welfare_members?.profiles?.phone
-                  : (selectedDetail as any).profiles?.phone || "-"],
+                  : (selectedDetail as any).profiles?.phone)],
                 ["Gross Amount", `KES ${Number(activeTab === "contributions" ? selectedDetail.gross_amount : selectedDetail.amount).toLocaleString()}`],
                 ...(activeTab === "contributions" ? [
                   ["Commission", `KES ${Number(selectedDetail.commission_amount || 0).toLocaleString()}`],
