@@ -471,6 +471,24 @@ serve(async (req) => {
         p_description: `Welfare ${isRegistration ? 'registration fee' : 'contribution'} commission (${(rate * 100).toFixed(0)}%)`,
       });
 
+      // Paired analytics row in financial_ledger (welfare parity with mchango/organization)
+      try {
+        const { error: ledgerErr } = await supabaseClient.from('financial_ledger').insert({
+          transaction_type: 'contribution',
+          source_type: 'welfare',
+          source_id: pending.welfare_id,
+          reference_id: pending.id,
+          gross_amount: grossAmount,
+          commission_amount: commissionAmount,
+          net_amount: netAmount,
+          commission_rate: rate,
+          description: `Welfare ${isRegistration ? 'registration fee' : 'contribution'} (STK)`,
+        });
+        if (ledgerErr) console.error('financial_ledger welfare insert failed (stk):', ledgerErr);
+      } catch (e) {
+        console.error('financial_ledger welfare insert threw (stk):', e);
+      }
+
       if (member?.user_id) {
         await createNotification(supabaseClient, {
           userId: member.user_id,
