@@ -227,18 +227,20 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
       doc.setFontSize(9);
       if (isContribTab) {
         doc.text("#", m + 2, y + 5.5);
-        doc.text("Name", m + 10, y + 5.5);
-        doc.text("Phone", m + 55, y + 5.5);
-        doc.text("Gross", m + 95, y + 5.5);
-        doc.text("Comm.", m + 118, y + 5.5);
-        doc.text("Net", m + 142, y + 5.5);
-        doc.text("Date", m + 162, y + 5.5);
+        doc.text("Name", m + 8, y + 5.5);
+        doc.text("Member ID", m + 46, y + 5.5);
+        doc.text("Phone", m + 72, y + 5.5);
+        doc.text("Gross", m + 100, y + 5.5);
+        doc.text("Comm.", m + 122, y + 5.5);
+        doc.text("Net", m + 145, y + 5.5);
+        doc.text("Date", m + 165, y + 5.5);
       } else {
         doc.text("#", m + 2, y + 5.5);
-        doc.text("Name", m + 12, y + 5.5);
-        doc.text("Phone", m + 65, y + 5.5);
-        doc.text("Amount (KES)", m + 105, y + 5.5);
-        doc.text("Date", m + 145, y + 5.5);
+        doc.text("Name", m + 10, y + 5.5);
+        doc.text("Member ID", m + 50, y + 5.5);
+        doc.text("Phone", m + 80, y + 5.5);
+        doc.text("Amount (KES)", m + 115, y + 5.5);
+        doc.text("Date", m + 155, y + 5.5);
       }
       y += 10;
       doc.setTextColor(0, 0, 0);
@@ -254,11 +256,15 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
           doc.rect(m, y - 4, pw - 2 * m, 7, "F");
         }
         const name = isContribTab
-          ? (item.welfare_members?.profiles?.full_name || "Member").substring(0, 18)
-          : (item.profiles?.full_name || "Unknown").substring(0, 18);
-        const phone = isContribTab
+          ? (item.welfare_members?.profiles?.full_name || "Member").substring(0, 16)
+          : (item.profiles?.full_name || "Unknown").substring(0, 16);
+        const rawPhone = isContribTab
           ? (item.welfare_members?.profiles?.phone || "")
           : (item.profiles?.phone || "");
+        const phone = isAdmin ? rawPhone : maskPhone(rawPhone);
+        const memberCode = isContribTab
+          ? (item.welfare_members?.member_code || "-")
+          : (memberCodeByUserId[(item as any).requested_by] || "-");
 
         doc.setFontSize(8);
         if (isContribTab) {
@@ -266,18 +272,20 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
           const commission = Number(item.commission_amount || 0);
           const net = item.net_amount != null ? Number(item.net_amount) : gross - commission;
           doc.text(`${idx + 1}`, m + 2, y);
-          doc.text(name, m + 10, y);
-          doc.text(phone, m + 55, y);
-          doc.text(gross.toLocaleString(), m + 95, y);
-          doc.text(commission.toLocaleString(), m + 118, y);
-          doc.text(net.toLocaleString(), m + 142, y);
-          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 162, y);
+          doc.text(name, m + 8, y);
+          doc.text(String(memberCode).substring(0, 12), m + 46, y);
+          doc.text(phone, m + 72, y);
+          doc.text(gross.toLocaleString(), m + 100, y);
+          doc.text(commission.toLocaleString(), m + 122, y);
+          doc.text(net.toLocaleString(), m + 145, y);
+          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 165, y);
         } else {
           doc.text(`${idx + 1}`, m + 2, y);
-          doc.text(name, m + 12, y);
-          doc.text(phone, m + 65, y);
-          doc.text(Number(item.amount).toLocaleString(), m + 105, y);
-          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 145, y);
+          doc.text(name, m + 10, y);
+          doc.text(String(memberCode).substring(0, 12), m + 50, y);
+          doc.text(phone, m + 80, y);
+          doc.text(Number(item.amount).toLocaleString(), m + 115, y);
+          doc.text(format(new Date(item.created_at), "MMM d, yyyy"), m + 155, y);
         }
         y += 7;
       });
