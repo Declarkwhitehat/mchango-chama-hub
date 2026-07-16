@@ -427,6 +427,7 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                 <TableRow>
                   <TableHead className="text-xs">#</TableHead>
                   <TableHead className="text-xs">Name</TableHead>
+                  <TableHead className="text-xs hidden xs:table-cell">Member ID</TableHead>
                   <TableHead className="text-xs hidden sm:table-cell">Phone</TableHead>
                   <TableHead className="text-xs">Amount</TableHead>
                   <TableHead className="text-xs hidden sm:table-cell">Date</TableHead>
@@ -440,16 +441,24 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                   const name = isContrib
                     ? (item.welfare_members?.profiles?.full_name || "Member")
                     : ((item as any).profiles?.full_name || "Unknown");
-                  const phone = isContrib
-                    ? (item.welfare_members?.profiles?.phone || "-")
-                    : ((item as any).profiles?.phone || "-");
+                  const rawPhone = isContrib
+                    ? (item.welfare_members?.profiles?.phone || "")
+                    : ((item as any).profiles?.phone || "");
+                  const phone = displayPhone(rawPhone);
+                  const memberCode = isContrib
+                    ? (item.welfare_members?.member_code || "-")
+                    : (memberCodeByUserId[(item as any).requested_by] || "-");
                   const amount = isContrib ? item.gross_amount : item.amount;
                   const status = isContrib ? item.payment_status : item.status;
 
                   return (
                     <TableRow key={item.id}>
                       <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="text-xs font-medium">{name}</TableCell>
+                      <TableCell className="text-xs font-medium">
+                        {name}
+                        <span className="block xs:hidden text-[10px] text-muted-foreground font-mono">{memberCode}</span>
+                      </TableCell>
+                      <TableCell className="text-xs hidden xs:table-cell text-muted-foreground font-mono">{memberCode}</TableCell>
                       <TableCell className="text-xs hidden sm:table-cell text-muted-foreground">{phone}</TableCell>
                       <TableCell className="text-xs font-medium">KES {Number(amount).toLocaleString()}</TableCell>
                       <TableCell className="text-xs hidden sm:table-cell text-muted-foreground">
