@@ -30,6 +30,8 @@ import { Loader2, History, Search, Download, FileText, Eye, Users, Filter, X } f
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { jsPDF } from "jspdf";
 import { toast } from "sonner";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { maskPhone } from "@/utils/maskPhone";
 
 interface Props {
   welfareId: string;
@@ -38,6 +40,8 @@ interface Props {
 type PeriodType = "today" | "week" | "month" | "all";
 
 export const WelfareTransactionLog = ({ welfareId }: Props) => {
+  const { isAdmin } = useIsAdmin();
+  const displayPhone = (p?: string | null) => (isAdmin ? (p || "-") : maskPhone(p));
   const [contributions, setContributions] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
