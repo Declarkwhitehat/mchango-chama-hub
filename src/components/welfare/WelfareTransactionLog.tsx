@@ -427,7 +427,7 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                 <TableRow>
                   <TableHead className="text-xs">#</TableHead>
                   <TableHead className="text-xs">Name</TableHead>
-                  <TableHead className="text-xs hidden xs:table-cell">Member ID</TableHead>
+                  <TableHead className="text-xs hidden sm:table-cell">Member ID</TableHead>
                   <TableHead className="text-xs hidden sm:table-cell">Phone</TableHead>
                   <TableHead className="text-xs">Amount</TableHead>
                   <TableHead className="text-xs hidden sm:table-cell">Date</TableHead>
@@ -456,9 +456,9 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
                       <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
                       <TableCell className="text-xs font-medium">
                         {name}
-                        <span className="block xs:hidden text-[10px] text-muted-foreground font-mono">{memberCode}</span>
+                        <span className="block sm:hidden text-[10px] text-muted-foreground font-mono">{memberCode}</span>
                       </TableCell>
-                      <TableCell className="text-xs hidden xs:table-cell text-muted-foreground font-mono">{memberCode}</TableCell>
+                      <TableCell className="text-xs hidden sm:table-cell text-muted-foreground font-mono">{memberCode}</TableCell>
                       <TableCell className="text-xs hidden sm:table-cell text-muted-foreground">{phone}</TableCell>
                       <TableCell className="text-xs font-medium">KES {Number(amount).toLocaleString()}</TableCell>
                       <TableCell className="text-xs hidden sm:table-cell text-muted-foreground">
