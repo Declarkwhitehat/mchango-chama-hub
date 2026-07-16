@@ -59,18 +59,29 @@ export const WelfareTransactionLog = ({ welfareId }: Props) => {
     fetchData();
   }, [welfareId]);
 
+  const [memberCodeByUserId, setMemberCodeByUserId] = useState<Record<string, string>>({});
+
   const fetchData = async () => {
     try {
-      const [contribRes, wdRes] = await Promise.all([
+      const [contribRes, wdRes, membersRes] = await Promise.all([
         supabase.functions.invoke(`welfare-contributions?welfare_id=${welfareId}`, { method: 'GET' }),
         supabase
           .from('withdrawals')
           .select('*, profiles:requested_by(full_name, phone)')
           .eq('welfare_id', welfareId)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('welfare_members')
+          .select('user_id, member_code')
+          .eq('welfare_id', welfareId),
       ]);
       setContributions(contribRes.data?.data || []);
       setWithdrawals(wdRes.data || []);
+      const map: Record<string, string> = {};
+      (membersRes.data || []).forEach((m: any) => {
+        if (m.user_id) map[m.user_id] = m.member_code;
+      });
+      setMemberCodeByUserId(map);
     } catch (e) {
       console.error('Error fetching transactions:', e);
     } finally {
