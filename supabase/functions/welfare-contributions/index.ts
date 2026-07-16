@@ -157,6 +157,25 @@ serve(async (req) => {
           p_reference_id: row.id,
           p_description: `Welfare ${category} commission (${(rate * 100).toFixed(0)}%)`,
         });
+
+        // Paired analytics row in financial_ledger (welfare parity with mchango/organization)
+        try {
+          const { error: ledgerErr } = await supabaseAdmin.from('financial_ledger').insert({
+            transaction_type: 'contribution',
+            source_type: 'welfare',
+            source_id: welfare_id,
+            reference_id: row.id,
+            gross_amount: gross,
+            commission_amount: commission,
+            net_amount: net,
+            commission_rate: rate,
+            description: `Welfare ${category} (${(rate * 100).toFixed(0)}%)`,
+          });
+          if (ledgerErr) console.error('financial_ledger welfare insert failed:', ledgerErr);
+        } catch (e) {
+          console.error('financial_ledger welfare insert threw:', e);
+        }
+
         return { row, commission, net };
       };
 
