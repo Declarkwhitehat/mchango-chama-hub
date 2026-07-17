@@ -90,7 +90,7 @@ export const PhoneVerification = ({
     }
 
     setLoading(true);
-    const result = await verifyOTP(phone, code, userId);
+    const result = await verifyOTP(`+${normalizePhone(phone) || phone.replace(/\D/g,'')}`, code, userId);
     setLoading(false);
 
     if (result.success) {
