@@ -86,7 +86,8 @@ const ForgotPassword = () => {
     setIdentifier(data.emailOrPhone);
     
     try {
-      const isPhoneInput = /^[\+\d]/.test(data.emailOrPhone.trim()) && !data.emailOrPhone.includes('@');
+      const cleanedInput = data.emailOrPhone.replace(/[^\d+@.\w-]/g, '');
+      const isPhoneInput = /^[\+\d]/.test(cleanedInput) && !data.emailOrPhone.includes('@');
       setIsPhone(true); // Always use phone OTP flow now
 
       let requestBody: Record<string, string> = { purpose: 'password_reset' };
