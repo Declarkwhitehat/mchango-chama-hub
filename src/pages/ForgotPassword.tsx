@@ -67,9 +67,12 @@ const ForgotPassword = () => {
   });
 
   const normalizePhone = (phone: string): string => {
-    let normalized = phone.trim();
+    // Strip all non-digit, non-plus chars (NBSP, zero-width, LRM/RLM, spaces, dashes, parens)
+    let normalized = phone.replace(/[^\d+]/g, '');
     if (normalized.startsWith('0')) {
       normalized = '+254' + normalized.substring(1);
+    } else if (normalized.startsWith('254')) {
+      normalized = '+' + normalized;
     } else if (normalized.startsWith('7') || normalized.startsWith('1')) {
       normalized = '+254' + normalized;
     } else if (!normalized.startsWith('+')) {
