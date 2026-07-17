@@ -32,7 +32,8 @@ export const PhoneVerification = ({
   const { toast } = useToast();
 
   const handleSendOTP = async () => {
-    if (!phone || !isValidKenyanPhone(phone)) {
+    const normalized = normalizePhone(phone);
+    if (!normalized) {
       toast({
         title: "Invalid Phone Number",
         description: "Enter a valid Kenyan number (e.g. 0712345678 or +254712345678)",
@@ -42,12 +43,11 @@ export const PhoneVerification = ({
     }
 
     // Normalize before sending so downstream always receives +254…
-    const display = formatPhoneDisplay(phone);
+    const display = `+${normalized}`;
     if (display !== phone) onPhoneChange(display);
 
-
     setLoading(true);
-    const result = await sendOTP(phone);
+    const result = await sendOTP(display);
     setLoading(false);
 
     if (result.success) {
