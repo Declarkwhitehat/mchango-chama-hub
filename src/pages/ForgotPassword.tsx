@@ -18,9 +18,11 @@ const identifierSchema = z.object({
     .refine(
       (val) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (emailRegex.test(val)) return true;
+        if (emailRegex.test(val.trim())) return true;
+        // Strip everything except leading + and digits (handles NBSP, LRM, zero-width, spaces from autofill)
+        const cleaned = val.replace(/[^\d+]/g, '');
         const phoneRegex = /^(\+?254[17]\d{8}|0[17]\d{8}|[17]\d{8})$/;
-        return phoneRegex.test(val.replace(/\s/g, ''));
+        return phoneRegex.test(cleaned);
       },
       { message: "Must be a valid email or phone number" }
     ),
@@ -65,9 +67,12 @@ const ForgotPassword = () => {
   });
 
   const normalizePhone = (phone: string): string => {
-    let normalized = phone.trim();
+    // Strip all non-digit, non-plus chars (NBSP, zero-width, LRM/RLM, spaces, dashes, parens)
+    let normalized = phone.replace(/[^\d+]/g, '');
     if (normalized.startsWith('0')) {
       normalized = '+254' + normalized.substring(1);
+    } else if (normalized.startsWith('254')) {
+      normalized = '+' + normalized;
     } else if (normalized.startsWith('7') || normalized.startsWith('1')) {
       normalized = '+254' + normalized;
     } else if (!normalized.startsWith('+')) {
@@ -81,7 +86,8 @@ const ForgotPassword = () => {
     setIdentifier(data.emailOrPhone);
     
     try {
-      const isPhoneInput = /^[\+\d]/.test(data.emailOrPhone.trim()) && !data.emailOrPhone.includes('@');
+      const cleanedInput = data.emailOrPhone.replace(/[^\d+@.\w-]/g, '');
+      const isPhoneInput = /^[\+\d]/.test(cleanedInput) && !data.emailOrPhone.includes('@');
       setIsPhone(true); // Always use phone OTP flow now
 
       let requestBody: Record<string, string> = { purpose: 'password_reset' };
