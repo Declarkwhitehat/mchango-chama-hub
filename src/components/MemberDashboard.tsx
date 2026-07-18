@@ -303,7 +303,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
       </Card>
 
       {/* Payout Schedule */}
-      {payout_schedule && (
+      {payout_schedule && chama.status !== 'pending' && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -325,6 +325,22 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
                 <p className="text-sm text-muted-foreground mb-1">Estimated Amount</p>
                 <p className="text-2xl font-bold text-primary">KES {payout_schedule.estimated_amount.toLocaleString()}</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {payout_schedule && chama.status === 'pending' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Your Payout Schedule
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+              Your position in queue is <span className="font-semibold text-foreground">#{payout_schedule.position_in_queue}</span>. Estimated payout date and amount will appear once the chama officially starts.
             </div>
           </CardContent>
         </Card>
