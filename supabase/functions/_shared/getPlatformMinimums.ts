@@ -15,7 +15,7 @@ export interface PlatformMinimums {
 }
 
 const DEFAULTS: PlatformMinimums = {
-  minChamaContribution: 20,
+  minChamaContribution: 100,
   minWithdrawal: { chama: 100, mchango: 100, welfare: 100 },
 };
 
