@@ -1070,20 +1070,19 @@ serve(async (req) => {
       );
     }
 
-    // IMPORTANT: No matching entity found
+    // IMPORTANT: No matching entity found — log to safety-net table so admin can allocate manually.
     console.warn('⚠️ UNMATCHED PAYMENT - Account not found:', accountNumber);
-    console.warn('Normalized search value:', upperAccountNumber);
-    console.warn('Searched tables: chama_members.member_code, mchango.paybill_account_id/group_code, organizations.paybill_account_id/group_code, welfares.paybill_account_id/group_code');
-    
-    // Send SMS to payer informing them the code was invalid
+    await logUnmatchedPayment(supabase, callbackData, mpesaReceiptNumber, amount, phoneNumber,
+      accountNumber, firstName, middleName, lastName,
+      `Account code "${accountNumber}" did not match any chama, welfare, campaign, or organization.`);
+
     await safeSendSms(
       supabase,
       phoneNumber,
-      `Your payment of KSh ${amount} (Receipt: ${mpesaReceiptNumber}) was received but the payment code "${accountNumber}" was not found. Your money is safe. Please contact customer care with your correct payment ID to have your payment allocated.`,
+      `Your payment of KSh ${amount} (Receipt: ${mpesaReceiptNumber}) was received but the payment code "${accountNumber}" was not found. Your money is safe — our team will allocate it. Please contact customer care with your correct payment ID.`,
       'unmatched-payer'
     );
 
-    
     // Accept the payment (return success) - customer support will manually allocate
     return new Response(
       JSON.stringify({ 
@@ -1093,22 +1092,72 @@ serve(async (req) => {
         original_code: accountNumber,
         normalized_code: upperAccountNumber
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Error processing C2B callback:', error);
+    // Safety net: log the raw callback so nothing is ever lost, even if downstream inserts throw.
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      const cb = (globalThis as any).__lastCallback || {};
+      await logUnmatchedPayment(
+        supabase, cb,
+        cb.TransID || 'UNKNOWN-' + Date.now(),
+        cb.TransAmount || 0,
+        cb.MSISDN, cb.BillRefNumber, cb.FirstName, cb.MiddleName, cb.LastName,
+        `Processing error: ${(error as Error)?.message || String(error)}`
+      );
+    } catch (_) { /* ignore */ }
+    // Return 200 to Safaricom so they don't retry endlessly; the record is safe in unmatched_c2b_payments.
     return new Response(
-      JSON.stringify({ 
-        ResultCode: 1, 
-        ResultDesc: 'Internal server error processing payment' 
-      }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      JSON.stringify({ ResultCode: 0, ResultDesc: 'Payment queued for manual allocation.' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
+
+async function logUnmatchedPayment(
+  supabase: any, raw: any, receipt: string, amount: any, phone: any,
+  account: any, firstName: any, middleName: any, lastName: any, reason: string,
+) {
+  try {
+    const { error } = await supabase.from('unmatched_c2b_payments').insert({
+      mpesa_receipt_number: receipt,
+      amount: Number(amount) || 0,
+      phone_number: phone || null,
+      account_number: account || null,
+      first_name: firstName || null,
+      middle_name: middleName || null,
+      last_name: lastName || null,
+      transaction_time: raw?.TransTime || null,
+      raw_callback: raw || null,
+      failure_reason: reason,
+      status: 'pending',
+    });
+    if (error && !String(error.message || '').includes('duplicate')) {
+      console.error('Failed to log unmatched payment:', error);
+    }
+    // Notify all admins so they can review promptly.
+    const { data: admins } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'admin');
+    const ids = (admins || []).map((a: any) => a.user_id).filter(Boolean);
+    if (ids.length > 0) {
+      const rows = ids.map((uid: string) => ({
+        user_id: uid,
+        title: 'Unmatched Offline Payment ⚠️',
+        message: `KES ${amount} from ${phone || 'unknown'} (Receipt ${receipt}) needs manual allocation. Reason: ${reason}`,
+        type: 'warning',
+        category: 'admin',
+      }));
+      await supabase.from('notifications').insert(rows);
+    }
+  } catch (err) {
+    console.error('logUnmatchedPayment failed:', err);
+  }
+}
+
