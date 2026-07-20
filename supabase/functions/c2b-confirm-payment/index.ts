@@ -896,7 +896,11 @@ serve(async (req) => {
           regFullyPaid = !!allocRes?.fully_paid;
         }
 
-        const recordRow = async (g: number, refSuffix: string, category: string, rate: number) => {
+        // Whether the raw M-Pesa receipt has been attached to a row yet.
+        // The unique-receipt constraint + enforce_receipt_on_completion trigger require:
+        //   - Exactly ONE row can carry the raw mpesa_receipt_number.
+        //   - Any other completed row must use an exempt payment_method (internal_credit).
+        const recordRow = async (g: number, refSuffix: string, category: string, rate: number, attachReceipt: boolean) => {
           const c = Math.round(g * rate * 100) / 100;
           const n = Math.round((g - c) * 100) / 100;
           const ref = refSuffix ? `${mpesaReceiptNumber}-${refSuffix}` : mpesaReceiptNumber;
@@ -910,7 +914,8 @@ serve(async (req) => {
               commission_amount: c,
               net_amount: n,
               payment_reference: ref,
-              payment_method: 'mpesa_offline',
+              payment_method: attachReceipt ? 'mpesa_offline' : 'internal_credit',
+              mpesa_receipt_number: attachReceipt ? mpesaReceiptNumber : null,
               payment_status: 'completed',
               cycle_month: cycleMonth,
               category,
@@ -932,17 +937,20 @@ serve(async (req) => {
           return { row, c, n };
         };
 
+        const remainderAmount = grossAmount - regApplied;
+        // Attach the raw receipt to the contribution row when it exists; otherwise attach to the REG row.
+        const attachReceiptToReg = regApplied > 0 && remainderAmount <= 0;
         if (regApplied > 0) {
-          const r = await recordRow(regApplied, 'REG', 'registration_fee', REGISTRATION_COMMISSION_RATE);
+          const r = await recordRow(regApplied, 'REG', 'registration_fee', REGISTRATION_COMMISSION_RATE, attachReceiptToReg);
           totalCommissionForBalances += r.c;
           totalNetForBalances += r.n;
         }
-        const remainder = grossAmount - regApplied;
-        if (remainder > 0) {
-          const r = await recordRow(remainder, '', 'contribution', commissionRate);
+        if (remainderAmount > 0) {
+          const r = await recordRow(remainderAmount, '', 'contribution', commissionRate, true);
           totalCommissionForBalances += r.c;
           totalNetForBalances += r.n;
         }
+
 
         // Update member total_contributed
         await supabase
