@@ -43,13 +43,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let callbackData: any = {};
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const callbackData = await req.json();
+    callbackData = await req.json();
+    (globalThis as any).__lastCallback = callbackData;
     console.log('Received C2B callback:', JSON.stringify(callbackData, null, 2));
+
 
     // Extract payment details from M-Pesa C2B callback
     const {
