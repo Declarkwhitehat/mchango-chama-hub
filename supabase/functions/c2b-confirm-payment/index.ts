@@ -972,7 +972,7 @@ serve(async (req) => {
           } catch (_) { /* ignore */ }
         }
 
-        console.log('Welfare contribution recorded for matched member', { regApplied, remainder });
+        console.log('Welfare contribution recorded for matched member', { regApplied, remainder: remainderAmount });
       } else {
         console.warn('No welfare member matched by phone. Welfare balance updated but no member contribution record created.');
       }
