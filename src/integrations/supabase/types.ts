@@ -3102,6 +3102,72 @@ export type Database = {
           },
         ]
       }
+      unmatched_c2b_payments: {
+        Row: {
+          account_number: string | null
+          allocated_at: string | null
+          allocated_by: string | null
+          allocated_to_id: string | null
+          allocated_to_type: string | null
+          amount: number
+          created_at: string
+          failure_reason: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          middle_name: string | null
+          mpesa_receipt_number: string
+          notes: string | null
+          phone_number: string | null
+          raw_callback: Json | null
+          status: string
+          transaction_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_number?: string | null
+          allocated_at?: string | null
+          allocated_by?: string | null
+          allocated_to_id?: string | null
+          allocated_to_type?: string | null
+          amount: number
+          created_at?: string
+          failure_reason?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          middle_name?: string | null
+          mpesa_receipt_number: string
+          notes?: string | null
+          phone_number?: string | null
+          raw_callback?: Json | null
+          status?: string
+          transaction_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_number?: string | null
+          allocated_at?: string | null
+          allocated_by?: string | null
+          allocated_to_id?: string | null
+          allocated_to_type?: string | null
+          amount?: number
+          created_at?: string
+          failure_reason?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          middle_name?: string | null
+          mpesa_receipt_number?: string
+          notes?: string | null
+          phone_number?: string | null
+          raw_callback?: Json | null
+          status?: string
+          transaction_time?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_consents: {
         Row: {
           accepted_at: string
