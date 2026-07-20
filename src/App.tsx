@@ -67,6 +67,8 @@ const AdminChamaDetail = lazy(() => import("./pages/AdminChamaDetail"));
 const AdminCampaigns = lazy(() => import("./pages/AdminCampaigns"));
 const AdminCampaignDetail = lazy(() => import("./pages/AdminCampaignDetail"));
 const AdminCallbacks = lazy(() => import("./pages/AdminCallbacks"));
+const AdminUnmatchedPayments = lazy(() => import("./pages/AdminUnmatchedPayments"));
+
 const AdminAudit = lazy(() => import("./pages/AdminAudit"));
 const AdminExport = lazy(() => import("./pages/AdminExport"));
 const AdminSearch = lazy(() => import("./pages/AdminSearch"));
