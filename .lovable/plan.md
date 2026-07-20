@@ -1,74 +1,57 @@
-# Hide Phone Numbers in Welfare Views & Statements
+# Fix: offline (Paybill) payments never reach the app
 
-Show phone numbers as `070******0` (first 3 + masked middle + last 1 digit) to regular members. Only admins/super_admins see the full number. Include Member ID (member_code) alongside so members can still be uniquely identified.
+## Confirmed root cause
 
-## Scope
+Both offline payments succeeded on M-Pesa but **zero C2B callbacks ever landed in our system since the database was cleared** — I verified:
 
-Applies to any welfare-context surface where a member's phone appears today:
+- Welfare `Kisumu ndogo` (code `NBGY`) and member `NBGYM0001` exist and are active — the KES 20 should have matched cleanly.
+- Receipts `UGKF9BUKTY` and `UGKF9BULH2` are **not in `mpesa_receipt_registry`**, meaning `c2b-confirm-payment` was never invoked by Safaricom.
+- STK Push callbacks work perfectly today (5 completed since morning) because STK passes the callback URL inline per request. C2B does not — it requires **pre-registration** with Safaricom.
 
-1. **`src/components/welfare/WelfareTransactionLog.tsx`**
-   - On-screen table (Contributions + Withdrawals tabs): mask phone column; add a **Member ID** column that uses `welfare_members.member_code` for contributions and (best-effort) the payer's welfare member code for withdrawals.
-   - Members summary cards: mask phone.
-   - Detail dialog: mask phone.
-   - PDF export (both contributions and withdrawals sections + detail PDF): mask phone; add Member ID column.
-   - Phone search input: keep working — match against the unmasked value in-memory so admins and non-admins both get results, but never render the raw number for non-admins.
+Conclusion: The **C2B Validation/Confirmation URLs are not registered (or were dropped) for shortcode 4015351**, so every Paybill payment is accepted by Safaricom but the callback is never fired. Money is safe in the paybill float; the app just never hears about it.
 
-2. **`src/components/welfare/WelfarePaymentLookup.tsx`**
-   - Already shows `member_code` (good). Currently does not display phone — leave as-is, but if we later add contact info, apply the same masking rule.
+## Fix
 
-3. **`src/components/welfare/WelfareContributionReport.tsx` (PDF statement)**
-   - Already omits phone and already includes `member_code`. No change needed unless we want to explicitly add "Phone" — we won't.
+### 1. Re-register C2B URLs with Safaricom
+Invoke the existing `register-c2b-urls` edge function (already correctly targets shortcode `4015351` with our two edge function URLs). If Safaricom rejects it, surface the actual error.
 
-Out of scope: chama, mchango, organizations, admin-only pages (`AdminWelfares*`, `AdminWelfareDetail`, etc.) — admins already have full visibility there.
+### 2. Add "Manage C2B URLs" panel to `/admin/payment-config`
+Two buttons:
+- **Register / Re-register C2B URLs** → calls `register-c2b-urls`, shows Safaricom's raw response.
+- **Check current registration** → new mode in `register-c2b-urls` that hits Safaricom's `getURLsRegistration` (or attempts a re-register and returns the response) so you can verify the callback URL Safaricom currently holds.
 
-## Admin detection
+### 3. Safety net: `unmatched_c2b_payments` table + admin page
+Even with URLs registered, a mistyped account like `7NUCM0001` (yours — the welfare it referred to had been deleted) currently vanishes silently. Add:
+- New table `unmatched_c2b_payments` (receipt UNIQUE, account, amount, payer phone/name, raw payload, status: `unmatched | allocated | refunded`, allocation metadata).
+- Update `c2b-confirm-payment` to always log every callback here; mark `allocated` once matched, keep `unmatched` when no match.
+- New admin page `/admin/unmatched-payments`: lists unmatched rows with an **Allocate** action (pick chama/welfare/mchango/organization + member) that writes the correct payment row and updates group balances, and a **Mark refunded** action with a required note.
+- Dashboard badge when unmatched count > 0.
 
-Add a small hook `useIsAdmin()` mirroring `useIsSuperAdmin` but checking `role IN ('admin','super_admin')` via two `user_roles` lookups (or a single `.in('role', [...])`). Reuse it in the two welfare components above.
+### 4. Manually recover your two payments
+After C2B URLs are re-registered, backfill the two lost receipts:
+- `UGKF9BULH2` KES 20 → insert directly into `welfare_contributions` for `Kisumu ndogo` / member `NBGYM0001` (matches cleanly), update welfare totals, write ledger + company_earnings.
+- `UGKF9BUKTY` KES 50 → insert into `unmatched_c2b_payments` so you can allocate/refund from the new admin page (original welfare `7NUCM0001` was deleted).
 
-## Masking helper
+### 5. Alert admins on unmatched payments
+When `c2b-confirm-payment` records an `unmatched` row, also push in-app notification + SMS to super_admins so they can act within minutes.
 
-New util `src/utils/maskPhone.ts`:
+## Files touched
 
-```ts
-export function maskPhone(phone?: string | null): string {
-  if (!phone) return "-";
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 5) return "***";
-  const last = digits.slice(-1);
-  // Normalize leading country code 254 -> 0 for display
-  const local = digits.startsWith("254") ? "0" + digits.slice(3) : digits;
-  const prefix = local.slice(0, 3);
-  const middleLen = Math.max(0, local.length - 4);
-  return `${prefix}${"*".repeat(middleLen)}${last}`;
-}
-```
+Backend
+- `supabase/migrations/*_unmatched_c2b_payments.sql` — new table + RLS + grants.
+- `supabase/functions/c2b-confirm-payment/index.ts` — always log to registry; mark allocated on success; notify admins on unmatched.
+- `supabase/functions/register-c2b-urls/index.ts` — accept `{ mode: 'query' }` to return current Safaricom-side URLs.
+- New `supabase/functions/allocate-unmatched-payment/index.ts` — super_admin-only allocation endpoint that reuses matching logic.
 
-Example: `0707874790` → `070******0`, `+254707874790` → `070******0`.
+Frontend
+- `src/pages/AdminPaymentConfig.tsx` — new "C2B URL registration" panel.
+- `src/pages/AdminUnmatchedPayments.tsx` — new admin page + route + nav link.
+- `src/components/admin/UnmatchedPaymentsBadge.tsx` — dashboard widget.
 
-## Rendering rule
+Data
+- Insert for `UGKF9BULH2` into welfare tables.
+- Insert for `UGKF9BUKTY` into `unmatched_c2b_payments`.
 
-In each spot that renders a phone:
-
-```tsx
-{isAdmin ? phone : maskPhone(phone)}
-```
-
-Apply the same conditional inside the jsPDF `doc.text(...)` calls for the PDF exports so downloaded statements are also masked for non-admins.
-
-## Technical details
-
-- No DB or edge function changes — masking is presentation-only. The `welfare_members`/`profiles` join still returns the raw phone (needed so admins see it and so search still works), we just don't render it for non-admins.
-- Member ID column pulls from `welfare_members.member_code`, which is already joined into `contributions` and available via a lookup for `withdrawals` (fall back to `-` when unknown).
-- Search-by-phone continues to filter on the raw digits so results stay consistent between admin and non-admin views.
-
-## Files to change
-
-- add: `src/utils/maskPhone.ts`
-- add: `src/hooks/useIsAdmin.ts`
-- edit: `src/components/welfare/WelfareTransactionLog.tsx` (table, summary, dialog, PDF; add Member ID column)
-
-## Verification
-
-- As a regular welfare member: table, summary, dialog, and downloaded PDF show `070******0` and a visible Member ID column/field.
-- As an admin/super_admin: full phone number remains visible everywhere.
-- Phone search still returns the correct rows for both roles.
+## Out of scope
+- Automatic Safaricom Reversal API for refunds (kept manual).
+- Any changes to STK/callback commission logic.

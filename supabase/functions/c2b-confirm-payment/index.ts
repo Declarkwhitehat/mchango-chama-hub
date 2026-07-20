@@ -43,13 +43,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let callbackData: any = {};
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const callbackData = await req.json();
+    callbackData = await req.json();
+    (globalThis as any).__lastCallback = callbackData;
     console.log('Received C2B callback:', JSON.stringify(callbackData, null, 2));
+
 
     // Extract payment details from M-Pesa C2B callback
     const {
@@ -896,7 +899,11 @@ serve(async (req) => {
           regFullyPaid = !!allocRes?.fully_paid;
         }
 
-        const recordRow = async (g: number, refSuffix: string, category: string, rate: number) => {
+        // Whether the raw M-Pesa receipt has been attached to a row yet.
+        // The unique-receipt constraint + enforce_receipt_on_completion trigger require:
+        //   - Exactly ONE row can carry the raw mpesa_receipt_number.
+        //   - Any other completed row must use an exempt payment_method (internal_credit).
+        const recordRow = async (g: number, refSuffix: string, category: string, rate: number, attachReceipt: boolean) => {
           const c = Math.round(g * rate * 100) / 100;
           const n = Math.round((g - c) * 100) / 100;
           const ref = refSuffix ? `${mpesaReceiptNumber}-${refSuffix}` : mpesaReceiptNumber;
@@ -910,7 +917,8 @@ serve(async (req) => {
               commission_amount: c,
               net_amount: n,
               payment_reference: ref,
-              payment_method: 'mpesa_offline',
+              payment_method: attachReceipt ? 'mpesa_offline' : 'internal_credit',
+              mpesa_receipt_number: attachReceipt ? mpesaReceiptNumber : null,
               payment_status: 'completed',
               cycle_month: cycleMonth,
               category,
@@ -932,17 +940,20 @@ serve(async (req) => {
           return { row, c, n };
         };
 
+        const remainderAmount = grossAmount - regApplied;
+        // Attach the raw receipt to the contribution row when it exists; otherwise attach to the REG row.
+        const attachReceiptToReg = regApplied > 0 && remainderAmount <= 0;
         if (regApplied > 0) {
-          const r = await recordRow(regApplied, 'REG', 'registration_fee', REGISTRATION_COMMISSION_RATE);
+          const r = await recordRow(regApplied, 'REG', 'registration_fee', REGISTRATION_COMMISSION_RATE, attachReceiptToReg);
           totalCommissionForBalances += r.c;
           totalNetForBalances += r.n;
         }
-        const remainder = grossAmount - regApplied;
-        if (remainder > 0) {
-          const r = await recordRow(remainder, '', 'contribution', commissionRate);
+        if (remainderAmount > 0) {
+          const r = await recordRow(remainderAmount, '', 'contribution', commissionRate, true);
           totalCommissionForBalances += r.c;
           totalNetForBalances += r.n;
         }
+
 
         // Update member total_contributed
         await supabase
@@ -964,7 +975,7 @@ serve(async (req) => {
           } catch (_) { /* ignore */ }
         }
 
-        console.log('Welfare contribution recorded for matched member', { regApplied, remainder });
+        console.log('Welfare contribution recorded for matched member', { regApplied, remainder: remainderAmount });
       } else {
         console.warn('No welfare member matched by phone. Welfare balance updated but no member contribution record created.');
       }
@@ -1062,20 +1073,19 @@ serve(async (req) => {
       );
     }
 
-    // IMPORTANT: No matching entity found
+    // IMPORTANT: No matching entity found — log to safety-net table so admin can allocate manually.
     console.warn('⚠️ UNMATCHED PAYMENT - Account not found:', accountNumber);
-    console.warn('Normalized search value:', upperAccountNumber);
-    console.warn('Searched tables: chama_members.member_code, mchango.paybill_account_id/group_code, organizations.paybill_account_id/group_code, welfares.paybill_account_id/group_code');
-    
-    // Send SMS to payer informing them the code was invalid
+    await logUnmatchedPayment(supabase, callbackData, mpesaReceiptNumber, amount, phoneNumber,
+      accountNumber, firstName, middleName, lastName,
+      `Account code "${accountNumber}" did not match any chama, welfare, campaign, or organization.`);
+
     await safeSendSms(
       supabase,
       phoneNumber,
-      `Your payment of KSh ${amount} (Receipt: ${mpesaReceiptNumber}) was received but the payment code "${accountNumber}" was not found. Your money is safe. Please contact customer care with your correct payment ID to have your payment allocated.`,
+      `Your payment of KSh ${amount} (Receipt: ${mpesaReceiptNumber}) was received but the payment code "${accountNumber}" was not found. Your money is safe — our team will allocate it. Please contact customer care with your correct payment ID.`,
       'unmatched-payer'
     );
 
-    
     // Accept the payment (return success) - customer support will manually allocate
     return new Response(
       JSON.stringify({ 
@@ -1085,22 +1095,72 @@ serve(async (req) => {
         original_code: accountNumber,
         normalized_code: upperAccountNumber
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Error processing C2B callback:', error);
+    // Safety net: log the raw callback so nothing is ever lost, even if downstream inserts throw.
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      const cb = (globalThis as any).__lastCallback || {};
+      await logUnmatchedPayment(
+        supabase, cb,
+        cb.TransID || 'UNKNOWN-' + Date.now(),
+        cb.TransAmount || 0,
+        cb.MSISDN, cb.BillRefNumber, cb.FirstName, cb.MiddleName, cb.LastName,
+        `Processing error: ${(error as Error)?.message || String(error)}`
+      );
+    } catch (_) { /* ignore */ }
+    // Return 200 to Safaricom so they don't retry endlessly; the record is safe in unmatched_c2b_payments.
     return new Response(
-      JSON.stringify({ 
-        ResultCode: 1, 
-        ResultDesc: 'Internal server error processing payment' 
-      }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      JSON.stringify({ ResultCode: 0, ResultDesc: 'Payment queued for manual allocation.' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
+
+async function logUnmatchedPayment(
+  supabase: any, raw: any, receipt: string, amount: any, phone: any,
+  account: any, firstName: any, middleName: any, lastName: any, reason: string,
+) {
+  try {
+    const { error } = await supabase.from('unmatched_c2b_payments').insert({
+      mpesa_receipt_number: receipt,
+      amount: Number(amount) || 0,
+      phone_number: phone || null,
+      account_number: account || null,
+      first_name: firstName || null,
+      middle_name: middleName || null,
+      last_name: lastName || null,
+      transaction_time: raw?.TransTime || null,
+      raw_callback: raw || null,
+      failure_reason: reason,
+      status: 'pending',
+    });
+    if (error && !String(error.message || '').includes('duplicate')) {
+      console.error('Failed to log unmatched payment:', error);
+    }
+    // Notify all admins so they can review promptly.
+    const { data: admins } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'admin');
+    const ids = (admins || []).map((a: any) => a.user_id).filter(Boolean);
+    if (ids.length > 0) {
+      const rows = ids.map((uid: string) => ({
+        user_id: uid,
+        title: 'Unmatched Offline Payment ⚠️',
+        message: `KES ${amount} from ${phone || 'unknown'} (Receipt ${receipt}) needs manual allocation. Reason: ${reason}`,
+        type: 'warning',
+        category: 'admin',
+      }));
+      await supabase.from('notifications').insert(rows);
+    }
+  } catch (err) {
+    console.error('logUnmatchedPayment failed:', err);
+  }
+}
+

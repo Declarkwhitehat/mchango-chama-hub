@@ -67,6 +67,8 @@ const AdminChamaDetail = lazy(() => import("./pages/AdminChamaDetail"));
 const AdminCampaigns = lazy(() => import("./pages/AdminCampaigns"));
 const AdminCampaignDetail = lazy(() => import("./pages/AdminCampaignDetail"));
 const AdminCallbacks = lazy(() => import("./pages/AdminCallbacks"));
+const AdminUnmatchedPayments = lazy(() => import("./pages/AdminUnmatchedPayments"));
+
 const AdminAudit = lazy(() => import("./pages/AdminAudit"));
 const AdminExport = lazy(() => import("./pages/AdminExport"));
 const AdminSearch = lazy(() => import("./pages/AdminSearch"));
@@ -200,6 +202,8 @@ const AppContent = () => {
             <Route path="/admin/welfares" element={<AdminProtectedRoute><AdminWelfares /></AdminProtectedRoute>} />
             <Route path="/admin/welfare/:id" element={<AdminProtectedRoute><AdminWelfareDetail /></AdminProtectedRoute>} />
             <Route path="/admin/callbacks" element={<AdminProtectedRoute><AdminCallbacks /></AdminProtectedRoute>} />
+            <Route path="/admin/unmatched-payments" element={<AdminProtectedRoute><AdminUnmatchedPayments /></AdminProtectedRoute>} />
+
             <Route path="/admin/audit" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminAudit /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
             <Route path="/admin/search" element={<AdminProtectedRoute><AdminSearch /></AdminProtectedRoute>} />
             <Route path="/admin/export" element={<AdminProtectedRoute><AdminExport /></AdminProtectedRoute>} />
