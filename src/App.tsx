@@ -202,6 +202,8 @@ const AppContent = () => {
             <Route path="/admin/welfares" element={<AdminProtectedRoute><AdminWelfares /></AdminProtectedRoute>} />
             <Route path="/admin/welfare/:id" element={<AdminProtectedRoute><AdminWelfareDetail /></AdminProtectedRoute>} />
             <Route path="/admin/callbacks" element={<AdminProtectedRoute><AdminCallbacks /></AdminProtectedRoute>} />
+            <Route path="/admin/unmatched-payments" element={<AdminProtectedRoute><AdminUnmatchedPayments /></AdminProtectedRoute>} />
+
             <Route path="/admin/audit" element={<AdminProtectedRoute><SuperAdminProtectedRoute><AdminAudit /></SuperAdminProtectedRoute></AdminProtectedRoute>} />
             <Route path="/admin/search" element={<AdminProtectedRoute><AdminSearch /></AdminProtectedRoute>} />
             <Route path="/admin/export" element={<AdminProtectedRoute><AdminExport /></AdminProtectedRoute>} />
