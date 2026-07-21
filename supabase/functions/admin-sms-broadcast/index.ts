@@ -369,7 +369,7 @@ serve(async (req) => {
       .from("admin_sms_broadcasts")
       .insert({
         admin_user_id: userData.user.id,
-        segment,
+        segment: usingCustom ? "custom" : segment,
         message: finalMessage,
         recipient_count: phones.length,
         status: "sending",
