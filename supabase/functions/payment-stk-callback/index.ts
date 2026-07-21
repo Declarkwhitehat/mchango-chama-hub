@@ -693,11 +693,10 @@ serve(async (req) => {
           // Thank-you SMS to donor — only for M-Pesa donations of KES 50 and above
           if (donation.phone && grossAmount >= 50) {
             try {
-              const donorFirst = (donorName || 'Friend').split(' ')[0];
               await supabaseClient.functions.invoke('send-transactional-sms', {
                 body: {
                   phone: donation.phone,
-                  message: `Thank you ${donorFirst}! Your donation of KES ${grossAmount.toLocaleString()} to "${campaignName}" has been received. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
+                  message: formatMchangoThankYouSms({ donorFullName: donorName, campaignName, amount: grossAmount }),
                   eventType: 'mchango_donation_thankyou',
                 },
               });
@@ -865,11 +864,10 @@ serve(async (req) => {
 
             // Thank-you SMS to donor
             try {
-              const donorFirst = (donorName || 'Friend').split(' ')[0];
               await supabaseClient.functions.invoke('send-transactional-sms', {
                 body: {
                   phone: orgDonation.phone,
-                  message: `Thank you ${donorFirst}! Your donation of KES ${grossAmount.toLocaleString()} to "${orgName}" has been received. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
+                  message: formatOrgThankYouSms({ donorFullName: donorName, organizationName: orgName, amount: grossAmount }),
                   eventType: 'organization_donation_thankyou',
                 },
               });
