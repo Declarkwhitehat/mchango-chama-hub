@@ -277,10 +277,20 @@ serve(async (req) => {
 
           if (beneficiaryProfile?.phone && payerLast9 && payerLast9 !== benefLast9) {
             const payerName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'A member';
+            const benefDues = await getMemberOutstanding(supabase, chamaMemberData.id, chamaMemberData.chama_id);
             await supabase.functions.invoke('send-transactional-sms', {
               body: {
                 phone: beneficiaryProfile.phone,
-                message: `Good news! ${payerName} has paid KES ${grossAmount.toLocaleString()} for your contribution to "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
+                message: formatChamaOnBehalfBeneficiarySms({
+                  beneficiaryFullName: beneficiaryProfile.full_name,
+                  payerFullName: payerName,
+                  chamaName: chamaData.name,
+                  amount: grossAmount,
+                  receipt: mpesaReceiptNumber,
+                  shortfall: benefDues.shortfall,
+                  priorDebt: benefDues.priorDebt,
+                }),
+                eventType: 'chama_payment_on_behalf_beneficiary',
               },
             });
 
