@@ -410,7 +410,7 @@ serve(async (req) => {
       actor_email: userData.user.email ?? null,
       action_key: "sms_broadcast.send",
       target_type: "segment",
-      target_id: segment,
+      target_id: usingCustom ? "custom" : segment,
       metadata: { recipient_count: phones.length, sent, failed },
       ip_address: req.headers.get("x-forwarded-for") || null,
       user_agent: req.headers.get("user-agent") || null,
