@@ -1,57 +1,100 @@
-# Fix: offline (Paybill) payments never reach the app
+## Goal
+Every deposit (online STK or offline C2B) triggers a clean, professional confirmation SMS from sender ID `PAMOJANOVA` that:
+- Greets the payer by first name.
+- Names the specific group (e.g. `"AMABUKO self help group"`, welfare name, campaign title, organization name).
+- Shows amount + M-Pesa receipt.
+- For chama payments only: appends a short line if the payer shortpaid the current cycle and/or still carries debt from previous cycles.
 
-## Confirmed root cause
+Sender ID is already `PAMOJANOVA` via Onfon (no `Pamojanova:` text prefix — that's the standing SMS-hygiene rule). No emojis in SMS.
 
-Both offline payments succeeded on M-Pesa but **zero C2B callbacks ever landed in our system since the database was cleared** — I verified:
+## Unified message templates
 
-- Welfare `Kisumu ndogo` (code `NBGY`) and member `NBGYM0001` exist and are active — the KES 20 should have matched cleanly.
-- Receipts `UGKF9BUKTY` and `UGKF9BULH2` are **not in `mpesa_receipt_registry`**, meaning `c2b-confirm-payment` was never invoked by Safaricom.
-- STK Push callbacks work perfectly today (5 completed since morning) because STK passes the callback URL inline per request. C2B does not — it requires **pre-registration** with Safaricom.
+Chama (self-payment):
+```
+Hi {FirstName}, KES {amount} received for "{ChamaName}". Receipt: {RCPT}.
+{outstanding_line?}
+STOP 4569*5#
+```
 
-Conclusion: The **C2B Validation/Confirmation URLs are not registered (or were dropped) for shortcode 4015351**, so every Paybill payment is accepted by Safaricom but the callback is never fired. Money is safe in the paybill float; the app just never hears about it.
+Chama (paid on behalf of another member) — sent to payer:
+```
+Hi {PayerFirstName}, KES {amount} paid for {BeneficiaryFirstName} in "{ChamaName}". Receipt: {RCPT}.
+STOP 4569*5#
+```
+Sent to beneficiary:
+```
+Hi {BeneficiaryFirstName}, {PayerFirstName} paid KES {amount} toward your contribution in "{ChamaName}". Receipt: {RCPT}.
+{outstanding_line?}
+STOP 4569*5#
+```
 
-## Fix
+Welfare:
+```
+Hi {FirstName}, KES {amount} received for "{WelfareName}". Receipt: {RCPT}.
+STOP 4569*5#
+```
 
-### 1. Re-register C2B URLs with Safaricom
-Invoke the existing `register-c2b-urls` edge function (already correctly targets shortcode `4015351` with our two edge function URLs). If Safaricom rejects it, surface the actual error.
+Mchango / Organization donation (unchanged tone, already personalized):
+```
+Thank you {FirstName}! Your donation of KES {amount} to "{Name}" has been received. Sisi tuko pamoja, je wewe?
+STOP 4569*5#
+```
 
-### 2. Add "Manage C2B URLs" panel to `/admin/payment-config`
-Two buttons:
-- **Register / Re-register C2B URLs** → calls `register-c2b-urls`, shows Safaricom's raw response.
-- **Check current registration** → new mode in `register-c2b-urls` that hits Safaricom's `getURLsRegistration` (or attempts a re-register and returns the response) so you can verify the callback URL Safaricom currently holds.
+## Outstanding-dues line (chama only)
 
-### 3. Safety net: `unmatched_c2b_payments` table + admin page
-Even with URLs registered, a mistyped account like `7NUCM0001` (yours — the welfare it referred to had been deleted) currently vanishes silently. Add:
-- New table `unmatched_c2b_payments` (receipt UNIQUE, account, amount, payer phone/name, raw payload, status: `unmatched | allocated | refunded`, allocation metadata).
-- Update `c2b-confirm-payment` to always log every callback here; mark `allocated` once matched, keep `unmatched` when no match.
-- New admin page `/admin/unmatched-payments`: lists unmatched rows with an **Allocate** action (pick chama/welfare/mchango/organization + member) that writes the correct payment row and updates group balances, and a **Mark refunded** action with a required note.
-- Dashboard badge when unmatched count > 0.
+Computed for the beneficiary member right after settlement runs. Line only appears when there's something owed:
 
-### 4. Manually recover your two payments
-After C2B URLs are re-registered, backfill the two lost receipts:
-- `UGKF9BULH2` KES 20 → insert directly into `welfare_contributions` for `Kisumu ndogo` / member `NBGYM0001` (matches cleanly), update welfare totals, write ledger + company_earnings.
-- `UGKF9BUKTY` KES 50 → insert into `unmatched_c2b_payments` so you can allocate/refund from the new admin page (original welfare `7NUCM0001` was deleted).
+- Current cycle shortpaid → `You still owe KES {shortfall} for this cycle.`
+- Prior missed cycles → `You have KES {debt} in unpaid past contributions.`
+- Both → both lines, comma-separated, capped so total SMS ≤ 320 chars.
 
-### 5. Alert admins on unmatched payments
-When `c2b-confirm-payment` records an `unmatched` row, also push in-app notification + SMS to super_admins so they can act within minutes.
+Data sources (already exist, no schema changes):
+- `member_cycle_payments` for the current cycle → `expected_amount - amount_paid` (only if > 0 and cycle not complete).
+- `chama_member_debts.total_outstanding` (or sum of unpaid debt rows) for prior-cycle debt.
 
-## Files touched
+If neither > 0, omit the line entirely — silent success.
 
-Backend
-- `supabase/migrations/*_unmatched_c2b_payments.sql` — new table + RLS + grants.
-- `supabase/functions/c2b-confirm-payment/index.ts` — always log to registry; mark allocated on success; notify admins on unmatched.
-- `supabase/functions/register-c2b-urls/index.ts` — accept `{ mode: 'query' }` to return current Safaricom-side URLs.
-- New `supabase/functions/allocate-unmatched-payment/index.ts` — super_admin-only allocation endpoint that reuses matching logic.
+## Files to change (frontend/edge only, no schema)
 
-Frontend
-- `src/pages/AdminPaymentConfig.tsx` — new "C2B URL registration" panel.
-- `src/pages/AdminUnmatchedPayments.tsx` — new admin page + route + nav link.
-- `src/components/admin/UnmatchedPaymentsBadge.tsx` — dashboard widget.
+1. `supabase/functions/_shared/paymentSmsTemplates.ts` (new)
+   - `formatChamaPaymentSms({firstName, chamaName, amount, receipt, shortfall, priorDebt})`
+   - `formatChamaOnBehalfPayerSms(...)` / `formatChamaOnBehalfBeneficiarySms(...)`
+   - `formatWelfarePaymentSms(...)`
+   - `formatMchangoThankYouSms(...)` / `formatOrgThankYouSms(...)`
+   - All strings plain GSM-7, no `Pamojanova:` prefix, always end with `\nSTOP 4569*5#`.
 
-Data
-- Insert for `UGKF9BULH2` into welfare tables.
-- Insert for `UGKF9BUKTY` into `unmatched_c2b_payments`.
+2. `supabase/functions/_shared/chamaOutstanding.ts` (new)
+   - `getMemberOutstanding(supabaseAdmin, memberId)` → `{ shortfall, priorDebt }` using the two queries above. Fails soft (returns zeros on error) so SMS never blocks.
 
-## Out of scope
-- Automatic Safaricom Reversal API for refunds (kept manual).
-- Any changes to STK/callback commission logic.
+3. `supabase/functions/payment-stk-callback/index.ts`
+   - Chama self-payment branch (~line 338): call outstanding helper for the beneficiary member, use `formatChamaPaymentSms`. Fetch first name from `beneficiaryProfile.full_name`.
+   - Pay-on-behalf branch (~lines 294–326): use payer/beneficiary formatters; only the beneficiary SMS carries the outstanding-dues line.
+   - Welfare confirmation SMS in this file (if present): switch to `formatWelfarePaymentSms`.
+   - Mchango / org branches (~640, ~830): switch to `formatMchangoThankYouSms` / `formatOrgThankYouSms` (keeps existing wording, standardized).
+
+4. `supabase/functions/c2b-confirm-payment/index.ts`
+   - Line 241 payer SMS: fetch payer profile first name (from `chamaMemberData.user_id`'s profile) and compute outstanding for that member, use `formatChamaPaymentSms`.
+   - Line 261 on-behalf beneficiary SMS: use `formatChamaOnBehalfBeneficiarySms` with outstanding line.
+
+5. `supabase/functions/welfare-contributions/index.ts`
+   - Line 262 SMS: switch to `formatWelfarePaymentSms` (already has first name + welfare name; standardize wording via the shared template).
+
+6. `src/utils/smsService.ts` (frontend template constants)
+   - Update `paymentReceived`, add `chamaPaymentReceived({firstName, chamaName, amount, receipt, shortfall, priorDebt})` and `welfarePaymentReceived(...)` to keep client-side previews in sync with the edge-function copy. No behavioral change (edge functions are the actual senders); this keeps the two sources aligned.
+
+## Non-goals / preserved rules
+
+- Payment thresholds and cost policy unchanged: still only payer + beneficiary receive SMS on a chama/welfare payment; other members get push only. Mchango thank-you still gated at ≥ KES 50.
+- No changes to receipt/idempotency, ledger, commission, or settlement logic.
+- No schema migrations.
+- No emojis in SMS; no `Pamojanova:` text prefix (sender ID already identifies the source).
+- Character budget: aim ≤ 320 chars (2-part SMS worst case) even with both outstanding lines; templates trim decimals to whole KES where safe.
+
+## Verification
+
+- Deploy edge functions.
+- Trigger a real chama STK payment on preview → confirm SMS reads `Hi {Name}, KES ... received for "{Chama}". ...`.
+- Manually set a `chama_member_debts.total_outstanding` on a test member and pay a partial amount → confirm outstanding line appears with both shortfall and prior-debt.
+- Trigger a welfare STK → confirm welfare template.
+- Trigger a C2B (Paybill) payment → confirm same personalized copy path.
+- Confirm no SMS is sent to non-payer chama members.

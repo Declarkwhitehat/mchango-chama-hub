@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { COMMISSION_RATES } from "../_shared/commissionRates.ts";
 import { getCommissionRate } from "../_shared/getCommissionRate.ts";
 import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
+import { formatChamaPaymentSms, formatChamaOnBehalfBeneficiarySms } from "../_shared/paymentSmsTemplates.ts";
+import { getMemberOutstanding } from "../_shared/chamaOutstanding.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -235,12 +237,29 @@ serve(async (req) => {
 
       // Send SMS notification to the actual M-Pesa payer
       if (chamaData) {
+        // Personalized SMS to the payer (payer == beneficiary member for C2B self path)
+        const { data: payerProfile } = await supabase
+          .from('profiles')
+          .select('full_name, phone')
+          .eq('id', chamaMemberData.user_id)
+          .maybeSingle();
+        const payerDues = await getMemberOutstanding(supabase, chamaMemberData.id, chamaMemberData.chama_id);
         await safeSendSms(
           supabase,
           phoneNumber,
-          `Payment of KES ${grossAmount.toLocaleString()} received for "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
+          formatChamaPaymentSms({
+            fullName: payerProfile?.full_name || [firstName, middleName, lastName].filter(Boolean).join(' '),
+            chamaName: chamaData.name,
+            amount: grossAmount,
+            receipt: mpesaReceiptNumber,
+            shortfall: payerDues.shortfall,
+            priorDebt: payerDues.priorDebt,
+          }),
           'chama-payer'
         );
+
+
+
 
 
         // If the payer phone differs from the beneficiary member's profile phone,
@@ -258,10 +277,20 @@ serve(async (req) => {
 
           if (beneficiaryProfile?.phone && payerLast9 && payerLast9 !== benefLast9) {
             const payerName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'A member';
+            const benefDues = await getMemberOutstanding(supabase, chamaMemberData.id, chamaMemberData.chama_id);
             await supabase.functions.invoke('send-transactional-sms', {
               body: {
                 phone: beneficiaryProfile.phone,
-                message: `Good news! ${payerName} has paid KES ${grossAmount.toLocaleString()} for your contribution to "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
+                message: formatChamaOnBehalfBeneficiarySms({
+                  beneficiaryFullName: beneficiaryProfile.full_name,
+                  payerFullName: payerName,
+                  chamaName: chamaData.name,
+                  amount: grossAmount,
+                  receipt: mpesaReceiptNumber,
+                  shortfall: benefDues.shortfall,
+                  priorDebt: benefDues.priorDebt,
+                }),
+                eventType: 'chama_payment_on_behalf_beneficiary',
               },
             });
 
@@ -451,7 +480,7 @@ serve(async (req) => {
                     await supabase.functions.invoke('send-transactional-sms', {
                       body: {
                         phone: beneficiaryPhone,
-                        message: `🎉 All members have paid for "${chamaData.name}". Your payout of KES ${netPayoutAmount.toFixed(2)} is being processed now!`,
+                        message: `All members have paid for "${chamaData.name}". Your payout of KES ${Math.round(netPayoutAmount).toLocaleString()} is being processed now.\nSTOP 4569*5#`,
                       },
                     });
                   }
