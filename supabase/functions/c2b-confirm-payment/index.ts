@@ -480,7 +480,7 @@ serve(async (req) => {
                     await supabase.functions.invoke('send-transactional-sms', {
                       body: {
                         phone: beneficiaryPhone,
-                        message: `🎉 All members have paid for "${chamaData.name}". Your payout of KES ${netPayoutAmount.toFixed(2)} is being processed now!`,
+                        message: `All members have paid for "${chamaData.name}". Your payout of KES ${Math.round(netPayoutAmount).toLocaleString()} is being processed now.\nSTOP 4569*5#`,
                       },
                     });
                   }
