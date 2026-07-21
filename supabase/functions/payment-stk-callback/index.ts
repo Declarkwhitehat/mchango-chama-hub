@@ -299,14 +299,21 @@ serve(async (req) => {
               });
             }
 
-            // SMS to payer
+            // Personalized SMS to payer (paid on behalf)
             if (payerProfile?.phone) {
               try {
                 await supabaseClient.functions.invoke('send-transactional-sms', {
                   body: {
                     phone: payerProfile.phone,
-                    message: `Payment successful! KES ${actualAmount} credited to ${beneficiaryProfile?.full_name || 'member'}'s account. Receipt: ${mpesaReceiptNumber || 'N/A'}`
-                  }
+                    message: formatChamaOnBehalfPayerSms({
+                      payerFullName: payerProfile.full_name,
+                      beneficiaryFullName: beneficiaryProfile?.full_name,
+                      chamaName,
+                      amount: actualAmount,
+                      receipt: mpesaReceiptNumber || 'N/A',
+                    }),
+                    eventType: 'chama_payment_on_behalf_payer',
+                  },
                 });
               } catch (smsError) {
                 console.error('Error sending SMS to payer:', smsError);
@@ -314,7 +321,7 @@ serve(async (req) => {
             }
           }
 
-          // SMS to beneficiary
+          // SMS to beneficiary — include outstanding-dues line
           if (beneficiaryProfile?.phone) {
             try {
               const { data: payerProfile2 } = await supabaseClient
@@ -322,11 +329,21 @@ serve(async (req) => {
                 .select('full_name')
                 .eq('id', payerMember?.user_id)
                 .single();
+              const dues = await getMemberOutstanding(supabaseClient, contribution.member_id, contribution.chama_id);
               await supabaseClient.functions.invoke('send-transactional-sms', {
                 body: {
                   phone: beneficiaryProfile.phone,
-                  message: `Good news! ${payerProfile2?.full_name || 'A member'} has paid KES ${actualAmount} for your chama contribution. Receipt: ${mpesaReceiptNumber || 'N/A'}`
-                }
+                  message: formatChamaOnBehalfBeneficiarySms({
+                    beneficiaryFullName: beneficiaryProfile.full_name,
+                    payerFullName: payerProfile2?.full_name,
+                    chamaName,
+                    amount: actualAmount,
+                    receipt: mpesaReceiptNumber || 'N/A',
+                    shortfall: dues.shortfall,
+                    priorDebt: dues.priorDebt,
+                  }),
+                  eventType: 'chama_payment_on_behalf_beneficiary',
+                },
               });
             } catch (smsError) {
               console.error('Error sending SMS to beneficiary:', smsError);
@@ -345,11 +362,20 @@ serve(async (req) => {
 
           if (beneficiaryProfile?.phone) {
             try {
+              const dues = await getMemberOutstanding(supabaseClient, contribution.member_id, contribution.chama_id);
               await supabaseClient.functions.invoke('send-transactional-sms', {
                 body: {
                   phone: beneficiaryProfile.phone,
-                  message: `Chama contribution confirmed! KES ${actualAmount} received. Receipt: ${mpesaReceiptNumber || 'N/A'}`
-                }
+                  message: formatChamaPaymentSms({
+                    fullName: beneficiaryProfile.full_name,
+                    chamaName,
+                    amount: actualAmount,
+                    receipt: mpesaReceiptNumber || 'N/A',
+                    shortfall: dues.shortfall,
+                    priorDebt: dues.priorDebt,
+                  }),
+                  eventType: 'chama_payment_self',
+                },
               });
             } catch (smsError) {
               console.error('Error sending SMS:', smsError);
