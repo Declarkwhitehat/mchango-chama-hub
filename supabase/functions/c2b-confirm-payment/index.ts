@@ -237,12 +237,29 @@ serve(async (req) => {
 
       // Send SMS notification to the actual M-Pesa payer
       if (chamaData) {
+        // Personalized SMS to the payer (payer == beneficiary member for C2B self path)
+        const { data: payerProfile } = await supabase
+          .from('profiles')
+          .select('full_name, phone')
+          .eq('id', chamaMemberData.user_id)
+          .maybeSingle();
+        const payerDues = await getMemberOutstanding(supabase, chamaMemberData.id, chamaMemberData.chama_id);
         await safeSendSms(
           supabase,
           phoneNumber,
-          `Payment of KES ${grossAmount.toLocaleString()} received for "${chamaData.name}". Receipt: ${mpesaReceiptNumber}.`,
+          formatChamaPaymentSms({
+            fullName: payerProfile?.full_name || [firstName, middleName, lastName].filter(Boolean).join(' '),
+            chamaName: chamaData.name,
+            amount: grossAmount,
+            receipt: mpesaReceiptNumber,
+            shortfall: payerDues.shortfall,
+            priorDebt: payerDues.priorDebt,
+          }),
           'chama-payer'
         );
+
+
+
 
 
         // If the payer phone differs from the beneficiary member's profile phone,
