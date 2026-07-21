@@ -8,6 +8,7 @@ import {
   formatChamaPaymentSms,
   formatChamaOnBehalfPayerSms,
   formatChamaOnBehalfBeneficiarySms,
+  formatWelfarePaymentSms,
   formatMchangoThankYouSms,
   formatOrgThankYouSms,
 } from "../_shared/paymentSmsTemplates.ts";
