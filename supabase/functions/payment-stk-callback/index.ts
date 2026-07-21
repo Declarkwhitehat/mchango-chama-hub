@@ -545,7 +545,7 @@ serve(async (req) => {
             await supabaseClient.functions.invoke('send-transactional-sms', {
               body: {
                 phone: contribProfile.phone,
-                message: (await import('../_shared/paymentSmsTemplates.ts')).formatWelfarePaymentSms({
+                message: formatWelfarePaymentSms({
                   fullName: contribProfile.full_name,
                   welfareName: welfare?.name || 'Welfare',
                   amount: grossAmount,
