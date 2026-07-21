@@ -532,6 +532,31 @@ serve(async (req) => {
           relatedEntityId: pending.welfare_id,
           relatedEntityType: 'welfare',
         });
+
+        // Personalized confirmation SMS to the contributor
+        try {
+          const { data: contribProfile } = await supabaseClient
+            .from('profiles')
+            .select('full_name, phone')
+            .eq('id', member.user_id)
+            .maybeSingle();
+          if (contribProfile?.phone) {
+            await supabaseClient.functions.invoke('send-transactional-sms', {
+              body: {
+                phone: contribProfile.phone,
+                message: (await import('../_shared/paymentSmsTemplates.ts')).formatWelfarePaymentSms({
+                  fullName: contribProfile.full_name,
+                  welfareName: welfare?.name || 'Welfare',
+                  amount: grossAmount,
+                  receipt: mpesaReceiptNumber || checkoutRequestId,
+                }),
+                eventType: 'welfare_contribution_confirmation_stk',
+              },
+            });
+          }
+        } catch (smsErr) {
+          console.error('Error sending welfare STK confirmation SMS:', smsErr);
+        }
       }
 
       return new Response(JSON.stringify({ success: true, message: 'Welfare payment processed', contribution: updatedWelfarePayment }), {
