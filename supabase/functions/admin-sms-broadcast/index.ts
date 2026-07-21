@@ -295,11 +295,12 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const segment = body.segment as Segment;
+    const segment = body.segment as Segment | undefined;
     const message = sanitize(String(body.message || ""));
     const preview = !!body.preview;
     const appendTagline = body.appendTagline !== false;
     const privilegeCode = String(body.privilege_code || "");
+    const customPhonesInput: unknown = body.custom_phones;
 
     if (privilegeCode !== ADMIN_PRIVILEGE_CODE) {
       console.warn("[admin-sms-broadcast] invalid privilege code from", userData.user.id);
@@ -321,7 +322,9 @@ serve(async (req) => {
       "mchango_donors",
       "top_trust",
     ];
-    if (!VALID.includes(segment)) {
+
+    const usingCustom = Array.isArray(customPhonesInput) && customPhonesInput.length > 0;
+    if (!usingCustom && (!segment || !VALID.includes(segment))) {
       return new Response(JSON.stringify({ error: "Invalid segment" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -340,7 +343,9 @@ serve(async (req) => {
       });
     }
 
-    const phones = await fetchRecipientPhones(admin, segment);
+    const phones = usingCustom
+      ? uniqPhones((customPhonesInput as unknown[]).map((v) => String(v)))
+      : await fetchRecipientPhones(admin, segment!);
 
     if (preview) {
       return new Response(JSON.stringify({ success: true, recipient_count: phones.length }), {
