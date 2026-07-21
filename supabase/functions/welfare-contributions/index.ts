@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
 import { COMMISSION_RATES } from "../_shared/commissionRates.ts";
 import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
+import { formatWelfarePaymentSms } from "../_shared/paymentSmsTemplates.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -257,12 +258,16 @@ serve(async (req) => {
           .eq('id', userData.user.id)
           .maybeSingle();
         if (contribProfile?.phone) {
-          const firstName = (contribProfile.full_name || '').split(' ')[0] || 'Member';
           try {
             await supabaseAdmin.functions.invoke('send-transactional-sms', {
               body: {
                 phone: contribProfile.phone,
-                message: `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${wName}" has been received. Ref: ${paymentRef}.`,
+                message: formatWelfarePaymentSms({
+                  fullName: contribProfile.full_name,
+                  welfareName: wName,
+                  amount: grossAmount,
+                  receipt: paymentRef,
+                }),
                 eventType: 'welfare_contribution_confirmation',
               },
             });
