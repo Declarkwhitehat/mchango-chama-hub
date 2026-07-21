@@ -4,6 +4,14 @@ import { COMMISSION_RATES } from "../_shared/commissionRates.ts";
 import { getCommissionRate } from "../_shared/getCommissionRate.ts";
 import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
 import { getCallbackClientIP, isSafaricomCallbackIP } from "../_shared/safaricomIp.ts";
+import {
+  formatChamaPaymentSms,
+  formatChamaOnBehalfPayerSms,
+  formatChamaOnBehalfBeneficiarySms,
+  formatMchangoThankYouSms,
+  formatOrgThankYouSms,
+} from "../_shared/paymentSmsTemplates.ts";
+import { getMemberOutstanding } from "../_shared/chamaOutstanding.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
