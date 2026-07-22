@@ -340,7 +340,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({ 
           status: 'approved', 
-          message: 'Both approvers agreed. Withdrawal approved with 24-hour cooling-off period before payout.',
+          message: 'Both approvers agreed. Withdrawal approved with 12-hour cooling-off period before payout.',
           cooling_off_until: coolingOffUntil,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
