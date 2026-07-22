@@ -60,6 +60,8 @@ export const WelfareWithdrawalStatus = ({ welfareId, isAdmin }: Props) => {
   const [withdrawals, setWithdrawals] = useState<WithdrawalInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [releasing, setReleasing] = useState<string | null>(null);
+
 
   useEffect(() => {
     fetchWithdrawals();
