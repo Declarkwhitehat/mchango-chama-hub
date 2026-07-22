@@ -60,6 +60,8 @@ export const WelfareWithdrawalStatus = ({ welfareId, isAdmin }: Props) => {
   const [withdrawals, setWithdrawals] = useState<WithdrawalInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [releasing, setReleasing] = useState<string | null>(null);
+
 
   useEffect(() => {
     fetchWithdrawals();
@@ -126,6 +128,23 @@ export const WelfareWithdrawalStatus = ({ welfareId, isAdmin }: Props) => {
       setCancelling(null);
     }
   };
+  const handleAdminRelease = async (withdrawalId: string) => {
+    setReleasing(withdrawalId);
+    try {
+      const { data, error } = await supabase.functions.invoke('welfare-withdrawal-approve', {
+        body: { action: 'release_now', withdrawal_id: withdrawalId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Payout released — processing now");
+      fetchWithdrawals();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to release");
+    } finally {
+      setReleasing(null);
+    }
+  };
+
 
   const parseRecipientFromNotes = (notes: string) => {
     const nameMatch = notes.match(/Name:\s*([^)]+)\)/);
@@ -170,7 +189,7 @@ export const WelfareWithdrawalStatus = ({ welfareId, isAdmin }: Props) => {
                   variant={w.status === 'approved' ? 'default' : w.status === 'processing' ? 'secondary' : 'outline'}
                   className={isCoolingOff ? 'bg-orange-500 text-white' : ''}
                 >
-                  {isCoolingOff ? '24hr Hold' : w.status === 'pending_approval' ? 'Pending Approval' : w.status}
+                  {isCoolingOff ? '12hr Hold' : w.status === 'pending_approval' ? 'Pending Approval' : w.status}
                 </Badge>
               </div>
 
@@ -203,23 +222,34 @@ export const WelfareWithdrawalStatus = ({ welfareId, isAdmin }: Props) => {
                 <div className="p-3 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
                   <p className="text-xs text-orange-700 dark:text-orange-300 mb-1">Payout will be sent after:</p>
                   <CountdownTimer targetDate={w.cooling_off_until} />
-                  <p className="text-xs text-muted-foreground mt-1">Admin can cancel before the timer runs out</p>
+                  <p className="text-xs text-muted-foreground mt-1">Admin can release now or cancel before the timer runs out</p>
                 </div>
               )}
 
-              {/* Admin cancel button */}
+              {/* Admin action buttons */}
               {isAdmin && isCoolingOff && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleAdminCancel(w.id)}
-                  disabled={cancelling === w.id}
-                  className="w-full"
-                >
-                  {cancelling === w.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <XCircle className="h-4 w-4 mr-1" />}
-                  Cancel Withdrawal
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleAdminRelease(w.id)}
+                    disabled={releasing === w.id || cancelling === w.id}
+                  >
+                    {releasing === w.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                    Release Now
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleAdminCancel(w.id)}
+                    disabled={cancelling === w.id || releasing === w.id}
+                  >
+                    {cancelling === w.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <XCircle className="h-4 w-4 mr-1" />}
+                    Cancel
+                  </Button>
+                </div>
               )}
+
             </div>
           );
         })}

@@ -27,24 +27,25 @@ serve(async (req) => {
     if (req.method === 'POST') {
       const body = await req.json();
       
-      // Handle admin cancel during cooling-off period
-      if (body.action === 'cancel_cooling_off') {
+      // Handle admin cancel or release during cooling-off period
+      if (body.action === 'cancel_cooling_off' || body.action === 'release_now') {
         const { withdrawal_id } = body;
         if (!withdrawal_id) {
           return new Response(JSON.stringify({ error: 'withdrawal_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
-        // Check if user is admin
+        // Check if user is admin or super_admin
         const { data: adminRole } = await supabaseAdmin
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .eq('role', 'admin')
+          .in('role', ['admin', 'super_admin'])
           .maybeSingle();
 
         if (!adminRole) {
-          return new Response(JSON.stringify({ error: 'Only admin can cancel during cooling-off period' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Only admin can act during cooling-off period' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
+
 
         const { data: withdrawal } = await supabaseAdmin
           .from('withdrawals')
@@ -60,11 +61,54 @@ serve(async (req) => {
           return new Response(JSON.stringify({ error: 'Withdrawal is not in cooling-off period' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
+        if (body.action === 'release_now') {
+          // Admin releases the payout immediately by clearing the cooling-off timer.
+          // The scheduled welfare-cooling-off-payout cron will pick it up and trigger B2C.
+          // We also fire the payout function immediately so the user doesn't wait for the next cron tick.
+          await supabaseAdmin
+            .from('withdrawals')
+            .update({
+              cooling_off_until: new Date(Date.now() - 1000).toISOString(),
+              notes: undefined, // preserved by not setting
+            } as any)
+            .eq('id', withdrawal_id);
+
+          // Trigger the cooling-off payout worker immediately (fire-and-forget)
+          try {
+            await fetch(`${supabaseUrl}/functions/v1/welfare-cooling-off-payout`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({}),
+            });
+          } catch (e) {
+            console.warn('release_now: failed to invoke payout worker', e);
+          }
+
+          if (withdrawal.requested_by) {
+            await createNotification(supabaseAdmin, {
+              userId: withdrawal.requested_by,
+              title: 'Withdrawal Released',
+              message: `Admin released your KES ${Number(withdrawal.amount).toLocaleString()} withdrawal early. Payout is being processed now.`,
+              category: 'welfare',
+              relatedEntityType: 'welfare',
+              relatedEntityId: withdrawal.welfare_id,
+            });
+          }
+
+          return new Response(JSON.stringify({ status: 'released', message: 'Payout released and processing now' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // cancel_cooling_off path
         await supabaseAdmin
           .from('withdrawals')
           .update({
             status: 'rejected',
-            rejection_reason: 'Cancelled by admin during 24-hour cooling-off period',
+            rejection_reason: 'Cancelled by admin during cooling-off period',
             reviewed_at: new Date().toISOString(),
             cooling_off_until: null,
           })
@@ -104,6 +148,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
 
       const { approval_id, decision, rejection_reason } = body;
 
@@ -223,8 +268,9 @@ serve(async (req) => {
           .eq('id', approval.withdrawal_id)
           .single();
 
-        // Set 24-hour cooling-off period instead of immediate B2C
-        const coolingOffUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        // Set 12-hour cooling-off period instead of immediate B2C
+        const coolingOffUntil = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+
         const withdrawalAmount = Number(withdrawal?.amount || 0);
         
         await supabaseAdmin
@@ -233,7 +279,7 @@ serve(async (req) => {
             status: 'approved',
             reviewed_at: new Date().toISOString(),
             cooling_off_until: coolingOffUntil,
-            notes: (withdrawal?.notes || '') + '\n[SYSTEM] Multi-sig approved by Secretary and Treasurer. 24-hour cooling-off period started.',
+            notes: (withdrawal?.notes || '') + '\n[SYSTEM] Multi-sig approved by Secretary and Treasurer. 12-hour cooling-off period started.',
           })
           .eq('id', approval.withdrawal_id);
 
@@ -258,8 +304,9 @@ serve(async (req) => {
         if (withdrawal) {
           await createNotification(supabaseAdmin, {
             userId: withdrawal.requested_by,
-            title: 'Withdrawal Approved — 24hr Hold',
-            message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} has been approved. Payout will be processed after a 24-hour cooling-off period.`,
+            title: 'Withdrawal Approved — 12hr Hold',
+            message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} has been approved. Payout will be processed after a 12-hour cooling-off period.`,
+
             category: 'welfare',
             relatedEntityType: 'welfare',
             relatedEntityId: approval.welfare_id,
@@ -282,7 +329,7 @@ serve(async (req) => {
               await createNotification(supabaseAdmin, {
                 userId: member.user_id,
                 title: 'Welfare Withdrawal Approved',
-                message: `A withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} to ${recipientName} has been approved. Payout in 24 hours unless cancelled.`,
+                message: `A withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} to ${recipientName} has been approved. Payout in 12 hours unless cancelled.`,
                 category: 'welfare',
                 relatedEntityType: 'welfare',
                 relatedEntityId: approval.welfare_id,
@@ -293,7 +340,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({ 
           status: 'approved', 
-          message: 'Both approvers agreed. Withdrawal approved with 24-hour cooling-off period before payout.',
+          message: 'Both approvers agreed. Withdrawal approved with 12-hour cooling-off period before payout.',
           cooling_off_until: coolingOffUntil,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
