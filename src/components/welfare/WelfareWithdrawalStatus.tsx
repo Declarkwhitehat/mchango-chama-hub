@@ -189,7 +189,7 @@ export const WelfareWithdrawalStatus = ({ welfareId, isAdmin }: Props) => {
                   variant={w.status === 'approved' ? 'default' : w.status === 'processing' ? 'secondary' : 'outline'}
                   className={isCoolingOff ? 'bg-orange-500 text-white' : ''}
                 >
-                  {isCoolingOff ? '24hr Hold' : w.status === 'pending_approval' ? 'Pending Approval' : w.status}
+                  {isCoolingOff ? '12hr Hold' : w.status === 'pending_approval' ? 'Pending Approval' : w.status}
                 </Badge>
               </div>
 
