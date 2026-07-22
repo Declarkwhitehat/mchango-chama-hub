@@ -128,6 +128,23 @@ export const WelfareWithdrawalStatus = ({ welfareId, isAdmin }: Props) => {
       setCancelling(null);
     }
   };
+  const handleAdminRelease = async (withdrawalId: string) => {
+    setReleasing(withdrawalId);
+    try {
+      const { data, error } = await supabase.functions.invoke('welfare-withdrawal-approve', {
+        body: { action: 'release_now', withdrawal_id: withdrawalId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Payout released — processing now");
+      fetchWithdrawals();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to release");
+    } finally {
+      setReleasing(null);
+    }
+  };
+
 
   const parseRecipientFromNotes = (notes: string) => {
     const nameMatch = notes.match(/Name:\s*([^)]+)\)/);
