@@ -81,10 +81,10 @@ serve(async (req) => {
       );
     }
 
-    // Normalize account number: uppercase and remove all spaces
-    // This allows customers to enter "act5 moo1" or "ACT5MOO1" - both will work
-    const upperAccountNumber = accountNumber.toUpperCase().replace(/\s+/g, '');
-    
+    // Normalize account number aggressively: uppercase and strip ALL non-alphanumeric chars
+    // This allows customers to enter "act5-moo1", "ACT5 MOO1", "act.5.moo.1" - all will match
+    const upperAccountNumber = String(accountNumber).toUpperCase().replace(/[^A-Z0-9]/g, '');
+
     console.log(`Original account: "${accountNumber}" -> Normalized: "${upperAccountNumber}"`);
 
     // Check for duplicate payment (same M-Pesa receipt number) across all tables
