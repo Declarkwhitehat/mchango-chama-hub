@@ -304,8 +304,9 @@ serve(async (req) => {
         if (withdrawal) {
           await createNotification(supabaseAdmin, {
             userId: withdrawal.requested_by,
-            title: 'Withdrawal Approved — 24hr Hold',
-            message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} has been approved. Payout will be processed after a 24-hour cooling-off period.`,
+            title: 'Withdrawal Approved — 12hr Hold',
+            message: `Your withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} has been approved. Payout will be processed after a 12-hour cooling-off period.`,
+
             category: 'welfare',
             relatedEntityType: 'welfare',
             relatedEntityId: approval.welfare_id,
