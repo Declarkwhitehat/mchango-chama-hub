@@ -27,24 +27,25 @@ serve(async (req) => {
     if (req.method === 'POST') {
       const body = await req.json();
       
-      // Handle admin cancel during cooling-off period
-      if (body.action === 'cancel_cooling_off') {
+      // Handle admin cancel or release during cooling-off period
+      if (body.action === 'cancel_cooling_off' || body.action === 'release_now') {
         const { withdrawal_id } = body;
         if (!withdrawal_id) {
           return new Response(JSON.stringify({ error: 'withdrawal_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
-        // Check if user is admin
+        // Check if user is admin or super_admin
         const { data: adminRole } = await supabaseAdmin
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .eq('role', 'admin')
+          .in('role', ['admin', 'super_admin'])
           .maybeSingle();
 
         if (!adminRole) {
-          return new Response(JSON.stringify({ error: 'Only admin can cancel during cooling-off period' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Only admin can act during cooling-off period' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
+
 
         const { data: withdrawal } = await supabaseAdmin
           .from('withdrawals')
