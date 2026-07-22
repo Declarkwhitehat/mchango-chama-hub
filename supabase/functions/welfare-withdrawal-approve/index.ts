@@ -329,7 +329,7 @@ serve(async (req) => {
               await createNotification(supabaseAdmin, {
                 userId: member.user_id,
                 title: 'Welfare Withdrawal Approved',
-                message: `A withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} to ${recipientName} has been approved. Payout in 24 hours unless cancelled.`,
+                message: `A withdrawal of KES ${Number(withdrawal.amount).toLocaleString()} to ${recipientName} has been approved. Payout in 12 hours unless cancelled.`,
                 category: 'welfare',
                 relatedEntityType: 'welfare',
                 relatedEntityId: approval.welfare_id,
