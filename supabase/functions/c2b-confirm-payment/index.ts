@@ -81,10 +81,10 @@ serve(async (req) => {
       );
     }
 
-    // Normalize account number: uppercase and remove all spaces
-    // This allows customers to enter "act5 moo1" or "ACT5MOO1" - both will work
-    const upperAccountNumber = accountNumber.toUpperCase().replace(/\s+/g, '');
-    
+    // Normalize account number aggressively: uppercase and strip ALL non-alphanumeric chars
+    // This allows customers to enter "act5-moo1", "ACT5 MOO1", "act.5.moo.1" - all will match
+    const upperAccountNumber = String(accountNumber).toUpperCase().replace(/[^A-Z0-9]/g, '');
+
     console.log(`Original account: "${accountNumber}" -> Normalized: "${upperAccountNumber}"`);
 
     // Check for duplicate payment (same M-Pesa receipt number) across all tables
@@ -117,12 +117,24 @@ serve(async (req) => {
       );
     }
 
-    // Try to find member in chama first using full member code
-    const { data: chamaMemberData } = await supabase
+    // Try to find member in chama first using full member code (exact, then fuzzy ilike fallback)
+    let { data: chamaMemberData } = await supabase
       .from('chama_members')
       .select('id, user_id, chama_id, member_code, first_payment_completed')
       .eq('member_code', upperAccountNumber)
       .maybeSingle();
+
+    if (!chamaMemberData && upperAccountNumber.length >= 4) {
+      const { data: fuzzy } = await supabase
+        .from('chama_members')
+        .select('id, user_id, chama_id, member_code, first_payment_completed')
+        .ilike('member_code', upperAccountNumber)
+        .limit(2);
+      if (fuzzy && fuzzy.length === 1) {
+        chamaMemberData = fuzzy[0];
+        console.log('Chama member matched via fuzzy ilike:', chamaMemberData.member_code);
+      }
+    }
 
     if (chamaMemberData) {
       console.log('Found Chama member:', chamaMemberData);
@@ -839,12 +851,25 @@ serve(async (req) => {
     let welfareData: any = null;
     let matchedMember: { id: string; user_id: string } | null = null;
 
-    const { data: welfareMemberByCode } = await supabase
+    let { data: welfareMemberByCode } = await supabase
       .from('welfare_members')
       .select('id, user_id, welfare_id, member_code')
       .eq('member_code', upperAccountNumber)
       .eq('status', 'active')
       .maybeSingle();
+
+    if (!welfareMemberByCode && upperAccountNumber.length >= 4) {
+      const { data: fuzzyW } = await supabase
+        .from('welfare_members')
+        .select('id, user_id, welfare_id, member_code')
+        .ilike('member_code', upperAccountNumber)
+        .eq('status', 'active')
+        .limit(2);
+      if (fuzzyW && fuzzyW.length === 1) {
+        welfareMemberByCode = fuzzyW[0];
+        console.log('Welfare member matched via fuzzy ilike:', welfareMemberByCode.member_code);
+      }
+    }
 
     if (welfareMemberByCode) {
       console.log('Found Welfare member by member_code:', welfareMemberByCode);
@@ -1172,22 +1197,9 @@ async function logUnmatchedPayment(
     if (error && !String(error.message || '').includes('duplicate')) {
       console.error('Failed to log unmatched payment:', error);
     }
-    // Notify all admins so they can review promptly.
-    const { data: admins } = await supabase
-      .from('user_roles')
-      .select('user_id')
-      .eq('role', 'admin');
-    const ids = (admins || []).map((a: any) => a.user_id).filter(Boolean);
-    if (ids.length > 0) {
-      const rows = ids.map((uid: string) => ({
-        user_id: uid,
-        title: 'Unmatched Offline Payment ⚠️',
-        message: `KES ${amount} from ${phone || 'unknown'} (Receipt ${receipt}) needs manual allocation. Reason: ${reason}`,
-        type: 'warning',
-        category: 'admin',
-      }));
-      await supabase.from('notifications').insert(rows);
-    }
+    // NOTE: Admin notifications for unmatched offline payments are intentionally suppressed.
+    // Records are still stored in unmatched_c2b_payments for reconciliation, but admins are
+    // no longer pinged — fuzzy matching now catches typos and normalization variants automatically.
   } catch (err) {
     console.error('logUnmatchedPayment failed:', err);
   }
