@@ -1197,22 +1197,9 @@ async function logUnmatchedPayment(
     if (error && !String(error.message || '').includes('duplicate')) {
       console.error('Failed to log unmatched payment:', error);
     }
-    // Notify all admins so they can review promptly.
-    const { data: admins } = await supabase
-      .from('user_roles')
-      .select('user_id')
-      .eq('role', 'admin');
-    const ids = (admins || []).map((a: any) => a.user_id).filter(Boolean);
-    if (ids.length > 0) {
-      const rows = ids.map((uid: string) => ({
-        user_id: uid,
-        title: 'Unmatched Offline Payment ⚠️',
-        message: `KES ${amount} from ${phone || 'unknown'} (Receipt ${receipt}) needs manual allocation. Reason: ${reason}`,
-        type: 'warning',
-        category: 'admin',
-      }));
-      await supabase.from('notifications').insert(rows);
-    }
+    // NOTE: Admin notifications for unmatched offline payments are intentionally suppressed.
+    // Records are still stored in unmatched_c2b_payments for reconciliation, but admins are
+    // no longer pinged — fuzzy matching now catches typos and normalization variants automatically.
   } catch (err) {
     console.error('logUnmatchedPayment failed:', err);
   }
