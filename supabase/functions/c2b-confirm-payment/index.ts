@@ -117,12 +117,24 @@ serve(async (req) => {
       );
     }
 
-    // Try to find member in chama first using full member code
-    const { data: chamaMemberData } = await supabase
+    // Try to find member in chama first using full member code (exact, then fuzzy ilike fallback)
+    let { data: chamaMemberData } = await supabase
       .from('chama_members')
       .select('id, user_id, chama_id, member_code, first_payment_completed')
       .eq('member_code', upperAccountNumber)
       .maybeSingle();
+
+    if (!chamaMemberData && upperAccountNumber.length >= 4) {
+      const { data: fuzzy } = await supabase
+        .from('chama_members')
+        .select('id, user_id, chama_id, member_code, first_payment_completed')
+        .ilike('member_code', upperAccountNumber)
+        .limit(2);
+      if (fuzzy && fuzzy.length === 1) {
+        chamaMemberData = fuzzy[0];
+        console.log('Chama member matched via fuzzy ilike:', chamaMemberData.member_code);
+      }
+    }
 
     if (chamaMemberData) {
       console.log('Found Chama member:', chamaMemberData);
