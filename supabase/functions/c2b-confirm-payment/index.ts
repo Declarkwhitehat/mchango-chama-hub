@@ -851,12 +851,25 @@ serve(async (req) => {
     let welfareData: any = null;
     let matchedMember: { id: string; user_id: string } | null = null;
 
-    const { data: welfareMemberByCode } = await supabase
+    let { data: welfareMemberByCode } = await supabase
       .from('welfare_members')
       .select('id, user_id, welfare_id, member_code')
       .eq('member_code', upperAccountNumber)
       .eq('status', 'active')
       .maybeSingle();
+
+    if (!welfareMemberByCode && upperAccountNumber.length >= 4) {
+      const { data: fuzzyW } = await supabase
+        .from('welfare_members')
+        .select('id, user_id, welfare_id, member_code')
+        .ilike('member_code', upperAccountNumber)
+        .eq('status', 'active')
+        .limit(2);
+      if (fuzzyW && fuzzyW.length === 1) {
+        welfareMemberByCode = fuzzyW[0];
+        console.log('Welfare member matched via fuzzy ilike:', welfareMemberByCode.member_code);
+      }
+    }
 
     if (welfareMemberByCode) {
       console.log('Found Welfare member by member_code:', welfareMemberByCode);
