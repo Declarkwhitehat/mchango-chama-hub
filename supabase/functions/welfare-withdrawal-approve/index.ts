@@ -61,11 +61,54 @@ serve(async (req) => {
           return new Response(JSON.stringify({ error: 'Withdrawal is not in cooling-off period' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
+        if (body.action === 'release_now') {
+          // Admin releases the payout immediately by clearing the cooling-off timer.
+          // The scheduled welfare-cooling-off-payout cron will pick it up and trigger B2C.
+          // We also fire the payout function immediately so the user doesn't wait for the next cron tick.
+          await supabaseAdmin
+            .from('withdrawals')
+            .update({
+              cooling_off_until: new Date(Date.now() - 1000).toISOString(),
+              notes: undefined, // preserved by not setting
+            } as any)
+            .eq('id', withdrawal_id);
+
+          // Trigger the cooling-off payout worker immediately (fire-and-forget)
+          try {
+            await fetch(`${supabaseUrl}/functions/v1/welfare-cooling-off-payout`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({}),
+            });
+          } catch (e) {
+            console.warn('release_now: failed to invoke payout worker', e);
+          }
+
+          if (withdrawal.requested_by) {
+            await createNotification(supabaseAdmin, {
+              userId: withdrawal.requested_by,
+              title: 'Withdrawal Released',
+              message: `Admin released your KES ${Number(withdrawal.amount).toLocaleString()} withdrawal early. Payout is being processed now.`,
+              category: 'welfare',
+              relatedEntityType: 'welfare',
+              relatedEntityId: withdrawal.welfare_id,
+            });
+          }
+
+          return new Response(JSON.stringify({ status: 'released', message: 'Payout released and processing now' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // cancel_cooling_off path
         await supabaseAdmin
           .from('withdrawals')
           .update({
             status: 'rejected',
-            rejection_reason: 'Cancelled by admin during 24-hour cooling-off period',
+            rejection_reason: 'Cancelled by admin during cooling-off period',
             reviewed_at: new Date().toISOString(),
             cooling_off_until: null,
           })
@@ -105,6 +148,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
 
       const { approval_id, decision, rejection_reason } = body;
 
