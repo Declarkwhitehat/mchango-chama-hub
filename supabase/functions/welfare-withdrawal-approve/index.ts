@@ -279,7 +279,7 @@ serve(async (req) => {
             status: 'approved',
             reviewed_at: new Date().toISOString(),
             cooling_off_until: coolingOffUntil,
-            notes: (withdrawal?.notes || '') + '\n[SYSTEM] Multi-sig approved by Secretary and Treasurer. 24-hour cooling-off period started.',
+            notes: (withdrawal?.notes || '') + '\n[SYSTEM] Multi-sig approved by Secretary and Treasurer. 12-hour cooling-off period started.',
           })
           .eq('id', approval.withdrawal_id);
 
