@@ -268,8 +268,9 @@ serve(async (req) => {
           .eq('id', approval.withdrawal_id)
           .single();
 
-        // Set 24-hour cooling-off period instead of immediate B2C
-        const coolingOffUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        // Set 12-hour cooling-off period instead of immediate B2C
+        const coolingOffUntil = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+
         const withdrawalAmount = Number(withdrawal?.amount || 0);
         
         await supabaseAdmin
