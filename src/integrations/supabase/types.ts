@@ -4536,6 +4536,15 @@ export type Database = {
         Args: { p_email: string; p_id_number: string; p_phone: string }
         Returns: Json
       }
+      schedule_welfare_payout_trigger: {
+        Args: {
+          _apikey: string
+          _run_at: string
+          _url: string
+          _withdrawal_id: string
+        }
+        Returns: string
+      }
       sweep_mchango_to_revenue: {
         Args: { p_actor?: string; p_mchango_id: string; p_reason: string }
         Returns: Json

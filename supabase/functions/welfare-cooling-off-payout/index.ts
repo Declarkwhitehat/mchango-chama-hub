@@ -11,14 +11,27 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
-    // Find welfare withdrawals where cooling-off period has expired
-    const { data: readyWithdrawals, error } = await supabaseAdmin
+    // Optional: single-withdrawal invocation from the per-withdrawal scheduled trigger
+    let targetId: string | null = null;
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json();
+        if (body && typeof body.withdrawal_id === 'string') targetId = body.withdrawal_id;
+      } catch (_) { /* no body */ }
+    }
+
+    // Find welfare withdrawals whose cooling-off has ended (or a specific one)
+    let query = supabaseAdmin
       .from('withdrawals')
       .select('id, amount, net_amount, notes, welfare_id, requested_by')
       .eq('status', 'approved')
       .not('welfare_id', 'is', null)
       .not('cooling_off_until', 'is', null)
       .lte('cooling_off_until', new Date().toISOString());
+
+    if (targetId) query = query.eq('id', targetId);
+
+    const { data: readyWithdrawals, error } = await query;
 
     if (error) throw error;
 

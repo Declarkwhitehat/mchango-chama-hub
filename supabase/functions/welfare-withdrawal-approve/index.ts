@@ -73,7 +73,7 @@ serve(async (req) => {
             } as any)
             .eq('id', withdrawal_id);
 
-          // Trigger the cooling-off payout worker immediately (fire-and-forget)
+          // Fire the payout function immediately (no waiting for any cron)
           try {
             await fetch(`${supabaseUrl}/functions/v1/welfare-cooling-off-payout`, {
               method: 'POST',
@@ -81,7 +81,7 @@ serve(async (req) => {
                 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({}),
+              body: JSON.stringify({ withdrawal_id }),
             });
           } catch (e) {
             console.warn('release_now: failed to invoke payout worker', e);
@@ -282,6 +282,20 @@ serve(async (req) => {
             notes: (withdrawal?.notes || '') + '\n[SYSTEM] Multi-sig approved by Secretary and Treasurer. 12-hour cooling-off period started.',
           })
           .eq('id', approval.withdrawal_id);
+
+        // Schedule an event-driven one-shot trigger to fire the B2C payout
+        // exactly when the 12-hour cooling-off ends (no recurring cron).
+        try {
+          const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+          await supabaseAdmin.rpc('schedule_welfare_payout_trigger', {
+            _withdrawal_id: approval.withdrawal_id,
+            _run_at: coolingOffUntil,
+            _url: `${supabaseUrl}/functions/v1/welfare-cooling-off-payout`,
+            _apikey: anonKey,
+          });
+        } catch (e) {
+          console.warn('failed to schedule cooling-off trigger:', e);
+        }
 
         // Immediately deduct the amount from welfare available_balance
         if (withdrawalAmount > 0) {
