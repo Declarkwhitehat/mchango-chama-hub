@@ -283,6 +283,20 @@ serve(async (req) => {
           })
           .eq('id', approval.withdrawal_id);
 
+        // Schedule an event-driven one-shot trigger to fire the B2C payout
+        // exactly when the 12-hour cooling-off ends (no recurring cron).
+        try {
+          const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+          await supabaseAdmin.rpc('schedule_welfare_payout_trigger', {
+            _withdrawal_id: approval.withdrawal_id,
+            _run_at: coolingOffUntil,
+            _url: `${supabaseUrl}/functions/v1/welfare-cooling-off-payout`,
+            _apikey: anonKey,
+          });
+        } catch (e) {
+          console.warn('failed to schedule cooling-off trigger:', e);
+        }
+
         // Immediately deduct the amount from welfare available_balance
         if (withdrawalAmount > 0) {
           const { data: welfare } = await supabaseAdmin
