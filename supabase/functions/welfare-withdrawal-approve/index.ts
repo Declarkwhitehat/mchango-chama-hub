@@ -73,7 +73,7 @@ serve(async (req) => {
             } as any)
             .eq('id', withdrawal_id);
 
-          // Trigger the cooling-off payout worker immediately (fire-and-forget)
+          // Fire the payout function immediately (no waiting for any cron)
           try {
             await fetch(`${supabaseUrl}/functions/v1/welfare-cooling-off-payout`, {
               method: 'POST',
@@ -81,7 +81,7 @@ serve(async (req) => {
                 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({}),
+              body: JSON.stringify({ withdrawal_id }),
             });
           } catch (e) {
             console.warn('release_now: failed to invoke payout worker', e);
