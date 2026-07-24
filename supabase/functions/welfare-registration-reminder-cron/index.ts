@@ -20,9 +20,9 @@ serve(async (req) => {
   try {
     const { data: members, error } = await supabaseAdmin
       .from('welfare_members')
-      .select('id, welfare_id, user_id, member_code, registration_fee_due, registration_fee_paid, registration_status, registration_deadline, welfares(name, registration_fee), profiles:user_id(phone, full_name)')
-      .in('registration_status', ['pending', 'partial'])
-      .eq('status', 'active');
+      .select('id, welfare_id, user_id, member_code, status, registration_fee_due, registration_fee_paid, registration_status, registration_deadline, welfares(name, registration_fee), profiles:user_id(phone, full_name)')
+      .in('registration_status', ['pending', 'partial', 'removed_unpaid']);
+
 
     if (error) throw error;
 
