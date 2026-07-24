@@ -945,14 +945,17 @@ serve(async (req) => {
         // Allocate to registration fee first if pending/partial
         let regApplied = 0;
         let regFullyPaid = false;
-        if (memberFull && (memberFull.registration_status === 'pending' || memberFull.registration_status === 'partial')) {
+        let regReinstated = false;
+        if (memberFull && ['pending','partial','removed_unpaid'].includes(memberFull.registration_status)) {
           const { data: allocRes } = await supabase.rpc('apply_welfare_registration_payment', {
             p_member_id: matchedMember.id,
             p_gross: grossAmount,
           });
           regApplied = Number(allocRes?.applied || 0);
           regFullyPaid = !!allocRes?.fully_paid;
+          regReinstated = !!allocRes?.reinstated;
         }
+
 
         // Whether the raw M-Pesa receipt has been attached to a row yet.
         // The unique-receipt constraint + enforce_receipt_on_completion trigger require:
