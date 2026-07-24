@@ -1021,17 +1021,29 @@ serve(async (req) => {
 
         if (regFullyPaid) {
           try {
+            const msg = regReinstated
+              ? `Welcome back to "${welfareData.name}". Your registration fee is fully paid and your membership has been reinstated.`
+              : `Your registration to "${welfareData.name}" is complete. You are now an active member.`;
             await supabase.from('notifications').insert({
               user_id: matchedMember.user_id,
-              title: 'Registration Confirmed',
-              message: `Your registration to "${welfareData.name}" is complete. You are now an active member.`,
+              title: regReinstated ? 'Membership Reinstated' : 'Registration Confirmed',
+              message: msg,
               type: 'success',
               category: 'welfare',
               related_entity_type: 'welfare',
               related_entity_id: welfareData.id,
             });
+            if (regReinstated) {
+              await safeSendSms(
+                supabase,
+                phoneNumber,
+                `PAMOJANOVA: Welcome back to ${welfareData.name}. Registration fee fully settled. You are now an active member.`,
+                'welfare-reinstated'
+              );
+            }
           } catch (_) { /* ignore */ }
         }
+
 
         console.log('Welfare contribution recorded for matched member', { regApplied, remainder: remainderAmount });
       } else {
