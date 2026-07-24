@@ -9,10 +9,12 @@ type: feature
 - Join with fee > 0 → `registration_status='pending'`, `registration_fee_due=fee`, `registration_deadline=now+5d`. Any prior `welfare_registration_credits` row for this user is consumed.
 - Partial payment → `registration_status='partial'`. Full payment → `'confirmed'`.
 - Past deadline unpaid → daily cron moves any `registration_fee_paid` into `welfare_registration_credits` and sets `status='removed'`, `registration_status='removed_unpaid'`.
+- **Auto-reinstatement**: A `removed_unpaid` member who later pays via Paybill using their `member_code` is folded back in by `apply_welfare_registration_payment`. Open credits + new payment are summed; once the total reaches `registration_fee_due` the member is automatically restored to `status='active'`, `registration_status='confirmed'`, credits consumed, and a Membership Reinstated SMS + push is sent. Surplus flows into contribution allocation as normal.
 
-**Payment allocation**: Inbound C2B / STK payments call RPC `apply_welfare_registration_payment`. Outstanding registration fee is allocated FIRST: 5% → `company_earnings`, 95% → `welfares.available_balance` (ledger row with `category='registration_fee'`). Remainder flows to normal contribution.
+**Payment allocation**: Inbound C2B / STK payments call RPC `apply_welfare_registration_payment` (accepts `pending`/`partial`/`removed_unpaid`). Outstanding registration fee is allocated FIRST: 5% → `company_earnings`, 95% → `welfares.available_balance` (ledger row with `category='registration_fee'`). Remainder flows to normal contribution.
 
 **Withdrawal gate**: A member with `registration_status != 'confirmed'` cannot be selected as withdrawal/payout recipient. UI in `WelfareWithdrawalRequest.tsx` enforces; edge function also rejects.
+
 
 **Notifications**:
 - Join SMS + push: Paybill 4015351 + member_code + amount + 5-day deadline.
