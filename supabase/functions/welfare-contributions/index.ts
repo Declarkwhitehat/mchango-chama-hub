@@ -111,7 +111,7 @@ serve(async (req) => {
       // ===== Registration-fee allocation FIRST =====
       let regApplied = 0;
       let regFullyPaid = false;
-      if (member.registration_status === 'pending' || member.registration_status === 'partial') {
+      if (['pending','partial','removed_unpaid'].includes(member.registration_status)) {
         const { data: allocRes } = await supabaseAdmin.rpc('apply_welfare_registration_payment', {
           p_member_id: member.id,
           p_gross: grossAmount,
