@@ -853,23 +853,24 @@ serve(async (req) => {
 
     let { data: welfareMemberByCode } = await supabase
       .from('welfare_members')
-      .select('id, user_id, welfare_id, member_code')
+      .select('id, user_id, welfare_id, member_code, status, registration_status')
       .eq('member_code', upperAccountNumber)
-      .eq('status', 'active')
+      .or('status.eq.active,registration_status.eq.removed_unpaid')
       .maybeSingle();
 
     if (!welfareMemberByCode && upperAccountNumber.length >= 4) {
       const { data: fuzzyW } = await supabase
         .from('welfare_members')
-        .select('id, user_id, welfare_id, member_code')
+        .select('id, user_id, welfare_id, member_code, status, registration_status')
         .ilike('member_code', upperAccountNumber)
-        .eq('status', 'active')
+        .or('status.eq.active,registration_status.eq.removed_unpaid')
         .limit(2);
       if (fuzzyW && fuzzyW.length === 1) {
         welfareMemberByCode = fuzzyW[0];
         console.log('Welfare member matched via fuzzy ilike:', welfareMemberByCode.member_code);
       }
     }
+
 
     if (welfareMemberByCode) {
       console.log('Found Welfare member by member_code:', welfareMemberByCode);
@@ -944,14 +945,17 @@ serve(async (req) => {
         // Allocate to registration fee first if pending/partial
         let regApplied = 0;
         let regFullyPaid = false;
-        if (memberFull && (memberFull.registration_status === 'pending' || memberFull.registration_status === 'partial')) {
+        let regReinstated = false;
+        if (memberFull && ['pending','partial','removed_unpaid'].includes(memberFull.registration_status)) {
           const { data: allocRes } = await supabase.rpc('apply_welfare_registration_payment', {
             p_member_id: matchedMember.id,
             p_gross: grossAmount,
           });
           regApplied = Number(allocRes?.applied || 0);
           regFullyPaid = !!allocRes?.fully_paid;
+          regReinstated = !!allocRes?.reinstated;
         }
+
 
         // Whether the raw M-Pesa receipt has been attached to a row yet.
         // The unique-receipt constraint + enforce_receipt_on_completion trigger require:
@@ -1017,17 +1021,29 @@ serve(async (req) => {
 
         if (regFullyPaid) {
           try {
+            const msg = regReinstated
+              ? `Welcome back to "${welfareData.name}". Your registration fee is fully paid and your membership has been reinstated.`
+              : `Your registration to "${welfareData.name}" is complete. You are now an active member.`;
             await supabase.from('notifications').insert({
               user_id: matchedMember.user_id,
-              title: 'Registration Confirmed',
-              message: `Your registration to "${welfareData.name}" is complete. You are now an active member.`,
+              title: regReinstated ? 'Membership Reinstated' : 'Registration Confirmed',
+              message: msg,
               type: 'success',
               category: 'welfare',
               related_entity_type: 'welfare',
               related_entity_id: welfareData.id,
             });
+            if (regReinstated) {
+              await safeSendSms(
+                supabase,
+                phoneNumber,
+                `PAMOJANOVA: Welcome back to ${welfareData.name}. Registration fee fully settled. You are now an active member.`,
+                'welfare-reinstated'
+              );
+            }
           } catch (_) { /* ignore */ }
         }
+
 
         console.log('Welfare contribution recorded for matched member', { regApplied, remainder: remainderAmount });
       } else {
