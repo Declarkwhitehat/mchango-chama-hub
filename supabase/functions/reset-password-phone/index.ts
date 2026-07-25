@@ -24,7 +24,13 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const { phone, newPassword, otp }: ResetPasswordRequest = await req.json();
+    const body: ResetPasswordRequest = await req.json();
+    const phone = (body.phone || '').trim();
+    // IMPORTANT: do NOT trim the password itself — a user may intentionally use
+    // leading/trailing spaces. But strip zero-width / invisible chars that some
+    // keyboards inject via autofill, which would otherwise silently mismatch on login.
+    const newPassword = (body.newPassword || '').replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '');
+    const otp = (body.otp || '').trim();
 
     if (!phone || !newPassword || !otp) {
       return new Response(
