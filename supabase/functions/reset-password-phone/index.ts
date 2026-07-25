@@ -24,7 +24,13 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const { phone, newPassword, otp }: ResetPasswordRequest = await req.json();
+    const body: ResetPasswordRequest = await req.json();
+    const phone = (body.phone || '').trim();
+    // IMPORTANT: do NOT trim the password itself — a user may intentionally use
+    // leading/trailing spaces. But strip zero-width / invisible chars that some
+    // keyboards inject via autofill, which would otherwise silently mismatch on login.
+    const newPassword = (body.newPassword || '').replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '');
+    const otp = (body.otp || '').trim();
 
     if (!phone || !newPassword || !otp) {
       return new Response(
@@ -99,10 +105,38 @@ serve(async (req) => {
 
     if (updateError) {
       console.error('Password update error:', updateError);
+      const msg = (updateError as any)?.message || '';
+      // Surface real error to the user (weak password, HIBP hit, etc.)
       return new Response(
-        JSON.stringify({ error: 'Failed to update password. Please try again.' }),
+        JSON.stringify({ error: msg || 'Failed to update password. Please try again.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // VERIFY the new password actually works by signing in with it.
+    // Uses a fresh anon-like client so we don't pollute the admin client's auth state.
+    const verifyClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data: verifySignIn, error: verifyError } = await verifyClient.auth.signInWithPassword({
+      email: profile.email,
+      password: newPassword,
+    });
+
+    if (verifyError || !verifySignIn?.session) {
+      console.error('Post-reset sign-in verification failed:', verifyError);
+      return new Response(
+        JSON.stringify({
+          error: 'Password was updated but sign-in verification failed. Please try logging in, or reset again.',
+          details: verifyError?.message,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
+    }
+
+    // Revoke all other refresh tokens so old sessions on other devices are killed.
+    try {
+      await supabase.auth.admin.signOut(profile.id, 'others');
+    } catch (e) {
+      console.warn('signOut(others) failed (non-fatal):', e);
     }
 
     // Invalidate the OTP record
@@ -111,12 +145,14 @@ serve(async (req) => {
       .update({ verified: false })
       .eq('phone', phone);
 
-    console.log(`Password reset successful for user ${profile.id}`);
+    console.log(`Password reset + verified for user ${profile.id}`);
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
-        message: 'Password reset successfully'
+        message: 'Password reset successfully',
+        session: verifySignIn.session,
+        user: verifySignIn.user,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
