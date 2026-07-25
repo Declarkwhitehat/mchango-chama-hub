@@ -187,9 +187,9 @@ const ForgotPassword = () => {
 
   const handlePasswordReset = async (data: NewPasswordFormData) => {
     setIsLoading(true);
-    
+
     try {
-      const { error } = await supabase.functions.invoke('reset-password-phone', {
+      const { data: resp, error } = await supabase.functions.invoke('reset-password-phone', {
         body: {
           phone: normalizedPhone,
           newPassword: data.password,
@@ -197,9 +197,19 @@ const ForgotPassword = () => {
         }
       });
 
-      if (error) {
-        toast.error("Failed to reset password. Please try again.");
+      if (error || !resp?.success) {
+        const msg = resp?.error || (error as any)?.message || "Failed to reset password. Please try again.";
+        toast.error(msg);
         return;
+      }
+
+      // Server verified the new password by signing in — hydrate the session so
+      // the user is immediately logged in with the just-set password.
+      if (resp.session?.access_token && resp.session?.refresh_token) {
+        await supabase.auth.setSession({
+          access_token: resp.session.access_token,
+          refresh_token: resp.session.refresh_token,
+        });
       }
 
       toast.success("Password reset successfully!");
