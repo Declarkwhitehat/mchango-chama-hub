@@ -97,17 +97,43 @@ export const UsersManagement = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    const t = setTimeout(() => {
+      fetchUsers(searchTerm.trim());
+    }, searchTerm.trim() ? 250 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (term: string = "") => {
     try {
-      const { data: usersData, error: usersError } = await supabase
+      setLoading(true);
+      let query = supabase
         .from('profiles')
-        .select('id, full_name, email, phone, kyc_status, created_at, deleted_at, is_verified')
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .select('id, full_name, email, phone, kyc_status, created_at, deleted_at, is_verified');
 
+      if (term) {
+        // Normalise phone: allow searching "0707..." even though DB stores "+254707..."
+        const digits = term.replace(/\D/g, '');
+        const phoneVariants = new Set<string>();
+        if (digits) {
+          phoneVariants.add(digits);
+          if (digits.startsWith('0')) phoneVariants.add('254' + digits.slice(1));
+          if (digits.startsWith('254')) phoneVariants.add('0' + digits.slice(3));
+          if (digits.length >= 9) phoneVariants.add(digits.slice(-9));
+        }
+        const orParts = [
+          `full_name.ilike.%${term}%`,
+          `email.ilike.%${term}%`,
+          `phone.ilike.%${term}%`,
+          ...Array.from(phoneVariants).map((v) => `phone.ilike.%${v}%`),
+        ];
+        query = query.or(orParts.join(','));
+        query = query.limit(200);
+      } else {
+        query = query.order('created_at', { ascending: false }).limit(100);
+      }
+
+      const { data: usersData, error: usersError } = await query;
       if (usersError) throw usersError;
 
       const { data: rolesData, error: rolesError } = await supabase
@@ -137,6 +163,7 @@ export const UsersManagement = () => {
       setLoading(false);
     }
   };
+
 
   const handleMakeAdminClick = (userId: string) => {
     setPendingAdminUserId(userId);
