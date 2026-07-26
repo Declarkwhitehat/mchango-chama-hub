@@ -107,6 +107,11 @@ const AdminKYC = () => {
   };
 
 
+  useEffect(() => {
+    applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions, filters]);
+
   const applyFilters = () => {
     let filtered = [...submissions];
 
@@ -129,6 +134,7 @@ const AdminKYC = () => {
 
     setFilteredSubmissions(filtered);
   };
+
 
   const handleBulkAction = async (actionId: string, ids: string[]) => {
     if (actionId === 'approve') {
