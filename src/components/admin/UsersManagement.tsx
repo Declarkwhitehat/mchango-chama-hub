@@ -368,13 +368,15 @@ export const UsersManagement = () => {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phone.includes(searchTerm);
+    const q = searchTerm.toLowerCase();
+    const matchesSearch =
+      !q ||
+      (user.full_name || '').toLowerCase().includes(q) ||
+      (user.email || '').toLowerCase().includes(q) ||
+      (user.phone || '').toLowerCase().includes(q);
 
     const isDeleted = !!user.deleted_at;
-    
+
     let matchesStatus = true;
     if (statusFilter === "all") {
       matchesStatus = true;
@@ -386,6 +388,7 @@ export const UsersManagement = () => {
 
     return matchesSearch && matchesStatus;
   });
+
 
   const getKycBadge = (status: string) => {
     switch (status) {
