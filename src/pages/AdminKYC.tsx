@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckCircle, XCircle, Clock, Eye } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Eye, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,26 +42,52 @@ const AdminKYC = () => {
   const [idFrontUrl, setIdFrontUrl] = useState<string | null>(null);
   const [idBackUrl, setIdBackUrl] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterConfig>({});
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { selectedIds, toggleSelection, selectAll, clearSelection, isSelected } = useBulkSelection(filteredSubmissions);
 
   useEffect(() => {
-    fetchSubmissions();
-  }, []);
+    const t = setTimeout(() => fetchSubmissions(searchTerm.trim()), searchTerm.trim() ? 250 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [submissions, filters]);
-
-  const fetchSubmissions = async () => {
+  const fetchSubmissions = async (term: string = "") => {
     try {
-      // Fetch all profiles with KYC submissions
-      const { data, error } = await supabase
+      setLoading(true);
+      let query = supabase
         .from('profiles')
-        .select('id, full_name, id_number, phone, email, kyc_status, id_front_url, id_back_url, kyc_submitted_at, kyc_rejection_reason')
-        .not('kyc_submitted_at', 'is', null)
-        .order('kyc_submitted_at', { ascending: false })
-        .limit(100);
+        .select('id, full_name, id_number, phone, email, kyc_status, id_front_url, id_back_url, kyc_submitted_at, kyc_rejection_reason');
+
+      if (term) {
+        // Search across all users with any KYC submission (pending, approved, rejected)
+        const digits = term.replace(/\D/g, '');
+        const phoneVariants = new Set<string>();
+        if (digits) {
+          phoneVariants.add(digits);
+          if (digits.startsWith('0')) phoneVariants.add('254' + digits.slice(1));
+          if (digits.startsWith('254')) phoneVariants.add('0' + digits.slice(3));
+          if (digits.length >= 9) phoneVariants.add(digits.slice(-9));
+        }
+        const orParts = [
+          `full_name.ilike.%${term}%`,
+          `email.ilike.%${term}%`,
+          `phone.ilike.%${term}%`,
+          `id_number.ilike.%${term}%`,
+          ...Array.from(phoneVariants).map((v) => `phone.ilike.%${v}%`),
+        ];
+        query = query
+          .not('kyc_submitted_at', 'is', null)
+          .or(orParts.join(','))
+          .limit(200);
+      } else {
+        query = query
+          .not('kyc_submitted_at', 'is', null)
+          .order('kyc_submitted_at', { ascending: false })
+          .limit(100);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Fetch error:', error);
@@ -67,7 +95,7 @@ const AdminKYC = () => {
       }
 
       console.log('KYC Submissions fetched:', data?.length || 0);
-      setSubmissions(data || []);
+      setSubmissions((data || []) as KYCSubmission[]);
     } catch (error: any) {
       console.error('Error fetching submissions:', error);
       toast({
@@ -79,6 +107,12 @@ const AdminKYC = () => {
       setLoading(false);
     }
   };
+
+
+  useEffect(() => {
+    applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions, filters]);
 
   const applyFilters = () => {
     let filtered = [...submissions];
@@ -102,6 +136,7 @@ const AdminKYC = () => {
 
     setFilteredSubmissions(filtered);
   };
+
 
   const handleBulkAction = async (actionId: string, ids: string[]) => {
     if (actionId === 'approve') {
@@ -388,10 +423,21 @@ const AdminKYC = () => {
           </Card>
         ) : (
           <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search all KYC (approved, pending, rejected) by name, email, phone, ID number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
             {submissions.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">No KYC submissions yet</p>
+                  <p className="text-muted-foreground">
+                    {searchTerm ? `No KYC records match "${searchTerm}"` : "No KYC submissions yet"}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -403,7 +449,7 @@ const AdminKYC = () => {
                         <h3 className="font-semibold">{submission.full_name}</h3>
                         <p className="text-sm text-muted-foreground">{submission.email}</p>
                         <p className="text-xs text-muted-foreground">
-                          Submitted: {formatDate(submission.kyc_submitted_at!)}
+                          {submission.phone} • Submitted: {formatDate(submission.kyc_submitted_at!)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -413,7 +459,7 @@ const AdminKYC = () => {
                           onClick={() => setSelectedSubmission(submission)}
                         >
                           <Eye className="h-4 w-4 mr-2" />
-                          Review
+                          {submission.kyc_status === 'approved' ? 'View' : 'Review'}
                         </Button>
                       </div>
                     </div>
@@ -423,6 +469,7 @@ const AdminKYC = () => {
             )}
           </div>
         )}
+
       </div>
     </AdminLayout>
   );
