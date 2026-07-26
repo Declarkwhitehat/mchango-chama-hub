@@ -40,26 +40,52 @@ const AdminKYC = () => {
   const [idFrontUrl, setIdFrontUrl] = useState<string | null>(null);
   const [idBackUrl, setIdBackUrl] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterConfig>({});
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { selectedIds, toggleSelection, selectAll, clearSelection, isSelected } = useBulkSelection(filteredSubmissions);
 
   useEffect(() => {
-    fetchSubmissions();
-  }, []);
+    const t = setTimeout(() => fetchSubmissions(searchTerm.trim()), searchTerm.trim() ? 250 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [submissions, filters]);
-
-  const fetchSubmissions = async () => {
+  const fetchSubmissions = async (term: string = "") => {
     try {
-      // Fetch all profiles with KYC submissions
-      const { data, error } = await supabase
+      setLoading(true);
+      let query = supabase
         .from('profiles')
-        .select('id, full_name, id_number, phone, email, kyc_status, id_front_url, id_back_url, kyc_submitted_at, kyc_rejection_reason')
-        .not('kyc_submitted_at', 'is', null)
-        .order('kyc_submitted_at', { ascending: false })
-        .limit(100);
+        .select('id, full_name, id_number, phone, email, kyc_status, id_front_url, id_back_url, kyc_submitted_at, kyc_rejection_reason');
+
+      if (term) {
+        // Search across all users with any KYC submission (pending, approved, rejected)
+        const digits = term.replace(/\D/g, '');
+        const phoneVariants = new Set<string>();
+        if (digits) {
+          phoneVariants.add(digits);
+          if (digits.startsWith('0')) phoneVariants.add('254' + digits.slice(1));
+          if (digits.startsWith('254')) phoneVariants.add('0' + digits.slice(3));
+          if (digits.length >= 9) phoneVariants.add(digits.slice(-9));
+        }
+        const orParts = [
+          `full_name.ilike.%${term}%`,
+          `email.ilike.%${term}%`,
+          `phone.ilike.%${term}%`,
+          `id_number.ilike.%${term}%`,
+          ...Array.from(phoneVariants).map((v) => `phone.ilike.%${v}%`),
+        ];
+        query = query
+          .not('kyc_submitted_at', 'is', null)
+          .or(orParts.join(','))
+          .limit(200);
+      } else {
+        query = query
+          .not('kyc_submitted_at', 'is', null)
+          .order('kyc_submitted_at', { ascending: false })
+          .limit(100);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Fetch error:', error);
@@ -67,7 +93,7 @@ const AdminKYC = () => {
       }
 
       console.log('KYC Submissions fetched:', data?.length || 0);
-      setSubmissions(data || []);
+      setSubmissions((data || []) as KYCSubmission[]);
     } catch (error: any) {
       console.error('Error fetching submissions:', error);
       toast({
@@ -79,6 +105,7 @@ const AdminKYC = () => {
       setLoading(false);
     }
   };
+
 
   const applyFilters = () => {
     let filtered = [...submissions];
