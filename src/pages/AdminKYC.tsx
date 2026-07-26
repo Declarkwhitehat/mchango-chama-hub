@@ -423,10 +423,21 @@ const AdminKYC = () => {
           </Card>
         ) : (
           <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search all KYC (approved, pending, rejected) by name, email, phone, ID number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
             {submissions.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">No KYC submissions yet</p>
+                  <p className="text-muted-foreground">
+                    {searchTerm ? `No KYC records match "${searchTerm}"` : "No KYC submissions yet"}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -438,7 +449,7 @@ const AdminKYC = () => {
                         <h3 className="font-semibold">{submission.full_name}</h3>
                         <p className="text-sm text-muted-foreground">{submission.email}</p>
                         <p className="text-xs text-muted-foreground">
-                          Submitted: {formatDate(submission.kyc_submitted_at!)}
+                          {submission.phone} • Submitted: {formatDate(submission.kyc_submitted_at!)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -448,7 +459,7 @@ const AdminKYC = () => {
                           onClick={() => setSelectedSubmission(submission)}
                         >
                           <Eye className="h-4 w-4 mr-2" />
-                          Review
+                          {submission.kyc_status === 'approved' ? 'View' : 'Review'}
                         </Button>
                       </div>
                     </div>
@@ -458,6 +469,7 @@ const AdminKYC = () => {
             )}
           </div>
         )}
+
       </div>
     </AdminLayout>
   );
