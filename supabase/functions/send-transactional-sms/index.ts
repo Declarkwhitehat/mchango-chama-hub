@@ -60,6 +60,8 @@ const sanitizeSmsMessage = (raw: string): string => {
     .replace(/[\u00A0\u2007\u202F]/g, ' ');
   // Collapse stray whitespace
   text = text.replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
+  // Never start a message with the brand name — sender ID already identifies us
+  text = text.replace(/^\s*(pamoja\s*nova|pamojanova)\s*[:\-–]\s*/i, '').trim();
   return text;
 };
 
