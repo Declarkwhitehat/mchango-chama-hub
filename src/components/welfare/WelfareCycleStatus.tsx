@@ -63,14 +63,20 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
   const hoursLeft = differenceInHours(endDate, now);
   const isExpired = now > endDate;
 
-  // --- Cumulative credit computation per member ---
-  // required = sum of cycle.amount for every cycle that started at/after the member joined
-  // paid     = sum of gross_amount of that member's completed contributions
-  // credit   = paid - required (positive = surplus carried forward)
+  // --- Per-cycle computation ---
+  // Every member is required to pay the FULL cycle amount (e.g. KES 300).
+  // Anything paid above that amount within this cycle counts as extra shares.
+  const cycleAmount = Number(activeCycle.amount || 0);
+  const cycleStart = parseISO(activeCycle.start_date);
+
+  const cycleContributions = allContributions.filter((c: any) => {
+    if (!c.created_at) return true;
+    return parseISO(c.created_at) >= cycleStart;
+  });
 
   const contributionsByMember = new Map<string, number>();
   const contributionsByUser = new Map<string, number>();
-  allContributions.forEach((c: any) => {
+  cycleContributions.forEach((c: any) => {
     const amt = Number(c.gross_amount || c.net_amount || 0);
     if (c.member_id) {
       contributionsByMember.set(c.member_id, (contributionsByMember.get(c.member_id) || 0) + amt);
@@ -80,31 +86,12 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
     }
   });
 
-  const computeRequired = (memberJoinedAt: string | null) => {
-    if (!memberJoinedAt) {
-      return allCycles.reduce((s, c) => s + Number(c.amount || 0), 0);
-    }
-    const joined = parseISO(memberJoinedAt);
-    return allCycles
-      .filter((c: any) => {
-        const cycleStart = parseISO(c.start_date);
-        // Bill member for a cycle if they joined on/before that cycle started
-        return joined <= cycleStart || c.status === 'active';
-      })
-      .reduce((s, c) => {
-        // If they joined AFTER an active cycle started, still bill the active cycle
-        // (they can pay for the current one). But skip past cycles that started before they joined.
-        const cycleStart = parseISO(c.start_date);
-        if (joined > cycleStart && c.status !== 'active') return s;
-        return s + Number(c.amount || 0);
-      }, 0);
-  };
-
   type Row = {
     member: any;
     paid: number;
     required: number;
-    credit: number; // paid - required
+    extra: number;     // paid above the required cycle amount = extra shares
+    remaining: number; // still owed on this cycle
   };
 
   const rows: Row[] = members.map((m: any) => {
@@ -112,20 +99,25 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
     const paidByUser = m.user_id ? (contributionsByUser.get(m.user_id) || 0) : 0;
     // Prefer member-id linkage; fall back to user-id when member_id wasn't set on the row
     const paid = Math.max(paidByMember, paidByUser);
-    const required = computeRequired(m.joined_at || m.created_at || null);
-    return { member: m, paid, required, credit: paid - required };
+    return {
+      member: m,
+      paid,
+      required: cycleAmount,
+      extra: Math.max(paid - cycleAmount, 0),
+      remaining: Math.max(cycleAmount - paid, 0),
+    };
   });
 
-  const cycleAmount = Number(activeCycle.amount || 0);
-
-  const paidRows = rows.filter(r => r.credit >= 0);
-  const underpaidRows = rows.filter(r => r.credit < 0 && r.credit > -cycleAmount);
-  const unpaidRows = rows.filter(r => r.credit <= -cycleAmount);
+  const paidRows = rows.filter(r => r.remaining === 0);
+  const underpaidRows = rows.filter(r => r.remaining > 0 && r.paid > 0);
+  const unpaidRows = rows.filter(r => r.paid === 0);
 
   const currentUserRow = rows.find(r => r.member.user_id === user?.id);
-  const currentUserPaid = currentUserRow ? currentUserRow.credit >= 0 : false;
-  const currentUserCredit = currentUserRow?.credit ?? 0;
-  const currentUserOwes = !currentUserPaid;
+  const currentUserPaid = currentUserRow ? currentUserRow.remaining === 0 : false;
+  const currentUserRemaining = currentUserRow?.remaining ?? 0;
+  const currentUserExtra = currentUserRow?.extra ?? 0;
+  const currentUserOwes = !!currentUserRow && !currentUserPaid;
+
 
   return (
     <div className="space-y-3">
