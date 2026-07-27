@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
                 ? `Final reminder: pay before ${dueTime} today.`
                 : `Deadline: ${dueTime} today.`)
             : `Pay by ${deadlineDateStr} at ${dueTime}.`;
-          const message = `Hi ${firstName}, KES ${payment.amount_due} due for ${chama.name}. ${slotLabel} Pay via Paybill 4015351, Account: ${member.member_code}. Or pay in-app.`;
+          const message = `Hi ${firstName}, your KES ${Number(payment.amount_due).toLocaleString()} contribution to "${chama.name}" is due. ${slotLabel} Pay via M-Pesa Paybill 4015351, Account ${member.member_code}, or in the app. Thank you.`;
 
           try {
             const { error: smsError } = await supabase.functions.invoke('send-transactional-sms', {
