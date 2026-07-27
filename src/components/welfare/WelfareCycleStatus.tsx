@@ -199,17 +199,21 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
             )}
           </div>
 
-          {/* Paid members with carried-forward credit */}
-          {paidRows.some(r => r.credit > 0) && (
+          <p className="text-xs text-muted-foreground">
+            Every member pays KES {cycleAmount.toLocaleString()} this cycle. Anyone who pays more holds extra shares.
+          </p>
+
+          {/* Members who paid extra shares */}
+          {paidRows.some(r => r.extra > 0) && (
             <Collapsible>
               <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
                 <span className="text-sm font-medium text-green-600">
-                  Members with credit ({paidRows.filter(r => r.credit > 0).length})
+                  Members with extra shares ({paidRows.filter(r => r.extra > 0).length})
                 </span>
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-1 mt-2">
-                {paidRows.filter(r => r.credit > 0).map(({ member: m, credit }) => (
+                {paidRows.filter(r => r.extra > 0).map(({ member: m, extra }) => (
                   <div key={m.id} className="flex items-center justify-between p-2 rounded bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-3 w-3 text-green-600" />
@@ -217,7 +221,7 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                       <span className="text-xs text-muted-foreground font-mono">{m.member_code}</span>
                     </div>
                     <Badge variant="outline" className="text-green-700 border-green-500 text-xs">
-                      Credit: KES {credit.toLocaleString()}
+                      +KES {extra.toLocaleString()} extra shares
                     </Badge>
                   </div>
                 ))}
@@ -232,7 +236,7 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-1 mt-2">
-                {unpaidRows.map(({ member: m, credit }) => (
+                {unpaidRows.map(({ member: m }) => (
                   <div key={m.id} className="flex items-center justify-between p-2 rounded bg-destructive/5 border border-destructive/20">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-3 w-3 text-destructive" />
@@ -240,7 +244,7 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                       <span className="text-xs text-muted-foreground font-mono">{m.member_code}</span>
                     </div>
                     <Badge variant="outline" className="text-destructive border-destructive text-xs">
-                      KES {Math.abs(credit).toLocaleString()} owed
+                      KES {cycleAmount.toLocaleString()} to pay
                     </Badge>
                   </div>
                 ))}
@@ -255,15 +259,18 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-1 mt-2">
-                {underpaidRows.map(({ member: m, credit }) => (
+                {underpaidRows.map(({ member: m, paid }) => (
                   <div key={m.id} className="flex items-center justify-between p-2 rounded bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-3 w-3 text-orange-500" />
                       <span className="text-sm">{m.profiles?.full_name || 'Unknown'}</span>
                     </div>
                     <Badge variant="outline" className="text-orange-600 border-orange-400 text-xs">
-                      KES {Math.abs(credit).toLocaleString()} remaining
+                      KES {paid.toLocaleString()} / {cycleAmount.toLocaleString()}
                     </Badge>
+                  </div>
+                ))}
+
                   </div>
                 ))}
               </CollapsibleContent>
