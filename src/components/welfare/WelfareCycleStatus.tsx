@@ -143,18 +143,18 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Overdue Payment</AlertTitle>
           <AlertDescription>
-            The deadline has passed! You owe KES {Math.abs(currentUserCredit).toLocaleString()}. Please pay immediately.
+            The deadline has passed! You still need to pay KES {currentUserRemaining.toLocaleString()} of the KES {cycleAmount.toLocaleString()} required. Please pay immediately.
           </AlertDescription>
         </Alert>
       )}
 
-      {currentUserPaid && currentUserCredit > 0 && (
+      {currentUserPaid && currentUserExtra > 0 && (
         <Alert>
           <CheckCircle className="h-4 w-4" />
           <AlertTitle>You're covered</AlertTitle>
           <AlertDescription>
-            You have a credit of KES {currentUserCredit.toLocaleString()} from previous overpayment
-            {currentUserCredit >= cycleAmount ? " — this cycle is fully covered." : "."}
+            You paid KES {(currentUserRow?.paid ?? 0).toLocaleString()} against the KES {cycleAmount.toLocaleString()} required — KES {currentUserExtra.toLocaleString()} extra counts as additional shares.
+
           </AlertDescription>
         </Alert>
       )}
