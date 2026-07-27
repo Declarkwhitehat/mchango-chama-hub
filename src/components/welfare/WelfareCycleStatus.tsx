@@ -63,14 +63,20 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
   const hoursLeft = differenceInHours(endDate, now);
   const isExpired = now > endDate;
 
-  // --- Cumulative credit computation per member ---
-  // required = sum of cycle.amount for every cycle that started at/after the member joined
-  // paid     = sum of gross_amount of that member's completed contributions
-  // credit   = paid - required (positive = surplus carried forward)
+  // --- Per-cycle computation ---
+  // Every member is required to pay the FULL cycle amount (e.g. KES 300).
+  // Anything paid above that amount within this cycle counts as extra shares.
+  const cycleAmount = Number(activeCycle.amount || 0);
+  const cycleStart = parseISO(activeCycle.start_date);
+
+  const cycleContributions = allContributions.filter((c: any) => {
+    if (!c.created_at) return true;
+    return parseISO(c.created_at) >= cycleStart;
+  });
 
   const contributionsByMember = new Map<string, number>();
   const contributionsByUser = new Map<string, number>();
-  allContributions.forEach((c: any) => {
+  cycleContributions.forEach((c: any) => {
     const amt = Number(c.gross_amount || c.net_amount || 0);
     if (c.member_id) {
       contributionsByMember.set(c.member_id, (contributionsByMember.get(c.member_id) || 0) + amt);
@@ -80,31 +86,12 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
     }
   });
 
-  const computeRequired = (memberJoinedAt: string | null) => {
-    if (!memberJoinedAt) {
-      return allCycles.reduce((s, c) => s + Number(c.amount || 0), 0);
-    }
-    const joined = parseISO(memberJoinedAt);
-    return allCycles
-      .filter((c: any) => {
-        const cycleStart = parseISO(c.start_date);
-        // Bill member for a cycle if they joined on/before that cycle started
-        return joined <= cycleStart || c.status === 'active';
-      })
-      .reduce((s, c) => {
-        // If they joined AFTER an active cycle started, still bill the active cycle
-        // (they can pay for the current one). But skip past cycles that started before they joined.
-        const cycleStart = parseISO(c.start_date);
-        if (joined > cycleStart && c.status !== 'active') return s;
-        return s + Number(c.amount || 0);
-      }, 0);
-  };
-
   type Row = {
     member: any;
     paid: number;
     required: number;
-    credit: number; // paid - required
+    extra: number;     // paid above the required cycle amount = extra shares
+    remaining: number; // still owed on this cycle
   };
 
   const rows: Row[] = members.map((m: any) => {
@@ -112,20 +99,25 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
     const paidByUser = m.user_id ? (contributionsByUser.get(m.user_id) || 0) : 0;
     // Prefer member-id linkage; fall back to user-id when member_id wasn't set on the row
     const paid = Math.max(paidByMember, paidByUser);
-    const required = computeRequired(m.joined_at || m.created_at || null);
-    return { member: m, paid, required, credit: paid - required };
+    return {
+      member: m,
+      paid,
+      required: cycleAmount,
+      extra: Math.max(paid - cycleAmount, 0),
+      remaining: Math.max(cycleAmount - paid, 0),
+    };
   });
 
-  const cycleAmount = Number(activeCycle.amount || 0);
-
-  const paidRows = rows.filter(r => r.credit >= 0);
-  const underpaidRows = rows.filter(r => r.credit < 0 && r.credit > -cycleAmount);
-  const unpaidRows = rows.filter(r => r.credit <= -cycleAmount);
+  const paidRows = rows.filter(r => r.remaining === 0);
+  const underpaidRows = rows.filter(r => r.remaining > 0 && r.paid > 0);
+  const unpaidRows = rows.filter(r => r.paid === 0);
 
   const currentUserRow = rows.find(r => r.member.user_id === user?.id);
-  const currentUserPaid = currentUserRow ? currentUserRow.credit >= 0 : false;
-  const currentUserCredit = currentUserRow?.credit ?? 0;
-  const currentUserOwes = !currentUserPaid;
+  const currentUserPaid = currentUserRow ? currentUserRow.remaining === 0 : false;
+  const currentUserRemaining = currentUserRow?.remaining ?? 0;
+  const currentUserExtra = currentUserRow?.extra ?? 0;
+  const currentUserOwes = !!currentUserRow && !currentUserPaid;
+
 
   return (
     <div className="space-y-3">
@@ -134,10 +126,8 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Payment Required</AlertTitle>
           <AlertDescription>
-            {currentUserCredit > -cycleAmount
-              ? `You still owe KES ${Math.abs(currentUserCredit).toLocaleString()} to complete this cycle.`
-              : `You owe KES ${Math.abs(currentUserCredit).toLocaleString()} in total (this and past cycles).`
-            }
+            {`Every member pays KES ${cycleAmount.toLocaleString()} this cycle. You still need to pay KES ${currentUserRemaining.toLocaleString()}.`}
+
             {daysLeft > 0
               ? ` Deadline: ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left.`
               : hoursLeft > 0
@@ -153,18 +143,18 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Overdue Payment</AlertTitle>
           <AlertDescription>
-            The deadline has passed! You owe KES {Math.abs(currentUserCredit).toLocaleString()}. Please pay immediately.
+            The deadline has passed! You still need to pay KES {currentUserRemaining.toLocaleString()} of the KES {cycleAmount.toLocaleString()} required. Please pay immediately.
           </AlertDescription>
         </Alert>
       )}
 
-      {currentUserPaid && currentUserCredit > 0 && (
+      {currentUserPaid && currentUserExtra > 0 && (
         <Alert>
           <CheckCircle className="h-4 w-4" />
           <AlertTitle>You're covered</AlertTitle>
           <AlertDescription>
-            You have a credit of KES {currentUserCredit.toLocaleString()} from previous overpayment
-            {currentUserCredit >= cycleAmount ? " — this cycle is fully covered." : "."}
+            You paid KES {(currentUserRow?.paid ?? 0).toLocaleString()} against the KES {cycleAmount.toLocaleString()} required — KES {currentUserExtra.toLocaleString()} extra counts as additional shares.
+
           </AlertDescription>
         </Alert>
       )}
@@ -209,17 +199,21 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
             )}
           </div>
 
-          {/* Paid members with carried-forward credit */}
-          {paidRows.some(r => r.credit > 0) && (
+          <p className="text-xs text-muted-foreground">
+            Every member pays KES {cycleAmount.toLocaleString()} this cycle. Anyone who pays more holds extra shares.
+          </p>
+
+          {/* Members who paid extra shares */}
+          {paidRows.some(r => r.extra > 0) && (
             <Collapsible>
               <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
                 <span className="text-sm font-medium text-green-600">
-                  Members with credit ({paidRows.filter(r => r.credit > 0).length})
+                  Members with extra shares ({paidRows.filter(r => r.extra > 0).length})
                 </span>
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-1 mt-2">
-                {paidRows.filter(r => r.credit > 0).map(({ member: m, credit }) => (
+                {paidRows.filter(r => r.extra > 0).map(({ member: m, extra }) => (
                   <div key={m.id} className="flex items-center justify-between p-2 rounded bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-3 w-3 text-green-600" />
@@ -227,7 +221,7 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                       <span className="text-xs text-muted-foreground font-mono">{m.member_code}</span>
                     </div>
                     <Badge variant="outline" className="text-green-700 border-green-500 text-xs">
-                      Credit: KES {credit.toLocaleString()}
+                      +KES {extra.toLocaleString()} extra shares
                     </Badge>
                   </div>
                 ))}
@@ -242,7 +236,7 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-1 mt-2">
-                {unpaidRows.map(({ member: m, credit }) => (
+                {unpaidRows.map(({ member: m }) => (
                   <div key={m.id} className="flex items-center justify-between p-2 rounded bg-destructive/5 border border-destructive/20">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-3 w-3 text-destructive" />
@@ -250,7 +244,7 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                       <span className="text-xs text-muted-foreground font-mono">{m.member_code}</span>
                     </div>
                     <Badge variant="outline" className="text-destructive border-destructive text-xs">
-                      KES {Math.abs(credit).toLocaleString()} owed
+                      KES {cycleAmount.toLocaleString()} to pay
                     </Badge>
                   </div>
                 ))}
@@ -265,14 +259,14 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-1 mt-2">
-                {underpaidRows.map(({ member: m, credit }) => (
+                {underpaidRows.map(({ member: m, paid }) => (
                   <div key={m.id} className="flex items-center justify-between p-2 rounded bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-3 w-3 text-orange-500" />
                       <span className="text-sm">{m.profiles?.full_name || 'Unknown'}</span>
                     </div>
                     <Badge variant="outline" className="text-orange-600 border-orange-400 text-xs">
-                      KES {Math.abs(credit).toLocaleString()} remaining
+                      KES {paid.toLocaleString()} / {cycleAmount.toLocaleString()}
                     </Badge>
                   </div>
                 ))}
