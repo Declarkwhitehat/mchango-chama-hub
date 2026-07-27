@@ -1037,7 +1037,7 @@ serve(async (req) => {
               await safeSendSms(
                 supabase,
                 phoneNumber,
-                `PAMOJANOVA: Welcome back to ${welfareData.name}. Registration fee fully settled. You are now an active member.`,
+                `Welcome back to ${welfareData.name}. Your registration fee is fully settled and you are now an active member. Thank you.`,
                 'welfare-reinstated'
               );
             }
