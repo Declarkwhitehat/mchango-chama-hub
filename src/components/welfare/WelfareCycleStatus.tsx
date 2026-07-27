@@ -126,10 +126,8 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Payment Required</AlertTitle>
           <AlertDescription>
-            {currentUserCredit > -cycleAmount
-              ? `You still owe KES ${Math.abs(currentUserCredit).toLocaleString()} to complete this cycle.`
-              : `You owe KES ${Math.abs(currentUserCredit).toLocaleString()} in total (this and past cycles).`
-            }
+            {`Every member pays KES ${cycleAmount.toLocaleString()} this cycle. You still need to pay KES ${currentUserRemaining.toLocaleString()}.`}
+
             {daysLeft > 0
               ? ` Deadline: ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left.`
               : hoursLeft > 0
