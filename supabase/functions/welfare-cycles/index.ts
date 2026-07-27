@@ -139,11 +139,15 @@ serve(async (req) => {
       );
 
       if (confirmedMembers.length > 0) {
-        const deadlineStr = end_date;
+        const deadlineStr = new Date(end_date).toLocaleDateString('en-KE', {
+          timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short', year: 'numeric',
+        });
+        const buildMsg = (m: any) =>
+          `Your ${'KES ' + Number(amount).toLocaleString()} contribution to "${welfareName}" is due on or before ${deadlineStr}. Pay via M-Pesa Paybill 4015351, Account ${m.member_code}, or in the app. Thank you for keeping your group strong.`;
         const notifications = confirmedMembers.map((m: any) => ({
           user_id: m.user_id,
           title: 'New Contribution Cycle',
-          message: `${welfareName}: pay KES ${amount.toLocaleString()} via Paybill 4015351, Acc ${m.member_code}, by ${deadlineStr}.`,
+          message: buildMsg(m),
           type: 'info',
           category: 'welfare',
           related_entity_type: 'welfare',
@@ -153,7 +157,7 @@ serve(async (req) => {
 
         // Fan out SMS + push
         for (const m of confirmedMembers as any[]) {
-          const smsBody = `${welfareName}: pay KES ${amount.toLocaleString()} via Paybill 4015351, Acc ${m.member_code}, by ${deadlineStr}.`;
+          const smsBody = buildMsg(m);
           const phone = m.profiles?.phone;
           if (phone) {
             supabaseAdmin.functions.invoke('send-transactional-sms', {
