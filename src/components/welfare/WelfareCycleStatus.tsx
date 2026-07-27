@@ -270,9 +270,6 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
                     </Badge>
                   </div>
                 ))}
-
-                  </div>
-                ))}
               </CollapsibleContent>
             </Collapsible>
           )}
