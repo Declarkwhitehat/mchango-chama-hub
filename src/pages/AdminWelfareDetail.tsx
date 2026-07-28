@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Loader2, Search, Users } from "lucide-react";
+import { ArrowLeft, Loader2, Search, ShieldCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 
 const AdminWelfareDetail = () => {
