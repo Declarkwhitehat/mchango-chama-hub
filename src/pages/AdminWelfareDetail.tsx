@@ -27,7 +27,7 @@ const AdminWelfareDetail = () => {
     if (!id) return;
     (async () => {
       try {
-        const [w, m, c, ct] = await Promise.all([
+        const [w, m, c, ct, nk] = await Promise.all([
           supabase.from("welfares").select("*").eq("id", id).maybeSingle(),
           supabase
             .from("welfare_members")
@@ -45,12 +45,17 @@ const AdminWelfareDetail = () => {
             .eq("welfare_id", id)
             .eq("payment_status", "completed")
             .neq("category", "registration_fee"),
+          supabase
+            .from("welfare_next_of_kin")
+            .select("*")
+            .eq("welfare_id", id),
         ]);
         if (w.error) throw w.error;
         setWelfare(w.data);
         setMembers(m.data || []);
         setCycles(c.data || []);
         setContribs(ct.data || []);
+        setNok(nk.data || []);
       } catch (e: any) {
         console.error(e);
         toast.error("Failed to load welfare");
