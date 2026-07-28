@@ -44,6 +44,7 @@ const WelfareDetail = () => {
   const [loading, setLoading] = useState(true);
   const [myRole, setMyRole] = useState<string | null>(null);
   const [myMemberId, setMyMemberId] = useState<string | null>(null);
+  const [nokRefresh, setNokRefresh] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [cooldownActive, setCooldownActive] = useState(false);
