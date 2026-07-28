@@ -424,6 +424,17 @@ const WelfareDetail = () => {
               onRoleAssigned={fetchWelfare}
             />
 
+            {isMember && (
+              <NextOfKinForm
+                welfareId={welfare.id}
+                welfareName={welfare.name}
+                memberId={myMemberId}
+                memberCode={myWelfareRow?.member_code}
+                memberName={profile?.full_name}
+                onSaved={() => setNokRefresh((n) => n + 1)}
+              />
+            )}
+
           </TabsContent>
 
           <TabsContent value="contribute">
