@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Loader2, Search, Users } from "lucide-react";
+import { ArrowLeft, Loader2, Search, ShieldCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 
 const AdminWelfareDetail = () => {
@@ -20,13 +20,14 @@ const AdminWelfareDetail = () => {
   const [members, setMembers] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
   const [contribs, setContribs] = useState<any[]>([]);
+  const [nok, setNok] = useState<any[]>([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!id) return;
     (async () => {
       try {
-        const [w, m, c, ct] = await Promise.all([
+        const [w, m, c, ct, nk] = await Promise.all([
           supabase.from("welfares").select("*").eq("id", id).maybeSingle(),
           supabase
             .from("welfare_members")
@@ -44,12 +45,17 @@ const AdminWelfareDetail = () => {
             .eq("welfare_id", id)
             .eq("payment_status", "completed")
             .neq("category", "registration_fee"),
+          supabase
+            .from("welfare_next_of_kin")
+            .select("*")
+            .eq("welfare_id", id),
         ]);
         if (w.error) throw w.error;
         setWelfare(w.data);
         setMembers(m.data || []);
         setCycles(c.data || []);
         setContribs(ct.data || []);
+        setNok(nk.data || []);
       } catch (e: any) {
         console.error(e);
         toast.error("Failed to load welfare");
@@ -151,6 +157,7 @@ const AdminWelfareDetail = () => {
         <Tabs defaultValue="members">
           <TabsList>
             <TabsTrigger value="members"><Users className="h-4 w-4 mr-2" />Members</TabsTrigger>
+            <TabsTrigger value="nok"><ShieldCheck className="h-4 w-4 mr-2" />Next of Kin</TabsTrigger>
           </TabsList>
           <TabsContent value="members">
             <Card>
@@ -213,6 +220,67 @@ const AdminWelfareDetail = () => {
                       {filtered.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                            No members found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="nok">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Next of Kin Records</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Confidential — visible to platform administrators only. {nok.length} of {members.length} members have submitted.
+                </p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Member</TableHead>
+                        <TableHead>Member ID</TableHead>
+                        <TableHead>Next of Kin</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>DOB</TableHead>
+                        <TableHead>Relationship</TableHead>
+                        <TableHead>Gender</TableHead>
+                        <TableHead>Submitted</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((r) => {
+                        const k = nok.find((n) => n.user_id === r.user_id);
+                        return (
+                          <TableRow key={`nok-${r.id}`}>
+                            <TableCell className="text-sm font-medium">{r.name}</TableCell>
+                            <TableCell className="font-mono text-xs">{r.member_code}</TableCell>
+                            {k ? (
+                              <>
+                                <TableCell className="text-sm">{k.full_name}</TableCell>
+                                <TableCell className="text-xs font-mono">{k.phone}</TableCell>
+                                <TableCell className="text-xs">{new Date(k.date_of_birth).toLocaleDateString("en-GB")}</TableCell>
+                                <TableCell className="text-xs">{k.relationship === "Other" ? k.relationship_other || "Other" : k.relationship}</TableCell>
+                                <TableCell className="text-xs capitalize">{k.gender}</TableCell>
+                                <TableCell className="text-xs">{new Date(k.updated_at).toLocaleDateString("en-GB")}</TableCell>
+                              </>
+                            ) : (
+                              <TableCell colSpan={6}>
+                                <Badge variant="secondary" className="text-[10px]">Not submitted</Badge>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                      {filtered.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
                             No members found.
                           </TableCell>
                         </TableRow>

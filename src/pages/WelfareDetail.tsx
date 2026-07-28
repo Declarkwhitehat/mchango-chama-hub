@@ -26,6 +26,8 @@ import { WelfareLeaveRequests } from "@/components/welfare/WelfareLeaveRequests"
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
 import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
+import { NextOfKinForm } from "@/components/welfare/NextOfKinForm";
+import { NextOfKinBanner } from "@/components/welfare/NextOfKinBanner";
 import SEO from "@/components/SEO";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 
@@ -42,6 +44,7 @@ const WelfareDetail = () => {
   const [loading, setLoading] = useState(true);
   const [myRole, setMyRole] = useState<string | null>(null);
   const [myMemberId, setMyMemberId] = useState<string | null>(null);
+  const [nokRefresh, setNokRefresh] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [cooldownActive, setCooldownActive] = useState(false);
@@ -376,6 +379,16 @@ const WelfareDetail = () => {
           );
         })()}
 
+        {isMember && (
+          <NextOfKinBanner
+            welfareId={welfare.id}
+            refreshKey={nokRefresh}
+            onFill={() => {
+              handleTabChange('overview');
+              setTimeout(() => document.getElementById('next-of-kin')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+            }}
+          />
+        )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 6 + (isExecutive ? 2 : 0))}, 1fr)` }}>
@@ -421,6 +434,17 @@ const WelfareDetail = () => {
               isAdmin={isAdmin}
               onRoleAssigned={fetchWelfare}
             />
+
+            {isMember && (
+              <NextOfKinForm
+                welfareId={welfare.id}
+                welfareName={welfare.name}
+                memberId={myMemberId}
+                memberCode={myWelfareRow?.member_code}
+                memberName={profile?.full_name}
+                onSaved={() => setNokRefresh((n) => n + 1)}
+              />
+            )}
 
           </TabsContent>
 

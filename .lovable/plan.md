@@ -1,38 +1,40 @@
 ## Goal
-When a welfare member misses the 5-day registration deadline and is removed as `removed_unpaid`, any later payment they make should count toward the registration fee. Once their cumulative payments (existing credit + partial + new payment) reach the required fee, auto-reinstate them as a confirmed active member.
 
-## Current behavior
-- On expiry, `welfare-registration-reminder-cron` moves `registration_fee_paid` into `welfare_registration_credits`, sets `status='removed'`, `registration_status='removed_unpaid'`.
-- `apply_welfare_registration_payment` RPC only allocates to members whose `registration_status` is `pending`/`partial`. Payments from a removed member's phone/account currently fall through to normal contribution logic or become unmatched.
+Every welfare member records a next of kin for their group. The details are private to platform admins, can be filled once and then locked for 3 months, and the member can download a professional PDF copy of what they submitted.
 
-## Changes
+## What members see
 
-### 1. Update `apply_welfare_registration_payment` RPC (migration)
-- Extend lookup to also match members with `registration_status='removed_unpaid'` (in addition to `pending`/`partial`).
-- For a removed_unpaid member:
-  - Pull any prior `welfare_registration_credits` rows for that user+welfare and treat them as already-paid toward the fee (consume/mark them used).
-  - Add the incoming payment on top.
-  - If `credits + prior partial + new payment >= registration_fee`:
-    - Reinstate: set `status='active'`, `registration_status='confirmed'`, `registration_fee_paid = registration_fee`, clear `registration_deadline` (or extend as needed).
-    - Extract 5% commission → `company_earnings`, 95% → `welfares.available_balance` with ledger row `category='registration_fee'`.
-    - Any surplus above the fee flows into the normal contribution allocation (existing downstream logic).
-    - Send confirmation SMS + push + in-app notification: "You have been reinstated in {welfare}."
-  - If still short: update `registration_fee_paid`, keep `registration_status='removed_unpaid'` but log the partial top-up as an additional credit row (so future payments continue to accumulate). No reinstatement yet.
+- **Reminder banner** at the top of the welfare page for anyone who hasn't filled it: a compact amber card, "Add your next of kin — the person who receives your dividends and benefits if anything happens to you", with a "Fill Details" button. Disappears once submitted.
+- **Next of Kin section** inside the welfare page (a card under the Overview tab plus the banner shortcut) with the form:
+  - Full legal name
+  - Phone number (auto-formatted to +254, same rules as signup)
+  - Date of birth (date picker)
+  - Relationship to you (dropdown: spouse, parent, child, sibling, other + free text for "other")
+  - Gender (Male / Female)
+  - Notice block, acknowledged with a required checkbox: *"I understand that this person is my nominated next of kin. In the event of my death or incapacity, they are authorised to receive my dividends, contributions and any other benefits from this welfare."*
+- **Confirmation dialog before saving** warning the record locks for 3 months.
+- **After saving**: read-only summary showing all fields, the date submitted, and "You can update these details on <date>" (submitted date + 90 days). Form fields disabled until then, no exceptions.
+- **Download button** producing a branded PDF (same PAMOJA NOVA header/footer styling used by existing welfare statements): welfare name, member name + member ID, all next-of-kin fields, the authorisation statement, submission date and a document serial.
 
-### 2. C2B / STK matching
-- `c2b-confirm-payment` and STK confirmation already resolve members by `member_code` (including fuzzy match). Ensure they do NOT skip rows where `status='removed'` when the row's `registration_status='removed_unpaid'` — only for the registration-fee allocation path. Normal contribution logic still ignores removed members.
+## Privacy
 
-### 3. Notifications
-- On successful auto-reinstatement: SMS from PAMOJANOVA — "Welcome back to {welfare}. Your registration fee of KES {fee} is fully paid. You are now an active member." Plus push + in-app.
-- No SMS on partial top-up (avoid spam); existing daily reminder cron already covers pending balances — extend it to include `removed_unpaid` members so they get reminded their partial credit is still held.
+- Next of kin is per welfare group (a member in two welfares fills it twice).
+- Only platform admins/super admins can read other members' records; executives (chairman/secretary/treasurer) cannot.
+- Members can read and download only their own.
+- Admins get a "Next of Kin" section on the admin welfare detail page: a table of members with the details, plus a "Not submitted" marker for gaps.
 
-### 4. Memory update
-- Update `mem://welfare/registration-fee-policy.md` to document auto-reinstatement: removed_unpaid members are auto-restored once cumulative payments reach the fee.
+## Technical details
 
-## Out of scope
-- No UI changes to the welfare detail page — reinstatement is fully automatic on payment callback. Member reappears in the active list on next refresh.
-- No changes to the 5-day deadline itself.
+**Database** — new `public.welfare_next_of_kin` table: `id`, `welfare_id`, `member_id`, `user_id`, `full_name`, `phone`, `date_of_birth`, `relationship`, `relationship_other`, `gender`, `acknowledged_at`, `locked_until` (submitted + 90 days), `created_at`, `updated_at` + updated-at trigger. Unique on `(welfare_id, user_id)`.
 
-## Technical notes
-- Reinstatement happens inside the RPC so it's atomic with the payment write and idempotent per M-Pesa receipt (existing `mpesa_receipt_registry` uniqueness prevents double credit).
-- Credits are consumed by marking rows (add a `consumed_at` column via migration) rather than deleted, preserving audit trail.
+Access rules:
+- Grants to `authenticated` and `service_role`; no `anon`.
+- Members may insert and read only their own row, and may update only when `locked_until <= now()`; a BEFORE UPDATE trigger re-stamps `locked_until` and rejects early edits server-side so the lock can't be bypassed from the client.
+- Admins (`has_role(auth.uid(),'admin')` or `'super_admin'`) may read all rows. No delete policy for members.
+
+**Frontend**
+- `src/components/welfare/NextOfKinForm.tsx` — form, lock state, confirmation dialog, read-only view.
+- `src/components/welfare/NextOfKinBanner.tsx` — dismissible-per-session reminder banner.
+- `src/components/welfare/NextOfKinPDFDownload.tsx` — uses the existing `pdfBranding` helper.
+- Wire banner + card into `src/pages/WelfareDetail.tsx` (active members only), and an admin table into `src/pages/AdminWelfareDetail.tsx` gated by `useIsAdmin`.
+- Validation with zod: name 2–100 chars, valid Kenyan phone via `phoneUtils`, DOB in the past and age ≥ 18, relationship required, gender required, acknowledgement required.

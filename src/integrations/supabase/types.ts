@@ -3847,6 +3847,57 @@ export type Database = {
           },
         ]
       }
+      welfare_next_of_kin: {
+        Row: {
+          acknowledged_at: string
+          created_at: string
+          date_of_birth: string
+          full_name: string
+          gender: string
+          id: string
+          locked_until: string
+          member_id: string | null
+          phone: string
+          relationship: string
+          relationship_other: string | null
+          updated_at: string
+          user_id: string
+          welfare_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          created_at?: string
+          date_of_birth: string
+          full_name: string
+          gender: string
+          id?: string
+          locked_until?: string
+          member_id?: string | null
+          phone: string
+          relationship: string
+          relationship_other?: string | null
+          updated_at?: string
+          user_id: string
+          welfare_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          created_at?: string
+          date_of_birth?: string
+          full_name?: string
+          gender?: string
+          id?: string
+          locked_until?: string
+          member_id?: string | null
+          phone?: string
+          relationship?: string
+          relationship_other?: string | null
+          updated_at?: string
+          user_id?: string
+          welfare_id?: string
+        }
+        Relationships: []
+      }
       welfare_registration_credits: {
         Row: {
           amount: number
