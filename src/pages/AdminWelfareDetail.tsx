@@ -40,9 +40,10 @@ const AdminWelfareDetail = () => {
             .order("start_date"),
           supabase
             .from("welfare_contributions")
-            .select("id, member_id, gross_amount, payment_status")
+            .select("id, member_id, gross_amount, payment_status, category")
             .eq("welfare_id", id)
-            .eq("payment_status", "completed"),
+            .eq("payment_status", "completed")
+            .neq("category", "registration_fee"),
         ]);
         if (w.error) throw w.error;
         setWelfare(w.data);
