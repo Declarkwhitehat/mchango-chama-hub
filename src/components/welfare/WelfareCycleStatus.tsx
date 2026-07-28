@@ -40,12 +40,14 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
       const active = cyclesList.find((c: any) => c.status === 'active') || null;
       setActiveCycle(active);
 
-      // All completed contributions for this welfare across ALL time
+      // All completed contributions for this welfare across ALL time.
+      // Registration fees are NOT contributions — they must never count toward a cycle.
       const { data: contribs } = await supabase
         .from('welfare_contributions')
-        .select('member_id, user_id, net_amount, gross_amount, payment_status, created_at')
+        .select('member_id, user_id, net_amount, gross_amount, payment_status, created_at, category')
         .eq('welfare_id', welfareId)
-        .eq('payment_status', 'completed');
+        .eq('payment_status', 'completed')
+        .neq('category', 'registration_fee');
 
       setAllContributions(contribs || []);
     } catch (error) {
