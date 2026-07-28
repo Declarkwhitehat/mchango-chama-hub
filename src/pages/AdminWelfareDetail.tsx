@@ -20,6 +20,7 @@ const AdminWelfareDetail = () => {
   const [members, setMembers] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
   const [contribs, setContribs] = useState<any[]>([]);
+  const [nok, setNok] = useState<any[]>([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
