@@ -26,6 +26,8 @@ import { WelfareLeaveRequests } from "@/components/welfare/WelfareLeaveRequests"
 import { WelfareCycleStatus } from "@/components/welfare/WelfareCycleStatus";
 import { WelfareContributionReport } from "@/components/welfare/WelfareContributionReport";
 import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
+import { NextOfKinForm } from "@/components/welfare/NextOfKinForm";
+import { NextOfKinBanner } from "@/components/welfare/NextOfKinBanner";
 import SEO from "@/components/SEO";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 
