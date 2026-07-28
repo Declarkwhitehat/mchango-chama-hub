@@ -229,6 +229,67 @@ const AdminWelfareDetail = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="nok">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Next of Kin Records</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Confidential — visible to platform administrators only. {nok.length} of {members.length} members have submitted.
+                </p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Member</TableHead>
+                        <TableHead>Member ID</TableHead>
+                        <TableHead>Next of Kin</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>DOB</TableHead>
+                        <TableHead>Relationship</TableHead>
+                        <TableHead>Gender</TableHead>
+                        <TableHead>Submitted</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((r) => {
+                        const k = nok.find((n) => n.user_id === r.user_id);
+                        return (
+                          <TableRow key={`nok-${r.id}`}>
+                            <TableCell className="text-sm font-medium">{r.name}</TableCell>
+                            <TableCell className="font-mono text-xs">{r.member_code}</TableCell>
+                            {k ? (
+                              <>
+                                <TableCell className="text-sm">{k.full_name}</TableCell>
+                                <TableCell className="text-xs font-mono">{k.phone}</TableCell>
+                                <TableCell className="text-xs">{new Date(k.date_of_birth).toLocaleDateString("en-GB")}</TableCell>
+                                <TableCell className="text-xs">{k.relationship === "Other" ? k.relationship_other || "Other" : k.relationship}</TableCell>
+                                <TableCell className="text-xs capitalize">{k.gender}</TableCell>
+                                <TableCell className="text-xs">{new Date(k.updated_at).toLocaleDateString("en-GB")}</TableCell>
+                              </>
+                            ) : (
+                              <TableCell colSpan={6}>
+                                <Badge variant="secondary" className="text-[10px]">Not submitted</Badge>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                      {filtered.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                            No members found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </AdminLayout>
