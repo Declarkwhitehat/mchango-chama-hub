@@ -34,7 +34,7 @@ const schema = z.object({
   date_of_birth: z.string().min(1, "Date of birth is required"),
   relationship: z.string().min(1, "Select the relationship"),
   relationship_other: z.string().trim().max(60).optional(),
-  gender: z.enum(["male", "female"], { errorMap: () => ({ message: "Select male or female" }) }),
+  gender: z.string().refine((v) => v === "male" || v === "female", "Select male or female"),
 });
 
 export interface NextOfKinRecord {
