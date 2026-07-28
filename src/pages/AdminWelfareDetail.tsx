@@ -157,6 +157,7 @@ const AdminWelfareDetail = () => {
         <Tabs defaultValue="members">
           <TabsList>
             <TabsTrigger value="members"><Users className="h-4 w-4 mr-2" />Members</TabsTrigger>
+            <TabsTrigger value="nok"><ShieldCheck className="h-4 w-4 mr-2" />Next of Kin</TabsTrigger>
           </TabsList>
           <TabsContent value="members">
             <Card>
