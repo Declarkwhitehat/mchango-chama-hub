@@ -378,6 +378,16 @@ const WelfareDetail = () => {
           );
         })()}
 
+        {isMember && (
+          <NextOfKinBanner
+            welfareId={welfare.id}
+            refreshKey={nokRefresh}
+            onFill={() => {
+              handleTabChange('overview');
+              setTimeout(() => document.getElementById('next-of-kin')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+            }}
+          />
+        )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="w-full grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${Math.min(3, 6 + (isExecutive ? 2 : 0))}, 1fr)` }}>
