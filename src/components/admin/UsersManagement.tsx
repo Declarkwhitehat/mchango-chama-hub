@@ -367,27 +367,15 @@ export const UsersManagement = () => {
     }
   };
 
+  // Search is executed server-side on submit; only status filtering happens here.
   const filteredUsers = users.filter(user => {
-    const q = searchTerm.toLowerCase();
-    const matchesSearch =
-      !q ||
-      (user.full_name || '').toLowerCase().includes(q) ||
-      (user.email || '').toLowerCase().includes(q) ||
-      (user.phone || '').toLowerCase().includes(q);
-
     const isDeleted = !!user.deleted_at;
 
-    let matchesStatus = true;
-    if (statusFilter === "all") {
-      matchesStatus = true;
-    } else if (statusFilter === "deleted") {
-      matchesStatus = isDeleted;
-    } else {
-      matchesStatus = !isDeleted && user.kyc_status === statusFilter;
-    }
-
-    return matchesSearch && matchesStatus;
+    if (statusFilter === "all") return true;
+    if (statusFilter === "deleted") return isDeleted;
+    return !isDeleted && user.kyc_status === statusFilter;
   });
+
 
 
   const getKycBadge = (status: string) => {
