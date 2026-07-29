@@ -164,10 +164,11 @@ export const UsersManagement = () => {
     } catch (error: any) {
       console.error('Error fetching users:', error);
       toast({
-        title: "Error",
-        description: "Failed to load users",
+        title: "Could not load users",
+        description: error?.message || error?.details || "Unexpected error while loading users",
         variant: "destructive",
       });
+
     } finally {
       setLoading(false);
     }
