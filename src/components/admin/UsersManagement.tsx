@@ -96,13 +96,22 @@ export const UsersManagement = () => {
     }
   };
 
+  // Load the default (most recent) list once. Searching is submit-only.
   useEffect(() => {
-    const t = setTimeout(() => {
-      fetchUsers(searchTerm.trim());
-    }, searchTerm.trim() ? 250 : 0);
-    return () => clearTimeout(t);
+    fetchUsers("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, []);
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    fetchUsers(searchTerm.trim());
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm("");
+    fetchUsers("");
+  };
+
 
   const fetchUsers = async (term: string = "") => {
     try {
