@@ -213,10 +213,11 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
     } catch (error: any) {
       console.error('Error loading user details:', error);
       toast({
-        title: "Error",
-        description: "Failed to load user details",
+        title: "Could not load user",
+        description: error?.message || error?.details || "Unexpected error while loading this user",
         variant: "destructive",
       });
+
     } finally {
       setLoading(false);
     }
