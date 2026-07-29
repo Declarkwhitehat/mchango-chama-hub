@@ -423,15 +423,29 @@ const AdminKYC = () => {
           </Card>
         ) : (
           <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search all KYC (approved, pending, rejected) by name, email, phone, ID number..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search all KYC (approved, pending, rejected) by name, email, phone, ID number..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={loading}>
+                  <Search className="h-4 w-4 mr-2" />
+                  Search
+                </Button>
+                {searchTerm && (
+                  <Button type="button" variant="outline" onClick={handleClearSearch} disabled={loading}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </form>
+
             {submissions.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
