@@ -96,13 +96,22 @@ export const UsersManagement = () => {
     }
   };
 
+  // Load the default (most recent) list once. Searching is submit-only.
   useEffect(() => {
-    const t = setTimeout(() => {
-      fetchUsers(searchTerm.trim());
-    }, searchTerm.trim() ? 250 : 0);
-    return () => clearTimeout(t);
+    fetchUsers("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, []);
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    fetchUsers(searchTerm.trim());
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm("");
+    fetchUsers("");
+  };
+
 
   const fetchUsers = async (term: string = "") => {
     try {
@@ -115,18 +124,21 @@ export const UsersManagement = () => {
         // Normalise phone: allow searching "0707..." even though DB stores "+254707..."
         const digits = term.replace(/\D/g, '');
         const phoneVariants = new Set<string>();
-        if (digits) {
+        if (digits.length >= 6) {
           phoneVariants.add(digits);
           if (digits.startsWith('0')) phoneVariants.add('254' + digits.slice(1));
           if (digits.startsWith('254')) phoneVariants.add('0' + digits.slice(3));
           if (digits.length >= 9) phoneVariants.add(digits.slice(-9));
         }
+        const safe = term.replace(/[,()]/g, ' ').trim();
         const orParts = [
-          `full_name.ilike.%${term}%`,
-          `email.ilike.%${term}%`,
-          `phone.ilike.%${term}%`,
+          `full_name.ilike.%${safe}%`,
+          `email.ilike.%${safe}%`,
+          `phone.ilike.%${safe}%`,
+          `id_number.ilike.%${safe}%`,
           ...Array.from(phoneVariants).map((v) => `phone.ilike.%${v}%`),
         ];
+
         query = query.or(orParts.join(','));
         query = query.limit(200);
       } else {
@@ -155,10 +167,11 @@ export const UsersManagement = () => {
     } catch (error: any) {
       console.error('Error fetching users:', error);
       toast({
-        title: "Error",
-        description: "Failed to load users",
+        title: "Could not load users",
+        description: error?.message || error?.details || "Unexpected error while loading users",
         variant: "destructive",
       });
+
     } finally {
       setLoading(false);
     }
@@ -367,27 +380,15 @@ export const UsersManagement = () => {
     }
   };
 
+  // Search is executed server-side on submit; only status filtering happens here.
   const filteredUsers = users.filter(user => {
-    const q = searchTerm.toLowerCase();
-    const matchesSearch =
-      !q ||
-      (user.full_name || '').toLowerCase().includes(q) ||
-      (user.email || '').toLowerCase().includes(q) ||
-      (user.phone || '').toLowerCase().includes(q);
-
     const isDeleted = !!user.deleted_at;
 
-    let matchesStatus = true;
-    if (statusFilter === "all") {
-      matchesStatus = true;
-    } else if (statusFilter === "deleted") {
-      matchesStatus = isDeleted;
-    } else {
-      matchesStatus = !isDeleted && user.kyc_status === statusFilter;
-    }
-
-    return matchesSearch && matchesStatus;
+    if (statusFilter === "all") return true;
+    if (statusFilter === "deleted") return isDeleted;
+    return !isDeleted && user.kyc_status === statusFilter;
   });
+
 
 
   const getKycBadge = (status: string) => {
@@ -430,18 +431,29 @@ export const UsersManagement = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filters */}
-        <div className="flex gap-4">
+        <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, email, or phone..."
+              placeholder="Search by name, email, phone or ID, then press Search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={loading}>
+              <Search className="h-4 w-4 mr-2" />
+              Search
+            </Button>
+            {searchTerm && (
+              <Button type="button" variant="outline" onClick={handleClearSearch} disabled={loading}>
+                Clear
+              </Button>
+            )}
+          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="KYC Status" />
             </SelectTrigger>
             <SelectContent>
@@ -452,7 +464,8 @@ export const UsersManagement = () => {
               <SelectItem value="deleted">Deleted</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </form>
+
 
         {/* Users List */}
         <div className="space-y-3">

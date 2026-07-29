@@ -95,15 +95,19 @@ export default function AdminSearch() {
       if (error) throw error;
       const payload: any = data;
       if (payload?.error) throw new Error(payload.error);
-      if (payload?.data) {
-        setActivity(payload.data);
-      }
+      if (!payload?.data) throw new Error('No activity data returned for this member');
+      setActivity(payload.data);
     } catch (error: any) {
       console.error('Activity error:', error);
-      toast({ title: "Error", description: "Failed to load member activity", variant: "destructive" });
+      toast({
+        title: "Could not load member activity",
+        description: error?.message || error?.details || "Unexpected error",
+        variant: "destructive",
+      });
     } finally {
       setActivityLoading(false);
     }
+
   };
 
   const handleClear = () => {

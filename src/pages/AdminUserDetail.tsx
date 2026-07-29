@@ -101,10 +101,20 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
+      if (!profile) {
+        setUser(null);
+        toast({
+          title: "User not found",
+          description: "This account no longer exists or you don't have access to it.",
+          variant: "destructive",
+        });
+        return;
+      }
       setUser(profile);
+
 
       // Fetch user roles
       const { data: roles } = await supabase
@@ -161,18 +171,24 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
         .limit(50);
       setTransactions(userTransactions || []);
 
-      // Fetch contributions
-      const { data: userContributions } = await supabase
-        .from('contributions')
-        .select(`
-          *,
-          chama:chama_id (name, slug),
-          member:member_id (member_code)
-        `)
-        .eq('paid_by_member_id', userId)
-        .order('contribution_date', { ascending: false })
-        .limit(50);
-      setContributions(userContributions || []);
+      // Fetch contributions — contributions reference chama_members ids, not user ids
+      const memberIds = (userChamas || []).map((m: any) => m.id).filter(Boolean);
+      if (memberIds.length > 0) {
+        const { data: userContributions } = await supabase
+          .from('contributions')
+          .select(`
+            *,
+            chama:chama_id (name, slug),
+            member:member_id (member_code)
+          `)
+          .or(`member_id.in.(${memberIds.join(',')}),paid_by_member_id.in.(${memberIds.join(',')})`)
+          .order('contribution_date', { ascending: false })
+          .limit(50);
+        setContributions(userContributions || []);
+      } else {
+        setContributions([]);
+      }
+
 
       // Fetch withdrawals
       const { data: userWithdrawals } = await supabase
@@ -197,10 +213,11 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
     } catch (error: any) {
       console.error('Error loading user details:', error);
       toast({
-        title: "Error",
-        description: "Failed to load user details",
+        title: "Could not load user",
+        description: error?.message || error?.details || "Unexpected error while loading this user",
         variant: "destructive",
       });
+
     } finally {
       setLoading(false);
     }
