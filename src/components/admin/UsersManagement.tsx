@@ -428,18 +428,29 @@ export const UsersManagement = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filters */}
-        <div className="flex gap-4">
+        <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, email, or phone..."
+              placeholder="Search by name, email, phone or ID, then press Search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={loading}>
+              <Search className="h-4 w-4 mr-2" />
+              Search
+            </Button>
+            {searchTerm && (
+              <Button type="button" variant="outline" onClick={handleClearSearch} disabled={loading}>
+                Clear
+              </Button>
+            )}
+          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="KYC Status" />
             </SelectTrigger>
             <SelectContent>
@@ -450,7 +461,8 @@ export const UsersManagement = () => {
               <SelectItem value="deleted">Deleted</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </form>
+
 
         {/* Users List */}
         <div className="space-y-3">
