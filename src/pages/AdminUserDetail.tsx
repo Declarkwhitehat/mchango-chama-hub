@@ -101,10 +101,20 @@ const [backSignedUrl, setBackSignedUrl] = useState<string | null>(null);
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
+      if (!profile) {
+        setUser(null);
+        toast({
+          title: "User not found",
+          description: "This account no longer exists or you don't have access to it.",
+          variant: "destructive",
+        });
+        return;
+      }
       setUser(profile);
+
 
       // Fetch user roles
       const { data: roles } = await supabase
