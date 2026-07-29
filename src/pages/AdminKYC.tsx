@@ -46,11 +46,22 @@ const AdminKYC = () => {
 
   const { selectedIds, toggleSelection, selectAll, clearSelection, isSelected } = useBulkSelection(filteredSubmissions);
 
+  // Load the default (most recent) queue once. Searching is submit-only.
   useEffect(() => {
-    const t = setTimeout(() => fetchSubmissions(searchTerm.trim()), searchTerm.trim() ? 250 : 0);
-    return () => clearTimeout(t);
+    fetchSubmissions("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, []);
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    fetchSubmissions(searchTerm.trim());
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm("");
+    fetchSubmissions("");
+  };
+
 
   const fetchSubmissions = async (term: string = "") => {
     try {
