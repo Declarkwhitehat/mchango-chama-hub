@@ -136,12 +136,23 @@ serve(async (req) => {
       );
     }
 
+    // Reminder SMS are disabled platform-wide (push + in-app only).
+    // Transactional confirmations (payments, payouts, OTP, approvals) still send.
+    if (eventType && /remind|reminder|grace_warning|expiry|kyc_reminder/i.test(eventType)) {
+      console.log(`Reminder SMS suppressed (eventType: ${eventType})`);
+      return new Response(
+        JSON.stringify({ success: true, skipped: true, reason: 'reminder_sms_disabled' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
     if (!message || message.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Message is required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
+
 
     if (message.length > 160) {
       console.warn(`Message length exceeds 160 characters (${message.length}). This may be split into multiple SMS.`);
