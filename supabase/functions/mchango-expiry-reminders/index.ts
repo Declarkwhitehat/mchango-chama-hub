@@ -108,10 +108,8 @@ serve(async (req) => {
 
       if (!dup24) {
         const msg = `Hi ${name}, your campaign "${c.title}" ends in less than 24 hours. Share the link to boost donations: ${link} - PAMOJA NOVA`;
-        if (phone) {
-          const ok = await sendSms(phone, msg);
-          if (ok) stats.sms24++;
-        }
+        // Reminder SMS disabled platform-wide — push + in-app only.
+        void phone; void msg; void sendSms;
         await admin.from("notifications").insert({
           user_id: c.created_by,
           title: "Campaign ends in less than 24 hours",
@@ -132,10 +130,8 @@ serve(async (req) => {
 
         if (!dupF) {
           const msg = `Hi ${name}, your campaign "${c.title}" ends today. You can withdraw the funds once it closes. - PAMOJA NOVA`;
-          if (phone) {
-            const ok = await sendSms(phone, msg);
-            if (ok) stats.smsFinal++;
-          }
+          // Reminder SMS disabled platform-wide — push + in-app only.
+          void phone; void msg;
           await admin.from("notifications").insert({
             user_id: c.created_by,
             title: "Your campaign ends today",
