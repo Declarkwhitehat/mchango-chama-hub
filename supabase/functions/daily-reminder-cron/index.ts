@@ -210,12 +210,70 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[CRON] Daily reminder completed. SMS Sent: ${remindersSent}, Notifications: ${notificationsCreated}, Errors: ${errors}`);
+    // ---------- Welfare monthly contribution reminders (push + in-app only) ----------
+    let welfareNotifications = 0;
+    try {
+      const { data: welfareCycles } = await supabase
+        .from('welfare_contribution_cycles')
+        .select('id, welfare_id, amount, end_date, welfares!inner(name)')
+        .eq('status', 'active')
+        .gte('end_date', today);
+
+      for (const cycle of welfareCycles || []) {
+        const welfareName = (cycle as any).welfares?.name || 'your welfare';
+
+        const [{ data: members }, { data: contributions }] = await Promise.all([
+          supabase
+            .from('welfare_members')
+            .select('id, user_id, member_code')
+            .eq('welfare_id', cycle.welfare_id)
+            .eq('status', 'active'),
+          supabase
+            .from('welfare_contributions')
+            .select('member_id, gross_amount, category')
+            .eq('cycle_id', cycle.id)
+            .eq('payment_status', 'completed'),
+        ]);
+
+        const paidByMember = new Map<string, number>();
+        for (const c of contributions || []) {
+          if (c.category === 'registration_fee') continue;
+          paidByMember.set(c.member_id, (paidByMember.get(c.member_id) || 0) + Number(c.gross_amount || 0));
+        }
+
+        const deadlineStr = new Date(cycle.end_date).toLocaleDateString('en-KE', {
+          timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short', year: 'numeric',
+        });
+
+        for (const member of members || []) {
+          if (!member.user_id) continue;
+          const paid = paidByMember.get(member.id) || 0;
+          const outstanding = Number(cycle.amount || 0) - paid;
+          if (outstanding <= 0) continue;
+
+          await createNotification(supabase, {
+            userId: member.user_id,
+            title: `${welfareName}: contribution due`,
+            message: `KES ${outstanding.toLocaleString()} is outstanding for the current cycle. Pay by ${deadlineStr} via M-Pesa Paybill 4015351, Account ${member.member_code}, or in the app.`,
+            type: 'payment_reminder',
+            relatedEntityId: cycle.welfare_id,
+            relatedEntityType: 'welfare',
+          } as any);
+          welfareNotifications++;
+        }
+      }
+    } catch (e) {
+      console.error('[CRON] Welfare reminder error:', e);
+    }
+
+    console.log(`[CRON] Daily reminder completed. SMS Sent: ${remindersSent}, Notifications: ${notificationsCreated}, Welfare: ${welfareNotifications}, Errors: ${errors}`);
+
 
     return new Response(JSON.stringify({ 
       success: true, 
       remindersSent,
       notificationsCreated,
+      welfareNotifications,
       errors,
       processedChamas: chamas?.length || 0
     }), {
