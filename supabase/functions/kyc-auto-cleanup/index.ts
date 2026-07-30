@@ -209,7 +209,8 @@ serve(async (req) => {
         if (sent) continue;
 
         const msg = `Hi ${name}, verify your KYC within ${daysLeft} day${daysLeft === 1 ? "" : "s"} or your PAMOJA NOVA account will be removed. Upload now: pamojanova.com/kyc-upload`;
-        if (phone) await sendSms(phone, msg);
+        // Reminder SMS disabled platform-wide — push + in-app only.
+        void msg;
 
         // In-app notification (best-effort)
         try {
