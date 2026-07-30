@@ -273,6 +273,7 @@ Deno.serve(async (req) => {
       success: true, 
       remindersSent,
       notificationsCreated,
+      welfareNotifications,
       errors,
       processedChamas: chamas?.length || 0
     }), {
