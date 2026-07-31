@@ -604,7 +604,6 @@ const WelfareDetail = () => {
               </CardContent>
             </Card>
           </TabsContent>
-          </TabsContent>
 
           <TabsContent value="loans">
             <Card>
