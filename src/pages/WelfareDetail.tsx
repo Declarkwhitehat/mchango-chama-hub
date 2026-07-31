@@ -400,6 +400,7 @@ const WelfareDetail = () => {
             {isExecutive && <TabsTrigger value="withdraw" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Withdraw</TabsTrigger>}
             {isExecutive && <TabsTrigger value="manage" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Manage</TabsTrigger>}
             <TabsTrigger value="members" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Members</TabsTrigger>
+            <TabsTrigger value="loans" className="text-sm sm:text-lg font-extrabold px-2 py-4 h-auto whitespace-normal leading-tight">Loans</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
