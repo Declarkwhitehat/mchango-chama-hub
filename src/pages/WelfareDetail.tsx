@@ -604,6 +604,24 @@ const WelfareDetail = () => {
               </CardContent>
             </Card>
           </TabsContent>
+          </TabsContent>
+
+          <TabsContent value="loans">
+            <Card>
+              <CardContent className="py-12 text-center space-y-4">
+                <h2 className="text-xl sm:text-2xl font-extrabold">Get loans up to 4× your shares</h2>
+                <p className="text-muted-foreground font-semibold">Coming soon</p>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  <Button variant="outline" onClick={() => handleTabChange('members')}>
+                    Back to Members
+                  </Button>
+                  <Button variant="ghost" onClick={() => handleTabChange('overview')}>
+                    Go to Overview
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
