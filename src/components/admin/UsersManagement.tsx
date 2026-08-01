@@ -273,19 +273,20 @@ export const UsersManagement = () => {
     setDeleteConfirmName("");
     setDeleteCodeError(false);
     setDeleteNameError(false);
+    setHardDeleteArmed(false);
     setDeleteDialogOpen(true);
   };
 
   const confirmDeleteUser = async (mode: 'soft' | 'hard_delete' = 'soft') => {
     if (!pendingDeleteUser) return;
-    if (mode === 'hard_delete') {
-      const ok = window.confirm(
-        `PERMANENT DELETE: ${pendingDeleteUser.full_name}\n\n` +
-        `This wipes the profile and auth account. The phone & email become reusable immediately. This cannot be undone.\n\nProceed?`
-      );
-      if (!ok) return;
+    // NOTE: never use window.confirm here — Android WebView blocks it and the
+    // click silently does nothing. Two-step arming is used instead.
+    if (mode === 'hard_delete' && !hardDeleteArmed) {
+      setHardDeleteArmed(true);
+      return;
     }
     setDeleting(true);
+
     try {
       const response = await supabase.functions.invoke('admin-delete-user', {
         body: {
