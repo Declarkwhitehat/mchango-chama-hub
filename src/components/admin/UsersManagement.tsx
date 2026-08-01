@@ -51,6 +51,7 @@ export const UsersManagement = () => {
   const [deleteCodeError, setDeleteCodeError] = useState(false);
   const [deleteNameError, setDeleteNameError] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [hardDeleteArmed, setHardDeleteArmed] = useState(false);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [restorePrivilegeCode, setRestorePrivilegeCode] = useState("");
   const [pendingRestoreUser, setPendingRestoreUser] = useState<User | null>(null);
@@ -272,19 +273,20 @@ export const UsersManagement = () => {
     setDeleteConfirmName("");
     setDeleteCodeError(false);
     setDeleteNameError(false);
+    setHardDeleteArmed(false);
     setDeleteDialogOpen(true);
   };
 
   const confirmDeleteUser = async (mode: 'soft' | 'hard_delete' = 'soft') => {
     if (!pendingDeleteUser) return;
-    if (mode === 'hard_delete') {
-      const ok = window.confirm(
-        `PERMANENT DELETE: ${pendingDeleteUser.full_name}\n\n` +
-        `This wipes the profile and auth account. The phone & email become reusable immediately. This cannot be undone.\n\nProceed?`
-      );
-      if (!ok) return;
+    // NOTE: never use window.confirm here — Android WebView blocks it and the
+    // click silently does nothing. Two-step arming is used instead.
+    if (mode === 'hard_delete' && !hardDeleteArmed) {
+      setHardDeleteArmed(true);
+      return;
     }
     setDeleting(true);
+
     try {
       const response = await supabase.functions.invoke('admin-delete-user', {
         body: {
@@ -701,6 +703,13 @@ export const UsersManagement = () => {
                   )}
                 </div>
               </div>
+              {hardDeleteArmed && (
+                <p className="text-sm text-destructive font-medium">
+                  PERMANENT DELETE: this wipes the profile and login account of{" "}
+                  {pendingDeleteUser?.full_name}. Phone &amp; email become reusable immediately.
+                  This cannot be undone. Tap "Confirm Permanent Delete" to proceed.
+                </p>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -709,18 +718,22 @@ export const UsersManagement = () => {
               setDeleteConfirmName("");
               setDeleteCodeError(false);
               setDeleteNameError(false);
+              setHardDeleteArmed(false);
               setPendingDeleteUser(null);
             }}>
               Cancel
             </AlertDialogCancel>
             <Button
+              type="button"
               variant="outline"
               onClick={() => confirmDeleteUser('hard_delete')}
               disabled={!deletePrivilegeCode || !deleteConfirmName || deleting}
               className="border-destructive text-destructive hover:bg-destructive/10"
             >
-              Hard Delete (Permanent)
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              {hardDeleteArmed ? "Confirm Permanent Delete" : "Hard Delete (Permanent)"}
             </Button>
+
             <AlertDialogAction
               onClick={() => confirmDeleteUser('soft')}
               disabled={!deletePrivilegeCode || !deleteConfirmName || deleting}

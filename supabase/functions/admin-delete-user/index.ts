@@ -163,16 +163,24 @@ serve(async (req) => {
       }
 
       // Permanently delete from auth.users — frees the phone & email immediately.
+      let authDeleted = true;
+      let authError: string | null = null;
       try {
-        await supabaseAdmin.auth.admin.deleteUser(user_id);
+        const { error: delErr } = await supabaseAdmin.auth.admin.deleteUser(user_id);
+        if (delErr) { authDeleted = false; authError = (delErr as any).message; }
       } catch (e) {
-        console.log('Warning: auth.deleteUser failed:', (e as any).message);
+        authDeleted = false;
+        authError = (e as any).message;
       }
+      if (!authDeleted) console.log('Warning: auth.deleteUser failed:', authError);
 
       return new Response(JSON.stringify({
         success: true,
-        message: 'User permanently deleted. Phone and email are now available for re-registration.',
+        message: authDeleted
+          ? 'User permanently deleted. Phone and email are now available for re-registration.'
+          : `Profile deleted, but the login account could not be removed (${authError}). The phone/email may still be reserved.`,
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
     }
     if (!confirm_name || confirm_name.trim().toLowerCase() !== profile.full_name.trim().toLowerCase()) {
       return new Response(JSON.stringify({ error: 'Name confirmation does not match. Please type the exact user name.' }), {
