@@ -703,6 +703,13 @@ export const UsersManagement = () => {
                   )}
                 </div>
               </div>
+              {hardDeleteArmed && (
+                <p className="text-sm text-destructive font-medium">
+                  PERMANENT DELETE: this wipes the profile and login account of{" "}
+                  {pendingDeleteUser?.full_name}. Phone &amp; email become reusable immediately.
+                  This cannot be undone. Tap "Confirm Permanent Delete" to proceed.
+                </p>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -711,18 +718,22 @@ export const UsersManagement = () => {
               setDeleteConfirmName("");
               setDeleteCodeError(false);
               setDeleteNameError(false);
+              setHardDeleteArmed(false);
               setPendingDeleteUser(null);
             }}>
               Cancel
             </AlertDialogCancel>
             <Button
+              type="button"
               variant="outline"
               onClick={() => confirmDeleteUser('hard_delete')}
               disabled={!deletePrivilegeCode || !deleteConfirmName || deleting}
               className="border-destructive text-destructive hover:bg-destructive/10"
             >
-              Hard Delete (Permanent)
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              {hardDeleteArmed ? "Confirm Permanent Delete" : "Hard Delete (Permanent)"}
             </Button>
+
             <AlertDialogAction
               onClick={() => confirmDeleteUser('soft')}
               disabled={!deletePrivilegeCode || !deleteConfirmName || deleting}
