@@ -51,6 +51,7 @@ export const UsersManagement = () => {
   const [deleteCodeError, setDeleteCodeError] = useState(false);
   const [deleteNameError, setDeleteNameError] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [hardDeleteArmed, setHardDeleteArmed] = useState(false);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [restorePrivilegeCode, setRestorePrivilegeCode] = useState("");
   const [pendingRestoreUser, setPendingRestoreUser] = useState<User | null>(null);
