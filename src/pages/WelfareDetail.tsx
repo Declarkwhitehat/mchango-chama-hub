@@ -18,6 +18,7 @@ import { WelfareContributionCycleManager } from "@/components/welfare/WelfareCon
 import { WelfareTransactionLog } from "@/components/welfare/WelfareTransactionLog";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecutiveChangeBanner";
+import { WelfarePendingActionsBanner } from "@/components/welfare/WelfarePendingActionsBanner";
 import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
 import { GroupDocuments } from "@/components/GroupDocuments";
 import { PendingMemberView } from "@/components/welfare/PendingMemberView";
