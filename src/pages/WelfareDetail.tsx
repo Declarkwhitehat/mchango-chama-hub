@@ -18,6 +18,7 @@ import { WelfareContributionCycleManager } from "@/components/welfare/WelfareCon
 import { WelfareTransactionLog } from "@/components/welfare/WelfareTransactionLog";
 import { VerificationRequestButton } from "@/components/VerificationRequestButton";
 import { WelfareExecutiveChangeBanner } from "@/components/welfare/WelfareExecutiveChangeBanner";
+import { WelfarePendingActionsBanner } from "@/components/welfare/WelfarePendingActionsBanner";
 import { WelfarePaymentLookup } from "@/components/welfare/WelfarePaymentLookup";
 import { GroupDocuments } from "@/components/GroupDocuments";
 import { PendingMemberView } from "@/components/welfare/PendingMemberView";
@@ -301,8 +302,17 @@ const WelfareDetail = () => {
           )}
         </div>
 
+        {/* Pending executive actions (withdrawals / fee change) */}
+        <WelfarePendingActionsBanner
+          welfareId={welfare.id}
+          welfare={welfare}
+          myRole={myRole}
+          onAction={fetchWelfare}
+        />
+
         {/* Executive Change Security Banner */}
         <WelfareExecutiveChangeBanner welfareId={welfare.id} onCooldownActive={setCooldownActive} />
+
 
         {/* Frozen Warning */}
         {welfare.is_frozen && (
