@@ -302,8 +302,17 @@ const WelfareDetail = () => {
           )}
         </div>
 
+        {/* Pending executive actions (withdrawals / fee change) */}
+        <WelfarePendingActionsBanner
+          welfareId={welfare.id}
+          welfare={welfare}
+          myRole={myRole}
+          onAction={fetchWelfare}
+        />
+
         {/* Executive Change Security Banner */}
         <WelfareExecutiveChangeBanner welfareId={welfare.id} onCooldownActive={setCooldownActive} />
+
 
         {/* Frozen Warning */}
         {welfare.is_frozen && (
