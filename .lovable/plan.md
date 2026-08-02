@@ -1,38 +1,27 @@
-## Goal
+# Welfare Executive Action Banner
 
-Make the three admin lookup surfaces — Member Search, Users Management, KYC Management — behave predictably: search only when submitted, match phone numbers in any format, and stop failing when opening a member's details.
+Right now, when a chairman, secretary or treasurer needs to approve something in a welfare, the controls are buried: withdrawal approvals sit far down the page (Secretary/Treasurer only) and the registration-fee approval is hidden inside the collapsed Executive Panel. Executives often miss them.
 
-## What I verified
+## What to build
 
-- **Search fires per keystroke**: `UsersManagement.tsx` and `AdminKYC.tsx` both run a debounced `fetch...(searchTerm)` inside a `useEffect` on every character typed. Member Search (`AdminSearch.tsx` + `SearchBar.tsx`) is already submit-based.
-- **Phone search cannot match**: all 284 profiles store phones as `+254…`. The `admin_search` database function matches `phone ILIKE '%query%'` with no normalisation, so `0711424126` returns 0 rows (confirmed by query); only the raw `+254…` string works. Users Management / KYC do normalise digits client-side, so their phone search works — the failure the user sees on Member Search comes from this function.
-- **Error messages are masked**: `AdminSearch.loadActivity`, `AdminUserDetail.loadUserDetails` and `UsersManagement.fetchUsers` all discard the real error and show a fixed string ("Failed to load member activity" / "Failed to load user details"), so the true cause is invisible.
-- **`AdminUserDetail` uses `.single()`** on the profile fetch, which throws whenever the row is missing or blocked, producing "Failed to load user details" instead of a clear "user not found".
-- The `admin_search` and `get_admin_member_activity` functions are executable by `authenticated` and their bodies run cleanly against real data, so the remaining failures are in the client layer and the phone matching.
+A single prominent banner at the top of the welfare page (right below the header, above the existing security banner) that appears only when there is something for the signed-in executive to act on.
 
-## Plan
+The banner shows one row per pending item:
 
-**1. Submit-only search on all three surfaces**
-- Users Management: wrap the input in a form with a Search button; run the query on submit or Enter only. Keep a Clear button that resets to the default recent-users list. Remove the keystroke effect.
-- KYC Management: same treatment for its search input.
-- Member Search: already submit-based; leave the interaction as is.
+1. **Withdrawal request awaiting your approval** — amount, who requested it, recipient/category. Inline "Approve" and "Reject" buttons (rejection reason optional, revealed when Reject is tapped). Shown to the secretary and treasurer who have not yet decided.
+2. **Registration fee change awaiting approval** — current fee vs proposed fee and who requested it. Inline "Approve" button. Shown to executives other than the requester.
+3. **Awaiting others** — if the signed-in executive already requested/decided, the banner shows a read-only "Waiting for <role> to approve" line instead of buttons, so the requester still sees progress.
 
-**2. Phone-number matching everywhere**
-- Update the `admin_search` database function to normalise the query when it looks like a phone number: strip non-digits and match against all equivalent forms (`0…`, `254…`, `+254…`, last 9 digits) for both the `all` and `phone` search types. Also let `member_code` and name searches keep working unchanged.
-- Keep the existing client-side normalisation in Users Management / KYC and extend it with the `+254…` variant so all three agree.
-
-**3. Fix and surface member/user detail loading**
-- `AdminUserDetail`: switch the profile fetch to `maybeSingle()` and render a clear "User not found" state instead of a toast error; show the actual error text when a query genuinely fails.
-- `AdminSearch.loadActivity`: show the real error returned by the function (including "Forbidden") rather than the generic string, and handle the case where the function returns no `data`.
-- `UsersManagement.fetchUsers`: surface the real error text too.
-- Review the User Detail page's contributions query, which filters `contributions.paid_by_member_id` by a user id; correct it to resolve the user's `chama_members` ids first so the payments tab is accurate.
-
-**4. Test each surface**
-- Drive the three pages in the browser as an admin and confirm: typing does not trigger requests, submitting by name / email / phone (`0…`, `+254…`, `254…`) / ID number / member code returns the right rows, clicking a result opens the detail view with profile, groups, payments and withdrawals populated, and no generic error toasts appear.
-- Report any surface that still misbehaves with the exact underlying error.
+Behaviour:
+- Banner is hidden entirely for regular members, and when nothing is pending.
+- Amber/attention styling consistent with the existing security banner.
+- After acting, the banner refreshes and the page data reloads; a toast confirms the result.
+- Each action requires the 5-digit PIN, matching the existing executive-action security rule.
 
 ## Technical notes
 
-- The database change is one migration replacing `admin_search` (function body only, no schema or policy change).
-- Frontend files touched: `src/components/admin/UsersManagement.tsx`, `src/pages/AdminKYC.tsx`, `src/pages/AdminSearch.tsx`, `src/pages/AdminUserDetail.tsx`.
-- The signed-in preview session belongs to a non-admin account, so browser verification of admin routes needs the admin account signed into the preview; otherwise verification will be limited to the query and code level.
+- New component `src/components/welfare/WelfarePendingActionsBanner.tsx`, rendered in `src/pages/WelfareDetail.tsx` just above `<WelfareExecutiveChangeBanner />`, receiving `welfareId`, `myRole`, and an `onAction` refresh callback.
+- Withdrawal items: reuse the existing `welfare-withdrawal-approve` edge function (GET to list pending for the welfare, POST with `approval_id` + `decision`) — same calls `WelfareApprovalCard` already makes.
+- Fee change items: read `registration_fee`, `registration_fee_pending`, `registration_fee_change_requested_by` from the welfare record and call `welfare-crud/{id}` PUT with `approve_registration_fee: true`, same as `WelfareExecutivePanel`.
+- Wrap both actions in `usePinVerification().requirePin(...)` and mount `<PinEntryDialog />`, matching the existing panel pattern.
+- No backend, schema, or business-logic changes — presentation only; the existing `WelfareApprovalCard` and Executive Panel controls stay as-is.
