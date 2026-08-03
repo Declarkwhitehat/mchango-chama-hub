@@ -174,7 +174,123 @@ serve(async (req) => {
     }
 
 
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // PATCH - Executive extends the deadline of the running cycle
+    if (req.method === 'PATCH') {
+      if (!token) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const { data: userData } = await supabaseAdmin.auth.getUser(token);
+      if (!userData?.user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const body = await req.json();
+      const { welfare_id, cycle_id, extra_days } = body;
+      const days = Number(extra_days);
+
+      if (!welfare_id || !cycle_id) {
+        return new Response(JSON.stringify({ error: 'welfare_id and cycle_id are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (!Number.isFinite(days) || days < 1 || days > 30) {
+        return new Response(JSON.stringify({ error: 'Extra days must be between 1 and 30' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const { data: member } = await supabaseAdmin
+        .from('welfare_members')
+        .select('role')
+        .eq('welfare_id', welfare_id)
+        .eq('user_id', userData.user.id)
+        .eq('status', 'active')
+        .single();
+
+      if (!member || !['chairman', 'secretary', 'treasurer'].includes(member.role)) {
+        return new Response(JSON.stringify({ error: 'Only executives (Chairman, Secretary, Treasurer) can extend a contribution cycle' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const { data: cycle } = await supabaseAdmin
+        .from('welfare_contribution_cycles')
+        .select('id, welfare_id, status, end_date, start_date, amount, deadline_days')
+        .eq('id', cycle_id)
+        .eq('welfare_id', welfare_id)
+        .maybeSingle();
+
+      if (!cycle) {
+        return new Response(JSON.stringify({ error: 'Contribution cycle not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (cycle.status !== 'active') {
+        return new Response(JSON.stringify({ error: 'Only an active cycle can be extended' }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (cycle.end_date < todayStr) {
+        return new Response(JSON.stringify({ error: 'This cycle has already expired and can no longer be extended' }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const newEnd = new Date(`${cycle.end_date}T00:00:00Z`);
+      newEnd.setUTCDate(newEnd.getUTCDate() + days);
+      const newEndDate = newEnd.toISOString().split('T')[0];
+
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('welfare_contribution_cycles')
+        .update({
+          end_date: newEndDate,
+          deadline_days: (cycle.deadline_days || 0) + days,
+        })
+        .eq('id', cycle_id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Notify all active confirmed members (in-app + push only, no SMS)
+      const { data: welfareRow } = await supabaseAdmin
+        .from('welfares')
+        .select('name')
+        .eq('id', welfare_id)
+        .single();
+      const welfareName = welfareRow?.name || 'Welfare';
+
+      const { data: allMembers } = await supabaseAdmin
+        .from('welfare_members')
+        .select('user_id, member_code, registration_status')
+        .eq('welfare_id', welfare_id)
+        .eq('status', 'active');
+
+      const confirmedMembers = (allMembers || []).filter(
+        (m: any) => !m.registration_status || m.registration_status === 'confirmed'
+      );
+
+      if (confirmedMembers.length > 0) {
+        const deadlineStr = new Date(`${newEndDate}T00:00:00Z`).toLocaleDateString('en-KE', {
+          timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short', year: 'numeric',
+        });
+        const buildMsg = (m: any) =>
+          `The deadline for your KES ${Number(cycle.amount).toLocaleString()} contribution to "${welfareName}" has been extended to ${deadlineStr}. Pay via M-Pesa Paybill 4015351, Account ${m.member_code}, or in the app.`;
+
+        await supabaseAdmin.from('notifications').insert(
+          confirmedMembers.map((m: any) => ({
+            user_id: m.user_id,
+            title: 'Contribution Deadline Extended',
+            message: buildMsg(m),
+            type: 'info',
+            category: 'welfare',
+            related_entity_type: 'welfare',
+            related_entity_id: welfare_id,
+          }))
+        );
+
+        for (const m of confirmedMembers as any[]) {
+          supabaseAdmin.functions.invoke('send-push-notification', {
+            body: { user_id: m.user_id, title: 'Contribution Deadline Extended', body: buildMsg(m) },
+          }).catch(() => {});
+        }
+      }
+
+      return new Response(JSON.stringify({ data: updated }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+
   } catch (error: any) {
     console.error('welfare-cycles error:', error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
