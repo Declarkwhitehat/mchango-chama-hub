@@ -19,6 +19,33 @@ export const WelfareContributionCycleManager = ({ welfareId }: Props) => {
   const [loading, setLoading] = useState(false);
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [checkingCycle, setCheckingCycle] = useState(true);
+  const [extraDays, setExtraDays] = useState("");
+  const [extending, setExtending] = useState(false);
+
+  const handleExtend = async () => {
+    const days = Number(extraDays);
+    if (!Number.isFinite(days) || days < 1 || days > 30) {
+      toast.error("Enter between 1 and 30 extra days");
+      return;
+    }
+    setExtending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('welfare-cycles', {
+        method: 'PATCH',
+        body: { welfare_id: welfareId, cycle_id: activeCycle.id, extra_days: days },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Deadline extended to ${format(parseISO(data.data.end_date), 'MMM dd, yyyy')}`);
+      setExtraDays("");
+      checkActiveCycle();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to extend deadline");
+    } finally {
+      setExtending(false);
+    }
+  };
+
 
   useEffect(() => {
     checkActiveCycle();
