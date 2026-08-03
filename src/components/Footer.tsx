@@ -4,7 +4,7 @@ import { Facebook, Youtube } from "lucide-react";
 const BUILD_VERSION = new Date().toISOString().slice(0, 10).replace(/-/g, "") + ".1";
 
 const Footer = () => {
-  const currentYear = new Date().getFullYear();
+  const currentYear = 2025;
 
   return (
     <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
