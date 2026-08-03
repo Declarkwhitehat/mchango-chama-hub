@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertTriangle, Clock, CheckCircle, Users, ChevronDown } from "lucide-react";
-import { differenceInDays, differenceInHours, format, parseISO } from "date-fns";
+import { differenceInDays, differenceInHours, endOfDay, format, parseISO } from "date-fns";
 
 interface Props {
   welfareId: string;
@@ -19,10 +19,16 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
   const [allCycles, setAllCycles] = useState<any[]>([]);
   const [allContributions, setAllContributions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   useEffect(() => {
     fetchCycleData();
   }, [welfareId]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const fetchCycleData = async () => {
     try {
@@ -120,9 +126,37 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
   const currentUserExtra = currentUserRow?.extra ?? 0;
   const currentUserOwes = !!currentUserRow && !currentUserPaid;
 
+  // Final-day live countdown (deadline = end of the end_date day)
+  const deadlineMoment = endOfDay(endDate);
+  const msLeft = deadlineMoment.getTime() - nowTick;
+  const isFinalDay = msLeft > 0 && msLeft <= 24 * 60 * 60 * 1000;
+  const countdownHours = Math.floor(msLeft / (60 * 60 * 1000));
+  const countdownMinutes = Math.floor((msLeft % (60 * 60 * 1000)) / (60 * 1000));
+  const countdownText = `${countdownHours}h ${countdownMinutes}m`;
+  const currentMemberCode = currentUserRow?.member?.member_code;
 
   return (
     <div className="space-y-3">
+      {isFinalDay && (
+        currentUserPaid ? (
+          <Alert className="border-green-500/50 bg-green-500/10">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertTitle>Final day — you're fully paid</AlertTitle>
+            <AlertDescription>
+              This cycle closes in {countdownText}. You have already paid your KES {cycleAmount.toLocaleString()} — nothing more is required.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="border-orange-500/60 bg-orange-500/10">
+            <Clock className="h-4 w-4 text-orange-600" />
+            <AlertTitle>Final day — {countdownText} left to pay KES {cycleAmount.toLocaleString()}</AlertTitle>
+            <AlertDescription>
+              You still owe KES {currentUserRemaining.toLocaleString()}. Pay via M-Pesa Paybill 4015351
+              {currentMemberCode ? `, Account ${currentMemberCode}` : ''}, or in the app before the deadline.
+            </AlertDescription>
+          </Alert>
+        )
+      )}
       {currentUserOwes && !isExpired && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />

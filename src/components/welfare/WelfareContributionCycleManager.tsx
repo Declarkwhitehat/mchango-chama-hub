@@ -19,6 +19,33 @@ export const WelfareContributionCycleManager = ({ welfareId }: Props) => {
   const [loading, setLoading] = useState(false);
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [checkingCycle, setCheckingCycle] = useState(true);
+  const [extraDays, setExtraDays] = useState("");
+  const [extending, setExtending] = useState(false);
+
+  const handleExtend = async () => {
+    const days = Number(extraDays);
+    if (!Number.isFinite(days) || days < 1 || days > 30) {
+      toast.error("Enter between 1 and 30 extra days");
+      return;
+    }
+    setExtending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('welfare-cycles', {
+        method: 'PATCH',
+        body: { welfare_id: welfareId, cycle_id: activeCycle.id, extra_days: days },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Deadline extended to ${format(parseISO(data.data.end_date), 'MMM dd, yyyy')}`);
+      setExtraDays("");
+      checkActiveCycle();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to extend deadline");
+    } finally {
+      setExtending(false);
+    }
+  };
+
 
   useEffect(() => {
     checkActiveCycle();
@@ -93,26 +120,50 @@ export const WelfareContributionCycleManager = ({ welfareId }: Props) => {
             <Loader2 className="h-4 w-4 animate-spin" /> Checking...
           </div>
         ) : hasActiveCycle ? (
-          <Alert>
-            <Clock className="h-4 w-4" />
-            <AlertDescription className="space-y-2">
-              <p className="font-medium">Active cycle in progress</p>
-              <p className="text-sm">
-                Members are required to pay <strong>KES {Number(activeCycle.amount).toLocaleString()}</strong>.
+          <>
+            <Alert>
+              <Clock className="h-4 w-4" />
+              <AlertDescription className="space-y-2">
+                <p className="font-medium">Active cycle in progress</p>
+                <p className="text-sm">
+                  Members are required to pay <strong>KES {Number(activeCycle.amount).toLocaleString()}</strong>.
+                </p>
+                <p className="text-sm">
+                  Deadline: <strong>{format(cycleEndDate!, 'MMM dd, yyyy')}</strong>
+                  {daysLeft > 0
+                    ? ` (${daysLeft} day${daysLeft !== 1 ? 's' : ''} left)`
+                    : hoursLeft > 0
+                    ? ` (${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''} left)`
+                    : ' (expires today)'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  You cannot set a new cycle until the current one expires — but you can add more days below.
+                </p>
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2 border-t pt-4">
+              <Label>Add more days to the deadline</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  placeholder="e.g., 3"
+                  value={extraDays}
+                  onChange={(e) => setExtraDays(e.target.value)}
+                />
+                <Button onClick={handleExtend} disabled={extending || !extraDays}>
+                  {extending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Extend Deadline
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                All members will be notified of the new deadline.
               </p>
-              <p className="text-sm">
-                Deadline: <strong>{format(cycleEndDate!, 'MMM dd, yyyy')}</strong>
-                {daysLeft > 0
-                  ? ` (${daysLeft} day${daysLeft !== 1 ? 's' : ''} left)`
-                  : hoursLeft > 0
-                  ? ` (${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''} left)`
-                  : ' (expires today)'}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                You cannot set a new cycle until the current one expires.
-              </p>
-            </AlertDescription>
-          </Alert>
+            </div>
+          </>
+
         ) : (
           <>
             <p className="text-sm text-muted-foreground">Set the required contribution amount and deadline for all members.</p>
