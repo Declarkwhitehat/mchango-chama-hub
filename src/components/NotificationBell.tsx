@@ -195,7 +195,7 @@ export function NotificationBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 sm:w-96 p-0" align="end">
+      <PopoverContent className="w-[calc(100vw-1rem)] max-w-96 p-0" align="end">
         <div className="flex items-center justify-between p-4 border-b">
           <div>
             <h4 className="font-semibold">Notifications</h4>
@@ -269,7 +269,7 @@ export function NotificationBell() {
                           <div className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                      <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">
                         {notification.message}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
