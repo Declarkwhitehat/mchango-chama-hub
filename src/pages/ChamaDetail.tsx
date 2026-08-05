@@ -688,7 +688,7 @@ const ChamaDetail = () => {
         {/* Chama End Date - Show when chama is active */}
         {isActive && (
           <ChamaEndDate
-            startDate={chama.start_date || chama.created_at}
+            startDate={chama.start_date || null}
             contributionFrequency={chama.contribution_frequency}
             everyNDaysCount={chama.every_n_days_count}
             memberCount={approvedMembers.length}
