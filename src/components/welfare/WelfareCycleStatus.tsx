@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertTriangle, Clock, CheckCircle, Users, ChevronDown } from "lucide-react";
-import { differenceInDays, differenceInHours, endOfDay, format, parseISO } from "date-fns";
+import { differenceInCalendarDays, endOfDay, format, parseISO } from "date-fns";
 
 interface Props {
   welfareId: string;
@@ -26,7 +26,7 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
   }, [welfareId]);
 
   useEffect(() => {
-    const id = setInterval(() => setNowTick(Date.now()), 60_000);
+    const id = setInterval(() => setNowTick(Date.now()), 1_000);
     return () => clearInterval(id);
   }, []);
 
@@ -43,7 +43,9 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
       const cyclesList = cycles || [];
       setAllCycles(cyclesList);
 
-      const active = cyclesList.find((c: any) => c.status === 'active') || null;
+      const active = [...cyclesList]
+        .reverse()
+        .find((c: any) => c.status === 'active' && endOfDay(parseISO(c.end_date)).getTime() > Date.now()) || null;
       setActiveCycle(active);
 
       // All completed contributions for this welfare across ALL time.
@@ -66,10 +68,12 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
   if (loading || !activeCycle) return null;
 
   const endDate = parseISO(activeCycle.end_date);
-  const now = new Date();
-  const daysLeft = differenceInDays(endDate, now);
-  const hoursLeft = differenceInHours(endDate, now);
-  const isExpired = now > endDate;
+  const deadlineMoment = endOfDay(endDate);
+  const now = new Date(nowTick);
+  const msLeft = deadlineMoment.getTime() - nowTick;
+  const daysLeft = differenceInCalendarDays(endDate, now);
+  const hoursLeft = Math.max(0, Math.floor(msLeft / (60 * 60 * 1000)));
+  const isExpired = msLeft <= 0;
 
   // --- Per-cycle computation ---
   // Every member is required to pay the FULL cycle amount (e.g. KES 300).
@@ -127,12 +131,11 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
   const currentUserOwes = !!currentUserRow && !currentUserPaid;
 
   // Final-day live countdown (deadline = end of the end_date day)
-  const deadlineMoment = endOfDay(endDate);
-  const msLeft = deadlineMoment.getTime() - nowTick;
   const isFinalDay = msLeft > 0 && msLeft <= 24 * 60 * 60 * 1000;
   const countdownHours = Math.floor(msLeft / (60 * 60 * 1000));
   const countdownMinutes = Math.floor((msLeft % (60 * 60 * 1000)) / (60 * 1000));
-  const countdownText = `${countdownHours}h ${countdownMinutes}m`;
+  const countdownSeconds = Math.floor((msLeft % (60 * 1000)) / 1000);
+  const countdownText = `${countdownHours}h ${countdownMinutes}m ${countdownSeconds}s`;
   const currentMemberCode = currentUserRow?.member?.member_code;
 
   return (
@@ -141,7 +144,7 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
         currentUserPaid ? (
           <Alert className="border-green-500/50 bg-green-500/10">
             <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertTitle>Final day — you're fully paid</AlertTitle>
+            <AlertTitle>1 day remaining — you're fully paid</AlertTitle>
             <AlertDescription>
               This cycle closes in {countdownText}. You have already paid your KES {cycleAmount.toLocaleString()} — nothing more is required.
             </AlertDescription>
@@ -149,9 +152,9 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
         ) : (
           <Alert className="border-orange-500/60 bg-orange-500/10">
             <Clock className="h-4 w-4 text-orange-600" />
-            <AlertTitle>Final day — {countdownText} left to pay KES {cycleAmount.toLocaleString()}</AlertTitle>
+            <AlertTitle>1 day remaining — {countdownText} left</AlertTitle>
             <AlertDescription>
-              You still owe KES {currentUserRemaining.toLocaleString()}. Pay via M-Pesa Paybill 4015351
+              You still owe KES {currentUserRemaining.toLocaleString()} of KES {cycleAmount.toLocaleString()}. Pay via M-Pesa Paybill 4015351
               {currentMemberCode ? `, Account ${currentMemberCode}` : ''}, or in the app before the deadline.
             </AlertDescription>
           </Alert>
