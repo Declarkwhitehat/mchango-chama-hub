@@ -26,6 +26,7 @@ export const ChamaEndDate = ({
       case 'daily': return 1;
       case 'weekly': return 7;
       case 'monthly': return 30;
+      case 'twice_monthly': return 15;
       case 'every_n_days': return everyNDays || 7;
       default: return 7;
     }

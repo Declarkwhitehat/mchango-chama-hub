@@ -8,7 +8,7 @@ import { CyclePaymentStatus } from "@/components/chama/DailyPaymentStatus";
 import { CheckCircle2, TrendingUp, CreditCard, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getNextDay10PmKenyaDeadline } from "@/utils/chamaDeadlines";
-import { frequencyLabel } from "@/utils/chamaFrequency";
+import { addCyclesToDeadline, frequencyLabel } from "@/utils/chamaFrequency";
 import { CurrentCyclePool } from "@/components/chama/CurrentCyclePool";
 import { toast } from "@/hooks/use-toast";
 // realtime subscription removed in favor of 30s polling
@@ -136,6 +136,20 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
   const isCycleComplete = chama.status === 'cycle_complete';
   const isPendingStart = chama.status === 'pending';
   const isChamaDeleted = chama.status === 'deleted' || chama.status === 'inactive';
+  const hasStarted = chama.status === 'active' && Boolean(chama.start_date);
+  const fallbackPayoutDate = hasStarted
+    ? addCyclesToDeadline(
+        new Date(chama.start_date),
+        Math.max(0, Number(member.order_index || 1) - 1),
+        {
+          frequency: chama.contribution_frequency,
+          everyNDaysCount: chama.every_n_days_count,
+        },
+      )
+    : null;
+  const estimatedPayoutDate = payout_schedule?.estimated_payout_date || fallbackPayoutDate;
+  const estimatedPayoutAmount = payout_schedule?.estimated_amount
+    ?? (Number(chama.contribution_amount || 0) * Number(chama.member_count || 0));
 
   const graceDeadline = chama.status === 'active'
     ? getNextDay10PmKenyaDeadline(chama.start_date)
@@ -303,7 +317,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
       </Card>
 
       {/* Payout Schedule */}
-      {payout_schedule && chama.status !== 'pending' && (
+      {hasStarted && estimatedPayoutDate && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -315,22 +329,22 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-primary/10 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Position in Queue</p>
-                <p className="text-3xl font-bold text-primary">#{payout_schedule.position_in_queue}</p>
+                <p className="text-3xl font-bold text-primary">#{payout_schedule?.position_in_queue || member.order_index}</p>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Estimated Payout Date</p>
-                <p className="text-lg font-semibold text-foreground">{formatDate(payout_schedule.estimated_payout_date)}</p>
+                <p className="text-lg font-semibold text-foreground">{formatDate(estimatedPayoutDate)}</p>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Estimated Amount</p>
-                <p className="text-2xl font-bold text-primary">KES {payout_schedule.estimated_amount.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-primary">KES {Number(estimatedPayoutAmount).toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {payout_schedule && chama.status === 'pending' && (
+      {payout_schedule && !hasStarted && chama.status === 'pending' && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
