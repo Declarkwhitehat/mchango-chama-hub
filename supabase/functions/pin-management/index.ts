@@ -58,32 +58,33 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Validate security answers (need exactly 3)
-        if (!security_answers || !Array.isArray(security_answers) || security_answers.length !== 3) {
-          return new Response(
-            JSON.stringify({ error: 'Exactly 3 security questions and answers are required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+        // Security answers are optional now
+        const hasAnswers = Array.isArray(security_answers) && security_answers.length > 0;
 
-        // Validate each answer has question_id and answer
-        for (const sa of security_answers) {
-          if (!sa.question_id || !sa.answer || sa.answer.trim().length < 2) {
+        if (hasAnswers) {
+          if (security_answers.length !== 3) {
             return new Response(
-              JSON.stringify({ error: 'Each security answer must have a question_id and an answer (min 2 characters)' }),
+              JSON.stringify({ error: 'Exactly 3 security questions and answers are required' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          for (const sa of security_answers) {
+            if (!sa.question_id || !sa.answer || sa.answer.trim().length < 2) {
+              return new Response(
+                JSON.stringify({ error: 'Each security answer must have a question_id and an answer (min 2 characters)' }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          }
+          const questionIds = security_answers.map((sa: any) => sa.question_id);
+          if (new Set(questionIds).size !== 3) {
+            return new Response(
+              JSON.stringify({ error: 'You must choose 3 different security questions' }),
               { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
         }
 
-        // Ensure unique questions
-        const questionIds = security_answers.map((sa: any) => sa.question_id);
-        if (new Set(questionIds).size !== 3) {
-          return new Response(
-            JSON.stringify({ error: 'You must choose 3 different security questions' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
 
         const pinHash = await hashValue(pin);
 
