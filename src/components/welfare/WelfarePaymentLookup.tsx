@@ -5,8 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Loader2, User, Wallet } from "lucide-react";
+import { Search, Loader2, User, Wallet, Download } from "lucide-react";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
+import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
+import { addPDFBrandingFooter } from "@/utils/pdfBranding";
+import { savePdfNative } from "@/lib/nativeDownloadNotification";
+import { toast } from "sonner";
 
 interface WelfarePaymentLookupProps {
   welfareId: string;
@@ -16,8 +21,10 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
   const [searchName, setSearchName] = useState("");
   const [searchMemberId, setSearchMemberId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
   const [memberInfo, setMemberInfo] = useState<any>(null);
+
 
   const handleSearch = async () => {
     if (!searchName.trim() && !searchMemberId.trim()) return;
