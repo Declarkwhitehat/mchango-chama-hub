@@ -276,8 +276,10 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
+
 
         {results !== null && results.length === 0 && memberInfo && (
           <div className="text-center py-6 text-muted-foreground">
