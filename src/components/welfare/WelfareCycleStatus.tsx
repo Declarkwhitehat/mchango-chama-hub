@@ -130,21 +130,22 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
   const currentUserExtra = currentUserRow?.extra ?? 0;
   const currentUserOwes = !!currentUserRow && !currentUserPaid;
 
-  // Final-day live countdown (deadline = end of the end_date day)
+  // Live countdown to the cycle deadline (deadline = end of the end_date day)
   const isFinalDay = msLeft > 0 && msLeft <= 24 * 60 * 60 * 1000;
-  const countdownHours = Math.floor(msLeft / (60 * 60 * 1000));
+  const countdownDays = Math.floor(msLeft / (24 * 60 * 60 * 1000));
+  const countdownHours = Math.floor((msLeft % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
   const countdownMinutes = Math.floor((msLeft % (60 * 60 * 1000)) / (60 * 1000));
   const countdownSeconds = Math.floor((msLeft % (60 * 1000)) / 1000);
-  const countdownText = `${countdownHours}h ${countdownMinutes}m ${countdownSeconds}s`;
+  const countdownText = `${countdownDays > 0 ? `${countdownDays}d ` : ''}${countdownHours}h ${countdownMinutes}m ${countdownSeconds}s`;
   const currentMemberCode = currentUserRow?.member?.member_code;
 
   return (
     <div className="space-y-3">
-      {isFinalDay && (
+      {!isExpired && (
         currentUserPaid ? (
           <Alert className="border-green-500/50 bg-green-500/10">
             <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertTitle>1 day remaining — you're fully paid</AlertTitle>
+            <AlertTitle>{isFinalDay ? "1 day remaining — you're fully paid" : "You're fully paid"}</AlertTitle>
             <AlertDescription>
               This cycle closes in {countdownText}. You have already paid your KES {cycleAmount.toLocaleString()} — nothing more is required.
             </AlertDescription>
@@ -152,10 +153,11 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
         ) : (
           <Alert className="border-orange-500/60 bg-orange-500/10">
             <Clock className="h-4 w-4 text-orange-600" />
-            <AlertTitle>1 day remaining — {countdownText} left</AlertTitle>
+            <AlertTitle>{countdownText} left to pay</AlertTitle>
             <AlertDescription>
               You still owe KES {currentUserRemaining.toLocaleString()} of KES {cycleAmount.toLocaleString()}. Pay via M-Pesa Paybill 4015351
-              {currentMemberCode ? `, Account ${currentMemberCode}` : ''}, or in the app before the deadline.
+              {currentMemberCode ? `, Account ${currentMemberCode}` : ''}, or in the app before {format(endDate, 'MMM dd, yyyy')}.
+              {' '}Members who have not paid by the deadline risk removal from the welfare.
             </AlertDescription>
           </Alert>
         )
