@@ -235,11 +235,18 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
         )}
 
         {results !== null && results.length > 0 && (
-          <div className="rounded-md border overflow-x-auto">
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={handleDownload} disabled={downloading} className="gap-2">
+                {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Download Payments
+              </Button>
+            </div>
+            <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
+                  <TableHead>Date &amp; Time</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden sm:table-cell">Receipt</TableHead>
@@ -248,7 +255,11 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
               <TableBody>
                 {results.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell className="text-xs">{format(new Date(tx.created_at), "dd MMM yyyy")}</TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {format(new Date(tx.created_at), "dd MMM yyyy")}
+                      <span className="block text-muted-foreground">{format(new Date(tx.created_at), "HH:mm")}</span>
+                    </TableCell>
+
                     <TableCell className="font-medium">KES {Number(tx.gross_amount || 0).toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge
