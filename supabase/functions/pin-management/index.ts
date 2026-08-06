@@ -107,35 +107,37 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Delete old security answers
-        await supabaseAdmin
-          .from('user_security_answers')
-          .delete()
-          .eq('user_id', userId);
+        if (hasAnswers) {
+          // Replace old security answers
+          await supabaseAdmin
+            .from('user_security_answers')
+            .delete()
+            .eq('user_id', userId);
 
-        // Insert new security answers
-        const answerRows = await Promise.all(
-          security_answers.map(async (sa: any) => ({
-            user_id: userId,
-            question_id: sa.question_id,
-            answer_hash: await hashValue(sa.answer.trim().toLowerCase()),
-          }))
-        );
-
-        const { error: answerError } = await supabaseAdmin
-          .from('user_security_answers')
-          .insert(answerRows);
-
-        if (answerError) {
-          console.error('Security answers error:', answerError);
-          return new Response(
-            JSON.stringify({ error: 'Failed to save security answers' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          const answerRows = await Promise.all(
+            security_answers.map(async (sa: any) => ({
+              user_id: userId,
+              question_id: sa.question_id,
+              answer_hash: await hashValue(sa.answer.trim().toLowerCase()),
+            }))
           );
+
+          const { error: answerError } = await supabaseAdmin
+            .from('user_security_answers')
+            .insert(answerRows);
+
+          if (answerError) {
+            console.error('Security answers error:', answerError);
+            return new Response(
+              JSON.stringify({ error: 'Failed to save security answers' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
         }
 
         return new Response(
-          JSON.stringify({ success: true, message: 'PIN and security questions set successfully' }),
+          JSON.stringify({ success: true, message: 'PIN set successfully' }),
+
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
