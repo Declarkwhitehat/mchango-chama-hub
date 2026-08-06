@@ -5,8 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Loader2, User, Wallet } from "lucide-react";
+import { Search, Loader2, User, Wallet, Download } from "lucide-react";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
+import { trackDocumentWithId, uploadDocumentPDF } from "@/utils/documentTracker";
+import { addPDFBrandingFooter } from "@/utils/pdfBranding";
+import { savePdfNative } from "@/lib/nativeDownloadNotification";
+import { toast } from "sonner";
 
 interface WelfarePaymentLookupProps {
   welfareId: string;
@@ -16,8 +21,10 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
   const [searchName, setSearchName] = useState("");
   const [searchMemberId, setSearchMemberId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
   const [memberInfo, setMemberInfo] = useState<any>(null);
+
 
   const handleSearch = async () => {
     if (!searchName.trim() && !searchMemberId.trim()) return;
@@ -77,6 +84,91 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
 
   const totalPaid = results?.filter(r => r.payment_status === "completed").reduce((sum, r) => sum + Number(r.gross_amount || 0), 0) || 0;
   const completedCount = results?.filter(r => r.payment_status === "completed").length || 0;
+
+  const handleDownload = async () => {
+    if (!memberInfo || !results || results.length === 0) return;
+    setDownloading(true);
+    try {
+      const { serialNumber, documentId } = await trackDocumentWithId({
+        documentType: "welfare_member_payments",
+        documentTitle: "Member Payment Statement",
+        entityType: "welfare",
+        entityId: welfareId,
+        metadata: { member_code: memberInfo.member_code, count: results.length },
+      });
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Member Payment Statement", pageWidth / 2, 20, { align: "center" });
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Generated: ${format(new Date(), "dd MMM yyyy HH:mm")}`, pageWidth / 2, 27, { align: "center" });
+      doc.setFont("helvetica", "bold");
+      doc.text(`Serial No: ${serialNumber}`, pageWidth / 2, 33, { align: "center" });
+
+      let y = 43;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Member: ${memberInfo.profiles?.full_name || "Unknown"}`, margin, y);
+      y += 6;
+      doc.text(`Member ID: ${memberInfo.member_code || "-"}`, margin, y);
+      y += 6;
+      doc.text(`Role: ${memberInfo.role || "-"}    Status: ${memberInfo.status || "-"}`, margin, y);
+      y += 10;
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text("Date", margin, y);
+      doc.text("Time", margin + 32, y);
+      doc.text("Amount (KES)", margin + 58, y);
+      doc.text("Status", margin + 100, y);
+      doc.text("Receipt", margin + 135, y);
+      y += 7;
+      doc.setFont("helvetica", "normal");
+
+      results.forEach((tx: any) => {
+        if (y > 250) {
+          doc.addPage();
+          y = 20;
+        }
+        const d = new Date(tx.created_at);
+        doc.text(format(d, "dd MMM yyyy"), margin, y);
+        doc.text(format(d, "HH:mm:ss"), margin + 32, y);
+        doc.text(Number(tx.gross_amount || 0).toLocaleString(), margin + 58, y);
+        doc.text(String(tx.payment_status || "-"), margin + 100, y);
+        doc.text(String(tx.mpesa_receipt_number || tx.payment_reference || "-").substring(0, 20), margin + 135, y);
+        y += 7;
+      });
+
+      y += 4;
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFont("helvetica", "bold");
+      doc.text(`Total Paid: KES ${totalPaid.toLocaleString()}`, margin, y);
+      doc.text(`Completed Payments: ${completedCount}`, margin + 90, y);
+
+      addPDFBrandingFooter(doc, serialNumber);
+
+      const blob = doc.output("blob");
+      const filename = `payments-${memberInfo.member_code || "member"}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+      await savePdfNative(blob, filename);
+      uploadDocumentPDF(documentId, serialNumber, blob).catch(() => {});
+      toast.success("Payment statement downloaded");
+    } catch (err) {
+      console.error("Payment statement error:", err);
+      toast.error("Could not generate payment statement");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
 
   return (
     <Card>
@@ -143,11 +235,18 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
         )}
 
         {results !== null && results.length > 0 && (
-          <div className="rounded-md border overflow-x-auto">
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={handleDownload} disabled={downloading} className="gap-2">
+                {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Download Payments
+              </Button>
+            </div>
+            <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
+                  <TableHead>Date &amp; Time</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden sm:table-cell">Receipt</TableHead>
@@ -156,7 +255,11 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
               <TableBody>
                 {results.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell className="text-xs">{format(new Date(tx.created_at), "dd MMM yyyy")}</TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {format(new Date(tx.created_at), "dd MMM yyyy")}
+                      <span className="block text-muted-foreground">{format(new Date(tx.created_at), "HH:mm")}</span>
+                    </TableCell>
+
                     <TableCell className="font-medium">KES {Number(tx.gross_amount || 0).toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge
@@ -173,8 +276,10 @@ export const WelfarePaymentLookup = ({ welfareId }: WelfarePaymentLookupProps) =
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
+
 
         {results !== null && results.length === 0 && memberInfo && (
           <div className="text-center py-6 text-muted-foreground">
