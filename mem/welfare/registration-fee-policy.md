@@ -22,3 +22,5 @@ type: feature
 - New contribution cycle (`welfare-cycles` POST) — SMS + push to every active confirmed member with amount, Paybill 4015351, member_code, deadline.
 
 **Cron**: pg_cron scheduled `welfare-registration-reminders-daily` at `0 6 * * *` UTC (09:00 EAT) hitting `welfare-registration-reminder-cron`.
+
+**Auto-enrollment from offline payment**: If a registered user pays via Paybill 4015351 using a welfare's group code / paybill account and is NOT a member, `c2b-confirm-payment` auto-creates their `welfare_members` row (new member_code via `generate_welfare_member_code`) when the payment >= `registration_fee` — no join-by-code needed. Former members (`left`/`removed`) paying again are matched by member_code or phone, keep their original member ID, and are reset to `removed_unpaid` so the registration fee must be cleared before reinstatement to `active`. Surplus beyond the fee flows to normal contribution.
