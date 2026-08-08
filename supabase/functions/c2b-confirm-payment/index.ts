@@ -905,27 +905,57 @@ serve(async (req) => {
       const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || 'Anonymous';
       const cycleMonth = new Date().toISOString().substring(0, 7);
 
-      // If not already matched by member_code, try matching by phone number
-      if (!matchedMember) {
-        const { data: allMembers } = await supabase
+      const welfareRegFee = Number(welfareData.registration_fee || 0);
+
+      // If not already matched by member_code, try matching by phone number (any membership state)
+      let payerProfileId: string | null = null;
+      const phoneSuffix = (phoneNumber || '').replace(/\D/g, '').slice(-9);
+      if (phoneSuffix) {
+        const { data: payerProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('phone', `%${phoneSuffix}`)
+          .maybeSingle();
+        payerProfileId = payerProfile?.id || null;
+      }
+
+      if (!matchedMember && payerProfileId) {
+        const { data: existingMember } = await supabase
           .from('welfare_members')
           .select('id, user_id')
           .eq('welfare_id', welfareData.id)
-          .eq('status', 'active');
+          .eq('user_id', payerProfileId)
+          .maybeSingle();
+        if (existingMember) matchedMember = existingMember;
+      }
 
-        if (allMembers && phoneNumber) {
-          const phoneSuffix = phoneNumber.replace(/\D/g, '').slice(-9);
-          for (const wm of allMembers) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('phone')
-              .eq('id', wm.user_id)
-              .maybeSingle();
-            if (profile?.phone && profile.phone.replace(/\D/g, '').endsWith(phoneSuffix)) {
-              matchedMember = wm;
-              break;
-            }
-          }
+      // AUTO-ENROLL: payer has an account but never joined this welfare.
+      // If they pay at least the registration fee, add them as a member automatically
+      // (no need to join by code).
+      if (!matchedMember && payerProfileId && grossAmount >= welfareRegFee) {
+        try {
+          const { data: newCode } = await supabase.rpc('generate_welfare_member_code', {
+            p_welfare_id: welfareData.id,
+          });
+          const { data: created, error: createErr } = await supabase
+            .from('welfare_members')
+            .insert({
+              welfare_id: welfareData.id,
+              user_id: payerProfileId,
+              role: 'member',
+              member_code: newCode,
+              status: welfareRegFee > 0 ? 'pending' : 'active',
+              registration_fee_due: welfareRegFee,
+              registration_fee_paid: 0,
+              registration_status: welfareRegFee > 0 ? 'pending' : 'confirmed',
+            })
+            .select('id, user_id')
+            .single();
+          if (createErr) throw createErr;
+          matchedMember = created;
+          console.log('Auto-enrolled welfare member from offline payment:', created?.id);
+        } catch (e) {
+          console.error('Auto-enroll failed:', (e as Error).message);
         }
       }
 
@@ -937,15 +967,40 @@ serve(async (req) => {
         // Pull member registration state
         const { data: memberFull } = await supabase
           .from('welfare_members')
-          .select('registration_status, registration_fee_due, registration_fee_paid, total_contributed')
+          .select('status, registration_status, registration_fee_due, registration_fee_paid, total_contributed')
           .eq('id', matchedMember.id)
           .single();
+
+        // A former member (left/removed) paying again must clear the registration fee
+        // to be reinstated — they keep their existing member ID.
+        let regState = memberFull?.registration_status;
+        if (
+          memberFull &&
+          memberFull.status !== 'active' &&
+          memberFull.registration_status === 'confirmed' &&
+          welfareRegFee > 0
+        ) {
+          await supabase
+            .from('welfare_members')
+            .update({
+              registration_status: 'removed_unpaid',
+              registration_fee_due: welfareRegFee,
+              registration_fee_paid: 0,
+            })
+            .eq('id', matchedMember.id);
+          regState = 'removed_unpaid';
+        } else if (memberFull && memberFull.status !== 'active' && welfareRegFee <= 0) {
+          await supabase
+            .from('welfare_members')
+            .update({ status: 'active', registration_status: 'confirmed' })
+            .eq('id', matchedMember.id);
+        }
 
         // Allocate to registration fee first if pending/partial
         let regApplied = 0;
         let regFullyPaid = false;
         let regReinstated = false;
-        if (memberFull && ['pending','partial','removed_unpaid'].includes(memberFull.registration_status)) {
+        if (regState && ['pending','partial','removed_unpaid'].includes(regState)) {
           const { data: allocRes } = await supabase.rpc('apply_welfare_registration_payment', {
             p_member_id: matchedMember.id,
             p_gross: grossAmount,
@@ -953,7 +1008,14 @@ serve(async (req) => {
           regApplied = Number(allocRes?.applied || 0);
           regFullyPaid = !!allocRes?.fully_paid;
           regReinstated = !!allocRes?.reinstated;
+          if (regFullyPaid) {
+            await supabase
+              .from('welfare_members')
+              .update({ status: 'active', registration_deadline: null })
+              .eq('id', matchedMember.id);
+          }
         }
+
 
 
         // Whether the raw M-Pesa receipt has been attached to a row yet.
