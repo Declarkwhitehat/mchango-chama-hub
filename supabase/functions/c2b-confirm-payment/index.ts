@@ -855,7 +855,6 @@ serve(async (req) => {
       .from('welfare_members')
       .select('id, user_id, welfare_id, member_code, status, registration_status')
       .eq('member_code', upperAccountNumber)
-      .or('status.eq.active,registration_status.eq.removed_unpaid')
       .maybeSingle();
 
     if (!welfareMemberByCode && upperAccountNumber.length >= 4) {
@@ -863,7 +862,6 @@ serve(async (req) => {
         .from('welfare_members')
         .select('id, user_id, welfare_id, member_code, status, registration_status')
         .ilike('member_code', upperAccountNumber)
-        .or('status.eq.active,registration_status.eq.removed_unpaid')
         .limit(2);
       if (fuzzyW && fuzzyW.length === 1) {
         welfareMemberByCode = fuzzyW[0];
@@ -879,7 +877,7 @@ serve(async (req) => {
       // Fetch the welfare group data
       const { data: wData } = await supabase
         .from('welfares')
-        .select('id, name, group_code, paybill_account_id, current_amount, total_gross_collected, total_commission_paid, available_balance, commission_rate')
+        .select('id, name, group_code, paybill_account_id, current_amount, total_gross_collected, total_commission_paid, available_balance, commission_rate, registration_fee')
         .eq('id', welfareMemberByCode.welfare_id)
         .single();
       welfareData = wData;
@@ -889,12 +887,13 @@ serve(async (req) => {
     if (!welfareData) {
       const { data: wData } = await supabase
         .from('welfares')
-        .select('id, name, group_code, paybill_account_id, current_amount, total_gross_collected, total_commission_paid, available_balance, commission_rate')
+        .select('id, name, group_code, paybill_account_id, current_amount, total_gross_collected, total_commission_paid, available_balance, commission_rate, registration_fee')
         .or(`paybill_account_id.eq.${upperAccountNumber},group_code.eq.${upperAccountNumber}`)
         .eq('status', 'active')
         .maybeSingle();
       welfareData = wData;
     }
+
 
     if (welfareData) {
       console.log('Found Welfare group:', welfareData);
