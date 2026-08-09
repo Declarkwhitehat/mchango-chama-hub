@@ -165,7 +165,18 @@ const AdminWelfareDetail = () => {
           <TabsContent value="members">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Member Contribution Progress</CardTitle>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-base">Member Contribution Progress</CardTitle>
+                  <WelfareMemberRegisterDownload
+                    welfareId={welfare.id}
+                    welfareName={welfare.name}
+                    welfareCode={welfare.group_code}
+                    members={members.filter((m) => m.status === "active" && (!m.registration_status || m.registration_status === "confirmed"))}
+                    canViewPhones={true}
+                    issuedByName={profile?.full_name || null}
+                    issuedByRole="Administrator"
+                  />
+                </div>
                 <div className="relative mt-2">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
