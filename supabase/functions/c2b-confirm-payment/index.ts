@@ -39,21 +39,103 @@ async function safeSendSms(supabase: any, rawPhone: unknown, message: string, la
 }
 
 
+// ---------------------------------------------------------------------------
+// Idempotency wrapper.
+// Safaricom retries C2B confirmations aggressively (and our own retries/manual
+// replays can fire the same callback again). Every callback is claimed
+// atomically by its M-Pesa receipt (TransID) via claim_c2b_callback() BEFORE any
+// business logic runs, so a duplicate can never create a second membership,
+// clear a registration fee twice, or double-credit a balance.
+//  - first caller  -> 'claimed'   -> processes, result cached on the claim row
+//  - later callers -> 'duplicate' -> cached response replayed, no side effects
+//  - crashed run   -> claim released / stale after 10 min so it can be retried
+// ---------------------------------------------------------------------------
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const idemClient = createClient(supabaseUrl, supabaseServiceKey);
+
   let callbackData: any = {};
+  try {
+    callbackData = await req.json();
+  } catch (_) {
+    return new Response(
+      JSON.stringify({ ResultCode: 1, ResultDesc: 'Invalid callback payload' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const receiptKey = callbackData?.TransID ? String(callbackData.TransID).trim().toUpperCase() : '';
+  if (!receiptKey) {
+    // No receipt = nothing to deduplicate on; the handler will reject/park it.
+    return await handleCallback(callbackData);
+  }
+
+  let claimed = true;
+  try {
+    const { data: claimResult, error: claimError } = await idemClient
+      .rpc('claim_c2b_callback', { p_receipt: receiptKey });
+    if (claimError) {
+      console.error('[idempotency] claim failed, falling back to in-handler checks:', claimError.message);
+    } else if (claimResult === 'duplicate') {
+      claimed = false;
+      const { data: prior } = await idemClient
+        .from('c2b_callback_claims')
+        .select('result')
+        .eq('receipt', receiptKey)
+        .maybeSingle();
+      console.log('[idempotency] Duplicate callback ignored for receipt:', receiptKey);
+      return new Response(
+        JSON.stringify(prior?.result ?? { ResultCode: 0, ResultDesc: 'Payment already processed' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+  } catch (err) {
+    console.error('[idempotency] claim threw, continuing:', (err as Error)?.message);
+  }
+
+  let response: Response;
+  try {
+    response = await handleCallback(callbackData);
+  } catch (err) {
+    // Release the claim so a retry can be processed.
+    await idemClient.from('c2b_callback_claims').delete().eq('receipt', receiptKey).eq('status', 'processing');
+    throw err;
+  }
+
+  const bodyText = await response.clone().text();
+  if (claimed) {
+    if (response.status >= 200 && response.status < 300) {
+      let parsed: any = null;
+      try { parsed = JSON.parse(bodyText); } catch (_) { parsed = { raw: bodyText }; }
+      await idemClient
+        .from('c2b_callback_claims')
+        .update({ status: 'completed', result: parsed, completed_at: new Date().toISOString() })
+        .eq('receipt', receiptKey);
+    } else {
+      // Nothing was recorded — free the receipt for a legitimate retry.
+      await idemClient.from('c2b_callback_claims').delete().eq('receipt', receiptKey).eq('status', 'processing');
+    }
+  }
+
+  return response;
+});
+
+async function handleCallback(callbackData: any): Promise<Response> {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    callbackData = await req.json();
     (globalThis as any).__lastCallback = callbackData;
     console.log('Received C2B callback:', JSON.stringify(callbackData, null, 2));
+
+
 
 
     // Extract payment details from M-Pesa C2B callback
@@ -955,8 +1037,22 @@ serve(async (req) => {
           matchedMember = created;
           console.log('Auto-enrolled welfare member from offline payment:', created?.id);
         } catch (e) {
-          console.error('Auto-enroll failed:', (e as Error).message);
+          // Second safety net: a concurrent/duplicate callback may have just created the
+          // membership. Never create a second one — re-read and reuse it.
+          const { data: raced } = await supabase
+            .from('welfare_members')
+            .select('id, user_id')
+            .eq('welfare_id', welfareData.id)
+            .eq('user_id', payerProfileId)
+            .maybeSingle();
+          if (raced) {
+            matchedMember = raced;
+            console.log('Auto-enroll raced; reusing existing membership:', raced.id);
+          } else {
+            console.error('Auto-enroll failed:', (e as Error).message);
+          }
         }
+
       }
 
       // Track real commission/net totals (registration is 10%, contribution is welfare rate)
@@ -1251,7 +1347,8 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}
+
 
 async function logUnmatchedPayment(
   supabase: any, raw: any, receipt: string, amount: any, phone: any,

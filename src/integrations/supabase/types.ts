@@ -196,6 +196,30 @@ export type Database = {
           },
         ]
       }
+      c2b_callback_claims: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          receipt: string
+          result: Json | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          receipt: string
+          result?: Json | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          receipt?: string
+          result?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
       chama: {
         Row: {
           accepting_rejoin_requests: boolean | null
@@ -4437,6 +4461,7 @@ export type Database = {
         Args: { p_email: string; p_id_number: string; p_phone: string }
         Returns: Json
       }
+      claim_c2b_callback: { Args: { p_receipt: string }; Returns: string }
       claim_chama_shortfall_for_settlement: {
         Args: { p_amount: number; p_chama_id: string }
         Returns: {
