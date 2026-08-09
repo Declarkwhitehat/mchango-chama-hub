@@ -148,7 +148,7 @@ const AdminWelfareDetail = () => {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">Members</p><p className="text-xl font-bold">{members.length}</p></CardContent></Card>
+          <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">Members</p><p className="text-xl font-bold">{members.filter((m) => m.status === "active" && (!m.registration_status || m.registration_status === "confirmed")).length}</p></CardContent></Card>
           <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">Registration Fee</p><p className="text-xl font-bold">KES {Number(welfare.registration_fee || 0).toLocaleString()}</p></CardContent></Card>
           <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">Cycle Amount</p><p className="text-xl font-bold">KES {Number(welfare.contribution_amount || 0).toLocaleString()}</p></CardContent></Card>
           <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">Balance</p><p className="text-xl font-bold">KES {Number(welfare.available_balance || 0).toLocaleString()}</p></CardContent></Card>
