@@ -11,10 +11,13 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Loader2, Search, ShieldCheck, Users } from "lucide-react";
 import { toast } from "sonner";
+import { WelfareMemberRegisterDownload } from "@/components/welfare/WelfareMemberRegisterDownload";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AdminWelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [welfare, setWelfare] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
@@ -162,7 +165,18 @@ const AdminWelfareDetail = () => {
           <TabsContent value="members">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Member Contribution Progress</CardTitle>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-base">Member Contribution Progress</CardTitle>
+                  <WelfareMemberRegisterDownload
+                    welfareId={welfare.id}
+                    welfareName={welfare.name}
+                    welfareCode={welfare.group_code}
+                    members={members.filter((m) => m.status === "active" && (!m.registration_status || m.registration_status === "confirmed"))}
+                    canViewPhones={true}
+                    issuedByName={profile?.full_name || null}
+                    issuedByRole="Administrator"
+                  />
+                </div>
                 <div className="relative mt-2">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
