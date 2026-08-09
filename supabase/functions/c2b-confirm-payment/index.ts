@@ -1037,8 +1037,22 @@ async function handleCallback(callbackData: any): Promise<Response> {
           matchedMember = created;
           console.log('Auto-enrolled welfare member from offline payment:', created?.id);
         } catch (e) {
-          console.error('Auto-enroll failed:', (e as Error).message);
+          // Second safety net: a concurrent/duplicate callback may have just created the
+          // membership. Never create a second one — re-read and reuse it.
+          const { data: raced } = await supabase
+            .from('welfare_members')
+            .select('id, user_id')
+            .eq('welfare_id', welfareData.id)
+            .eq('user_id', payerProfileId)
+            .maybeSingle();
+          if (raced) {
+            matchedMember = raced;
+            console.log('Auto-enroll raced; reusing existing membership:', raced.id);
+          } else {
+            console.error('Auto-enroll failed:', (e as Error).message);
+          }
         }
+
       }
 
       // Track real commission/net totals (registration is 10%, contribution is welfare rate)
