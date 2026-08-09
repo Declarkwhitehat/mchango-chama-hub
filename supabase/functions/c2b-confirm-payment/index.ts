@@ -1333,7 +1333,8 @@ async function handleCallback(callbackData: any): Promise<Response> {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}
+
 
 async function logUnmatchedPayment(
   supabase: any, raw: any, receipt: string, amount: any, phone: any,
