@@ -31,7 +31,7 @@ const AdminWelfareDetail = () => {
           supabase.from("welfares").select("*").eq("id", id).maybeSingle(),
           supabase
             .from("welfare_members")
-            .select("id, member_code, role, status, joined_at, total_contributed, registration_fee_paid, user_id, profiles:user_id(full_name, phone)")
+            .select("id, member_code, role, status, joined_at, total_contributed, registration_fee_paid, registration_status, user_id, profiles:user_id(full_name, phone)")
             .eq("welfare_id", id)
             .order("member_code"),
           supabase
