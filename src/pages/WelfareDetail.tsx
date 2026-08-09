@@ -572,7 +572,7 @@ const WelfareDetail = () => {
                     <Users className="h-4 w-4" />
                     Members ({countedMembers.length})
                   </CardTitle>
-                  {(isAdmin || isChairman || isSecretary) && (
+                  {(isAdmin || isChairman || isSecretary || isTreasurer) && (
                     <WelfareMemberRegisterDownload
                       welfareId={welfare.id}
                       welfareName={welfare.name}
