@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const AdminWelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [welfare, setWelfare] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
