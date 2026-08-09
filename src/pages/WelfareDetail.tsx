@@ -571,6 +571,39 @@ const WelfareDetail = () => {
               </Card>
             </div>
 
+            {/* Downloads */}
+            {(isAdmin || isChairman || isSecretary || isTreasurer) && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Official Downloads
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="[&_button]:w-full">
+                    <WelfareMemberRegisterDownload
+                      welfareId={welfare.id}
+                      welfareName={welfare.name}
+                      welfareCode={welfare.welfare_code || welfare.group_code}
+                      members={countedMembers}
+                      canViewPhones={isAdmin}
+                      issuedByName={profile?.full_name || null}
+                      issuedByRole={isAdmin ? 'Administrator' : myRole}
+                    />
+                  </div>
+                  <WelfareContributionReport
+                    welfareId={welfare.id}
+                    welfareName={welfare.name}
+                    welfareCode={welfare.welfare_code || welfare.group_code}
+                    canViewPhones={isAdmin}
+                    issuedByName={profile?.full_name || null}
+                    issuedByRole={isAdmin ? 'Administrator' : myRole}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
             {/* Members List with Success Rate */}
             <Card>
               <CardHeader>
