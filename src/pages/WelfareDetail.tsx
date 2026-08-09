@@ -501,7 +501,14 @@ const WelfareDetail = () => {
             />
             {/* PDF Report for all members */}
             {isMember && (
-              <WelfareContributionReport welfareId={welfare.id} welfareName={welfare.name} />
+              <WelfareContributionReport
+                welfareId={welfare.id}
+                welfareName={welfare.name}
+                welfareCode={welfare.welfare_code || welfare.group_code}
+                canViewPhones={isAdmin}
+                issuedByName={profile?.full_name || null}
+                issuedByRole={isAdmin ? 'Administrator' : myRole}
+              />
             )}
           </TabsContent>
 
