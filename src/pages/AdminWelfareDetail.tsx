@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Loader2, Search, ShieldCheck, Users } from "lucide-react";
 import { toast } from "sonner";
+import { WelfareMemberRegisterDownload } from "@/components/welfare/WelfareMemberRegisterDownload";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AdminWelfareDetail = () => {
   const { id } = useParams<{ id: string }>();
