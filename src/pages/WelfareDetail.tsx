@@ -120,6 +120,10 @@ const WelfareDetail = () => {
   }
 
   const activeMembers = welfare.welfare_members?.filter((m: any) => m.status === 'active') || [];
+  // Members who have cleared the registration fee (or where no fee applies) — used for counts/averages
+  const countedMembers = activeMembers.filter(
+    (m: any) => !m.registration_status || m.registration_status === 'confirmed'
+  );
   const isChairman = myRole === 'chairman';
   const isSecretary = myRole === 'secretary';
   const isTreasurer = myRole === 'treasurer';
@@ -543,15 +547,15 @@ const WelfareDetail = () => {
               <Card>
                 <CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xs text-muted-foreground">Total Members</p>
-                  <p className="text-2xl font-bold text-primary">{activeMembers.length}</p>
+                  <p className="text-2xl font-bold text-primary">{countedMembers.length}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-4 pb-4 text-center">
                   <p className="text-xs text-muted-foreground">Avg Contribution</p>
                   <p className="text-2xl font-bold">
-                    KES {activeMembers.length > 0
-                      ? Math.round(activeMembers.reduce((sum: number, m: any) => sum + Number(m.total_contributed || 0), 0) / activeMembers.length).toLocaleString()
+                    KES {countedMembers.length > 0
+                      ? Math.round(countedMembers.reduce((sum: number, m: any) => sum + Number(m.total_contributed || 0), 0) / countedMembers.length).toLocaleString()
                       : '0'}
                   </p>
                 </CardContent>
@@ -563,7 +567,7 @@ const WelfareDetail = () => {
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Members ({activeMembers.length})
+                  Members ({countedMembers.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>

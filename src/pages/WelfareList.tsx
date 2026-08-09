@@ -150,7 +150,7 @@ const WelfareList = () => {
                         </div>
                         <div>
                           <span className="text-muted-foreground">Members: </span>
-                          <span className="font-semibold">{welfare.welfare_members?.filter((m: any) => m.status === 'active').length || 0}</span>
+                          <span className="font-semibold">{welfare.welfare_members?.filter((m: any) => m.status === 'active' && (!m.registration_status || m.registration_status === 'confirmed')).length || 0}</span>
                         </div>
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Calendar className="h-3.5 w-3.5" />
