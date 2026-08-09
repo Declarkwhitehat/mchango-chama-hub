@@ -29,6 +29,8 @@ import { WelfareContributionReport } from "@/components/welfare/WelfareContribut
 import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 import { NextOfKinForm } from "@/components/welfare/NextOfKinForm";
 import { NextOfKinBanner } from "@/components/welfare/NextOfKinBanner";
+import { WelfareMemberRegisterDownload } from "@/components/welfare/WelfareMemberRegisterDownload";
+
 import SEO from "@/components/SEO";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 
@@ -565,11 +567,25 @@ const WelfareDetail = () => {
             {/* Members List with Success Rate */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Members ({countedMembers.length})
-                </CardTitle>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Members ({countedMembers.length})
+                  </CardTitle>
+                  {(isAdmin || isChairman || isSecretary) && (
+                    <WelfareMemberRegisterDownload
+                      welfareId={welfare.id}
+                      welfareName={welfare.name}
+                      welfareCode={welfare.welfare_code || welfare.group_code}
+                      members={countedMembers}
+                      canViewPhones={isAdmin}
+                      issuedByName={profile?.full_name || null}
+                      issuedByRole={isAdmin ? 'Administrator' : myRole}
+                    />
+                  )}
+                </div>
               </CardHeader>
+
               <CardContent>
                 <div className="space-y-2">
                   {activeMembers
