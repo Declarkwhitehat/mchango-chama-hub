@@ -120,6 +120,10 @@ const WelfareDetail = () => {
   }
 
   const activeMembers = welfare.welfare_members?.filter((m: any) => m.status === 'active') || [];
+  // Members who have cleared the registration fee (or where no fee applies) — used for counts/averages
+  const countedMembers = activeMembers.filter(
+    (m: any) => !m.registration_status || m.registration_status === 'confirmed'
+  );
   const isChairman = myRole === 'chairman';
   const isSecretary = myRole === 'secretary';
   const isTreasurer = myRole === 'treasurer';
