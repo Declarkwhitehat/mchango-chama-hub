@@ -30,6 +30,8 @@ import { WhatsAppLinkManager } from "@/components/shared/WhatsAppLinkManager";
 import { NextOfKinForm } from "@/components/welfare/NextOfKinForm";
 import { NextOfKinBanner } from "@/components/welfare/NextOfKinBanner";
 import { WelfareMemberRegisterDownload } from "@/components/welfare/WelfareMemberRegisterDownload";
+import { WelfareLoans } from "@/components/welfare/WelfareLoans";
+
 
 import SEO from "@/components/SEO";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
@@ -675,22 +677,18 @@ const WelfareDetail = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="loans">
-            <Card>
-              <CardContent className="py-12 text-center space-y-4">
-                <h2 className="text-xl sm:text-2xl font-extrabold">Get loans up to 4× your shares</h2>
-                <p className="text-muted-foreground font-semibold">Coming soon</p>
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                  <Button variant="outline" onClick={() => handleTabChange('members')}>
-                    Back to Members
-                  </Button>
-                  <Button variant="ghost" onClick={() => handleTabChange('overview')}>
-                    Go to Overview
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="loans" className="space-y-4">
+            <WelfareLoans welfareId={welfare.id} welfareName={welfare.name} />
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button variant="outline" onClick={() => handleTabChange('members')}>
+                Back to Members
+              </Button>
+              <Button variant="ghost" onClick={() => handleTabChange('overview')}>
+                Go to Overview
+              </Button>
+            </div>
           </TabsContent>
+
         </Tabs>
       </div>
     </Layout>

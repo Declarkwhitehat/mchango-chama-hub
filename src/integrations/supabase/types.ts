@@ -3802,6 +3802,190 @@ export type Database = {
           },
         ]
       }
+      welfare_loan_approvals: {
+        Row: {
+          approver_role: string
+          approver_user_id: string
+          created_at: string
+          decision: string
+          id: string
+          loan_id: string
+          notes: string | null
+        }
+        Insert: {
+          approver_role: string
+          approver_user_id: string
+          created_at?: string
+          decision?: string
+          id?: string
+          loan_id: string
+          notes?: string | null
+        }
+        Update: {
+          approver_role?: string
+          approver_user_id?: string
+          created_at?: string
+          decision?: string
+          id?: string
+          loan_id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_loan_approvals_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "welfare_loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      welfare_loan_repayments: {
+        Row: {
+          amount: number
+          balance_after: number
+          checkout_request_id: string | null
+          created_at: string
+          id: string
+          loan_id: string
+          member_id: string
+          mpesa_receipt: string | null
+          source: string
+          status: string
+          welfare_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after?: number
+          checkout_request_id?: string | null
+          created_at?: string
+          id?: string
+          loan_id: string
+          member_id: string
+          mpesa_receipt?: string | null
+          source?: string
+          status?: string
+          welfare_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          checkout_request_id?: string | null
+          created_at?: string
+          id?: string
+          loan_id?: string
+          member_id?: string
+          mpesa_receipt?: string | null
+          source?: string
+          status?: string
+          welfare_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_loan_repayments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "welfare_loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      welfare_loans: {
+        Row: {
+          amount_disbursed: number
+          approvals_count: number
+          balance: number
+          charge_amount: number
+          charge_rate: number
+          closed_at: string | null
+          company_share: number
+          created_at: string
+          disbursed_at: string | null
+          due_date: string | null
+          id: string
+          last_interest_at: string | null
+          loan_type: string
+          member_id: string
+          mpesa_receipt: string | null
+          principal: number
+          rejection_reason: string | null
+          shares_at_request: number
+          status: string
+          updated_at: string
+          user_id: string
+          welfare_id: string
+          welfare_share: number
+          withdrawal_id: string | null
+        }
+        Insert: {
+          amount_disbursed?: number
+          approvals_count?: number
+          balance?: number
+          charge_amount?: number
+          charge_rate?: number
+          closed_at?: string | null
+          company_share?: number
+          created_at?: string
+          disbursed_at?: string | null
+          due_date?: string | null
+          id?: string
+          last_interest_at?: string | null
+          loan_type: string
+          member_id: string
+          mpesa_receipt?: string | null
+          principal: number
+          rejection_reason?: string | null
+          shares_at_request?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+          welfare_id: string
+          welfare_share?: number
+          withdrawal_id?: string | null
+        }
+        Update: {
+          amount_disbursed?: number
+          approvals_count?: number
+          balance?: number
+          charge_amount?: number
+          charge_rate?: number
+          closed_at?: string | null
+          company_share?: number
+          created_at?: string
+          disbursed_at?: string | null
+          due_date?: string | null
+          id?: string
+          last_interest_at?: string | null
+          loan_type?: string
+          member_id?: string
+          mpesa_receipt?: string | null
+          principal?: number
+          rejection_reason?: string | null
+          shares_at_request?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+          welfare_id?: string
+          welfare_share?: number
+          withdrawal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_loans_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "welfare_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "welfare_loans_welfare_id_fkey"
+            columns: ["welfare_id"]
+            isOneToOne: false
+            referencedRelation: "welfares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       welfare_members: {
         Row: {
           created_at: string
@@ -4041,6 +4225,9 @@ export type Database = {
           is_frozen: boolean | null
           is_public: boolean | null
           is_verified: boolean | null
+          loan_min_membership_months: number
+          loan_min_payment_rate: number
+          loans_enabled: boolean
           min_contribution_period_months: number | null
           name: string
           paybill_account_id: string | null
@@ -4078,6 +4265,9 @@ export type Database = {
           is_frozen?: boolean | null
           is_public?: boolean | null
           is_verified?: boolean | null
+          loan_min_membership_months?: number
+          loan_min_payment_rate?: number
+          loans_enabled?: boolean
           min_contribution_period_months?: number | null
           name: string
           paybill_account_id?: string | null
@@ -4115,6 +4305,9 @@ export type Database = {
           is_frozen?: boolean | null
           is_public?: boolean | null
           is_verified?: boolean | null
+          loan_min_membership_months?: number
+          loan_min_payment_rate?: number
+          loans_enabled?: boolean
           min_contribution_period_months?: number | null
           name?: string
           paybill_account_id?: string | null
