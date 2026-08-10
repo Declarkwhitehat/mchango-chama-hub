@@ -5,6 +5,7 @@ import { getCommissionRate } from "../_shared/getCommissionRate.ts";
 import { createNotification, NotificationTemplates, notifyManyUsers } from "../_shared/notifications.ts";
 import { formatChamaPaymentSms, formatChamaOnBehalfBeneficiarySms } from "../_shared/paymentSmsTemplates.ts";
 import { getMemberOutstanding } from "../_shared/chamaOutstanding.ts";
+import { applyLoanRepayment, findOpenLoan } from "../_shared/applyLoanRepayment.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -140,7 +141,7 @@ async function handleCallback(callbackData: any): Promise<Response> {
 
     // Extract payment details from M-Pesa C2B callback
     const {
-      TransAmount: amount,
+      TransAmount: rawTransAmount,
       BillRefNumber: accountNumber, // This is the member ID (e.g., "ABC7")
       TransID: mpesaReceiptNumber,
       MSISDN: phoneNumber,
@@ -148,6 +149,8 @@ async function handleCallback(callbackData: any): Promise<Response> {
       MiddleName: middleName,
       LastName: lastName,
     } = callbackData;
+
+    let amount = rawTransAmount;
 
     if (!accountNumber || !amount || !mpesaReceiptNumber) {
       console.error('Missing required fields in callback:', callbackData);
@@ -979,6 +982,33 @@ async function handleCallback(callbackData: any): Promise<Response> {
 
     if (welfareData) {
       console.log('Found Welfare group:', welfareData);
+
+      // ── Offline loan repayment: an open loan is always settled first ──
+      if (matchedMember?.id) {
+        const openLoan = await findOpenLoan(supabase, matchedMember.id);
+        if (openLoan) {
+          const payAmount = parseFloat(amount);
+          const applyToLoan = Math.min(payAmount, Number(openLoan.balance || 0));
+          if (applyToLoan > 0) {
+            await applyLoanRepayment(supabase, {
+              loanId: openLoan.id,
+              amount: applyToLoan,
+              receipt: mpesaReceiptNumber,
+              source: 'paybill',
+            });
+            const leftover = Math.round((payAmount - applyToLoan) * 100) / 100;
+            if (leftover < 1) {
+              return new Response(
+                JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted', matched: 'welfare_loan_repayment' }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+              );
+            }
+            // Remaining money continues through the normal contribution flow
+            amount = String(leftover);
+          }
+        }
+      }
+
 
       const commissionRate = Number(welfareData.commission_rate) || COMMISSION_RATES.WELFARE;
       const REGISTRATION_COMMISSION_RATE = 0.10;

@@ -13,6 +13,7 @@ import {
   formatOrgThankYouSms,
 } from "../_shared/paymentSmsTemplates.ts";
 import { getMemberOutstanding } from "../_shared/chamaOutstanding.ts";
+import { applyLoanRepayment } from "../_shared/applyLoanRepayment.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -424,6 +425,39 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Welfare loan repayment initiated from the app (STK)
+    const { data: pendingLoanRepayments } = await supabaseClient
+      .from('welfare_loan_repayments')
+      .select('id, loan_id, amount, status')
+      .eq('checkout_request_id', checkoutRequestId)
+      .limit(1);
+
+    if (pendingLoanRepayments && pendingLoanRepayments.length > 0) {
+      const rep = pendingLoanRepayments[0];
+      if (rep.status === 'completed') {
+        return new Response(JSON.stringify({ success: true, message: 'Already processed' }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (status === 'failed') {
+        await supabaseClient.from('welfare_loan_repayments').update({ status: 'failed' }).eq('id', rep.id);
+        return new Response(JSON.stringify({ success: true, message: 'Loan repayment failed' }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const result = await applyLoanRepayment(supabaseClient, {
+        loanId: rep.loan_id,
+        amount: Number(paidAmount || rep.amount),
+        receipt: mpesaReceiptNumber || checkoutRequestId,
+        source: 'stk',
+        repaymentId: rep.id,
+      });
+      return new Response(JSON.stringify({ success: true, message: 'Loan repayment processed', ...result }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
 
     // Check if this is a welfare contribution / registration fee STK payment
     const { data: welfarePayments } = await supabaseClient
