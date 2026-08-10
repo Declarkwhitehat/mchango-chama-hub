@@ -266,7 +266,118 @@ Deno.serve(async (req) => {
       console.error('[CRON] Welfare reminder error:', e);
     }
 
-    console.log(`[CRON] Daily reminder completed. SMS Sent: ${remindersSent}, Notifications: ${notificationsCreated}, Welfare: ${welfareNotifications}, Errors: ${errors}`);
+    // ── Welfare loans: due reminders, overdue flagging, monthly penalty, shares recovery ──
+    let loansProcessed = 0;
+    try {
+      const { data: openLoans } = await supabase
+        .from('welfare_loans')
+        .select('id, welfare_id, member_id, user_id, loan_type, principal, balance, status, due_date, last_interest_at, welfares(name)')
+        .in('status', ['active', 'overdue'])
+        .limit(500);
+
+      const now = Date.now();
+      for (const loan of openLoans || []) {
+        const due = loan.due_date ? new Date(loan.due_date).getTime() : null;
+        if (!due) continue;
+        const welfareName = (loan as any).welfares?.name || 'your welfare';
+        const daysLeft = Math.ceil((due - now) / 86400000);
+
+        if (daysLeft > 0 && daysLeft <= 3) {
+          await createNotification(supabase, {
+            userId: loan.user_id,
+            title: 'Loan repayment due soon',
+            message: `Your loan balance of KES ${Number(loan.balance).toLocaleString()} with ${welfareName} is due in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Repay in the app or via Paybill 4015351.`,
+            type: 'warning',
+            category: 'welfare',
+            relatedEntityId: loan.welfare_id,
+            relatedEntityType: 'welfare',
+          } as any);
+          loansProcessed++;
+          continue;
+        }
+
+        if (daysLeft > 0) continue;
+
+        // Overdue
+        if (loan.loan_type === 'shares') {
+          // Recover the outstanding balance from the member's shares
+          const { data: member } = await supabase
+            .from('welfare_members')
+            .select('total_contributed')
+            .eq('id', loan.member_id)
+            .maybeSingle();
+          const outstanding = Number(loan.balance || 0);
+          const recovered = Math.min(outstanding, Number(member?.total_contributed || 0));
+          if (recovered > 0) {
+            await supabase.from('welfare_members')
+              .update({ total_contributed: Number(member?.total_contributed || 0) - recovered })
+              .eq('id', loan.member_id);
+            await supabase.from('welfare_loan_repayments').insert({
+              loan_id: loan.id, welfare_id: loan.welfare_id, member_id: loan.member_id,
+              amount: recovered, source: 'shares', status: 'completed',
+              balance_after: outstanding - recovered,
+            });
+          }
+          const newBal = Math.max(0, outstanding - recovered);
+          await supabase.from('welfare_loans').update({
+            balance: newBal,
+            status: newBal <= 0 ? 'repaid' : 'defaulted',
+            closed_at: newBal <= 0 ? new Date().toISOString() : null,
+          }).eq('id', loan.id);
+          await createNotification(supabase, {
+            userId: loan.user_id,
+            title: newBal <= 0 ? 'Loan recovered from your shares' : 'Loan in default',
+            message: newBal <= 0
+              ? `KES ${recovered.toLocaleString()} was recovered from your shares to clear your loan with ${welfareName}.`
+              : `KES ${recovered.toLocaleString()} was recovered from your shares. KES ${newBal.toLocaleString()} remains outstanding with ${welfareName}.`,
+            type: newBal <= 0 ? 'info' : 'error',
+            category: 'welfare',
+            relatedEntityId: loan.welfare_id,
+            relatedEntityType: 'welfare',
+          } as any);
+          loansProcessed++;
+          continue;
+        }
+
+        // Multiplier loan: +5% per full month past due, charged once per month
+        const lastAccrual = loan.last_interest_at ? new Date(loan.last_interest_at).getTime() : due;
+        if (now - lastAccrual >= 30 * 86400000) {
+          const penalty = Math.round(Number(loan.balance || 0) * 0.05 * 100) / 100;
+          const newBal = Math.round((Number(loan.balance || 0) + penalty) * 100) / 100;
+          await supabase.from('welfare_loans').update({
+            balance: newBal,
+            status: 'overdue',
+            last_interest_at: new Date().toISOString(),
+          }).eq('id', loan.id);
+          await createNotification(supabase, {
+            userId: loan.user_id,
+            title: 'Late loan penalty applied',
+            message: `A 5% monthly late charge of KES ${penalty.toLocaleString()} was added to your loan with ${welfareName}. New balance: KES ${newBal.toLocaleString()}.`,
+            type: 'error',
+            category: 'welfare',
+            relatedEntityId: loan.welfare_id,
+            relatedEntityType: 'welfare',
+          } as any);
+        } else if (loan.status !== 'overdue') {
+          await supabase.from('welfare_loans').update({ status: 'overdue' }).eq('id', loan.id);
+          await createNotification(supabase, {
+            userId: loan.user_id,
+            title: 'Loan overdue',
+            message: `Your loan of KES ${Number(loan.balance).toLocaleString()} with ${welfareName} is past due. A 5% charge is added each month it stays unpaid.`,
+            type: 'error',
+            category: 'welfare',
+            relatedEntityId: loan.welfare_id,
+            relatedEntityType: 'welfare',
+          } as any);
+        }
+        loansProcessed++;
+      }
+    } catch (e) {
+      console.error('[CRON] Welfare loan processing error:', e);
+    }
+
+    console.log(`[CRON] Daily reminder completed. SMS Sent: ${remindersSent}, Notifications: ${notificationsCreated}, Welfare: ${welfareNotifications}, Loans: ${loansProcessed}, Errors: ${errors}`);
+
 
 
     return new Response(JSON.stringify({ 
