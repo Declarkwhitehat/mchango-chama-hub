@@ -1,0 +1,1 @@
+TRUNCATE cron.job_run_details;
