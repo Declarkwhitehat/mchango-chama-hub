@@ -71,14 +71,31 @@ Deno.serve(async (req) => {
       );
     }
 
+    const SUPPORT_PHONE = '+254 755 991 325';
+    const deletedAccountResponse = (deletedAt: string | null) => {
+      let msg = `This account was deleted. Contact customer care on ${SUPPORT_PHONE} to restore it if 45 days have not elapsed since deletion.`;
+      if (deletedAt) {
+        const days = Math.floor((Date.now() - new Date(deletedAt).getTime()) / 86400000);
+        const remaining = 45 - days;
+        msg = remaining > 0
+          ? `This account was deleted ${days} day(s) ago. You have ${remaining} day(s) left to restore it — contact customer care on ${SUPPORT_PHONE}.`
+          : `This account was deleted ${days} day(s) ago and the 45-day restore window has elapsed. Contact customer care on ${SUPPORT_PHONE} for help.`;
+      }
+      return new Response(
+        JSON.stringify({ error: msg, accountDeleted: true }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    };
+
     // If phone number, look up email from profiles
     let loginEmail = normalizedIdentifier;
+    let deletedAtForIdentifier: string | null = null;
     if (identifierType === 'phone') {
       console.log('[LOGIN DEBUG] Looking up profile for phone:', normalizedIdentifier);
       
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('email, id, full_name')
+        .select('email, id, full_name, deleted_at')
         .eq('phone', normalizedIdentifier)
         .limit(1)
         .single();
@@ -86,10 +103,8 @@ Deno.serve(async (req) => {
       if (profileError || !profile) {
         console.error('[LOGIN DEBUG] Profile lookup failed:', {
           phone: normalizedIdentifier,
-          error: profileError,
           errorCode: profileError?.code,
           errorMessage: profileError?.message,
-          errorDetails: profileError?.details,
           remainingAttempts: identifierRateLimit.remainingAttempts
         });
         return new Response(
@@ -101,13 +116,22 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log('[LOGIN DEBUG] Profile found:', {
-        profileId: profile.id,
-        email: profile.email,
-        name: profile.full_name
-      });
-      
+      if (profile.deleted_at) {
+        return deletedAccountResponse(profile.deleted_at);
+      }
+
       loginEmail = profile.email;
+    } else {
+      const { data: emailProfile } = await supabase
+        .from('profiles')
+        .select('deleted_at')
+        .ilike('email', normalizedIdentifier)
+        .limit(1)
+        .maybeSingle();
+      if (emailProfile?.deleted_at) {
+        return deletedAccountResponse(emailProfile.deleted_at);
+      }
+      deletedAtForIdentifier = null;
     }
 
     console.log('[LOGIN DEBUG] Attempting authentication with email:', loginEmail);
@@ -117,6 +141,14 @@ Deno.serve(async (req) => {
       email: loginEmail,
       password: password,
     });
+
+    // Banned users (deleted accounts are banned in auth)
+    if (authError && (
+      (authError as any).code === 'user_banned' ||
+      /banned/i.test(authError.message || '')
+    )) {
+      return deletedAccountResponse(deletedAtForIdentifier);
+    }
 
     if (authError) {
       console.error('[LOGIN DEBUG] Authentication failed:', {
