@@ -256,6 +256,11 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       }
 
       if (!response.ok) {
+        if (responseData.accountDeleted) {
+          const delErr = new Error(responseData.error || 'This account was deleted. Contact customer care to restore it.');
+          (delErr as any).accountDeleted = true;
+          throw delErr;
+        }
         const error = new Error(
           responseData.error?.includes('Invalid credentials')
             ? 'Invalid email/phone or password. Please check your credentials and try again.'

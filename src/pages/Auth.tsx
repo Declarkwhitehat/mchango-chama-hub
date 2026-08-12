@@ -447,7 +447,9 @@ const Auth = () => {
           setRemainingAttempts((error as any).remainingAttempts);
         }
 
-        if (error.message.includes("Invalid login credentials") || error.message.includes("No account found") || error.message.includes("Invalid")) {
+        if ((error as any).accountDeleted) {
+          toast.error(error.message, { duration: 10000 });
+        } else if (error.message.includes("Invalid login credentials") || error.message.includes("No account found") || error.message.includes("Invalid")) {
           toast.error("Invalid credentials. Please check your email/phone and password.");
         } else if (error.message.includes("Email not confirmed")) {
           toast.error("Please verify your email address before logging in. Check your inbox.");
