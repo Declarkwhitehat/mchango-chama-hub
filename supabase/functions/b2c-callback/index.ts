@@ -286,12 +286,27 @@ serve(async (req) => {
       sourceName = welfareData?.name || 'your Welfare';
     }
 
-    // Get recipient phone from profile
+    // Get recipient phone from profile, with fallbacks so payout SMS is never skipped
     let recipientPhone = '';
     if (withdrawal.requested_by) {
       const { data: profileData } = await supabaseAdmin.from('profiles').select('phone').eq('id', withdrawal.requested_by).maybeSingle();
       recipientPhone = profileData?.phone || '';
     }
+    if (!recipientPhone && withdrawal.payment_method_id) {
+      try {
+        const { data: pm } = await supabaseAdmin
+          .from('payment_methods').select('account_number, phone_number').eq('id', withdrawal.payment_method_id).maybeSingle();
+        recipientPhone = (pm as any)?.phone_number || (pm as any)?.account_number || '';
+      } catch (_e) { /* ignore */ }
+    }
+    if (!recipientPhone && recipientPhoneLast9) {
+      recipientPhone = `+254${recipientPhoneLast9}`;
+    }
+    if (recipientPhone && !recipientPhone.startsWith('+')) {
+      const digits = recipientPhone.replace(/\D/g, '').slice(-9);
+      if (digits.length === 9) recipientPhone = `+254${digits}`;
+    }
+
 
     if (resultCode === 0) {
       // === PAYMENT SUCCESSFUL ===
