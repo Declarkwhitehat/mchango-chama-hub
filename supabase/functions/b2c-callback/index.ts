@@ -286,12 +286,27 @@ serve(async (req) => {
       sourceName = welfareData?.name || 'your Welfare';
     }
 
-    // Get recipient phone from profile
+    // Get recipient phone from profile, with fallbacks so payout SMS is never skipped
     let recipientPhone = '';
     if (withdrawal.requested_by) {
       const { data: profileData } = await supabaseAdmin.from('profiles').select('phone').eq('id', withdrawal.requested_by).maybeSingle();
       recipientPhone = profileData?.phone || '';
     }
+    if (!recipientPhone && withdrawal.payment_method_id) {
+      try {
+        const { data: pm } = await supabaseAdmin
+          .from('payment_methods').select('account_number, phone_number').eq('id', withdrawal.payment_method_id).maybeSingle();
+        recipientPhone = (pm as any)?.phone_number || (pm as any)?.account_number || '';
+      } catch (_e) { /* ignore */ }
+    }
+    if (!recipientPhone && recipientPhoneLast9) {
+      recipientPhone = `+254${recipientPhoneLast9}`;
+    }
+    if (recipientPhone && !recipientPhone.startsWith('+')) {
+      const digits = recipientPhone.replace(/\D/g, '').slice(-9);
+      if (digits.length === 9) recipientPhone = `+254${digits}`;
+    }
+
 
     if (resultCode === 0) {
       // === PAYMENT SUCCESSFUL ===
@@ -415,10 +430,12 @@ serve(async (req) => {
         const balanceLine = (withdrawal.mchango_id && remainingBalance !== null)
           ? ` Balance: KES ${remainingBalance.toFixed(2)}.`
           : '';
-        const refLine = transactionId ? ` Mpesa Ref: ${transactionId}.` : '';
+        const receiptRef = transactionId || conversationId || withdrawal.payment_reference || withdrawal.id.slice(0, 8).toUpperCase();
+        const paidAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 16);
         const sourceLabel = `${sourceName} ${sourceType.toLowerCase()}`;
-        const successMessage = `Confirmed you have received ${amountStr} from ${sourceLabel}.${refLine}${balanceLine} Sisi tuko pamoja, je wewe?`;
+        const successMessage = `Confirmed. You have received ${amountStr} from ${sourceLabel} on ${paidAt}. Receipt: ${receiptRef}.${balanceLine} Sisi tuko pamoja, je wewe?`;
         await sendSMS(recipientPhone, successMessage);
+
       }
 
       // === DUAL SMS: chama debt-settlement (payer + recipient) ===
