@@ -575,6 +575,16 @@ serve(async (req) => {
             .select('full_name, phone')
             .eq('id', member.user_id)
             .maybeSingle();
+          let currentShares: number | null = null;
+          try {
+            const { data: sharesRow } = await supabaseClient
+              .from('welfare_members')
+              .select('total_contributed')
+              .eq('id', member.id)
+              .maybeSingle();
+            if (sharesRow) currentShares = Number(sharesRow.total_contributed) || 0;
+          } catch (_e) { /* ignore */ }
+
           if (contribProfile?.phone) {
             await supabaseClient.functions.invoke('send-transactional-sms', {
               body: {
@@ -584,6 +594,7 @@ serve(async (req) => {
                   welfareName: welfare?.name || 'Welfare',
                   amount: grossAmount,
                   receipt: mpesaReceiptNumber || checkoutRequestId,
+                  shares: currentShares,
                 }),
                 eventType: 'welfare_contribution_confirmation_stk',
               },
@@ -714,7 +725,7 @@ serve(async (req) => {
         try {
           const { data: mchangoMeta } = await supabaseClient
             .from('mchango')
-            .select('title, created_by, managers')
+            .select('title, created_by, managers, current_amount, target_amount')
             .eq('id', donation.mchango_id)
             .maybeSingle();
           const campaignName = mchangoMeta?.title || 'your campaign';
@@ -756,7 +767,14 @@ serve(async (req) => {
               await supabaseClient.functions.invoke('send-transactional-sms', {
                 body: {
                   phone: donation.phone,
-                  message: formatMchangoThankYouSms({ donorFullName: donorName, campaignName, amount: grossAmount }),
+                  message: formatMchangoThankYouSms({
+                    donorFullName: donorName,
+                    campaignName,
+                    amount: grossAmount,
+                    receipt: mpesaReceiptNumber || checkoutRequestId,
+                    raised: mchangoMeta?.current_amount ?? null,
+                    goal: mchangoMeta?.target_amount ?? null,
+                  }),
                   eventType: 'mchango_donation_thankyou',
                 },
               });
