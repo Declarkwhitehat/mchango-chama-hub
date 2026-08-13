@@ -430,10 +430,12 @@ serve(async (req) => {
         const balanceLine = (withdrawal.mchango_id && remainingBalance !== null)
           ? ` Balance: KES ${remainingBalance.toFixed(2)}.`
           : '';
-        const refLine = transactionId ? ` Mpesa Ref: ${transactionId}.` : '';
+        const receiptRef = transactionId || conversationId || withdrawal.payment_reference || withdrawal.id.slice(0, 8).toUpperCase();
+        const paidAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 16);
         const sourceLabel = `${sourceName} ${sourceType.toLowerCase()}`;
-        const successMessage = `Confirmed you have received ${amountStr} from ${sourceLabel}.${refLine}${balanceLine} Sisi tuko pamoja, je wewe?`;
+        const successMessage = `Confirmed. You have received ${amountStr} from ${sourceLabel} on ${paidAt}. Receipt: ${receiptRef}.${balanceLine} Sisi tuko pamoja, je wewe?`;
         await sendSMS(recipientPhone, successMessage);
+
       }
 
       // === DUAL SMS: chama debt-settlement (payer + recipient) ===
