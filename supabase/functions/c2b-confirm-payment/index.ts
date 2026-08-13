@@ -650,7 +650,7 @@ async function handleCallback(callbackData: any): Promise<Response> {
     // Try mchango (fundraising campaign) - matches by paybill_account_id (e.g., MCAB1234) or group_code
     const { data: mchangoData } = await supabase
       .from('mchango')
-      .select('id, group_code, paybill_account_id, title, current_amount, total_gross_collected, total_commission_paid, available_balance')
+      .select('id, group_code, paybill_account_id, title, current_amount, target_amount, total_gross_collected, total_commission_paid, available_balance')
       .or(`paybill_account_id.eq.${upperAccountNumber},group_code.eq.${upperAccountNumber}`)
       .eq('status', 'active')
       .maybeSingle();
@@ -743,7 +743,7 @@ async function handleCallback(callbackData: any): Promise<Response> {
         await safeSendSms(
           supabase,
           phoneNumber,
-          `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${mchangoData.title}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
+          `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${mchangoData.title}" has been received. Receipt: ${mpesaReceiptNumber}. Campaign balance: KES ${Math.round((mchangoData.current_amount || 0) + netAmount).toLocaleString()}${mchangoData.target_amount ? ` of KES ${Math.round(mchangoData.target_amount).toLocaleString()} target` : ''}. Sisi tuko pamoja, je wewe?`,
           'mchango-donor'
         );
       }
@@ -1272,11 +1272,25 @@ async function handleCallback(callbackData: any): Promise<Response> {
           description: `Offline welfare contribution (registration fee 10%, contributions ${(commissionRate * 100).toFixed(0)}%)`
         });
 
-      // Send confirmation SMS
+      // Send confirmation SMS (with the member's current welfare shares)
+      let payerSharesLine = '';
+      try {
+        if (matchedMember?.id) {
+          const { data: sharesRow } = await supabase
+            .from('welfare_members')
+            .select('total_contributed')
+            .eq('id', matchedMember.id)
+            .maybeSingle();
+          if (sharesRow) {
+            payerSharesLine = ` Your total shares in this welfare are now KES ${Math.round(Number(sharesRow.total_contributed) || 0).toLocaleString()}.`;
+          }
+        }
+      } catch (_e) { /* ignore */ }
+
       await safeSendSms(
         supabase,
         phoneNumber,
-        `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${welfareData.name}" has been received. Receipt: ${mpesaReceiptNumber}.`,
+        `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${welfareData.name}" has been received. Receipt: ${mpesaReceiptNumber}.${payerSharesLine}`,
         'welfare-payer'
       );
 

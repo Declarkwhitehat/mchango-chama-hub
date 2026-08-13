@@ -66,18 +66,31 @@ export const formatWelfarePaymentSms = (args: {
   welfareName: string;
   amount: number;
   receipt: string;
+  shares?: number | null;
 }): string => {
   const name = firstNameOf(args.fullName);
-  return `Hi ${name}, ${kes(args.amount)} received for "${args.welfareName}". Receipt: ${args.receipt}.${STOP}`;
+  const sharesLine = (args.shares !== undefined && args.shares !== null)
+    ? ` Your total shares in this welfare are now ${kes(args.shares)}.`
+    : '';
+  return `Hi ${name}, ${kes(args.amount)} received for "${args.welfareName}". Receipt: ${args.receipt}.${sharesLine}${STOP}`;
 };
 
 export const formatMchangoThankYouSms = (args: {
   donorFullName?: string | null;
   campaignName: string;
   amount: number;
+  receipt?: string | null;
+  raised?: number | null;
+  goal?: number | null;
 }): string => {
   const name = firstNameOf(args.donorFullName, 'Friend');
-  return `Thank you ${name}! Your donation of ${kes(args.amount)} to "${args.campaignName}" has been received. Sisi tuko pamoja, je wewe?${STOP}`;
+  const receiptLine = args.receipt ? ` Receipt: ${args.receipt}.` : '';
+  let progress = '';
+  if (args.raised !== undefined && args.raised !== null) {
+    progress = ` Campaign balance: ${kes(args.raised)}`;
+    progress += (args.goal && args.goal > 0) ? ` of ${kes(args.goal)} target.` : '.';
+  }
+  return `Thank you ${name}! Your donation of ${kes(args.amount)} to "${args.campaignName}" has been received.${receiptLine}${progress} Sisi tuko pamoja, je wewe?${STOP}`;
 };
 
 export const formatOrgThankYouSms = (args: {

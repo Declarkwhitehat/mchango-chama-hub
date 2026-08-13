@@ -251,6 +251,18 @@ serve(async (req) => {
           relatedEntityType: 'welfare',
         });
 
+        // Member's current welfare shares (total contributed) for the SMS
+        let currentShares: number | null = null;
+        try {
+          const { data: sharesRow } = await supabaseAdmin
+            .from('welfare_members')
+            .select('total_contributed')
+            .eq('welfare_id', welfare_id)
+            .eq('user_id', userData.user.id)
+            .maybeSingle();
+          if (sharesRow) currentShares = Number(sharesRow.total_contributed) || 0;
+        } catch (_e) { /* ignore */ }
+
         // Send confirmation SMS to the contributor
         const { data: contribProfile } = await supabaseAdmin
           .from('profiles')
@@ -267,6 +279,7 @@ serve(async (req) => {
                   welfareName: wName,
                   amount: grossAmount,
                   receipt: paymentRef,
+                  shares: currentShares,
                 }),
                 eventType: 'welfare_contribution_confirmation',
               },
