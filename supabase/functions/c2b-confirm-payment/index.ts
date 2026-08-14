@@ -743,7 +743,7 @@ async function handleCallback(callbackData: any): Promise<Response> {
         await safeSendSms(
           supabase,
           phoneNumber,
-          `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${mchangoData.title}" has been received. Receipt: ${mpesaReceiptNumber}. Campaign balance: KES ${Math.round((mchangoData.current_amount || 0) + netAmount).toLocaleString()}${mchangoData.target_amount ? ` of KES ${Math.round(mchangoData.target_amount).toLocaleString()} target` : ''}. Sisi tuko pamoja, je wewe?`,
+          `Your KES ${grossAmount.toLocaleString()} donation to "${mchangoData.title}" has been received. Receipt: ${mpesaReceiptNumber}. Balance: KES ${Math.round((mchangoData.current_amount || 0) + netAmount).toLocaleString()}${mchangoData.target_amount ? ` of KES ${Math.round(mchangoData.target_amount).toLocaleString()} target` : ''}.`,
           'mchango-donor'
         );
       }
@@ -885,7 +885,7 @@ async function handleCallback(callbackData: any): Promise<Response> {
       await safeSendSms(
         supabase,
         phoneNumber,
-        `Thank you ${firstName}! Your donation of KES ${grossAmount.toLocaleString()} to "${orgData.name}" has been received. Receipt: ${mpesaReceiptNumber}. We sincerely appreciate your generosity. Sisi tuko pamoja, je wewe?`,
+        `Your KES ${grossAmount.toLocaleString()} donation to "${orgData.name}" has been received. Receipt: ${mpesaReceiptNumber}.`,
         'org-donor'
       );
 
@@ -1290,7 +1290,7 @@ async function handleCallback(callbackData: any): Promise<Response> {
       await safeSendSms(
         supabase,
         phoneNumber,
-        `Thank you ${firstName}! Your contribution of KES ${grossAmount.toLocaleString()} to "${welfareData.name}" has been received. Receipt: ${mpesaReceiptNumber}.${payerSharesLine}`,
+        `Hi ${firstName}, KES ${grossAmount.toLocaleString()} received for "${welfareData.name}". Receipt: ${mpesaReceiptNumber}.${payerSharesLine}`,
         'welfare-payer'
       );
 

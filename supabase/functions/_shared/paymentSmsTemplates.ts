@@ -83,14 +83,13 @@ export const formatMchangoThankYouSms = (args: {
   raised?: number | null;
   goal?: number | null;
 }): string => {
-  const name = firstNameOf(args.donorFullName, 'Friend');
   const receiptLine = args.receipt ? ` Receipt: ${args.receipt}.` : '';
   let progress = '';
   if (args.raised !== undefined && args.raised !== null) {
-    progress = ` Campaign balance: ${kes(args.raised)}`;
+    progress = ` Balance: ${kes(args.raised)}`;
     progress += (args.goal && args.goal > 0) ? ` of ${kes(args.goal)} target.` : '.';
   }
-  return `Thank you ${name}! Your donation of ${kes(args.amount)} to "${args.campaignName}" has been received.${receiptLine}${progress} Sisi tuko pamoja, je wewe?${STOP}`;
+  return `Your ${kes(args.amount)} donation to "${args.campaignName}" has been received.${receiptLine}${progress}${STOP}`;
 };
 
 export const formatOrgThankYouSms = (args: {
@@ -98,8 +97,7 @@ export const formatOrgThankYouSms = (args: {
   organizationName: string;
   amount: number;
 }): string => {
-  const name = firstNameOf(args.donorFullName, 'Friend');
-  return `Thank you ${name}! Your donation of ${kes(args.amount)} to "${args.organizationName}" has been received. Sisi tuko pamoja, je wewe?${STOP}`;
+  return `Your ${kes(args.amount)} donation to "${args.organizationName}" has been received.${STOP}`;
 };
 
 // Professional contribution reminder: who, how much, how to pay, and by when.
