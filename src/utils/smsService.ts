@@ -139,7 +139,7 @@ export const SMS_TEMPLATES = {
     `Your password reset code is ${code}. It expires in 10 minutes. Do not share this code with anyone.${STOP_LINE}`,
 
   paymentReceived: (amount: number, reference: string) =>
-    `Payment of KES ${amount.toFixed(2)} received successfully. Ref: ${reference}. Thank you!${STOP_LINE}`,
+    `Payment of KES ${amount.toFixed(2)} received successfully. Ref: ${reference}.${STOP_LINE}`,
 
   dailyPaymentReminder: (name: string, amount: number, memberCode: string) =>
     `Hi ${name}, your contribution of KES ${amount.toFixed(2)} is due today. Pay via M-Pesa or online. Member ID: ${memberCode}.${STOP_LINE}`,
@@ -181,7 +181,7 @@ export const SMS_TEMPLATES = {
     `A new cycle has started for "${chamaName}". You are member #${memberNumber}. Your payout date: ${payoutDate}. Contributions begin now.${STOP_LINE}`,
 
   payoutConfirmed: (amount: number, reference: string, entityType: string, entityName: string, timestamp: string) =>
-    `Payout of KES ${amount.toFixed(2)} confirmed. Ref: ${reference}. Source: ${entityType} "${entityName}". Sent on ${timestamp}. Sisi tuko pamoja, je wewe?${STOP_LINE}`,
+    `Payout of KES ${amount.toFixed(2)} confirmed. Ref: ${reference}. Source: ${entityType} "${entityName}". Sent on ${timestamp}.${STOP_LINE}`,
 
   chamaDeleted: (chamaName: string, rejoinCount: number, totalMembers: number) =>
     `"${chamaName}" did not meet the 40% rejoin requirement (${rejoinCount}/${totalMembers}). The Chama has been closed. You may join or create a new one.${STOP_LINE}`,

@@ -433,7 +433,7 @@ serve(async (req) => {
         const receiptRef = transactionId || conversationId || withdrawal.payment_reference || withdrawal.id.slice(0, 8).toUpperCase();
         const paidAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 16);
         const sourceLabel = `${sourceName} ${sourceType.toLowerCase()}`;
-        const successMessage = `Confirmed. You have received ${amountStr} from ${sourceLabel} on ${paidAt}. Receipt: ${receiptRef}.${balanceLine} Sisi tuko pamoja, je wewe?`;
+        const successMessage = `Confirmed. You have received ${amountStr} from ${sourceLabel} on ${paidAt}. Receipt: ${receiptRef}.${balanceLine}`;
         await sendSMS(recipientPhone, successMessage);
 
       }
