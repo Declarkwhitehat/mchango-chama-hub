@@ -106,10 +106,9 @@ export const formatContributionReminderSms = (args: {
   dueText: string; // e.g. "5 Aug 2026 by 10:00 PM"
   balance?: number;
 }): string => {
-  const name = firstNameOf(args.fullName);
   const owed = args.balance && args.balance > 0 && args.balance !== args.amount
     ? ` Outstanding balance: ${kes(args.balance)}.`
     : '';
-  return `Hi ${name}, your ${kes(args.amount)} contribution to "${args.groupName}" is due on ${args.dueText}.${owed} Pay via M-Pesa Paybill 4015351, Account ${args.memberCode}, or in the app. Thank you for keeping your group strong.${STOP}`;
+  return `Your ${kes(args.amount)} contribution to "${args.groupName}" is due on ${args.dueText}.${owed} Pay via Paybill 4015351, Account ${args.memberCode}.${STOP}`;
 };
 
