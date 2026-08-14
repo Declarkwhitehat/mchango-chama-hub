@@ -29,9 +29,8 @@ export interface ChamaPaymentSmsArgs {
 }
 
 export const formatChamaPaymentSms = (a: ChamaPaymentSmsArgs): string => {
-  const name = firstNameOf(a.fullName);
   const dues = outstandingLine(a.shortfall || 0, a.priorDebt || 0);
-  return `Hi ${name}, ${kes(a.amount)} received for "${a.chamaName}". Receipt: ${a.receipt}.${dues}${STOP}`;
+  return `${kes(a.amount)} received for "${a.chamaName}". Receipt: ${a.receipt}.${dues}${STOP}`;
 };
 
 export const formatChamaOnBehalfPayerSms = (args: {
@@ -41,9 +40,8 @@ export const formatChamaOnBehalfPayerSms = (args: {
   amount: number;
   receipt: string;
 }): string => {
-  const payer = firstNameOf(args.payerFullName);
   const beneficiary = firstNameOf(args.beneficiaryFullName, 'a member');
-  return `Hi ${payer}, ${kes(args.amount)} paid for ${beneficiary} in "${args.chamaName}". Receipt: ${args.receipt}.${STOP}`;
+  return `${kes(args.amount)} paid for ${beneficiary} in "${args.chamaName}". Receipt: ${args.receipt}.${STOP}`;
 };
 
 export const formatChamaOnBehalfBeneficiarySms = (args: {
@@ -55,10 +53,9 @@ export const formatChamaOnBehalfBeneficiarySms = (args: {
   shortfall?: number;
   priorDebt?: number;
 }): string => {
-  const beneficiary = firstNameOf(args.beneficiaryFullName);
   const payer = firstNameOf(args.payerFullName, 'A member');
   const dues = outstandingLine(args.shortfall || 0, args.priorDebt || 0);
-  return `Hi ${beneficiary}, ${payer} paid ${kes(args.amount)} toward your contribution in "${args.chamaName}". Receipt: ${args.receipt}.${dues}${STOP}`;
+  return `${payer} paid ${kes(args.amount)} toward your contribution in "${args.chamaName}". Receipt: ${args.receipt}.${dues}${STOP}`;
 };
 
 export const formatWelfarePaymentSms = (args: {
@@ -68,12 +65,12 @@ export const formatWelfarePaymentSms = (args: {
   receipt: string;
   shares?: number | null;
 }): string => {
-  const name = firstNameOf(args.fullName);
   const sharesLine = (args.shares !== undefined && args.shares !== null)
-    ? ` Your total shares in this welfare are now ${kes(args.shares)}.`
+    ? ` Shares now ${kes(args.shares)}.`
     : '';
-  return `Hi ${name}, ${kes(args.amount)} received for "${args.welfareName}". Receipt: ${args.receipt}.${sharesLine}${STOP}`;
+  return `${kes(args.amount)} received for "${args.welfareName}". Receipt: ${args.receipt}.${sharesLine}${STOP}`;
 };
+
 
 export const formatMchangoThankYouSms = (args: {
   donorFullName?: string | null;
