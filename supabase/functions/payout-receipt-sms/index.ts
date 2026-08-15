@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { sendSms } from "../_shared/sendSms.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,38 +9,7 @@ const corsHeaders = {
 };
 
 async function sendSMS(phone: string, message: string) {
-  const onfonApiKey = Deno.env.get('ONFON_API_KEY');
-  const onfonClientId = Deno.env.get('ONFON_CLIENT_ID');
-  const onfonAccessKey = Deno.env.get('ONFON_ACCESS_KEY');
-  const onfonSenderId = Deno.env.get('ONFON_SENDER_ID') || 'OnfonInfo';
-
-  if (!onfonApiKey || !onfonClientId || !onfonAccessKey) {
-    console.error('Onfon SMS credentials not configured');
-    return { success: false, error: 'SMS not configured' };
-  }
-
-  let normalizedPhone = phone.replace(/^\+/, '').replace(/\s|-/g, '');
-  if (normalizedPhone.startsWith('0')) normalizedPhone = '254' + normalizedPhone.substring(1);
-  else if (!normalizedPhone.startsWith('254')) normalizedPhone = '254' + normalizedPhone.slice(-9);
-
-  try {
-    const response = await fetch('https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accesskey': onfonAccessKey },
-      body: JSON.stringify({
-        ApiKey: onfonApiKey,
-        ClientId: onfonClientId,
-        SenderId: onfonSenderId,
-        MessageParameters: [{ Number: normalizedPhone, Text: message }],
-      }),
-    });
-    const data = await response.json();
-    console.log('Payout SMS response:', JSON.stringify(data));
-    return { success: response.ok, data };
-  } catch (error) {
-    console.error('Payout SMS error:', (error as Error).message);
-    return { success: false, error: (error as Error).message };
-  }
+  return await sendSms(phone, message, 'payout_receipt');
 }
 
 function kenyaStamp(iso?: string | null) {
