@@ -568,6 +568,25 @@ async function handleCallback(callbackData: any): Promise<Response> {
                   })
                   .eq('id', currentCycle.id);
 
+                // Immediate payment completion must advance through the same
+                // idempotent cycle creator as scheduled payouts. Without this,
+                // carry-forward remains stranded and the next pool is empty.
+                try {
+                  const advanceResponse = await fetch(`${supabaseUrl}/functions/v1/cycle-auto-create`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${supabaseServiceKey}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ chamaId: chamaMemberData.chama_id, lastCycleId: currentCycle.id }),
+                  });
+                  if (!advanceResponse.ok) {
+                    console.error('C2B next-cycle creation failed:', await advanceResponse.text());
+                  }
+                } catch (advanceError) {
+                  console.error('C2B next-cycle dispatch failed:', (advanceError as Error)?.message);
+                }
+
                 // Trigger B2C payout if approved
                 if (canAutoApprove && paymentMethod.phone_number) {
                   console.log('🚀 C2B: Triggering automatic B2C payout');

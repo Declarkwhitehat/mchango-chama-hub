@@ -96,6 +96,89 @@ export function getEatMidnightOnePastForDate(referenceDate: Date): Date {
   ));
 }
 
+export interface ChamaCycleSchedule {
+  frequency: string;
+  everyNDaysCount?: number | null;
+  monthlyDay?: number | null;
+  monthlyDay2?: number | null;
+}
+
+function kenyaDateParts(date: Date) {
+  const kenyaClock = toKenyaClock(date);
+  return {
+    year: kenyaClock.getUTCFullYear(),
+    month: kenyaClock.getUTCMonth(),
+    day: kenyaClock.getUTCDate(),
+  };
+}
+
+function atKenyaTime(year: number, month: number, day: number, hour: number, minute = 0) {
+  return new Date(Date.UTC(year, month, day, hour - 3, minute, 0, 0));
+}
+
+/**
+ * Returns the cycle immediately after `lastEndDate` using Kenya calendar dates.
+ * All frequencies share this implementation so payout estimates and real cycles
+ * cannot drift at month boundaries.
+ */
+export function getNextChamaCycleWindow(
+  lastEndDate: Date,
+  schedule: ChamaCycleSchedule,
+): { startDate: Date; endDate: Date } {
+  const last = kenyaDateParts(lastEndDate);
+  const nextCalendarDay = new Date(Date.UTC(last.year, last.month, last.day + 1));
+  const nextYear = nextCalendarDay.getUTCFullYear();
+  const nextMonth = nextCalendarDay.getUTCMonth();
+  const nextDay = nextCalendarDay.getUTCDate();
+  const startDate = atKenyaTime(nextYear, nextMonth, nextDay, 0, 1);
+  let endYear = nextYear;
+  let endMonth = nextMonth;
+  let endDay = nextDay;
+
+  switch (schedule.frequency) {
+    case 'daily':
+      break;
+    case 'weekly': {
+      const target = new Date(Date.UTC(nextYear, nextMonth, nextDay + 6));
+      endYear = target.getUTCFullYear(); endMonth = target.getUTCMonth(); endDay = target.getUTCDate();
+      break;
+    }
+    case 'every_n_days': {
+      const length = Math.max(1, schedule.everyNDaysCount || 7);
+      const target = new Date(Date.UTC(nextYear, nextMonth, nextDay + length - 1));
+      endYear = target.getUTCFullYear(); endMonth = target.getUTCMonth(); endDay = target.getUTCDate();
+      break;
+    }
+    case 'monthly': {
+      if (schedule.monthlyDay) {
+        const candidate = new Date(Date.UTC(nextYear, nextMonth, schedule.monthlyDay));
+        if (candidate < new Date(Date.UTC(nextYear, nextMonth, nextDay))) candidate.setUTCMonth(candidate.getUTCMonth() + 1);
+        endYear = candidate.getUTCFullYear(); endMonth = candidate.getUTCMonth(); endDay = candidate.getUTCDate();
+      } else {
+        const target = new Date(Date.UTC(nextYear, nextMonth + 1, 0));
+        endYear = target.getUTCFullYear(); endMonth = target.getUTCMonth(); endDay = target.getUTCDate();
+      }
+      break;
+    }
+    case 'twice_monthly': {
+      const first = Math.min(schedule.monthlyDay || 1, schedule.monthlyDay2 || 15);
+      const second = Math.max(schedule.monthlyDay || 1, schedule.monthlyDay2 || 15);
+      let candidate: Date;
+      if (nextDay <= first) candidate = new Date(Date.UTC(nextYear, nextMonth, first));
+      else if (nextDay <= second) candidate = new Date(Date.UTC(nextYear, nextMonth, second));
+      else candidate = new Date(Date.UTC(nextYear, nextMonth + 1, first));
+      endYear = candidate.getUTCFullYear(); endMonth = candidate.getUTCMonth(); endDay = candidate.getUTCDate();
+      break;
+    }
+    default: {
+      const target = new Date(Date.UTC(nextYear, nextMonth, nextDay + 6));
+      endYear = target.getUTCFullYear(); endMonth = target.getUTCMonth(); endDay = target.getUTCDate();
+    }
+  }
+
+  return { startDate, endDate: atKenyaTime(endYear, endMonth, endDay, 22) };
+}
+
 /**
  * For twice-monthly chamas, return the next upcoming chosen contribution day
  * at 21:00 EAT (18:00 UTC). If both chosen days have passed this Kenya month,
