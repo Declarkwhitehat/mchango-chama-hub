@@ -1,5 +1,8 @@
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -67,12 +70,29 @@ export const PreStartDashboard = ({
   const canStart = approvedMembers.length >= minMembers;
   const membersNeeded = minMembers - approvedMembers.length;
 
-  // Sort by join date for display (earliest first = will be first in payout order)
+  const [provenUsers, setProvenUsers] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const loadTrack = async () => {
+      const userIds = approvedMembers.map(m => m.user_id).filter(Boolean);
+      if (userIds.length === 0) return;
+      const { data } = await supabase
+        .from('member_trust_scores')
+        .select('user_id, total_chamas_completed')
+        .in('user_id', userIds);
+      setProvenUsers(new Set((data || []).filter(r => (r.total_chamas_completed || 0) > 0).map(r => r.user_id)));
+    };
+    loadTrack();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members]);
+
+  // Sort by join date for display
   const sortedMembers = [...approvedMembers].sort((a, b) => {
     const aTime = a.joined_at ? new Date(a.joined_at).getTime() : 0;
     const bTime = b.joined_at ? new Date(b.joined_at).getTime() : 0;
     return aTime - bTime;
   });
+
 
   return (
     <div className="space-y-6">
@@ -125,7 +145,9 @@ export const PreStartDashboard = ({
             <CardTitle>Members ({approvedMembers.length})</CardTitle>
           </div>
           <CardDescription>
-            These members will participate when the chama starts. Order is based on join date.
+            These members will participate when the chama starts. Payout order is set on start
+            based on payment track record — members who completed a past chama come first, new
+            members are shuffled fairly.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -162,11 +184,16 @@ export const PreStartDashboard = ({
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-                    Payout #{index + 1}
-                  </Badge>
+                  {provenUsers.has(member.user_id) ? (
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                      Proven
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">New</Badge>
+                  )}
                 </div>
               ))}
+
             </div>
           )}
         </CardContent>
@@ -178,7 +205,7 @@ export const PreStartDashboard = ({
           <CardTitle className="text-base">What happens when you start?</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>• All approved members will be activated with their payout positions</p>
+          <p>• Payout positions are assigned by payment track record (proven members first)</p>
           <p>• <strong className="text-foreground">Members get until the next-day cutoff</strong> to prepare their first payment</p>
           <p>• First payment deadline: <strong className="text-foreground">9:00 PM the next day</strong> after start</p>
           <p>• Members will receive SMS notifications with their contribution schedule</p>
