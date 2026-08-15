@@ -737,6 +737,7 @@ export const CommissionAnalyticsDashboard = () => {
                     <Line type="monotone" dataKey="mchango" stroke="#ec4899" strokeWidth={2} name="Mchango" dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="chama" stroke="#3b82f6" strokeWidth={2} name="Chama" dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="organizations" stroke="#a855f7" strokeWidth={2} name="Organizations" dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="welfare" stroke="#10b981" strokeWidth={2} name="Welfare" dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </TabsContent>
