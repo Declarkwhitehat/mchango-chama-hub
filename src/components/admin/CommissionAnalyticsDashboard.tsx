@@ -331,6 +331,7 @@ export const CommissionAnalyticsDashboard = () => {
       { name: "Mchango (Campaigns)", rate: "7%", gross: summary.mchangoGross, commission: summary.mchangoCommission },
       { name: "Chama (Groups)", rate: "5-10%", gross: summary.chamaGross, commission: summary.chamaCommission },
       { name: "Organizations (NGOs)", rate: "5%", gross: summary.orgGross, commission: summary.orgCommission },
+      { name: "Welfare (Groups)", rate: "5-10%", gross: summary.welfareGross, commission: summary.welfareCommission },
     ];
 
     doc.setFontSize(9);
