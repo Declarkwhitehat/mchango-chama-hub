@@ -206,9 +206,16 @@ export const CommissionAnalyticsDashboard = () => {
 
       // Chama commission is booked on dedicated `commission` ledger rows
       // (their `contribution_summary` inflow rows carry 0 commission), so add
-      // those in for any source whose inflow rows recorded no commission.
+      // those in — but only for sources whose inflow rows recorded none, to
+      // avoid double-counting mirrored rows.
+      const inflowCommissionBySource: Record<string, number> = {};
+      for (const e of inflows) {
+        inflowCommissionBySource[e.source_type] =
+          (inflowCommissionBySource[e.source_type] || 0) + (Number(e.commission_amount) || 0);
+      }
       for (const e of all) {
         if (String(e.transaction_type || "").toLowerCase() !== "commission") continue;
+        if ((inflowCommissionBySource[e.source_type] || 0) > 0) continue;
         const c = Number(e.commission_amount) || Number(e.gross_amount) || 0;
         if (!c) continue;
         s.totalCommission += c;
@@ -217,6 +224,7 @@ export const CommissionAnalyticsDashboard = () => {
         else if (e.source_type === "organization") s.orgCommission += c;
         else if (e.source_type === "welfare") s.welfareCommission += c;
       }
+
       setSummary(s);
 
     } catch (err: any) {
