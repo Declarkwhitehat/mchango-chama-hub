@@ -72,6 +72,7 @@ interface TrendPoint {
   mchango: number;
   chama: number;
   organizations: number;
+  welfare: number;
   total: number;
 }
 
@@ -81,6 +82,7 @@ export const CommissionAnalyticsDashboard = () => {
   const { rates } = usePlatformCommission();
   const MCHANGO_COMMISSION_RATE = rates.mchango;
   const ORGANIZATION_COMMISSION_RATE = rates.organization;
+  const WELFARE_COMMISSION_RATE = rates.welfare;
   const [loading, setLoading] = useState(true);
   const [ledgerData, setLedgerData] = useState<LedgerEntry[]>([]);
   const [summary, setSummary] = useState<SummaryData>({
@@ -277,7 +279,8 @@ export const CommissionAnalyticsDashboard = () => {
       const mchango = bucket.filter(e => e.source_type === "mchango").reduce((s, e) => s + Number(e.commission_amount), 0);
       const chama = bucket.filter(e => e.source_type === "chama").reduce((s, e) => s + Number(e.commission_amount), 0);
       const organizations = bucket.filter(e => e.source_type === "organization").reduce((s, e) => s + Number(e.commission_amount), 0);
-      return { label: iv.label, mchango, chama, organizations, total: mchango + chama + organizations };
+      const welfare = bucket.filter(e => e.source_type === "welfare").reduce((s, e) => s + Number(e.commission_amount), 0);
+      return { label: iv.label, mchango, chama, organizations, welfare, total: mchango + chama + organizations + welfare };
     });
 
     setTrendData(points);
@@ -287,6 +290,7 @@ export const CommissionAnalyticsDashboard = () => {
     { name: "Mchango", value: summary.mchangoCommission, color: COLORS[0] },
     { name: "Chama", value: summary.chamaCommission, color: COLORS[1] },
     { name: "Organizations", value: summary.orgCommission, color: COLORS[2] },
+    { name: "Welfare", value: summary.welfareCommission, color: COLORS[3] },
   ].filter(d => d.value > 0);
 
   const downloadStatement = () => {
@@ -327,6 +331,7 @@ export const CommissionAnalyticsDashboard = () => {
       { name: "Mchango (Campaigns)", rate: "7%", gross: summary.mchangoGross, commission: summary.mchangoCommission },
       { name: "Chama (Groups)", rate: "5-10%", gross: summary.chamaGross, commission: summary.chamaCommission },
       { name: "Organizations (NGOs)", rate: "5%", gross: summary.orgGross, commission: summary.orgCommission },
+      { name: "Welfare (Groups)", rate: "5-10%", gross: summary.welfareGross, commission: summary.welfareCommission },
     ];
 
     doc.setFontSize(9);
@@ -500,7 +505,7 @@ export const CommissionAnalyticsDashboard = () => {
       </Card>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <Card className="border-l-4 border-l-primary">
           <CardHeader className="pb-2">
             <CardDescription>Total Commission</CardDescription>
@@ -546,6 +551,18 @@ export const CommissionAnalyticsDashboard = () => {
               KES {summary.orgCommission.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </div>
             <p className="text-sm text-muted-foreground mt-1">on KES {summary.orgGross.toLocaleString()} gross</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1"><Users className="h-3 w-3" /> Welfare ({formatCommissionPercentage(WELFARE_COMMISSION_RATE)})</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600">
+              KES {summary.welfareCommission.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">on KES {summary.welfareGross.toLocaleString()} gross</p>
           </CardContent>
         </Card>
       </div>
@@ -675,6 +692,7 @@ export const CommissionAnalyticsDashboard = () => {
                     <Bar dataKey="mchango" fill="#ec4899" name="Mchango" stackId="a" />
                     <Bar dataKey="chama" fill="#3b82f6" name="Chama" stackId="a" />
                     <Bar dataKey="organizations" fill="#a855f7" name="Organizations" stackId="a" />
+                    <Bar dataKey="welfare" fill="#10b981" name="Welfare" stackId="a" />
                   </BarChart>
                 </ResponsiveContainer>
               </TabsContent>
@@ -695,6 +713,10 @@ export const CommissionAnalyticsDashboard = () => {
                         <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8} />
                         <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
                       </linearGradient>
+                      <linearGradient id="cWelfare" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="label" className="text-xs" />
@@ -704,6 +726,7 @@ export const CommissionAnalyticsDashboard = () => {
                     <Area type="monotone" dataKey="mchango" stroke="#ec4899" fill="url(#cMchango)" name="Mchango" stackId="1" />
                     <Area type="monotone" dataKey="chama" stroke="#3b82f6" fill="url(#cChama)" name="Chama" stackId="1" />
                     <Area type="monotone" dataKey="organizations" stroke="#a855f7" fill="url(#cOrg)" name="Organizations" stackId="1" />
+                    <Area type="monotone" dataKey="welfare" stroke="#10b981" fill="url(#cWelfare)" name="Welfare" stackId="1" />
                   </AreaChart>
                 </ResponsiveContainer>
               </TabsContent>
@@ -720,6 +743,7 @@ export const CommissionAnalyticsDashboard = () => {
                     <Line type="monotone" dataKey="mchango" stroke="#ec4899" strokeWidth={2} name="Mchango" dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="chama" stroke="#3b82f6" strokeWidth={2} name="Chama" dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="organizations" stroke="#a855f7" strokeWidth={2} name="Organizations" dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="welfare" stroke="#10b981" strokeWidth={2} name="Welfare" dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </TabsContent>
