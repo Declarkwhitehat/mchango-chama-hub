@@ -712,6 +712,10 @@ export const CommissionAnalyticsDashboard = () => {
                         <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8} />
                         <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
                       </linearGradient>
+                      <linearGradient id="cWelfare" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="label" className="text-xs" />
@@ -721,6 +725,7 @@ export const CommissionAnalyticsDashboard = () => {
                     <Area type="monotone" dataKey="mchango" stroke="#ec4899" fill="url(#cMchango)" name="Mchango" stackId="1" />
                     <Area type="monotone" dataKey="chama" stroke="#3b82f6" fill="url(#cChama)" name="Chama" stackId="1" />
                     <Area type="monotone" dataKey="organizations" stroke="#a855f7" fill="url(#cOrg)" name="Organizations" stackId="1" />
+                    <Area type="monotone" dataKey="welfare" stroke="#10b981" fill="url(#cWelfare)" name="Welfare" stackId="1" />
                   </AreaChart>
                 </ResponsiveContainer>
               </TabsContent>
