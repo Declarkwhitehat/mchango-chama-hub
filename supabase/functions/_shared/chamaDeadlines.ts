@@ -239,3 +239,30 @@ export function getTwiceMonthlyFirstDeadline(
 
   return new Date(Date.UTC(targetYear, targetMonth, targetDay, KENYA_9PM_UTC_HOUR, 0, 0, 0));
 }
+
+/**
+ * For twice-weekly chamas, return the next upcoming chosen weekday at 21:00 EAT
+ * (18:00 UTC). Never returns the same Kenya calendar day as `referenceDate`, so
+ * members always get at least a full day to pay the first cycle.
+ */
+export function getTwiceWeeklyFirstDeadline(
+  referenceDate: Date,
+  day1?: number | null,
+  day2?: number | null,
+): Date {
+  const [d1, d2] = normalizeWeeklyDays(day1, day2);
+  const kenyaClock = toKenyaClock(referenceDate);
+  const y = kenyaClock.getUTCFullYear();
+  const m = kenyaClock.getUTCMonth();
+  const d = kenyaClock.getUTCDate();
+  const todayDow = kenyaClock.getUTCDay();
+
+  // Distance in days from today to a chosen weekday, at least 1 day away.
+  const distance = (dow: number) => {
+    const raw = (dow - todayDow + 7) % 7;
+    return raw === 0 ? 7 : raw;
+  };
+  const advance = Math.min(distance(d1), distance(d2));
+
+  return new Date(Date.UTC(y, m, d + advance, KENYA_9PM_UTC_HOUR, 0, 0, 0));
+}
