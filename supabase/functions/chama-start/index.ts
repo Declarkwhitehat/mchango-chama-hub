@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate, getTwiceMonthlyFirstDeadline } from "../_shared/chamaDeadlines.ts";
+import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate, getTwiceMonthlyFirstDeadline, getTwiceWeeklyFirstDeadline } from "../_shared/chamaDeadlines.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -158,18 +158,27 @@ serve(async (req) => {
       chama.monthly_contribution_day &&
       chama.monthly_contribution_day_2;
 
+    const isTwiceWeekly = chama.contribution_frequency === 'twice_weekly';
+
     const graceDeadline = isTwiceMonthly
       ? getTwiceMonthlyFirstDeadline(
           startDate,
           chama.monthly_contribution_day,
           chama.monthly_contribution_day_2,
         )
-      : getNextDay10PmKenyaDeadline(startDate);
+      : isTwiceWeekly
+        ? getTwiceWeeklyFirstDeadline(
+            startDate,
+            chama.weekly_contribution_day,
+            chama.weekly_contribution_day_2,
+          )
+        : getNextDay10PmKenyaDeadline(startDate);
 
     console.log('First cycle deadline:', {
       startDate: startDate.toISOString(),
       graceDeadline: graceDeadline.toISOString(),
       isTwiceMonthly,
+      isTwiceWeekly,
     });
 
     // ============================================
@@ -421,6 +430,7 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
     case 'weekly': return 7;
     case 'monthly': return 30;
     case 'twice_monthly': return 15;
+    case 'twice_weekly': return 4;
     case 'every_n_days': return everyNDays || 7;
     default: return 7;
   }
