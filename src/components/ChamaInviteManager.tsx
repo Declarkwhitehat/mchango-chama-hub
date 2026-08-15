@@ -32,7 +32,8 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
-  const [maxUses, setMaxUses] = useState(1);
+  const [maxUsesInput, setMaxUsesInput] = useState("1");
+  const maxUses = Math.max(1, Math.min(100, Number(maxUsesInput) || 1));
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copyCode = async (id: string, code: string) => {
@@ -167,8 +168,10 @@ export const ChamaInviteManager = ({ chamaId, chamaSlug, isManager }: ChamaInvit
                 type="number"
                 min={1}
                 max={100}
-                value={maxUses}
-                onChange={(e) => setMaxUses(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                value={maxUsesInput}
+                onChange={(e) => setMaxUsesInput(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
+                onBlur={() => setMaxUsesInput(String(maxUses))}
+                inputMode="numeric"
                 className="w-24"
               />
             </div>
