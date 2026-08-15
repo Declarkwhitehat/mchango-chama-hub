@@ -276,8 +276,10 @@ Deno.serve(async (req) => {
     }
 
     // ── Welfare loans: due reminders, overdue flagging, monthly penalty, shares recovery ──
+    // Runs once a day, on the 8 AM EAT slot only.
     let loansProcessed = 0;
-    try {
+    if (slot === null || slot === '0800') try {
+
       const { data: openLoans } = await supabase
         .from('welfare_loans')
         .select('id, welfare_id, member_id, user_id, loan_type, principal, balance, status, due_date, last_interest_at, welfares(name)')
