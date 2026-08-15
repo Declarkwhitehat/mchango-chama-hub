@@ -205,7 +205,7 @@ export const PreStartDashboard = ({
           <CardTitle className="text-base">What happens when you start?</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>• All approved members will be activated with their payout positions</p>
+          <p>• Payout positions are assigned by payment track record (proven members first)</p>
           <p>• <strong className="text-foreground">Members get until the next-day cutoff</strong> to prepare their first payment</p>
           <p>• First payment deadline: <strong className="text-foreground">9:00 PM the next day</strong> after start</p>
           <p>• Members will receive SMS notifications with their contribution schedule</p>
