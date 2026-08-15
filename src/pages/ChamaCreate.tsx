@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { sendTransactionalSMS, SMS_TEMPLATES } from "@/utils/smsService";
+import { WEEKDAY_NAMES } from "@/utils/chamaFrequency";
 import { usePlatformMinimums } from "@/hooks/usePlatformMinimums";
 import { KycGate } from "@/components/KycGate";
 
@@ -32,6 +33,8 @@ const ChamaCreate = () => {
   const [showEveryNDays, setShowEveryNDays] = useState(false);
   const [monthlyDay, setMonthlyDay] = useState<string>("");
   const [monthlyDay2, setMonthlyDay2] = useState<string>("");
+  const [weekDay1, setWeekDay1] = useState<string>("1");
+  const [weekDay2, setWeekDay2] = useState<string>("4");
   const formRef = useRef<HTMLFormElement>(null);
 
   const handleFrequencyChange = (value: string) => {
@@ -40,6 +43,10 @@ const ChamaCreate = () => {
     if (value !== "monthly" && value !== "twice_monthly") {
       setMonthlyDay("");
       setMonthlyDay2("");
+    }
+    if (value === "twice_weekly") {
+      setWeekDay1((prev) => prev || "1");
+      setWeekDay2((prev) => prev || "4");
     }
   };
 
@@ -111,6 +118,20 @@ const ChamaCreate = () => {
         chamaData.monthly_contribution_day = Math.min(Number(monthlyDay), Number(monthlyDay2));
         chamaData.monthly_contribution_day_2 = Math.max(Number(monthlyDay), Number(monthlyDay2));
       }
+      if (frequency === "twice_weekly") {
+        if (weekDay1 === "" || weekDay2 === "") {
+          toast({ title: "Error", description: "Please select both contribution days of the week", variant: "destructive" });
+          setIsLoading(false);
+          return;
+        }
+        if (weekDay1 === weekDay2) {
+          toast({ title: "Error", description: "The two contribution days must be different", variant: "destructive" });
+          setIsLoading(false);
+          return;
+        }
+        chamaData.weekly_contribution_day = Number(weekDay1);
+        chamaData.weekly_contribution_day_2 = Number(weekDay2);
+      }
 
       const res = await supabase.functions.invoke("chama-crud", {
         body: chamaData,
@@ -169,7 +190,7 @@ const ChamaCreate = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [frequency, monthlyDay, monthlyDay2, navigate, toast]);
+  }, [frequency, monthlyDay, monthlyDay2, weekDay1, weekDay2, navigate, toast]);
 
   const { execute: handleSubmit, isProcessing } = useDebounceAction(handleSubmitInner);
 
@@ -248,6 +269,7 @@ const ChamaCreate = () => {
                     <SelectContent>
                       <SelectItem value="daily">Daily</SelectItem>
                       <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="twice_weekly">Twice a Week</SelectItem>
                       <SelectItem value="monthly">Monthly</SelectItem>
                       <SelectItem value="twice_monthly">Twice a Month</SelectItem>
                       <SelectItem value="every_n_days">Every N Days</SelectItem>
@@ -323,6 +345,49 @@ const ChamaCreate = () => {
                   </div>
                   <p className="text-xs text-muted-foreground col-span-2">
                     Pick two different days (1–28) for contributions each month
+                  </p>
+                </div>
+              )}
+
+              {frequency === "twice_weekly" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="week_day_1">First Contribution Day *</Label>
+                    <Select value={weekDay1} onValueChange={setWeekDay1}>
+                      <SelectTrigger id="week_day_1">
+                        <SelectValue placeholder="Select day" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WEEKDAY_NAMES.map((name, idx) => (
+                          <SelectItem
+                            key={name}
+                            value={String(idx)}
+                            disabled={String(idx) === weekDay2}
+                          >
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="week_day_2">Second Contribution Day *</Label>
+                    <Select value={weekDay2} onValueChange={setWeekDay2}>
+                      <SelectTrigger id="week_day_2">
+                        <SelectValue placeholder="Select day" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WEEKDAY_NAMES.filter((_, idx) => String(idx) !== weekDay1).map((name) => (
+                          <SelectItem key={name} value={String(WEEKDAY_NAMES.indexOf(name))}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground col-span-2">
+                    Members contribute twice every week on these two days. Payouts are
+                    made on each of these days at 10:00 PM.
                   </p>
                 </div>
               )}
