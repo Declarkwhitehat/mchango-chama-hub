@@ -1424,10 +1424,13 @@ serve(async (req) => {
                     }).eq('id', currentCycle.id);
 
                     try {
-                      const advanceResponse = await fetch(`${supabaseUrl}/functions/v1/cycle-auto-create`, {
+                      const functionUrl = Deno.env.get('SUPABASE_URL');
+                      const functionKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+                      if (!functionUrl || !functionKey) throw new Error('Backend function credentials unavailable');
+                      const advanceResponse = await fetch(`${functionUrl}/functions/v1/cycle-auto-create`, {
                         method: 'POST',
                         headers: {
-                          'Authorization': `Bearer ${serviceKey}`,
+                          'Authorization': `Bearer ${functionKey}`,
                           'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({ chamaId: body.chama_id, lastCycleId: currentCycle.id }),
