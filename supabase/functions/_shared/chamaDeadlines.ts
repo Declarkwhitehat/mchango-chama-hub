@@ -101,7 +101,24 @@ export interface ChamaCycleSchedule {
   everyNDaysCount?: number | null;
   monthlyDay?: number | null;
   monthlyDay2?: number | null;
+  /** 0 = Sunday ... 6 = Saturday (twice_weekly) */
+  weeklyDay?: number | null;
+  weeklyDay2?: number | null;
 }
+
+/** Normalises the two chosen weekdays, falling back to Mon/Thu. */
+export function normalizeWeeklyDays(
+  day1?: number | null,
+  day2?: number | null,
+): [number, number] {
+  const valid = (d?: number | null) =>
+    typeof d === 'number' && Number.isInteger(d) && d >= 0 && d <= 6;
+  const a = valid(day1) ? (day1 as number) : 1; // Monday
+  let b = valid(day2) ? (day2 as number) : 4;   // Thursday
+  if (b === a) b = (a + 3) % 7;
+  return [a, b];
+}
+
 
 function kenyaDateParts(date: Date) {
   const kenyaClock = toKenyaClock(date);
