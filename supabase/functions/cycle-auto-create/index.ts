@@ -180,6 +180,26 @@ Deno.serve(async (req) => {
       .single();
 
     if (cycleError) {
+      // A concurrent payout callback may have created the same cycle between
+      // the existence check and insert. The unique key makes that safe; return
+      // the winner as success so callers never treat a retry as failed.
+      if (cycleError.code === '23505') {
+        const { data: concurrentCycle } = await supabase
+          .from('contribution_cycles')
+          .select('id')
+          .eq('chama_id', chamaId)
+          .eq('cycle_number', nextCycleNumber)
+          .single();
+        if (concurrentCycle) {
+          return new Response(JSON.stringify({
+            success: true,
+            message: 'Cycle already created concurrently',
+            cycleId: concurrentCycle.id,
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
       console.error('Error creating cycle:', cycleError);
       return new Response(JSON.stringify({ error: cycleError.message }), {
         status: 500,
