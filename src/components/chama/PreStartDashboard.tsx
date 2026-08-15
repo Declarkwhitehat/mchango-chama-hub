@@ -67,12 +67,29 @@ export const PreStartDashboard = ({
   const canStart = approvedMembers.length >= minMembers;
   const membersNeeded = minMembers - approvedMembers.length;
 
-  // Sort by join date for display (earliest first = will be first in payout order)
+  const [provenUsers, setProvenUsers] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const loadTrack = async () => {
+      const userIds = approvedMembers.map(m => m.user_id).filter(Boolean);
+      if (userIds.length === 0) return;
+      const { data } = await supabase
+        .from('member_trust_scores')
+        .select('user_id, total_chamas_completed')
+        .in('user_id', userIds);
+      setProvenUsers(new Set((data || []).filter(r => (r.total_chamas_completed || 0) > 0).map(r => r.user_id)));
+    };
+    loadTrack();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members]);
+
+  // Sort by join date for display
   const sortedMembers = [...approvedMembers].sort((a, b) => {
     const aTime = a.joined_at ? new Date(a.joined_at).getTime() : 0;
     const bTime = b.joined_at ? new Date(b.joined_at).getTime() : 0;
     return aTime - bTime;
   });
+
 
   return (
     <div className="space-y-6">
