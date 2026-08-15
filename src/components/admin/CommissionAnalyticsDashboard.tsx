@@ -116,7 +116,7 @@ export const CommissionAnalyticsDashboard = () => {
       const fromISO = startOfDay(parseISO(dateFrom)).toISOString();
       const toISO = endOfDay(parseISO(dateTo)).toISOString();
 
-      const [mchangoRes, orgRes, welfareRes] = await Promise.all([
+      const [mchangoRes, orgRes, welfareRes, chamaRes] = await Promise.all([
         supabase.from("mchango_donations")
           .select("commission_amount")
           .eq("payment_status", "completed")
@@ -132,19 +132,28 @@ export const CommissionAnalyticsDashboard = () => {
           .eq("payment_status", "completed")
           .gte("completed_at", fromISO)
           .lte("completed_at", toISO),
+        // Chama commissions are booked to company_earnings ("Chama ..." descriptions)
+        supabase.from("company_earnings")
+          .select("amount, description, source")
+          .ilike("source", "commission")
+          .ilike("description", "Chama%")
+          .gte("created_at", fromISO)
+          .lte("created_at", toISO),
       ]);
 
       const mchangoTotal = (mchangoRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
       const orgTotal = (orgRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
       const welfareTotal = (welfareRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
+      const chamaTotal = (chamaRes.data || []).reduce((s, d) => s + Number(d.amount || 0), 0);
 
       setLiveVerification({
         mchangoDonations: mchangoTotal,
         orgDonations: orgTotal,
         welfareContributions: welfareTotal,
-        chamaContributions: 0, // chama commissions live in financial_ledger only
-        totalLive: mchangoTotal + orgTotal + welfareTotal,
+        chamaContributions: chamaTotal,
+        totalLive: mchangoTotal + orgTotal + welfareTotal + chamaTotal,
       });
+
     } catch (err) {
       console.error("Live verification error:", err);
     }
