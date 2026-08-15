@@ -4608,17 +4608,31 @@ export type Database = {
         Args: { p_query: string; p_type?: string }
         Returns: Json
       }
-      advance_chama_deadline: {
-        Args: {
-          p_deadline: string
-          p_every_n_days: number
-          p_frequency: string
-          p_monthly_day: number
-          p_monthly_day_2: number
-          p_steps: number
-        }
-        Returns: string
-      }
+      advance_chama_deadline:
+        | {
+            Args: {
+              p_deadline: string
+              p_every_n_days: number
+              p_frequency: string
+              p_monthly_day: number
+              p_monthly_day_2: number
+              p_steps: number
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_deadline: string
+              p_every_n_days: number
+              p_frequency: string
+              p_monthly_day: number
+              p_monthly_day_2: number
+              p_steps: number
+              p_weekly_day: number
+              p_weekly_day_2: number
+            }
+            Returns: string
+          }
       apply_welfare_registration_payment: {
         Args: { p_gross: number; p_member_id: string }
         Returns: Json
