@@ -516,10 +516,12 @@ serve(async (req) => {
         });
       }
 
-      // Validate monthly contribution day(s)
-      if ((body.contribution_frequency === 'monthly' || body.contribution_frequency === 'twice_monthly') && body.monthly_contribution_day) {
-        if (body.monthly_contribution_day < 1 || body.monthly_contribution_day > 28) {
-          return new Response(JSON.stringify({ error: 'Monthly contribution day must be between 1 and 28' }), {
+      // Validate monthly contribution day(s) — days 1..28 only so every month is safe
+      const validMonthDay = (d: any) => Number.isInteger(d) && d >= 1 && d <= 28;
+      if ((body.contribution_frequency === 'monthly' || body.contribution_frequency === 'twice_monthly') &&
+          body.monthly_contribution_day !== null && body.monthly_contribution_day !== undefined) {
+        if (!validMonthDay(body.monthly_contribution_day)) {
+          return new Response(JSON.stringify({ error: 'Monthly contribution day must be a whole number between 1 and 28' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
