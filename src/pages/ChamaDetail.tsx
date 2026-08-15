@@ -624,7 +624,7 @@ const ChamaDetail = () => {
                 <p className="text-[10px] text-muted-foreground mt-1">After 5% commission. Overpayment wallet shown separately.</p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">{frequencyLabel(chama.contribution_frequency, chama.every_n_days_count)}</p>
+                <p className="text-sm text-muted-foreground mb-1">{frequencyLabel(chama.contribution_frequency, chama.every_n_days_count, (chama as any).weekly_contribution_day, (chama as any).weekly_contribution_day_2)}</p>
                 <p className="text-2xl font-bold text-foreground">
                   KES {chama.contribution_amount.toLocaleString()}
                 </p>
