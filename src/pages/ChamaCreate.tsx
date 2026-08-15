@@ -309,7 +309,11 @@ const ChamaCreate = () => {
                     <Label htmlFor="monthly_day_1">First Contribution Day *</Label>
                     <Select
                       value={monthlyDay}
-                      onValueChange={setMonthlyDay}
+                      onValueChange={(v) => {
+                        setMonthlyDay(v);
+                        if (monthlyDay2 && Number(monthlyDay2) <= Number(v)) setMonthlyDay2("");
+                      }}
+
 
                     >
                       <SelectTrigger id="monthly_day_1">
