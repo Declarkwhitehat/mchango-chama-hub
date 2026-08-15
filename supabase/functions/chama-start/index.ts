@@ -371,10 +371,19 @@ serve(async (req) => {
       const member = sortedMembers[i];
       const memberIndex = i + 1;
 
-      // Payout lands on cycle N's 10:00 PM EAT close.
-      // Cycle 1 closes at graceDeadline; each subsequent cycle is +cycleLength days.
-      const payoutDate = new Date(graceDeadline);
-      payoutDate.setUTCDate(payoutDate.getUTCDate() + (memberIndex - 1) * cycleLength);
+      // Payout lands on cycle N's close. Walk the real calendar so twice-weekly /
+      // twice-monthly / monthly schedules never drift on a fixed day-count guess.
+      let payoutDate = new Date(graceDeadline);
+      for (let step = 1; step < memberIndex; step++) {
+        payoutDate = getNextChamaCycleWindow(payoutDate, {
+          frequency: chama.contribution_frequency,
+          monthlyDay: chama.monthly_contribution_day,
+          monthlyDay2: chama.monthly_contribution_day_2,
+          weeklyDay: chama.weekly_contribution_day,
+          weeklyDay2: chama.weekly_contribution_day_2,
+          everyNDaysCount: chama.every_n_days_count,
+        }).endDate;
+      }
 
       const graceDeadlineStr = fmtEAT(graceDeadline);
       const payoutStr = fmtEAT(payoutDate);
