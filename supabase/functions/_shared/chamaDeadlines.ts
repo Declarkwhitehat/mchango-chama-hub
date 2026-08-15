@@ -124,16 +124,12 @@ export function normalizeWeeklyDays(
 
 
 function kenyaDateParts(date: Date) {
-  const kenyaClock = toKenyaClock(date);
-  return {
-    year: kenyaClock.getUTCFullYear(),
-    month: kenyaClock.getUTCMonth(),
-    day: kenyaClock.getUTCDate(),
-  };
+  const parts = kenyaParts(date)!;
+  return { year: parts.year, month: parts.month, day: parts.day };
 }
 
 function atKenyaTime(year: number, month: number, day: number, hour: number, minute = 0) {
-  return new Date(Date.UTC(year, month, day, hour - 3, minute, 0, 0));
+  return kenyaDateTime(year, month, day, hour, minute);
 }
 
 /**
