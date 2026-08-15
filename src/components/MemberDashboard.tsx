@@ -144,6 +144,10 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         {
           frequency: chama.contribution_frequency,
           everyNDaysCount: chama.every_n_days_count,
+          monthlyDay: (chama as any).monthly_contribution_day,
+          monthlyDay2: (chama as any).monthly_contribution_day_2,
+          weeklyDay: (chama as any).weekly_contribution_day,
+          weeklyDay2: (chama as any).weekly_contribution_day_2,
         },
       )
     : null;

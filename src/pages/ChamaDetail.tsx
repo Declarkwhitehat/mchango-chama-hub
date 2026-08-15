@@ -423,6 +423,8 @@ const ChamaDetail = () => {
           everyNDaysCount: chamaData.every_n_days_count,
           monthlyDay: chamaData.monthly_contribution_day,
           monthlyDay2: chamaData.monthly_contribution_day_2,
+          weeklyDay: chamaData.weekly_contribution_day,
+          weeklyDay2: chamaData.weekly_contribution_day_2,
         };
 
         approvedMembers.forEach((member, idx) => {
@@ -474,6 +476,7 @@ const ChamaDetail = () => {
     switch (frequency) {
       case 'daily': return 1;
       case 'weekly': return 7;
+      case 'twice_weekly': return 4;
       case 'monthly': return 30;
       case 'every_n_days': return everyNDays || 7;
       default: return 7;

@@ -191,6 +191,7 @@ export function JoinByCodeForm({ onJoinSuccess }: JoinByCodeFormProps) {
     switch (frequency) {
       case "daily": return "Daily";
       case "weekly": return "Weekly";
+      case "twice_weekly": return "Twice a Week";
       case "bi-weekly": return "Bi-Weekly";
       case "monthly": return "Monthly";
       default: return frequency;
