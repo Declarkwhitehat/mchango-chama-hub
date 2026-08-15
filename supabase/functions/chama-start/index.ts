@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate, getTwiceMonthlyFirstDeadline, getTwiceWeeklyFirstDeadline } from "../_shared/chamaDeadlines.ts";
+import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate, getTwiceMonthlyFirstDeadline, getTwiceWeeklyFirstDeadline, getNextChamaCycleWindow } from "../_shared/chamaDeadlines.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -371,10 +371,19 @@ serve(async (req) => {
       const member = sortedMembers[i];
       const memberIndex = i + 1;
 
-      // Payout lands on cycle N's 10:00 PM EAT close.
-      // Cycle 1 closes at graceDeadline; each subsequent cycle is +cycleLength days.
-      const payoutDate = new Date(graceDeadline);
-      payoutDate.setUTCDate(payoutDate.getUTCDate() + (memberIndex - 1) * cycleLength);
+      // Payout lands on cycle N's close. Walk the real calendar so twice-weekly /
+      // twice-monthly / monthly schedules never drift on a fixed day-count guess.
+      let payoutDate = new Date(graceDeadline);
+      for (let step = 1; step < memberIndex; step++) {
+        payoutDate = getNextChamaCycleWindow(payoutDate, {
+          frequency: chama.contribution_frequency,
+          monthlyDay: chama.monthly_contribution_day,
+          monthlyDay2: chama.monthly_contribution_day_2,
+          weeklyDay: chama.weekly_contribution_day,
+          weeklyDay2: chama.weekly_contribution_day_2,
+          everyNDaysCount: chama.every_n_days_count,
+        }).endDate;
+      }
 
       const graceDeadlineStr = fmtEAT(graceDeadline);
       const payoutStr = fmtEAT(payoutDate);
