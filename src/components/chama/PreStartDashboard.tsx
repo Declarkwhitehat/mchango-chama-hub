@@ -306,11 +306,17 @@ export const PreStartDashboard = ({
                     <li className="text-green-700">
                       Activate <strong>{approvedMembers.length}</strong> member(s)
                     </li>
-                    <li>Start the first contribution cycle</li>
+                    <li>
+                      Start cycle 1, closing <strong>{cycle1Label}</strong> — first payout follows immediately
+                    </li>
+                    <li>
+                      Cycle 2 will close <strong>{cycle2Label}</strong>
+                    </li>
                     <li>Send SMS notifications to all members</li>
                     <li>Members will need to contribute KES {contributionAmount.toLocaleString()}</li>
                   </ul>
                   <p className="font-semibold mt-2">This action cannot be undone.</p>
+
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
