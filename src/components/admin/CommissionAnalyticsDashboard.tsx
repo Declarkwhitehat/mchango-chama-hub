@@ -692,6 +692,7 @@ export const CommissionAnalyticsDashboard = () => {
                     <Bar dataKey="mchango" fill="#ec4899" name="Mchango" stackId="a" />
                     <Bar dataKey="chama" fill="#3b82f6" name="Chama" stackId="a" />
                     <Bar dataKey="organizations" fill="#a855f7" name="Organizations" stackId="a" />
+                    <Bar dataKey="welfare" fill="#10b981" name="Welfare" stackId="a" />
                   </BarChart>
                 </ResponsiveContainer>
               </TabsContent>
