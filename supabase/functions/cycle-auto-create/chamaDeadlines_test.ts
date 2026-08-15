@@ -37,3 +37,57 @@ Deno.test("every-N-days uses inclusive cycle windows", () => {
   });
   assertEquals(result.endDate.toISOString(), "2026-08-17T19:00:00.000Z");
 });
+Deno.test("twice-weekly alternates the two chosen weekdays (Mon & Thu)", () => {
+  // Sat 15 Aug 2026 19:00 UTC (22:00 EAT) -> next chosen weekday is Monday 17 Aug
+  const first = getNextChamaCycleWindow(new Date("2026-08-15T19:00:00Z"), {
+    frequency: "twice_weekly",
+    weeklyDay: 1,
+    weeklyDay2: 4,
+  });
+  assertEquals(first.endDate.toISOString(), "2026-08-17T19:00:00.000Z");
+
+  const second = getNextChamaCycleWindow(first.endDate, {
+    frequency: "twice_weekly",
+    weeklyDay: 1,
+    weeklyDay2: 4,
+  });
+  assertEquals(second.endDate.toISOString(), "2026-08-20T19:00:00.000Z");
+
+  const third = getNextChamaCycleWindow(second.endDate, {
+    frequency: "twice_weekly",
+    weeklyDay: 1,
+    weeklyDay2: 4,
+  });
+  assertEquals(third.endDate.toISOString(), "2026-08-24T19:00:00.000Z");
+});
+
+Deno.test("twice-weekly handles Sunday/Monday pair across year boundary", () => {
+  // Thu 31 Dec 2026 -> next is Sunday 3 Jan 2027, then Monday 4 Jan
+  const first = getNextChamaCycleWindow(new Date("2026-12-31T19:00:00Z"), {
+    frequency: "twice_weekly",
+    weeklyDay: 0,
+    weeklyDay2: 1,
+  });
+  assertEquals(first.endDate.toISOString(), "2027-01-03T19:00:00.000Z");
+
+  const second = getNextChamaCycleWindow(first.endDate, {
+    frequency: "twice_weekly",
+    weeklyDay: 0,
+    weeklyDay2: 1,
+  });
+  assertEquals(second.endDate.toISOString(), "2027-01-04T19:00:00.000Z");
+});
+
+Deno.test("twice-weekly falls back safely when days are missing or identical", () => {
+  const missing = getNextChamaCycleWindow(new Date("2026-08-15T19:00:00Z"), {
+    frequency: "twice_weekly",
+  });
+  assertEquals(missing.endDate > new Date("2026-08-15T19:00:00Z"), true);
+
+  const identical = getNextChamaCycleWindow(new Date("2026-08-15T19:00:00Z"), {
+    frequency: "twice_weekly",
+    weeklyDay: 3,
+    weeklyDay2: 3,
+  });
+  assertEquals(identical.endDate.toISOString(), "2026-08-19T19:00:00.000Z");
+});
