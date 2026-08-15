@@ -14,6 +14,7 @@ import {
 } from "../_shared/paymentSmsTemplates.ts";
 import { getMemberOutstanding } from "../_shared/chamaOutstanding.ts";
 import { applyLoanRepayment } from "../_shared/applyLoanRepayment.ts";
+import { completeCycleIfAllPaid } from "../_shared/completeCycleIfPaid.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -245,6 +246,15 @@ serve(async (req) => {
         }
 
         console.log('Financial tracking delegated to contributions-crud');
+
+        // ═══ IMMEDIATE PAYOUT / CYCLE ADVANCE ═══
+        // Online payments must complete the cycle exactly like offline C2B ones.
+        try {
+          const completion = await completeCycleIfAllPaid(supabaseClient, contribution.chama_id);
+          console.log('Cycle completion check (STK):', completion);
+        } catch (completionError) {
+          console.error('Cycle completion failed (STK):', completionError);
+        }
 
         // Get beneficiary profile for notification
         const { data: beneficiaryProfile } = await supabaseClient
