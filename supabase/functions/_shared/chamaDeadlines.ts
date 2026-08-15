@@ -187,7 +187,18 @@ export function getNextChamaCycleWindow(
       endYear = candidate.getUTCFullYear(); endMonth = candidate.getUTCMonth(); endDay = candidate.getUTCDate();
       break;
     }
+    case 'twice_weekly': {
+      const [d1, d2] = normalizeWeeklyDays(schedule.weeklyDay, schedule.weeklyDay2);
+      const base = new Date(Date.UTC(nextYear, nextMonth, nextDay));
+      const baseDow = base.getUTCDay();
+      const delta = (dow: number) => (dow - baseDow + 7) % 7;
+      const advance = Math.min(delta(d1), delta(d2));
+      const target = new Date(Date.UTC(nextYear, nextMonth, nextDay + advance));
+      endYear = target.getUTCFullYear(); endMonth = target.getUTCMonth(); endDay = target.getUTCDate();
+      break;
+    }
     default: {
+
       const target = new Date(Date.UTC(nextYear, nextMonth, nextDay + 6));
       endYear = target.getUTCFullYear(); endMonth = target.getUTCMonth(); endDay = target.getUTCDate();
     }
