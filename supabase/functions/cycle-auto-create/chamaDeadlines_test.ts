@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
-import { getNextChamaCycleWindow } from "./chamaDeadlines.ts";
+import { getNextChamaCycleWindow } from "../_shared/chamaDeadlines.ts";
 
 Deno.test("daily cycle advances to the next Kenya day at 00:01–22:00 EAT", () => {
   const result = getNextChamaCycleWindow(new Date("2026-08-14T18:00:00Z"), { frequency: "daily" });
