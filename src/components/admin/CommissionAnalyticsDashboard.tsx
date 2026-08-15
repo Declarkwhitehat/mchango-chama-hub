@@ -551,6 +551,18 @@ export const CommissionAnalyticsDashboard = () => {
             <p className="text-sm text-muted-foreground mt-1">on KES {summary.orgGross.toLocaleString()} gross</p>
           </CardContent>
         </Card>
+
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1"><Users className="h-3 w-3" /> Welfare ({formatCommissionPercentage(WELFARE_COMMISSION_RATE)})</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600">
+              KES {summary.welfareCommission.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">on KES {summary.welfareGross.toLocaleString()} gross</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* M-Pesa B2C Transaction Fees — recipient-paid fee tier breakdown */}
