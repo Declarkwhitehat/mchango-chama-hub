@@ -258,10 +258,13 @@ export const CommissionAnalyticsDashboard = () => {
 
     const points: TrendPoint[] = intervals.map(iv => {
       const bucket = ledgerData.filter(e => {
-        if (!isInflowRow(e)) return false;
+        const tt = String(e.transaction_type || "").toLowerCase();
+        // chama commission lives on dedicated `commission` rows
+        if (!isInflowRow(e) && !(tt === "commission" && e.source_type === "chama")) return false;
         const d = parseISO(e.created_at);
         return isWithinInterval(d, { start: iv.start, end: iv.end });
       });
+
       const mchango = bucket.filter(e => e.source_type === "mchango").reduce((s, e) => s + Number(e.commission_amount), 0);
       const chama = bucket.filter(e => e.source_type === "chama").reduce((s, e) => s + Number(e.commission_amount), 0);
       const organizations = bucket.filter(e => e.source_type === "organization").reduce((s, e) => s + Number(e.commission_amount), 0);
