@@ -247,6 +247,15 @@ serve(async (req) => {
 
         console.log('Financial tracking delegated to contributions-crud');
 
+        // ═══ IMMEDIATE PAYOUT / CYCLE ADVANCE ═══
+        // Online payments must complete the cycle exactly like offline C2B ones.
+        try {
+          const completion = await completeCycleIfAllPaid(supabaseClient, contribution.chama_id);
+          console.log('Cycle completion check (STK):', completion);
+        } catch (completionError) {
+          console.error('Cycle completion failed (STK):', completionError);
+        }
+
         // Get beneficiary profile for notification
         const { data: beneficiaryProfile } = await supabaseClient
           .from('profiles')
