@@ -199,19 +199,39 @@ export const PreStartDashboard = ({
         </CardContent>
       </Card>
 
-      {/* What Happens When You Start */}
+      {/* Schedule preview — exactly what happens if you start today */}
       <Card className="border-dashed">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">What happens when you start?</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            If you start today
+          </CardTitle>
+          <CardDescription>{scheduleSummary}</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>• Payout positions are assigned by payment track record (proven members first)</p>
-          <p>• <strong className="text-foreground">Members get until the next-day cutoff</strong> to prepare their first payment</p>
-          <p>• First payment deadline: <strong className="text-foreground">9:00 PM the next day</strong> after start</p>
-          <p>• Members will receive SMS notifications with their contribution schedule</p>
-          <p>• The first member in order will receive the pooled contributions after the cycle ends</p>
+        <CardContent className="text-sm space-y-2">
+          <div className="rounded-md border p-3 space-y-1">
+            <p>
+              <span className="text-muted-foreground">Cycle 1 closes:</span>{' '}
+              <strong>{cycle1Label}</strong>
+            </p>
+            <p>
+              <span className="text-muted-foreground">First payout:</span>{' '}
+              <strong>right after cycle 1 closes</strong>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Cycle 2 closes:</span>{' '}
+              <strong>{cycle2Label}</strong>
+            </p>
+          </div>
+          <div className="text-muted-foreground space-y-1">
+            <p>• Members must pay before each cycle deadline</p>
+            <p>• Payout positions are assigned by payment track record (proven members first)</p>
+            <p>• Members will receive SMS notifications with their contribution schedule</p>
+            <p>• The first member in order receives the pooled contributions when cycle 1 closes</p>
+          </div>
         </CardContent>
       </Card>
+
 
       {/* Start Button */}
       {isManager && (
