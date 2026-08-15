@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
+import { formatKenya, formatKenyaTime } from "@/lib/kenyaTime";
+import { getFirstCycleDeadline } from "@/utils/chamaDeadlines";
+import { addCyclesToDeadline, frequencyLabel } from "@/utils/chamaFrequency";
+
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +56,12 @@ interface PreStartDashboardProps {
   isManager: boolean;
   onStart: () => Promise<void>;
   isStarting: boolean;
+  frequency?: string | null;
+  everyNDaysCount?: number | null;
+  monthlyDay?: number | null;
+  monthlyDay2?: number | null;
+  weeklyDay?: number | null;
+  weeklyDay2?: number | null;
 }
 
 export const PreStartDashboard = ({
@@ -62,7 +72,13 @@ export const PreStartDashboard = ({
   members,
   isManager,
   onStart,
-  isStarting
+  isStarting,
+  frequency,
+  everyNDaysCount,
+  monthlyDay,
+  monthlyDay2,
+  weeklyDay,
+  weeklyDay2,
 }: PreStartDashboardProps) => {
   // All approved members are ready to participate
   const approvedMembers = members.filter(m => m.approval_status === 'approved');
@@ -70,7 +86,32 @@ export const PreStartDashboard = ({
   const canStart = approvedMembers.length >= minMembers;
   const membersNeeded = minMembers - approvedMembers.length;
 
+  // Schedule preview — mirrors the backend first-deadline maths exactly.
+  const cycle1 = getFirstCycleDeadline(new Date(), {
+    frequency,
+    monthlyDay,
+    monthlyDay2,
+    weeklyDay,
+    weeklyDay2,
+  });
+  const cycle2 = cycle1
+    ? addCyclesToDeadline(cycle1, 1, {
+        frequency: frequency || 'daily',
+        everyNDaysCount,
+        monthlyDay,
+        monthlyDay2,
+        weeklyDay,
+        weeklyDay2,
+      })
+    : null;
+  const labelFor = (d: Date | null) =>
+    d ? `${formatKenya(d, { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatKenyaTime(d)}` : '—';
+  const cycle1Label = labelFor(cycle1);
+  const cycle2Label = labelFor(cycle2);
+  const scheduleSummary = frequencyLabel(frequency || '', everyNDaysCount, weeklyDay, weeklyDay2);
+
   const [provenUsers, setProvenUsers] = useState<Set<string>>(new Set());
+
 
   useEffect(() => {
     const loadTrack = async () => {
@@ -199,19 +240,39 @@ export const PreStartDashboard = ({
         </CardContent>
       </Card>
 
-      {/* What Happens When You Start */}
+      {/* Schedule preview — exactly what happens if you start today */}
       <Card className="border-dashed">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">What happens when you start?</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            If you start today
+          </CardTitle>
+          <CardDescription>{scheduleSummary}</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>• Payout positions are assigned by payment track record (proven members first)</p>
-          <p>• <strong className="text-foreground">Members get until the next-day cutoff</strong> to prepare their first payment</p>
-          <p>• First payment deadline: <strong className="text-foreground">9:00 PM the next day</strong> after start</p>
-          <p>• Members will receive SMS notifications with their contribution schedule</p>
-          <p>• The first member in order will receive the pooled contributions after the cycle ends</p>
+        <CardContent className="text-sm space-y-2">
+          <div className="rounded-md border p-3 space-y-1">
+            <p>
+              <span className="text-muted-foreground">Cycle 1 closes:</span>{' '}
+              <strong>{cycle1Label}</strong>
+            </p>
+            <p>
+              <span className="text-muted-foreground">First payout:</span>{' '}
+              <strong>right after cycle 1 closes</strong>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Cycle 2 closes:</span>{' '}
+              <strong>{cycle2Label}</strong>
+            </p>
+          </div>
+          <div className="text-muted-foreground space-y-1">
+            <p>• Members must pay before each cycle deadline</p>
+            <p>• Payout positions are assigned by payment track record (proven members first)</p>
+            <p>• Members will receive SMS notifications with their contribution schedule</p>
+            <p>• The first member in order receives the pooled contributions when cycle 1 closes</p>
+          </div>
         </CardContent>
       </Card>
+
 
       {/* Start Button */}
       {isManager && (
@@ -245,11 +306,17 @@ export const PreStartDashboard = ({
                     <li className="text-green-700">
                       Activate <strong>{approvedMembers.length}</strong> member(s)
                     </li>
-                    <li>Start the first contribution cycle</li>
+                    <li>
+                      Start cycle 1, closing <strong>{cycle1Label}</strong> — first payout follows immediately
+                    </li>
+                    <li>
+                      Cycle 2 will close <strong>{cycle2Label}</strong>
+                    </li>
                     <li>Send SMS notifications to all members</li>
                     <li>Members will need to contribute KES {contributionAmount.toLocaleString()}</li>
                   </ul>
                   <p className="font-semibold mt-2">This action cannot be undone.</p>
+
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

@@ -91,3 +91,29 @@ Deno.test("twice-weekly falls back safely when days are missing or identical", (
   });
   assertEquals(identical.endDate.toISOString(), "2026-08-19T19:00:00.000Z");
 });
+
+Deno.test("twice-weekly first cycle always closes on the first chosen day", async (t) => {
+  const { getTwiceWeeklyFirstDeadline } = await import("../_shared/chamaDeadlines.ts");
+
+  await t.step("Wed start with Mon/Fri closes the coming Monday", () => {
+    // Wed 19 Aug 2026 09:00 UTC (12:00 EAT)
+    const d = getTwiceWeeklyFirstDeadline(new Date("2026-08-19T09:00:00Z"), 1, 5);
+    assertEquals(d.toISOString(), "2026-08-24T18:00:00.000Z");
+  });
+
+  await t.step("Monday start rolls to next week's Monday", () => {
+    const d = getTwiceWeeklyFirstDeadline(new Date("2026-08-17T09:00:00Z"), 1, 5);
+    assertEquals(d.toISOString(), "2026-08-24T18:00:00.000Z");
+  });
+
+  await t.step("Sunday start closes the very next day", () => {
+    const d = getTwiceWeeklyFirstDeadline(new Date("2026-08-23T09:00:00Z"), 1, 5);
+    assertEquals(d.toISOString(), "2026-08-24T18:00:00.000Z");
+  });
+
+  await t.step("Sat/Sun pair anchors on Saturday across a year boundary", () => {
+    // Wed 30 Dec 2026 -> first chosen day Saturday is 2 Jan 2027
+    const d = getTwiceWeeklyFirstDeadline(new Date("2026-12-30T09:00:00Z"), 6, 0);
+    assertEquals(d.toISOString(), "2027-01-02T18:00:00.000Z");
+  });
+});

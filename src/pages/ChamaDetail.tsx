@@ -669,6 +669,13 @@ const ChamaDetail = () => {
             isManager={isManager}
             onStart={handleStartChama}
             isStarting={isStarting}
+            frequency={chama.contribution_frequency}
+            everyNDaysCount={(chama as any).every_n_days_count}
+            monthlyDay={(chama as any).monthly_contribution_day}
+            monthlyDay2={(chama as any).monthly_contribution_day_2}
+            weeklyDay={(chama as any).weekly_contribution_day}
+            weeklyDay2={(chama as any).weekly_contribution_day_2}
+
           />
         )}
 
