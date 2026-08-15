@@ -278,7 +278,8 @@ export const CommissionAnalyticsDashboard = () => {
       const mchango = bucket.filter(e => e.source_type === "mchango").reduce((s, e) => s + Number(e.commission_amount), 0);
       const chama = bucket.filter(e => e.source_type === "chama").reduce((s, e) => s + Number(e.commission_amount), 0);
       const organizations = bucket.filter(e => e.source_type === "organization").reduce((s, e) => s + Number(e.commission_amount), 0);
-      return { label: iv.label, mchango, chama, organizations, total: mchango + chama + organizations };
+      const welfare = bucket.filter(e => e.source_type === "welfare").reduce((s, e) => s + Number(e.commission_amount), 0);
+      return { label: iv.label, mchango, chama, organizations, welfare, total: mchango + chama + organizations + welfare };
     });
 
     setTrendData(points);
@@ -288,6 +289,7 @@ export const CommissionAnalyticsDashboard = () => {
     { name: "Mchango", value: summary.mchangoCommission, color: COLORS[0] },
     { name: "Chama", value: summary.chamaCommission, color: COLORS[1] },
     { name: "Organizations", value: summary.orgCommission, color: COLORS[2] },
+    { name: "Welfare", value: summary.welfareCommission, color: COLORS[3] },
   ].filter(d => d.value > 0);
 
   const downloadStatement = () => {
