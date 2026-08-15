@@ -137,14 +137,17 @@ serve(async (req) => {
     }
 
     // Reminder SMS are disabled platform-wide (push + in-app only).
+    // Exception: chama contribution reminders (explicitly re-enabled, 4PM EAT slot).
     // Transactional confirmations (payments, payouts, OTP, approvals) still send.
-    if (eventType && /remind|reminder|grace_warning|expiry|kyc_reminder/i.test(eventType)) {
+    const isAllowedReminder = eventType === 'chama_payment_reminder';
+    if (!isAllowedReminder && eventType && /remind|reminder|grace_warning|expiry|kyc_reminder/i.test(eventType)) {
       console.log(`Reminder SMS suppressed (eventType: ${eventType})`);
       return new Response(
         JSON.stringify({ success: true, skipped: true, reason: 'reminder_sms_disabled' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
+
 
     if (!message || message.length === 0) {
       return new Response(

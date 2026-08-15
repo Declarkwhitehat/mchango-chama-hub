@@ -166,8 +166,9 @@ Deno.serve(async (req) => {
           console.log(`In-app notification created for ${member.member_code}`);
         }
 
-        // Send SMS via the platform-standard send-transactional-sms (Onfon)
-        if (profile?.phone) {
+        // Send SMS via the platform-standard send-transactional-sms (Onfon).
+        // SMS only fires on the 4:00 PM EAT slot; other slots are push + in-app only.
+        if (profile?.phone && slot === '1600') {
           const firstName = (profile.full_name || '').split(' ')[0] || 'Member';
           // Determine if "today" (Kenya date) equals the deadline date
           const eatToday = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -186,7 +187,7 @@ Deno.serve(async (req) => {
 
           try {
             const { error: smsError } = await supabase.functions.invoke('send-transactional-sms', {
-              body: { phone: profile.phone, message, eventType: 'payment_reminder' },
+              body: { phone: profile.phone, message, eventType: 'chama_payment_reminder' },
             });
             if (smsError) {
               errors++;

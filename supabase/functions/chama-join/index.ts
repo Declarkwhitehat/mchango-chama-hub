@@ -193,6 +193,59 @@ serve(async (req) => {
 
         console.log('Member status updated:', updatedMember);
 
+        // Notify the member of the decision (in-app + SMS)
+        try {
+          const chamaName = (member as any).chama?.name || 'your chama';
+          const { data: requesterProfile } = await adminClient
+            .from('profiles')
+            .select('phone, full_name')
+            .eq('id', member.user_id)
+            .maybeSingle();
+
+          try {
+            await adminClient.from('notifications').insert({
+              user_id: member.user_id,
+              title: isApproved ? 'Join request approved' : 'Join request rejected',
+              message: isApproved
+                ? `You have been approved to join ${chamaName}. Make your first contribution to activate your membership.`
+                : `Your request to join ${chamaName} was not approved.`,
+              type: isApproved ? 'success' : 'info',
+              category: 'chama',
+              related_entity_id: member.chama_id,
+              related_entity_type: 'chama',
+            });
+          } catch (notifErr) {
+            console.error('Failed to insert requester notification:', notifErr);
+          }
+
+          if (requesterProfile?.phone) {
+            const smsMessage = isApproved
+              ? `You have been accepted into "${chamaName}". Your member code is ${member.member_code}. Open the app to make your first contribution via Paybill 4015351.`
+              : `Your request to join "${chamaName}" was not approved by the manager. You may contact them or request a new invite code.`;
+            const smsRes = await fetch(
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-sms`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+                },
+                body: JSON.stringify({
+                  phone: requesterProfile.phone,
+                  message: smsMessage,
+                  eventType: isApproved ? 'chama_join_approved' : 'chama_join_rejected',
+                }),
+              }
+            );
+            console.log(`Decision SMS -> ${smsRes.status}`);
+          }
+        } catch (notifyError) {
+          console.error('Error notifying member of decision:', notifyError);
+        }
+
+
+
         return new Response(JSON.stringify({ 
           success: true,
           message: `Member ${isApproved ? 'approved' : 'rejected'} successfully`,
@@ -660,7 +713,7 @@ serve(async (req) => {
 
         const chamaName = (member as any).chama?.name || 'your chama';
         const smsMessage = isApproved
-          ? `Your request to join "${chamaName}" has been approved. Open the app to make your first contribution.`
+          ? `You have been accepted into "${chamaName}". Your member code is ${member.member_code}. Open the app to make your first contribution via Paybill 4015351.`
           : `Your request to join "${chamaName}" was not approved by the manager. You may contact them or request a new invite code.`;
 
         try {
