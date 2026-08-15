@@ -75,13 +75,20 @@ Deno.serve(async (req) => {
     let notificationsCreated = 0;
     let errors = 0;
 
-    // Parse slot from body for slot-specific behavior (1205 = midday, 1815 = evening)
+    // Slot policy (Kenya time):
+    //   SMS  -> 1300 (first reminder) and 1700 (final reminder). Two SMS max per day.
+    //   PUSH -> 0800, 1100, 2000 (in-app + native push only, no SMS).
     let slot: string | null = null;
     try {
       const body = await req.clone().json();
       slot = body?.slot ?? null;
     } catch (_) { /* no body */ }
-    console.log('[CRON] Slot:', slot ?? 'default');
+    const SMS_SLOTS = ['1300', '1700'];
+    const PUSH_SLOTS = ['0800', '1100', '2000'];
+    const isSmsSlot = slot !== null && SMS_SLOTS.includes(slot);
+    const isPushSlot = slot === null || PUSH_SLOTS.includes(slot);
+    console.log('[CRON] Slot:', slot ?? 'default', { isSmsSlot, isPushSlot });
+
 
     for (const chama of chamas || []) {
       // Get current active cycle (must include start_date for grace-period check)
@@ -147,8 +154,8 @@ Deno.serve(async (req) => {
 
         const dueTime = formatEatDeadline(cycle.end_date);
 
-        // Create in-app notification if user_id exists
-        if (userId) {
+        // In-app + native push notification (8 AM, 11 AM, 8 PM EAT slots only)
+        if (userId && isPushSlot) {
           const notificationData = NotificationTemplates.paymentReminder(
             payment.amount_due,
             chama.name,
@@ -166,10 +173,8 @@ Deno.serve(async (req) => {
           console.log(`In-app notification created for ${member.member_code}`);
         }
 
-        // Send SMS via the platform-standard send-transactional-sms (Onfon).
-        // SMS only fires on the 4:00 PM EAT slot; other slots are push + in-app only.
-        if (profile?.phone && slot === '1600') {
-          const firstName = (profile.full_name || '').split(' ')[0] || 'Member';
+        // SMS via send-transactional-sms (Onfon) — only two per day: 1 PM and 5 PM EAT.
+        if (profile?.phone && isSmsSlot) {
           // Determine if "today" (Kenya date) equals the deadline date
           const eatToday = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
           const eatDeadlineDate = new Date(new Date(cycle.end_date).getTime() + 3 * 60 * 60 * 1000)
@@ -179,11 +184,12 @@ Deno.serve(async (req) => {
             timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short',
           });
           const slotLabel = isDeadlineDay
-            ? (slot === '1815'
+            ? (slot === '1700'
                 ? `Final reminder: pay before ${dueTime} today.`
                 : `Deadline: ${dueTime} today.`)
             : `Pay by ${deadlineDateStr} at ${dueTime}.`;
           const message = `Your KES ${Number(payment.amount_due).toLocaleString()} contribution to "${chama.name}" is due. ${slotLabel} Pay via Paybill 4015351, Account ${member.member_code}.`;
+
 
           try {
             const { error: smsError } = await supabase.functions.invoke('send-transactional-sms', {
@@ -213,7 +219,9 @@ Deno.serve(async (req) => {
 
     // ---------- Welfare monthly contribution reminders (push + in-app only) ----------
     let welfareNotifications = 0;
-    try {
+    if (isPushSlot) try {
+
+
       const { data: welfareCycles } = await supabase
         .from('welfare_contribution_cycles')
         .select('id, welfare_id, amount, end_date, welfares!inner(name)')
@@ -268,8 +276,10 @@ Deno.serve(async (req) => {
     }
 
     // ── Welfare loans: due reminders, overdue flagging, monthly penalty, shares recovery ──
+    // Runs once a day, on the 8 AM EAT slot only.
     let loansProcessed = 0;
-    try {
+    if (slot === null || slot === '0800') try {
+
       const { data: openLoans } = await supabase
         .from('welfare_loans')
         .select('id, welfare_id, member_id, user_id, loan_type, principal, balance, status, due_date, last_interest_at, welfares(name)')
