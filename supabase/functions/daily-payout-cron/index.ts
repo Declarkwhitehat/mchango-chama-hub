@@ -610,12 +610,9 @@ Deno.serve(async (req) => {
       console.log(`[CATCH-UP] Processing ${pendingCycles.length} overdue cycle(s) for ${chama.name}`);
 
       for (const cycle of pendingCycles) {
-        // ========== NEW CYCLE GRACE: skip cycles created less than 23h ago ==========
-        const cycleAge = Date.now() - new Date(cycle.created_at).getTime();
-        if (cycleAge < 23 * 60 * 60 * 1000) {
-          console.log(`[SKIP] Cycle ${cycle.id} too new (${(cycleAge / 3600000).toFixed(1)}h), skipping`);
-          continue;
-        }
+        // A cycle is payable the moment its 21:00 EAT deadline passes — no age
+        // grace, otherwise same-day (daily / twice-weekly) cycles would never
+        // pay out on their own payout day.
 
         console.log(`  Processing cycle #${cycle.cycle_number} (${cycle.start_date} - ${cycle.end_date})`);
 

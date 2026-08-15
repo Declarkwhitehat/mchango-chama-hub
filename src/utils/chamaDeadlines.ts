@@ -68,7 +68,7 @@ export function getSameDay10PmKenyaCutoff(input: DateInput): Date | null {
   return atKenyaTimeOn(input, 21, 0);
 }
 
-/** 9:30 PM EAT on the same Kenya day as `input` — on-time payment cutoff. */
+/** 9:00 PM EAT on the same Kenya day as `input` — on-time payment cutoff. */
 export function getSameDay930PmKenyaCutoff(input: DateInput): Date | null {
-  return atKenyaTimeOn(input, 21, 30);
+  return atKenyaTimeOn(input, 21, 0);
 }
