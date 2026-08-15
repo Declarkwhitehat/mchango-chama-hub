@@ -430,7 +430,7 @@ Deno.serve(async (req) => {
                   const kenyaDow = new Date(nextEnd.getTime() + 3 * 60 * 60 * 1000).getUTCDay();
                   const advance = Math.min((wd1 - kenyaDow + 7) % 7, (wd2 - kenyaDow + 7) % 7);
                   nextEnd.setUTCDate(nextEnd.getUTCDate() + advance);
-                  nextEnd.setUTCHours(19, 0, 0, 0); // 10 PM EAT
+                  nextEnd.setUTCHours(18, 0, 0, 0); // 9 PM EAT
                   break;
                 }
                 case 'monthly':

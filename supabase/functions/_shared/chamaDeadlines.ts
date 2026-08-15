@@ -3,7 +3,7 @@
 import { KENYA_OFFSET_MS, kenyaDateTime, kenyaParts } from './kenyaTime.ts';
 
 const KENYA_9PM_UTC_HOUR = 18;        // 21:00 EAT == 18:00 UTC (first-cycle payment cutoff)
-const KENYA_10PM_UTC_HOUR = 19;       // 22:00 EAT == 19:00 UTC (payout processor/admin summary runs after cutoff)
+const KENYA_10PM_UTC_HOUR = 18;       // 21:00 EAT == 18:00 UTC (universal cycle cutoff & payout time)
 const KENYA_930PM_UTC_HOUR = 18;      // 21:30 EAT == 18:30 UTC (on-time cutoff)
 const KENYA_930PM_UTC_MINUTE = 30;
 const KENYA_1201PM_UTC_HOUR = 9;      // 12:01 PM EAT == 09:01 UTC (grace reminder)
@@ -203,7 +203,7 @@ export function getNextChamaCycleWindow(
     }
   }
 
-  return { startDate, endDate: atKenyaTime(endYear, endMonth, endDay, 22) };
+  return { startDate, endDate: atKenyaTime(endYear, endMonth, endDay, 21) };
 }
 
 /**

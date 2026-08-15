@@ -391,7 +391,7 @@ const ChamaCreate = () => {
                   </div>
                   <p className="text-xs text-muted-foreground col-span-2">
                     Members contribute twice every week on these two days. Payouts are
-                    made on each of these days at 10:00 PM.
+                    made on each of these days at 9:00 PM.
                   </p>
                 </div>
               )}

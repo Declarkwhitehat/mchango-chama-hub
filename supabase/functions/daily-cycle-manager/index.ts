@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
           if (cutoff) {
             endDate.setTime(cutoff.getTime());
           } else {
-            endDate.setUTCHours(19, 0, 0, 0); // fallback: 10 PM Kenya = 19:00 UTC
+            endDate.setUTCHours(18, 0, 0, 0); // fallback: 9 PM Kenya = 18:00 UTC
           }
           break;
         }
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
           const kenyaDow = new Date(endDate.getTime() + 3 * 60 * 60 * 1000).getUTCDay();
           const advance = Math.min((wd1 - kenyaDow + 7) % 7, (wd2 - kenyaDow + 7) % 7);
           endDate.setUTCDate(endDate.getUTCDate() + advance);
-          endDate.setUTCHours(19, 0, 0, 0); // 10 PM EAT
+          endDate.setUTCHours(18, 0, 0, 0); // 9 PM EAT
           break;
         }
         case 'monthly':
@@ -340,7 +340,7 @@ Deno.serve(async (req) => {
         cycle: {
           ...cycle,
           end_date: cycle.end_date,
-          cutoff_time: '22:00:00'
+          cutoff_time: '21:00:00'
         }, 
         payments 
       }), {

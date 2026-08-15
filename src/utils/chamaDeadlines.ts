@@ -63,9 +63,9 @@ export function getNextDay10PmKenyaDeadline(input: DateInput): Date | null {
 
 export const getNextDay9PmKenyaDeadline = getNextDay10PmKenyaDeadline;
 
-/** 10:00 PM EAT on the same Kenya day as `input` — cycle deadline. */
+/** 9:00 PM EAT on the same Kenya day as `input` — cycle deadline & payout time. */
 export function getSameDay10PmKenyaCutoff(input: DateInput): Date | null {
-  return atKenyaTimeOn(input, 22, 0);
+  return atKenyaTimeOn(input, 21, 0);
 }
 
 /** 9:30 PM EAT on the same Kenya day as `input` — on-time payment cutoff. */
