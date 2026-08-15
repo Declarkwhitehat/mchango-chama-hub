@@ -75,13 +75,20 @@ Deno.serve(async (req) => {
     let notificationsCreated = 0;
     let errors = 0;
 
-    // Parse slot from body for slot-specific behavior (1205 = midday, 1815 = evening)
+    // Slot policy (Kenya time):
+    //   SMS  -> 1300 (first reminder) and 1700 (final reminder). Two SMS max per day.
+    //   PUSH -> 0800, 1100, 2000 (in-app + native push only, no SMS).
     let slot: string | null = null;
     try {
       const body = await req.clone().json();
       slot = body?.slot ?? null;
     } catch (_) { /* no body */ }
-    console.log('[CRON] Slot:', slot ?? 'default');
+    const SMS_SLOTS = ['1300', '1700'];
+    const PUSH_SLOTS = ['0800', '1100', '2000'];
+    const isSmsSlot = slot !== null && SMS_SLOTS.includes(slot);
+    const isPushSlot = slot === null || PUSH_SLOTS.includes(slot);
+    console.log('[CRON] Slot:', slot ?? 'default', { isSmsSlot, isPushSlot });
+
 
     for (const chama of chamas || []) {
       // Get current active cycle (must include start_date for grace-period check)
