@@ -435,6 +435,12 @@ serve(async (req) => {
         const sourceLabel = `${sourceName} ${sourceType.toLowerCase()}`;
         const successMessage = `Confirmed. You have received ${amountStr} from ${sourceLabel} on ${paidAt}. Receipt: ${receiptRef}.${balanceLine}`;
         await sendSMS(recipientPhone, successMessage);
+        try {
+          await supabaseAdmin
+            .from('withdrawals')
+            .update({ metadata: { ...meta, payout_sms_sent_at: new Date().toISOString() } })
+            .eq('id', withdrawal.id);
+        } catch (_e) { /* non-fatal */ }
 
       }
 
