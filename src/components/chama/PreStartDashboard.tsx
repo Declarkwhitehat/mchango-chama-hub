@@ -145,7 +145,9 @@ export const PreStartDashboard = ({
             <CardTitle>Members ({approvedMembers.length})</CardTitle>
           </div>
           <CardDescription>
-            These members will participate when the chama starts. Order is based on join date.
+            These members will participate when the chama starts. Payout order is set on start
+            based on payment track record — members who completed a past chama come first, new
+            members are shuffled fairly.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -182,11 +184,16 @@ export const PreStartDashboard = ({
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-                    Payout #{index + 1}
-                  </Badge>
+                  {provenUsers.has(member.user_id) ? (
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                      Proven
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">New</Badge>
+                  )}
                 </div>
               ))}
+
             </div>
           )}
         </CardContent>
