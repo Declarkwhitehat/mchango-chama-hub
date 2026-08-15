@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { corsHeaders } from '../_shared/cors.ts';
-import { getEatMidnightOnePastForDate } from '../_shared/chamaDeadlines.ts';
+import { getNextChamaCycleWindow } from '../_shared/chamaDeadlines.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -36,97 +36,6 @@ async function sendSMS(phone: string, message: string) {
     return { success: false, error: error.message };
   }
 }
-
-function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
-  switch (frequency) {
-    case 'daily':
-      return 1;
-    case 'weekly':
-      return 7;
-    case 'monthly':
-      return 30;
-    case 'twice_monthly':
-      return 15;
-    case 'every_n_days':
-      return everyNDays || 7;
-    default:
-      return 7;
-  }
-}
-
-function calculateNextCycleDates(
-  lastEndDate: Date,
-  frequency: string,
-  everyNDays?: number,
-  monthlyDay?: number | null,
-  monthlyDay2?: number | null
-): { startDate: Date; endDate: Date } {
-  // Anchor the next cycle on the Kenya-calendar day AFTER lastEndDate.
-  // Using "now" caused bugs where, if this function ran at/after the daily
-  // cutoff (22:00 EAT = 19:00 UTC), endDate was set to the same day that
-  // just closed (i.e. already in the past).
-  const KENYA_OFFSET_MS = 3 * 60 * 60 * 1000;
-  const KENYA_22_UTC_HOUR = 19; // 22:00 EAT == 19:00 UTC
-
-  // Kenya-calendar day of lastEndDate's *last second of the closing window*.
-  const lastEndKenya = new Date(lastEndDate.getTime() + KENYA_OFFSET_MS);
-  // Next Kenya day (UTC components shifted)
-  const nextDayY = lastEndKenya.getUTCFullYear();
-  const nextDayM = lastEndKenya.getUTCMonth();
-  const nextDayD = lastEndKenya.getUTCDate() + 1;
-
-  // startDate (for downstream helpers) = next Kenya day at 00:00 EAT (= prior UTC day 21:00)
-  // Helpers like getEatMidnightOnePastForDate will refine this to 00:01 EAT.
-  const startDate = new Date(Date.UTC(nextDayY, nextDayM, nextDayD - 1, 21, 0, 0, 0));
-  const endDate = new Date(startDate);
-
-  switch (frequency) {
-    case 'daily':
-      // End the next Kenya day at 22:00 EAT (= 19:00 UTC of that Kenya day)
-      endDate.setTime(Date.UTC(nextDayY, nextDayM, nextDayD, KENYA_22_UTC_HOUR, 0, 0, 0));
-      break;
-    case 'weekly':
-      endDate.setUTCDate(endDate.getUTCDate() + 7);
-      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
-      break;
-    case 'monthly':
-      if (monthlyDay) {
-        endDate.setUTCMonth(endDate.getUTCMonth() + 1);
-        endDate.setUTCDate(monthlyDay - 1);
-      } else {
-        endDate.setUTCMonth(endDate.getUTCMonth() + 1);
-        endDate.setUTCDate(0);
-      }
-      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
-      break;
-    case 'twice_monthly':
-      if (monthlyDay && monthlyDay2) {
-        const day1 = Math.min(monthlyDay, monthlyDay2);
-        const day2 = Math.max(monthlyDay, monthlyDay2);
-        const currentDay = nextDayD;
-        if (currentDay >= day1 && currentDay < day2) {
-          endDate.setUTCDate(day2 - 1);
-        } else {
-          if (currentDay >= day2) endDate.setUTCMonth(endDate.getUTCMonth() + 1);
-          endDate.setUTCDate(day1 - 1);
-        }
-      } else {
-        endDate.setUTCDate(endDate.getUTCDate() + 15);
-      }
-      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
-      break;
-    case 'every_n_days':
-      endDate.setUTCDate(endDate.getUTCDate() + (everyNDays || 7));
-      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
-      break;
-    default:
-      endDate.setUTCDate(endDate.getUTCDate() + 7);
-      endDate.setUTCHours(KENYA_22_UTC_HOUR, 0, 0, 0);
-  }
-
-  return { startDate, endDate };
-}
-
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -247,13 +156,12 @@ Deno.serve(async (req) => {
 
     // Calculate next cycle dates
     const lastEndDate = new Date(lastCycle.end_date);
-    const { startDate, endDate } = calculateNextCycleDates(
-      lastEndDate,
-      chama.contribution_frequency,
-      chama.every_n_days_count,
-      chama.monthly_contribution_day,
-      chama.monthly_contribution_day_2
-    );
+    const { startDate, endDate } = getNextChamaCycleWindow(lastEndDate, {
+      frequency: chama.contribution_frequency,
+      everyNDaysCount: chama.every_n_days_count,
+      monthlyDay: chama.monthly_contribution_day,
+      monthlyDay2: chama.monthly_contribution_day_2,
+    });
 
     // Create new cycle
     const { data: newCycle, error: cycleError } = await supabase
@@ -261,7 +169,7 @@ Deno.serve(async (req) => {
       .insert({
         chama_id: chamaId,
         cycle_number: nextCycleNumber,
-        start_date: getEatMidnightOnePastForDate(startDate).toISOString(),
+        start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         due_amount: chama.contribution_amount,
         beneficiary_member_id: beneficiary.id,
@@ -466,6 +374,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
+      cycleId: newCycle.id,
       cycle: newCycle,
       beneficiary: {
         id: beneficiary.id,

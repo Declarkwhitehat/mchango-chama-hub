@@ -1423,6 +1423,22 @@ serve(async (req) => {
                       total_collected_amount: grossAmount
                     }).eq('id', currentCycle.id);
 
+                    try {
+                      const advanceResponse = await fetch(`${supabaseUrl}/functions/v1/cycle-auto-create`, {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${serviceKey}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ chamaId: body.chama_id, lastCycleId: currentCycle.id }),
+                      });
+                      if (!advanceResponse.ok) {
+                        console.error('Next-cycle creation failed:', await advanceResponse.text());
+                      }
+                    } catch (advanceError) {
+                      console.error('Next-cycle dispatch failed:', (advanceError as Error)?.message);
+                    }
+
                     if (canAutoApprove && paymentMethod.phone_number) {
                       try {
                         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
