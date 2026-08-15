@@ -219,8 +219,8 @@ Deno.serve(async (req) => {
 
     // ---------- Welfare monthly contribution reminders (push + in-app only) ----------
     let welfareNotifications = 0;
-    try {
-      if (!isPushSlot) throw { skip: true };
+    if (isPushSlot) try {
+
 
       const { data: welfareCycles } = await supabase
         .from('welfare_contribution_cycles')
