@@ -336,10 +336,10 @@ const ChamaCreate = () => {
 
                     >
                       <SelectTrigger id="monthly_day_2">
-                        <SelectValue placeholder="Select day" />
+                        <SelectValue placeholder={monthlyDay ? "Select day" : "Pick first day"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {DAY_OPTIONS.filter(d => String(d) !== monthlyDay).map(day => (
+                        {DAY_OPTIONS.filter(d => monthlyDay && d > Number(monthlyDay)).map(day => (
                           <SelectItem key={day} value={String(day)}>
                             {getOrdinalSuffix(day)}
                           </SelectItem>
@@ -348,7 +348,7 @@ const ChamaCreate = () => {
                     </Select>
                   </div>
                   <p className="text-xs text-muted-foreground col-span-2">
-                    Pick two different days (1–28) for contributions each month
+                    Pick two different days (1–28) in the same month — the second day must come after the first
                   </p>
                 </div>
               )}
