@@ -203,7 +203,22 @@ export const CommissionAnalyticsDashboard = () => {
         else if (e.source_type === "organization") { s.orgCommission += c; s.orgGross += g; }
         else if (e.source_type === "welfare") { s.welfareCommission += c; s.welfareGross += g; }
       }
+
+      // Chama commission is booked on dedicated `commission` ledger rows
+      // (their `contribution_summary` inflow rows carry 0 commission), so add
+      // those in for any source whose inflow rows recorded no commission.
+      for (const e of all) {
+        if (String(e.transaction_type || "").toLowerCase() !== "commission") continue;
+        const c = Number(e.commission_amount) || Number(e.gross_amount) || 0;
+        if (!c) continue;
+        s.totalCommission += c;
+        if (e.source_type === "mchango") s.mchangoCommission += c;
+        else if (e.source_type === "chama") s.chamaCommission += c;
+        else if (e.source_type === "organization") s.orgCommission += c;
+        else if (e.source_type === "welfare") s.welfareCommission += c;
+      }
       setSummary(s);
+
     } catch (err: any) {
       console.error(err);
       toast({ title: "Error", description: "Failed to load commission data", variant: "destructive" });
