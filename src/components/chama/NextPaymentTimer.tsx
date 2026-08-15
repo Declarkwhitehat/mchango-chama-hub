@@ -10,9 +10,14 @@ interface NextPaymentTimerProps {
   refreshKey?: number;
 }
 
+type Mode = "due" | "next-cycle" | "awaiting-next" | "final-cycle";
+
 interface TimerState {
+  mode: Mode | null;
+  /** Deadline to count down to (only for "due" and "next-cycle"). */
   deadline: Date | null;
-  isPaidForCurrent: boolean;
+  /** Deadline of the current open cycle, shown for reference. */
+  currentDeadline: Date | null;
   loading: boolean;
 }
 
@@ -32,33 +37,18 @@ function formatRemaining(ms: number): string {
   return parts.join(" ");
 }
 
-function estimateNextDeadline(currentEnd: Date, freq: string | null, everyN: number | null): Date {
-  const next = new Date(currentEnd);
-  switch (freq) {
-    case "daily":
-      next.setUTCDate(next.getUTCDate() + 1);
-      break;
-    case "weekly":
-      next.setUTCDate(next.getUTCDate() + 7);
-      break;
-    case "monthly":
-      next.setUTCMonth(next.getUTCMonth() + 1);
-      break;
-    case "twice_monthly":
-      next.setUTCDate(next.getUTCDate() + 15);
-      break;
-    case "every_n_days":
-      next.setUTCDate(next.getUTCDate() + (everyN || 1));
-      break;
-    default:
-      next.setUTCDate(next.getUTCDate() + 1);
-  }
-  return next;
+function formatDeadline(d: Date): string {
+  return d.toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function NextPaymentTimer({ chamaId, memberId, refreshKey = 0 }: NextPaymentTimerProps) {
-  const [state, setState] = useState<TimerState>({ deadline: null, isPaidForCurrent: false, loading: true });
-  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<TimerState>({
+    mode: null,
+    deadline: null,
+    currentDeadline: null,
+    loading: true,
+  });
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,9 +66,11 @@ export function NextPaymentTimer({ chamaId, memberId, refreshKey = 0 }: NextPaym
 
         const currentCycle = cycles?.[0];
         if (!currentCycle) {
-          if (!cancelled) setState({ deadline: null, isPaidForCurrent: false, loading: false });
+          if (!cancelled) setState({ mode: null, deadline: null, currentDeadline: null, loading: false });
           return;
         }
+
+        const currentEnd = new Date(currentCycle.end_date);
 
         // Paid status for current cycle
         const { data: payment } = await supabase
@@ -89,14 +81,15 @@ export function NextPaymentTimer({ chamaId, memberId, refreshKey = 0 }: NextPaym
           .maybeSingle();
 
         const isPaid = !!(payment?.fully_paid || payment?.is_paid);
-        const currentEnd = new Date(currentCycle.end_date);
 
         if (!isPaid) {
-          if (!cancelled) setState({ deadline: currentEnd, isPaidForCurrent: false, loading: false });
+          if (!cancelled) {
+            setState({ mode: "due", deadline: currentEnd, currentDeadline: currentEnd, loading: false });
+          }
           return;
         }
 
-        // Paid: find next cycle's deadline (or estimate from frequency)
+        // Paid: only count down to a cycle that actually exists.
         const { data: nextCycle } = await supabase
           .from("contribution_cycles")
           .select("end_date")
@@ -106,30 +99,47 @@ export function NextPaymentTimer({ chamaId, memberId, refreshKey = 0 }: NextPaym
           .limit(1)
           .maybeSingle();
 
-        let nextDeadline: Date;
         if (nextCycle?.end_date) {
-          nextDeadline = new Date(nextCycle.end_date);
-        } else {
-          const { data: chama } = await supabase
-            .from("chama")
-            .select("contribution_frequency, every_n_days_count")
-            .eq("id", chamaId)
-            .maybeSingle();
-          nextDeadline = estimateNextDeadline(
-            currentEnd,
-            (chama as any)?.contribution_frequency ?? null,
-            (chama as any)?.every_n_days_count ?? null,
-          );
+          if (!cancelled) {
+            setState({
+              mode: "next-cycle",
+              deadline: new Date(nextCycle.end_date),
+              currentDeadline: currentEnd,
+              loading: false,
+            });
+          }
+          return;
         }
 
-        if (!cancelled) setState({ deadline: nextDeadline, isPaidForCurrent: true, loading: false });
+        // No next cycle row yet — is this the final round? A single-round ROSCA
+        // runs exactly one cycle per approved active member.
+        const { count } = await supabase
+          .from("chama_members")
+          .select("id", { count: "exact", head: true })
+          .eq("chama_id", chamaId)
+          .eq("approval_status", "approved")
+          .eq("status", "active");
+
+        const totalRounds = count ?? 0;
+        const isFinal = totalRounds > 0 && currentCycle.cycle_number >= totalRounds;
+
+        if (!cancelled) {
+          setState({
+            mode: isFinal ? "final-cycle" : "awaiting-next",
+            deadline: null,
+            currentDeadline: currentEnd,
+            loading: false,
+          });
+        }
       } catch (err) {
         console.error("NextPaymentTimer load error", err);
-        if (!cancelled) setState({ deadline: null, isPaidForCurrent: false, loading: false });
+        if (!cancelled) setState({ mode: null, deadline: null, currentDeadline: null, loading: false });
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [chamaId, memberId, refreshKey]);
 
   useEffect(() => {
@@ -145,41 +155,52 @@ export function NextPaymentTimer({ chamaId, memberId, refreshKey = 0 }: NextPaym
     );
   }
 
-  if (!state.deadline) return null;
+  if (!state.mode) return null;
 
-  const remaining = state.deadline.getTime() - Date.now();
-  const urgent = !state.isPaidForCurrent && remaining > 0 && remaining < 4 * 60 * 60 * 1000;
-  const passed = remaining <= 0;
+  const isDue = state.mode === "due";
+  const remaining = state.deadline ? state.deadline.getTime() - Date.now() : null;
 
-  const paidUp = state.isPaidForCurrent;
+  const title =
+    state.mode === "due"
+      ? "Time left to pay this cycle"
+      : state.mode === "next-cycle"
+        ? "You're paid up for this cycle — next payment due in"
+        : state.mode === "final-cycle"
+          ? "You're fully paid — this is the final cycle"
+          : "You're paid up for this cycle";
+
+  const subtitle =
+    state.mode === "final-cycle"
+      ? `Payouts complete after the deadline: ${state.currentDeadline ? formatDeadline(state.currentDeadline) : "—"}`
+      : state.mode === "awaiting-next"
+        ? `The next cycle opens after the current deadline: ${state.currentDeadline ? formatDeadline(state.currentDeadline) : "—"}`
+        : state.deadline
+          ? `Deadline: ${formatDeadline(state.deadline)}`
+          : null;
 
   return (
     <div
       className={cn(
         "rounded-md border px-4 py-3 flex items-start gap-3",
-        paidUp
-          ? "border-primary/30 bg-primary/5"
-          : "border-destructive/40 bg-destructive/10",
+        isDue ? "border-destructive/40 bg-destructive/10" : "border-primary/30 bg-primary/5",
       )}
     >
-      {paidUp ? (
-        <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-      ) : (
+      {isDue ? (
         <Clock className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+      ) : (
+        <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 shrink-0" />
       )}
       <div className="space-y-0.5">
-        <p className={cn("text-sm font-medium", paidUp ? "text-primary" : "text-destructive")}>
-          {paidUp ? "You're paid up for this cycle — next payment due in" : "Time left to pay this cycle"}
-        </p>
-        <p className={cn("text-lg font-bold tabular-nums", paidUp ? "text-primary" : "text-destructive")}>
-          {formatRemaining(remaining)}
-        </p>
-        <p className={cn("text-xs", paidUp ? "text-muted-foreground" : "text-destructive/80")}>
-          Deadline: {state.deadline.toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" })}
-        </p>
+        <p className={cn("text-sm font-medium", isDue ? "text-destructive" : "text-primary")}>{title}</p>
+        {remaining !== null && (
+          <p className={cn("text-lg font-bold tabular-nums", isDue ? "text-destructive" : "text-primary")}>
+            {formatRemaining(remaining)}
+          </p>
+        )}
+        {subtitle && (
+          <p className={cn("text-xs", isDue ? "text-destructive/80" : "text-muted-foreground")}>{subtitle}</p>
+        )}
       </div>
     </div>
   );
-
 }
-
