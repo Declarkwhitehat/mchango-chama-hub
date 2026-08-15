@@ -1,6 +1,31 @@
+export const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+/** Normalises the two chosen weekdays, falling back to Mon/Thu. */
+export function normalizeWeeklyDays(
+  day1?: number | null,
+  day2?: number | null,
+): [number, number] {
+  const valid = (d?: number | null) =>
+    typeof d === "number" && Number.isInteger(d) && d >= 0 && d <= 6;
+  const a = valid(day1) ? (day1 as number) : 1;
+  let b = valid(day2) ? (day2 as number) : 4;
+  if (b === a) b = (a + 3) % 7;
+  return [a, b];
+}
+
 export function frequencyLabel(
   frequency: string | null | undefined,
   everyNDaysCount?: number | null,
+  weeklyDay?: number | null,
+  weeklyDay2?: number | null,
 ): string {
   switch (frequency) {
     case "daily":
@@ -11,6 +36,18 @@ export function frequencyLabel(
       return "Monthly";
     case "twice_monthly":
       return "Twice Monthly";
+    case "twice_weekly": {
+      if (
+        typeof weeklyDay === "number" &&
+        typeof weeklyDay2 === "number" &&
+        weeklyDay >= 0 &&
+        weeklyDay2 >= 0
+      ) {
+        const [a, b] = normalizeWeeklyDays(weeklyDay, weeklyDay2);
+        return `Twice a Week (${WEEKDAY_NAMES[a].slice(0, 3)} & ${WEEKDAY_NAMES[b].slice(0, 3)})`;
+      }
+      return "Twice a Week";
+    }
     case "every_n_days":
       return everyNDaysCount && everyNDaysCount > 0
         ? `Every ${everyNDaysCount} Days`
@@ -28,6 +65,9 @@ interface ChamaScheduleOpts {
   everyNDaysCount?: number | null;
   monthlyDay?: number | null;
   monthlyDay2?: number | null;
+  /** 0 = Sunday ... 6 = Saturday (twice_weekly) */
+  weeklyDay?: number | null;
+  weeklyDay2?: number | null;
 }
 
 function deadlineAtKenyaDay(year: number, month: number, day: number): Date {
@@ -46,7 +86,31 @@ export function addCyclesToDeadline(
 ): Date {
   if (cyclesAhead <= 0) return new Date(fromDeadline);
 
-  const { frequency, everyNDaysCount, monthlyDay, monthlyDay2 } = opts;
+  const { frequency, everyNDaysCount, monthlyDay, monthlyDay2, weeklyDay, weeklyDay2 } = opts;
+
+  // Twice-weekly: hop to the next chosen weekday, alternating between the two.
+  if (frequency === "twice_weekly") {
+    const [d1, d2] = normalizeWeeklyDays(weeklyDay, weeklyDay2);
+    const days = [d1, d2].sort((a, b) => a - b);
+    const kenya = new Date(fromDeadline.getTime() + KENYA_OFFSET_MS);
+    let year = kenya.getUTCFullYear();
+    let month = kenya.getUTCMonth();
+    let day = kenya.getUTCDate();
+    for (let i = 0; i < cyclesAhead; i++) {
+      const base = new Date(Date.UTC(year, month, day));
+      const dow = base.getUTCDay();
+      const deltas = days.map((d) => {
+        const raw = (d - dow + 7) % 7;
+        return raw === 0 ? 7 : raw;
+      });
+      const advance = Math.min(...deltas);
+      const next = new Date(Date.UTC(year, month, day + advance));
+      year = next.getUTCFullYear();
+      month = next.getUTCMonth();
+      day = next.getUTCDate();
+    }
+    return deadlineAtKenyaDay(year, month, day);
+  }
 
   // Twice-monthly with two chosen days: alternate between the two days.
   if (frequency === "twice_monthly" && monthlyDay && monthlyDay2) {

@@ -546,6 +546,24 @@ serve(async (req) => {
         }
       }
 
+      if (body.contribution_frequency === 'twice_weekly') {
+        const d1 = body.weekly_contribution_day;
+        const d2 = body.weekly_contribution_day_2;
+        const validDay = (d: any) => Number.isInteger(d) && d >= 0 && d <= 6;
+        if (!validDay(d1) || !validDay(d2)) {
+          return new Response(JSON.stringify({ error: 'Two valid contribution days of the week are required for twice weekly frequency' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (d1 === d2) {
+          return new Response(JSON.stringify({ error: 'The two contribution days must be different' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       // Validate required fields and generate a safe slug
       if (!body?.name || typeof body.name !== 'string') {
         return new Response(JSON.stringify({ error: 'name is required' }), {
@@ -603,6 +621,8 @@ serve(async (req) => {
           every_n_days_count: body.every_n_days_count,
           monthly_contribution_day: body.monthly_contribution_day || null,
           monthly_contribution_day_2: body.monthly_contribution_day_2 || null,
+          weekly_contribution_day: body.contribution_frequency === 'twice_weekly' ? body.weekly_contribution_day : null,
+          weekly_contribution_day_2: body.contribution_frequency === 'twice_weekly' ? body.weekly_contribution_day_2 : null,
           min_members: minMembers,
           max_members: maxMembers,
           is_public: body.is_public !== undefined ? body.is_public : true,

@@ -25,6 +25,7 @@ export const ChamaEndDate = ({
     switch (frequency) {
       case 'daily': return 1;
       case 'weekly': return 7;
+      case 'twice_weekly': return 4;
       case 'monthly': return 30;
       case 'twice_monthly': return 15;
       case 'every_n_days': return everyNDays || 7;

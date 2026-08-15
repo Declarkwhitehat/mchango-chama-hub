@@ -325,6 +325,8 @@ async function getChamaInfo(supabase: any, chamaId: string, userId: string | nul
   const frequencyMap: Record<string, string> = {
     'daily': 'Daily',
     'weekly': 'Weekly',
+    'twice_weekly': 'Twice a Week',
+    'twice_monthly': 'Twice Monthly',
     'monthly': 'Monthly',
     'every_n_days': `Every ${chama.every_n_days_count} days`
   };

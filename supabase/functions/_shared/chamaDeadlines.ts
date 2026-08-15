@@ -101,7 +101,24 @@ export interface ChamaCycleSchedule {
   everyNDaysCount?: number | null;
   monthlyDay?: number | null;
   monthlyDay2?: number | null;
+  /** 0 = Sunday ... 6 = Saturday (twice_weekly) */
+  weeklyDay?: number | null;
+  weeklyDay2?: number | null;
 }
+
+/** Normalises the two chosen weekdays, falling back to Mon/Thu. */
+export function normalizeWeeklyDays(
+  day1?: number | null,
+  day2?: number | null,
+): [number, number] {
+  const valid = (d?: number | null) =>
+    typeof d === 'number' && Number.isInteger(d) && d >= 0 && d <= 6;
+  const a = valid(day1) ? (day1 as number) : 1; // Monday
+  let b = valid(day2) ? (day2 as number) : 4;   // Thursday
+  if (b === a) b = (a + 3) % 7;
+  return [a, b];
+}
+
 
 function kenyaDateParts(date: Date) {
   const kenyaClock = toKenyaClock(date);
@@ -170,7 +187,18 @@ export function getNextChamaCycleWindow(
       endYear = candidate.getUTCFullYear(); endMonth = candidate.getUTCMonth(); endDay = candidate.getUTCDate();
       break;
     }
+    case 'twice_weekly': {
+      const [d1, d2] = normalizeWeeklyDays(schedule.weeklyDay, schedule.weeklyDay2);
+      const base = new Date(Date.UTC(nextYear, nextMonth, nextDay));
+      const baseDow = base.getUTCDay();
+      const delta = (dow: number) => (dow - baseDow + 7) % 7;
+      const advance = Math.min(delta(d1), delta(d2));
+      const target = new Date(Date.UTC(nextYear, nextMonth, nextDay + advance));
+      endYear = target.getUTCFullYear(); endMonth = target.getUTCMonth(); endDay = target.getUTCDate();
+      break;
+    }
     default: {
+
       const target = new Date(Date.UTC(nextYear, nextMonth, nextDay + 6));
       endYear = target.getUTCFullYear(); endMonth = target.getUTCMonth(); endDay = target.getUTCDate();
     }
@@ -210,4 +238,31 @@ export function getTwiceMonthlyFirstDeadline(
   }
 
   return new Date(Date.UTC(targetYear, targetMonth, targetDay, KENYA_9PM_UTC_HOUR, 0, 0, 0));
+}
+
+/**
+ * For twice-weekly chamas, return the next upcoming chosen weekday at 21:00 EAT
+ * (18:00 UTC). Never returns the same Kenya calendar day as `referenceDate`, so
+ * members always get at least a full day to pay the first cycle.
+ */
+export function getTwiceWeeklyFirstDeadline(
+  referenceDate: Date,
+  day1?: number | null,
+  day2?: number | null,
+): Date {
+  const [d1, d2] = normalizeWeeklyDays(day1, day2);
+  const kenyaClock = toKenyaClock(referenceDate);
+  const y = kenyaClock.getUTCFullYear();
+  const m = kenyaClock.getUTCMonth();
+  const d = kenyaClock.getUTCDate();
+  const todayDow = kenyaClock.getUTCDay();
+
+  // Distance in days from today to a chosen weekday, at least 1 day away.
+  const distance = (dow: number) => {
+    const raw = (dow - todayDow + 7) % 7;
+    return raw === 0 ? 7 : raw;
+  };
+  const advance = Math.min(distance(d1), distance(d2));
+
+  return new Date(Date.UTC(y, m, d + advance, KENYA_9PM_UTC_HOUR, 0, 0, 0));
 }

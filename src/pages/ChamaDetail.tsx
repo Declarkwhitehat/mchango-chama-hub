@@ -61,6 +61,8 @@ interface ChamaData {
   every_n_days_count?: number;
   monthly_contribution_day?: number | null;
   monthly_contribution_day_2?: number | null;
+  weekly_contribution_day?: number | null;
+  weekly_contribution_day_2?: number | null;
   current_cycle_round?: number;
   last_cycle_completed_at?: string;
   accepting_rejoin_requests?: boolean;
@@ -423,6 +425,8 @@ const ChamaDetail = () => {
           everyNDaysCount: chamaData.every_n_days_count,
           monthlyDay: chamaData.monthly_contribution_day,
           monthlyDay2: chamaData.monthly_contribution_day_2,
+          weeklyDay: chamaData.weekly_contribution_day,
+          weeklyDay2: chamaData.weekly_contribution_day_2,
         };
 
         approvedMembers.forEach((member, idx) => {
@@ -474,6 +478,7 @@ const ChamaDetail = () => {
     switch (frequency) {
       case 'daily': return 1;
       case 'weekly': return 7;
+      case 'twice_weekly': return 4;
       case 'monthly': return 30;
       case 'every_n_days': return everyNDays || 7;
       default: return 7;
@@ -621,7 +626,7 @@ const ChamaDetail = () => {
                 <p className="text-[10px] text-muted-foreground mt-1">After 5% commission. Overpayment wallet shown separately.</p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">{frequencyLabel(chama.contribution_frequency, chama.every_n_days_count)}</p>
+                <p className="text-sm text-muted-foreground mb-1">{frequencyLabel(chama.contribution_frequency, chama.every_n_days_count, (chama as any).weekly_contribution_day, (chama as any).weekly_contribution_day_2)}</p>
                 <p className="text-2xl font-bold text-foreground">
                   KES {chama.contribution_amount.toLocaleString()}
                 </p>
