@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { createNotification, NotificationTemplates, notifyManyUsers, notifyAllAdmins } from "../_shared/notifications.ts";
 import { getCallbackClientIP, isSafaricomCallbackIP } from "../_shared/safaricomIp.ts";
+import { sendSms } from "../_shared/sendSms.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,51 +11,7 @@ const corsHeaders = {
 };
 
 async function sendSMS(phone: string, message: string) {
-  const onfonApiKey = Deno.env.get('ONFON_API_KEY');
-  const onfonClientId = Deno.env.get('ONFON_CLIENT_ID');
-  const onfonAccessKey = Deno.env.get('ONFON_ACCESS_KEY');
-  const onfonSenderId = Deno.env.get('ONFON_SENDER_ID') || 'OnfonInfo';
-
-  if (!onfonApiKey || !onfonClientId || !onfonAccessKey) {
-    console.error('Onfon SMS credentials not configured');
-    return { success: false, error: 'SMS not configured' };
-  }
-
-  try {
-    // Normalize phone: remove '+' prefix for Onfon
-    let normalizedPhone = phone.replace(/^\+/, '');
-    if (normalizedPhone.startsWith('0')) {
-      normalizedPhone = '254' + normalizedPhone.substring(1);
-    } else if (!normalizedPhone.startsWith('254')) {
-      normalizedPhone = '254' + normalizedPhone;
-    }
-
-    const response = await fetch('https://api.onfonmedia.co.ke/v1/sms/SendBulkSMS', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accesskey': onfonAccessKey,
-      },
-      body: JSON.stringify({
-        ApiKey: onfonApiKey,
-        ClientId: onfonClientId,
-        SenderId: onfonSenderId,
-        MessageParameters: [
-          {
-            Number: normalizedPhone,
-            Text: message,
-          },
-        ],
-      }),
-    });
-
-    const data = await response.json();
-    console.log('SMS response:', JSON.stringify(data));
-    return { success: response.ok, data };
-  } catch (error: any) {
-    console.error('SMS error:', error);
-    return { success: false, error: error.message };
-  }
+  return await sendSms(phone, message, 'payout_receipt');
 }
 
 function extractOccasion(result: any): string {
@@ -435,6 +392,12 @@ serve(async (req) => {
         const sourceLabel = `${sourceName} ${sourceType.toLowerCase()}`;
         const successMessage = `Confirmed. You have received ${amountStr} from ${sourceLabel} on ${paidAt}. Receipt: ${receiptRef}.${balanceLine}`;
         await sendSMS(recipientPhone, successMessage);
+        try {
+          await supabaseAdmin
+            .from('withdrawals')
+            .update({ metadata: { ...meta, payout_sms_sent_at: new Date().toISOString() } })
+            .eq('id', withdrawal.id);
+        } catch (_e) { /* non-fatal */ }
 
       }
 

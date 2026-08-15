@@ -33,6 +33,7 @@
 - [Scheduled 9PM Payout](mem://chama/scheduled-2100-payout) — cycles pay out at 21:00 EAT paid-or-not; instant/early payouts removed
 - [Cycle-End Manager Notifications](mem://architecture/cycle-end-manager-notifications) — SMS summary at cycle close: all-paid or missed list
 - [Withdrawals Profile Link](mem://architecture/withdrawals-to-profiles-link) — Foreign key enables PostgREST embedded joins
+- [Payout Receipt SMS](mem://architecture/payout-receipt-sms) — DB trigger guarantees payout SMS; all edge SMS via _shared/sendSms.ts
 - [Welfare Deduction Timing](mem://architecture/welfare-balance-deduction-timing) — Deduct on dual approval, refund on cancel
 - [Document Serial Retrieval](mem://architecture/document-serial-and-retrieval-policy) — Numeric serials, QR codes, 1-month retention
 - [External Migration](mem://constraints/external-migration) — Unsupported due to auth hashes & callback config

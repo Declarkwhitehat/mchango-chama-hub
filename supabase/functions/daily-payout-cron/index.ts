@@ -3,6 +3,7 @@ import { getSameDay10PmKenyaCutoff, normalizeWeeklyDays } from '../_shared/chama
 import { corsHeaders } from '../_shared/cors.ts';
 import { getMpesaTransactionFee } from '../_shared/mpesaTransactionFee.ts';
 import { applyPendingWalletToCycle } from '../_shared/applyChamaWallet.ts';
+import { sendSms } from '../_shared/sendSms.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -20,33 +21,7 @@ function sanitizeSmsMessage(raw: string): string {
 }
 
 async function sendSMS(phone: string, message: string) {
-  message = sanitizeSmsMessage(message);
-  if (!celcomApiKey || !celcomPartnerId || !celcomShortcode) {
-    console.error('SMS credentials not configured');
-    return { success: false, error: 'SMS not configured' };
-  }
-
-  try {
-    const response = await fetch('https://api.celcomafrica.com/v1/sms/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${celcomApiKey}`
-      },
-      body: JSON.stringify({
-        partnerID: celcomPartnerId,
-        shortCode: celcomShortcode,
-        mobile: phone.startsWith('254') ? phone : `254${phone.replace(/^0+/, '')}`,
-        message: message
-      })
-    });
-
-    const data = await response.json();
-    return { success: response.ok, messageId: data.messageId };
-  } catch (error: any) {
-    console.error('SMS error:', error);
-    return { success: false, error: error.message };
-  }
+  return await sendSms(phone, sanitizeSmsMessage(message), 'chama_payout');
 }
 
 // Check if a member is eligible for payout based on PER-CYCLE payment records

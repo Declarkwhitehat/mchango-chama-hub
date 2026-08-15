@@ -1,0 +1,1 @@
+UPDATE public.withdrawals SET metadata = COALESCE(metadata,'{}'::jsonb) - 'payout_sms_sent_at' WHERE id='df15092c-7549-48de-94b9-1e48830465ba';
