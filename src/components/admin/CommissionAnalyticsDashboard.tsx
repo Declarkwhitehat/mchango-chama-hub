@@ -72,6 +72,7 @@ interface TrendPoint {
   mchango: number;
   chama: number;
   organizations: number;
+  welfare: number;
   total: number;
 }
 
