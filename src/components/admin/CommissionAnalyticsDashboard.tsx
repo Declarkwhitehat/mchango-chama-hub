@@ -574,7 +574,7 @@ export const CommissionAnalyticsDashboard = () => {
                 Live Data Cross-Verification
               </CardTitle>
               <CardDescription className="text-xs">
-                Comparing ledger totals with live tables for {dateFrom === dateTo ? "today" : "selected period"}. Chama commissions live in the ledger only.
+                Comparing ledger totals with live tables for {dateFrom === dateTo ? "today" : "selected period"}. Chama commissions are cross-checked against recorded platform earnings.
               </CardDescription>
             </CardHeader>
             <CardContent>
