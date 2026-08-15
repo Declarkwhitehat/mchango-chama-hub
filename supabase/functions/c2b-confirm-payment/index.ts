@@ -1159,8 +1159,8 @@ async function handleCallback(callbackData: any): Promise<Response> {
           ResultDesc: 'Contribution accepted and recorded for Welfare',
           type: 'welfare',
           gross_amount: grossAmount,
-          commission_amount: commissionAmount,
-          net_amount: netAmount
+          commission_amount: finalCommission,
+          net_amount: finalNet
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
