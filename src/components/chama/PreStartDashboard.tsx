@@ -52,6 +52,12 @@ interface PreStartDashboardProps {
   isManager: boolean;
   onStart: () => Promise<void>;
   isStarting: boolean;
+  frequency?: string | null;
+  everyNDaysCount?: number | null;
+  monthlyDay?: number | null;
+  monthlyDay2?: number | null;
+  weeklyDay?: number | null;
+  weeklyDay2?: number | null;
 }
 
 export const PreStartDashboard = ({
@@ -62,7 +68,13 @@ export const PreStartDashboard = ({
   members,
   isManager,
   onStart,
-  isStarting
+  isStarting,
+  frequency,
+  everyNDaysCount,
+  monthlyDay,
+  monthlyDay2,
+  weeklyDay,
+  weeklyDay2,
 }: PreStartDashboardProps) => {
   // All approved members are ready to participate
   const approvedMembers = members.filter(m => m.approval_status === 'approved');
@@ -70,7 +82,32 @@ export const PreStartDashboard = ({
   const canStart = approvedMembers.length >= minMembers;
   const membersNeeded = minMembers - approvedMembers.length;
 
+  // Schedule preview — mirrors the backend first-deadline maths exactly.
+  const cycle1 = getFirstCycleDeadline(new Date(), {
+    frequency,
+    monthlyDay,
+    monthlyDay2,
+    weeklyDay,
+    weeklyDay2,
+  });
+  const cycle2 = cycle1
+    ? addCyclesToDeadline(cycle1, 1, {
+        frequency: frequency || 'daily',
+        everyNDaysCount,
+        monthlyDay,
+        monthlyDay2,
+        weeklyDay,
+        weeklyDay2,
+      })
+    : null;
+  const labelFor = (d: Date | null) =>
+    d ? `${formatKenya(d, { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatKenyaTime(d)}` : '—';
+  const cycle1Label = labelFor(cycle1);
+  const cycle2Label = labelFor(cycle2);
+  const scheduleSummary = frequencyLabel(frequency || '', everyNDaysCount, weeklyDay, weeklyDay2);
+
   const [provenUsers, setProvenUsers] = useState<Set<string>>(new Set());
+
 
   useEffect(() => {
     const loadTrack = async () => {
