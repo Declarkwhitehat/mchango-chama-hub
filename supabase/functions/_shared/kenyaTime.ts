@@ -211,7 +211,7 @@ export function weekdayName(index: number, short = false): string {
 export function nextKenyaWeekdayAt(
   input: DateInput,
   weekday: number,
-  hour = KENYA_CUTOFFS.cycleDeadline.hour,
+  hour: number = KENYA_CUTOFFS.cycleDeadline.hour,
   minute = 0,
 ): Date | null {
   const parts = kenyaParts(input);
@@ -229,7 +229,7 @@ export function nextKenyaWeekdayOfPairAt(
   input: DateInput,
   weekdayA: number,
   weekdayB: number,
-  hour = KENYA_CUTOFFS.cycleDeadline.hour,
+  hour: number = KENYA_CUTOFFS.cycleDeadline.hour,
   minute = 0,
 ): Date | null {
   const first = nextKenyaWeekdayAt(input, weekdayA, hour, minute);
