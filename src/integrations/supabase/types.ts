@@ -255,6 +255,8 @@ export type Database = {
           total_gross_collected: number | null
           total_withdrawn: number | null
           updated_at: string
+          weekly_contribution_day: number | null
+          weekly_contribution_day_2: number | null
           whatsapp_link: string | null
         }
         Insert: {
@@ -291,6 +293,8 @@ export type Database = {
           total_gross_collected?: number | null
           total_withdrawn?: number | null
           updated_at?: string
+          weekly_contribution_day?: number | null
+          weekly_contribution_day_2?: number | null
           whatsapp_link?: string | null
         }
         Update: {
@@ -327,6 +331,8 @@ export type Database = {
           total_gross_collected?: number | null
           total_withdrawn?: number | null
           updated_at?: string
+          weekly_contribution_day?: number | null
+          weekly_contribution_day_2?: number | null
           whatsapp_link?: string | null
         }
         Relationships: [
@@ -4865,6 +4871,7 @@ export type Database = {
         | "monthly"
         | "every_n_days"
         | "twice_monthly"
+        | "twice_weekly"
       kyc_status: "pending" | "approved" | "rejected"
       mchango_status: "active" | "completed" | "cancelled"
       member_status: "active" | "inactive" | "left" | "removed" | "frozen"
@@ -5015,6 +5022,7 @@ export const Constants = {
         "monthly",
         "every_n_days",
         "twice_monthly",
+        "twice_weekly",
       ],
       kyc_status: ["pending", "approved", "rejected"],
       mchango_status: ["active", "completed", "cancelled"],
