@@ -14,6 +14,7 @@ import {
 } from "../_shared/paymentSmsTemplates.ts";
 import { getMemberOutstanding } from "../_shared/chamaOutstanding.ts";
 import { applyLoanRepayment } from "../_shared/applyLoanRepayment.ts";
+import { completeCycleIfAllPaid } from "../_shared/completeCycleIfPaid.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
