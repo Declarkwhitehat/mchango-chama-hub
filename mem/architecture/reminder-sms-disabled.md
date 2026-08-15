@@ -8,3 +8,5 @@ Reminder SMS are disabled platform-wide. `send-transactional-sms` returns `{ ski
 Still sent: payment/payout confirmations, OTP, KYC approve/reject, account-removal notice, admin broadcasts.
 
 **Why:** SMS cost control. Reminders go out as push + in-app notifications instead. Do not re-add reminder SMS unless the user explicitly asks.
+
+**Exception (user-requested):** chama contribution reminders. `eventType: 'chama_payment_reminder'` is whitelisted and sends. It fires only from `daily-reminder-cron` slot `1600` (cron `daily-reminder-1600-eat`, 13:00 UTC = 4:00 PM EAT). Other slots (7am/10am/3pm/9pm) stay push + in-app only.
