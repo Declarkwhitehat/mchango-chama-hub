@@ -713,7 +713,7 @@ serve(async (req) => {
 
         const chamaName = (member as any).chama?.name || 'your chama';
         const smsMessage = isApproved
-          ? `Your request to join "${chamaName}" has been approved. Open the app to make your first contribution.`
+          ? `You have been accepted into "${chamaName}". Your member code is ${member.member_code}. Open the app to make your first contribution via Paybill 4015351.`
           : `Your request to join "${chamaName}" was not approved by the manager. You may contact them or request a new invite code.`;
 
         try {
