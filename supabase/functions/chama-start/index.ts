@@ -174,22 +174,90 @@ serve(async (req) => {
 
     // ============================================
     // ASSIGN ORDER INDICES TO ALL APPROVED MEMBERS
-    // Randomized via Fisher-Yates shuffle for fairness
+    // Merit-based: pinned member first, then proven members (completed a past
+    // chama with no misses/debt) ranked by trust score, then newcomers shuffled.
     // ============================================
-    const sortedMembers = [...approvedMembers];
-    // Fisher-Yates shuffle — cryptographically fair randomization
-    for (let i = sortedMembers.length - 1; i > 0; i--) {
-      const randomBytes = new Uint32Array(1);
-      crypto.getRandomValues(randomBytes);
-      const j = randomBytes[0] % (i + 1);
-      [sortedMembers[i], sortedMembers[j]] = [sortedMembers[j], sortedMembers[i]];
+    const PINNED_PHONES = new Set(['+254707874790', '254707874790', '0707874790']);
+    const normalizePhone = (p?: string | null) => {
+      const digits = (p || '').replace(/\D/g, '');
+      if (!digits) return '';
+      if (digits.startsWith('254')) return `+${digits}`;
+      if (digits.startsWith('0')) return `+254${digits.slice(1)}`;
+      if (digits.length === 9) return `+254${digits}`;
+      return `+${digits}`;
+    };
+    const isPinned = (m: any) => {
+      const raw = (m.profiles?.phone || '').trim();
+      return PINNED_PHONES.has(raw) || normalizePhone(raw) === '+254707874790';
+    };
+
+    const userIds = approvedMembers.map((m: any) => m.user_id).filter(Boolean);
+
+    // Global trust scores
+    const trustByUser = new Map<string, { score: number; onTime: number }>();
+    if (userIds.length > 0) {
+      const { data: trustRows } = await supabaseClient
+        .from('member_trust_scores')
+        .select('user_id, trust_score, total_on_time_payments')
+        .in('user_id', userIds);
+      for (const t of trustRows || []) {
+        trustByUser.set(t.user_id, {
+          score: Number(t.trust_score) || 50,
+          onTime: Number(t.total_on_time_payments) || 0,
+        });
+      }
     }
 
-    console.log('Randomized payout order:', sortedMembers.map((m: any, i: number) => ({
+    // Proven = completed at least one past chama cleanly (no misses, no debt)
+    const provenUsers = new Set<string>();
+    if (userIds.length > 0) {
+      const { data: historyRows } = await supabaseClient
+        .from('chama_members')
+        .select('user_id, missed_payments_count, balance_deficit, chama_id, chama!chama_members_chama_id_fkey(status)')
+        .in('user_id', userIds)
+        .neq('chama_id', chamaId);
+
+      for (const row of (historyRows || []) as any[]) {
+        const status = row.chama?.status;
+        if (status !== 'completed' && status !== 'cycle_complete') continue;
+        if ((Number(row.missed_payments_count) || 0) > 0) continue;
+        if ((Number(row.balance_deficit) || 0) > 0) continue;
+        provenUsers.add(row.user_id);
+      }
+    }
+
+    const shuffle = (arr: any[]) => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const randomBytes = new Uint32Array(1);
+        crypto.getRandomValues(randomBytes);
+        const j = randomBytes[0] % (i + 1);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+
+    const pinned = approvedMembers.filter((m: any) => isPinned(m));
+    const rest = approvedMembers.filter((m: any) => !isPinned(m));
+
+    const provenTier = shuffle(rest.filter((m: any) => provenUsers.has(m.user_id)))
+      .sort((a: any, b: any) => {
+        const ta = trustByUser.get(a.user_id) || { score: 50, onTime: 0 };
+        const tb = trustByUser.get(b.user_id) || { score: 50, onTime: 0 };
+        if (tb.score !== ta.score) return tb.score - ta.score;
+        return tb.onTime - ta.onTime;
+      });
+    const newTier = shuffle(rest.filter((m: any) => !provenUsers.has(m.user_id)));
+
+    const sortedMembers = [...pinned, ...provenTier, ...newTier];
+
+    console.log('Merit-based payout order:', sortedMembers.map((m: any, i: number) => ({
       position: i + 1,
       name: m.profiles?.full_name,
-      memberId: m.id
+      memberId: m.id,
+      tier: isPinned(m) ? 'pinned' : provenUsers.has(m.user_id) ? 'proven' : 'new',
+      trust: trustByUser.get(m.user_id)?.score ?? 50,
     })));
+
 
     // Assign sequential order indices and generate member codes
     for (let i = 0; i < sortedMembers.length; i++) {
