@@ -240,28 +240,29 @@ export function getTwiceMonthlyFirstDeadline(
 }
 
 /**
- * For twice-weekly chamas, return the next upcoming chosen weekday at 21:00 EAT
- * (18:00 UTC). Never returns the same Kenya calendar day as `referenceDate`, so
- * members always get at least a full day to pay the first cycle.
+ * For twice-weekly chamas, the FIRST cycle always closes on the chama's first
+ * chosen weekday (`day1`), so the schedule always begins at the top of the
+ * pattern. Starting on that same weekday rolls a full week forward, giving
+ * members a complete payment window.
+ *
+ * Mon & Fri, started Wednesday -> cycle 1 closes the coming Monday.
+ * Mon & Fri, started Monday    -> cycle 1 closes next week's Monday.
  */
 export function getTwiceWeeklyFirstDeadline(
   referenceDate: Date,
   day1?: number | null,
   day2?: number | null,
 ): Date {
-  const [d1, d2] = normalizeWeeklyDays(day1, day2);
+  const [anchor] = normalizeWeeklyDays(day1, day2);
   const kenyaClock = toKenyaClock(referenceDate);
   const y = kenyaClock.getUTCFullYear();
   const m = kenyaClock.getUTCMonth();
   const d = kenyaClock.getUTCDate();
   const todayDow = kenyaClock.getUTCDay();
 
-  // Distance in days from today to a chosen weekday, at least 1 day away.
-  const distance = (dow: number) => {
-    const raw = (dow - todayDow + 7) % 7;
-    return raw === 0 ? 7 : raw;
-  };
-  const advance = Math.min(distance(d1), distance(d2));
+  const raw = (anchor - todayDow + 7) % 7;
+  const advance = raw === 0 ? 7 : raw;
 
   return new Date(Date.UTC(y, m, d + advance, KENYA_9PM_UTC_HOUR, 0, 0, 0));
 }
+
