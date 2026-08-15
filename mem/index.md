@@ -54,6 +54,8 @@
 ### Chama Features
 - [Twice-weekly First Cycle Anchor](mem://chama/twice-weekly-first-cycle-anchor) — Cycle 1 always closes on the first chosen weekday; manager start preview + confirm dialog
 - [Grace Period Reminders](mem://chama/grace-period-reminders) — Push 10h + SMS 6h before first-cycle 10PM deadline; payment UI hidden for `pending` chamas
+- [Chama Reminder Cadence](mem://architecture/chama-reminder-cadence) — SMS at 1PM & 5PM EAT only; push at 8AM, 11AM, 8PM EAT
+
 - [Automated Governance](mem://chama/automated-governance-and-payout-logic) — Auto-completion, daily cron, auto-removal
 - [Activation Sequence](mem://features/chama-activation-sequence) — Join, Start, Contribution phases and Fisher-Yates shuffling
 - [First Payment Guard](mem://chama/first-payment-activation-guard) — Order re-assignment strictly for pending chamas
