@@ -161,6 +161,8 @@ Deno.serve(async (req) => {
       everyNDaysCount: chama.every_n_days_count,
       monthlyDay: chama.monthly_contribution_day,
       monthlyDay2: chama.monthly_contribution_day_2,
+      weeklyDay: chama.weekly_contribution_day,
+      weeklyDay2: chama.weekly_contribution_day_2,
     });
 
     // Create new cycle

@@ -17,6 +17,7 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
   switch (frequency) {
     case 'daily': return 1;
     case 'weekly': return 7;
+    case 'twice_weekly': return 4;
     case 'monthly': return 30;
     case 'every_n_days': return everyNDays || 7;
     default: return 7;

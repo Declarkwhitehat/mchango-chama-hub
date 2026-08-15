@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate } from "../_shared/chamaDeadlines.ts";
+import { getNextDay10PmKenyaDeadline, getEatMidnightOnePastForDate, getTwiceWeeklyFirstDeadline } from "../_shared/chamaDeadlines.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -20,6 +20,8 @@ function getCycleLengthInDays(frequency: string, everyNDays?: number): number {
       return 1;
     case "weekly":
       return 7;
+    case "twice_weekly":
+      return 4;
     case "monthly":
       return 30;
     case "every_n_days":
@@ -392,7 +394,9 @@ Deno.serve(async (req) => {
     throwIfError(updateError);
 
     // ========== CALCULATE FIRST PAYMENT DEADLINE (next day at 9:00 PM EAT) ==========
-    const graceDeadline = getNextDay10PmKenyaDeadline(startDate);
+    const graceDeadline = chama.contribution_frequency === 'twice_weekly'
+      ? getTwiceWeeklyFirstDeadline(startDate, chama.weekly_contribution_day, chama.weekly_contribution_day_2)
+      : getNextDay10PmKenyaDeadline(startDate);
 
     // ========== CREATE FIRST CONTRIBUTION CYCLE ==========
     // First cycle always closes next day at 9:00 PM EAT, regardless of frequency.

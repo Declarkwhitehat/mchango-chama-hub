@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { getSameDay10PmKenyaCutoff } from '../_shared/chamaDeadlines.ts';
+import { getSameDay10PmKenyaCutoff, normalizeWeeklyDays } from '../_shared/chamaDeadlines.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getMpesaTransactionFee } from '../_shared/mpesaTransactionFee.ts';
 import { applyPendingWalletToCycle } from '../_shared/applyChamaWallet.ts';
@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
 
     let chamaQuery = supabase
       .from('chama')
-      .select('id, name, contribution_amount, commission_rate, contribution_frequency, current_cycle_round, start_date, created_at, every_n_days_count, monthly_contribution_day, monthly_contribution_day_2')
+      .select('id, name, contribution_amount, commission_rate, contribution_frequency, current_cycle_round, start_date, created_at, every_n_days_count, monthly_contribution_day, monthly_contribution_day_2, weekly_contribution_day, weekly_contribution_day_2')
       .eq('status', 'active');
 
     if (singleChamaId) {
@@ -425,6 +425,14 @@ Deno.serve(async (req) => {
                   nextEnd.setDate(nextEnd.getDate() + 6);
                   nextEnd.setHours(23, 59, 59, 999);
                   break;
+                case 'twice_weekly': {
+                  const [wd1, wd2] = normalizeWeeklyDays(chama.weekly_contribution_day, chama.weekly_contribution_day_2);
+                  const kenyaDow = new Date(nextEnd.getTime() + 3 * 60 * 60 * 1000).getUTCDay();
+                  const advance = Math.min((wd1 - kenyaDow + 7) % 7, (wd2 - kenyaDow + 7) % 7);
+                  nextEnd.setUTCDate(nextEnd.getUTCDate() + advance);
+                  nextEnd.setUTCHours(19, 0, 0, 0); // 10 PM EAT
+                  break;
+                }
                 case 'monthly':
                   if (chama.monthly_contribution_day) {
                     nextEnd.setMonth(nextEnd.getMonth() + 1);

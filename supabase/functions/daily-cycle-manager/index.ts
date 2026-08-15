@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { getSameDay10PmKenyaCutoff } from '../_shared/chamaDeadlines.ts';
+import { getSameDay10PmKenyaCutoff, normalizeWeeklyDays } from '../_shared/chamaDeadlines.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -107,6 +107,14 @@ Deno.serve(async (req) => {
           endDate.setDate(endDate.getDate() + 6);
           endDate.setHours(23, 59, 59, 999);
           break;
+        case 'twice_weekly': {
+          const [wd1, wd2] = normalizeWeeklyDays(chama.weekly_contribution_day, chama.weekly_contribution_day_2);
+          const kenyaDow = new Date(endDate.getTime() + 3 * 60 * 60 * 1000).getUTCDay();
+          const advance = Math.min((wd1 - kenyaDow + 7) % 7, (wd2 - kenyaDow + 7) % 7);
+          endDate.setUTCDate(endDate.getUTCDate() + advance);
+          endDate.setUTCHours(19, 0, 0, 0); // 10 PM EAT
+          break;
+        }
         case 'monthly':
           endDate.setMonth(endDate.getMonth() + 1);
           endDate.setDate(0);
