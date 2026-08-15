@@ -1,68 +1,20 @@
-const KENYA_OFFSET_MS = 3 * 60 * 60 * 1000;
-const KENYA_9PM_UTC_HOUR = 18;
-const KENYA_10PM_UTC_HOUR = 19;
-const KENYA_930PM_UTC_HOUR = 18;
-const KENYA_930PM_UTC_MINUTE = 30;
+// Chama deadline helpers. All calendar/clock maths is delegated to the shared
+// Kenya time utility so the UI can never drift from the backend.
+import { atKenyaTimeOn, type DateInput } from '@/lib/kenyaTime';
 
-function toKenyaClock(input: string | Date | null | undefined): Date | null {
-  if (!input) return null;
-
-  const sourceDate = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(sourceDate.getTime())) return null;
-
-  return new Date(sourceDate.getTime() + KENYA_OFFSET_MS);
-}
-
-function buildKenya10PmCutoff(input: string | Date | null | undefined, dayOffset: number): Date | null {
-  const kenyaClock = toKenyaClock(input);
-  if (!kenyaClock) return null;
-
-  return new Date(Date.UTC(
-    kenyaClock.getUTCFullYear(),
-    kenyaClock.getUTCMonth(),
-    kenyaClock.getUTCDate() + dayOffset,
-    KENYA_10PM_UTC_HOUR,
-    0,
-    0,
-    0,
-  ));
-}
-
-export function getNextDay10PmKenyaDeadline(input: string | Date | null | undefined): Date | null {
-  const kenyaClock = toKenyaClock(input);
-  if (!kenyaClock) return null;
-
-  return new Date(Date.UTC(
-    kenyaClock.getUTCFullYear(),
-    kenyaClock.getUTCMonth(),
-    kenyaClock.getUTCDate() + 1,
-    KENYA_9PM_UTC_HOUR,
-    0,
-    0,
-    0,
-  ));
+/** 9:00 PM EAT the day after `input` — first-cycle payment deadline. */
+export function getNextDay10PmKenyaDeadline(input: DateInput): Date | null {
+  return atKenyaTimeOn(input, 21, 0, 1);
 }
 
 export const getNextDay9PmKenyaDeadline = getNextDay10PmKenyaDeadline;
 
-export function getSameDay10PmKenyaCutoff(input: string | Date | null | undefined): Date | null {
-  return buildKenya10PmCutoff(input, 0);
+/** 10:00 PM EAT on the same Kenya day as `input` — cycle deadline. */
+export function getSameDay10PmKenyaCutoff(input: DateInput): Date | null {
+  return atKenyaTimeOn(input, 22, 0);
 }
 
-/**
- * 9:30 PM EAT on the same Kenya day as `input`. v2 on-time payment cutoff.
- */
-export function getSameDay930PmKenyaCutoff(input: string | Date | null | undefined): Date | null {
-  const kenyaClock = toKenyaClock(input);
-  if (!kenyaClock) return null;
-
-  return new Date(Date.UTC(
-    kenyaClock.getUTCFullYear(),
-    kenyaClock.getUTCMonth(),
-    kenyaClock.getUTCDate(),
-    KENYA_930PM_UTC_HOUR,
-    KENYA_930PM_UTC_MINUTE,
-    0,
-    0,
-  ));
+/** 9:30 PM EAT on the same Kenya day as `input` — on-time payment cutoff. */
+export function getSameDay930PmKenyaCutoff(input: DateInput): Date | null {
+  return atKenyaTimeOn(input, 21, 30);
 }
