@@ -285,6 +285,12 @@ Deno.serve(async (req) => {
 
     if (paymentError) {
       console.error('Error creating payment records:', paymentError);
+    } else {
+      const membersPaidCount = paymentRecords.filter(record => record.fully_paid).length;
+      await supabase.from('contribution_cycles').update({
+        members_paid_count: membersPaidCount,
+        total_collected_amount: totalNetCreditApplied,
+      }).eq('id', newCycle.id);
     }
 
     // Sync overpayment wallet entries AND late-payment buffer entries — mark as
@@ -378,9 +384,9 @@ Deno.serve(async (req) => {
 
       let message: string;
       if (isBeneficiary) {
-        message = `You're the beneficiary for the next cycle in "${chama.name}". Members contribute KES ${chama.contribution_amount} by ${formatDate(endDate)} at 9:00 PM. ${amountDue > 0 ? `Your contribution due: KES ${amountDue}.` : 'Your credit covers this cycle.'}`;
+        message = `You're the beneficiary for the next cycle in "${chama.name}". Members contribute KES ${chama.contribution_amount} by ${formatDate(endDate)} at 10:00 PM. ${amountDue > 0 ? `Your contribution due: KES ${amountDue}.` : 'Your credit covers this cycle.'}`;
       } else {
-        message = `New cycle started in "${chama.name}". Contribute KES ${amountDue > 0 ? amountDue : 0} by ${formatDate(endDate)} at 9:00 PM. Account ${member.member_code}. ${beneficiary.profiles?.full_name || 'Member #' + beneficiary.order_index} will receive the payout.${amountDue <= 0 ? ' Your credit covers this cycle.' : ''}`;
+        message = `New cycle started in "${chama.name}". Contribute KES ${amountDue > 0 ? amountDue : 0} by ${formatDate(endDate)} at 10:00 PM. Account ${member.member_code}. ${beneficiary.profiles?.full_name || 'Member #' + beneficiary.order_index} will receive the payout.${amountDue <= 0 ? ' Your credit covers this cycle.' : ''}`;
       }
 
       const result = await sendSMS(phone, message);
