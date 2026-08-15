@@ -1,6 +1,6 @@
 // All Kenya calendar/clock maths comes from the shared kenyaTime utility so
 // this module can never drift on timezone, weekday, month or year boundaries.
-import { KENYA_OFFSET_MS, kenyaParts } from './kenyaTime.ts';
+import { KENYA_OFFSET_MS, kenyaDateTime, kenyaParts } from './kenyaTime.ts';
 
 const KENYA_9PM_UTC_HOUR = 18;        // 21:00 EAT == 18:00 UTC (first-cycle payment cutoff)
 const KENYA_10PM_UTC_HOUR = 19;       // 22:00 EAT == 19:00 UTC (payout processor/admin summary runs after cutoff)
