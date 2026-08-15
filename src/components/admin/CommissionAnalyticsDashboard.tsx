@@ -116,7 +116,7 @@ export const CommissionAnalyticsDashboard = () => {
       const fromISO = startOfDay(parseISO(dateFrom)).toISOString();
       const toISO = endOfDay(parseISO(dateTo)).toISOString();
 
-      const [mchangoRes, orgRes, welfareRes] = await Promise.all([
+      const [mchangoRes, orgRes, welfareRes, chamaRes] = await Promise.all([
         supabase.from("mchango_donations")
           .select("commission_amount")
           .eq("payment_status", "completed")
@@ -132,19 +132,28 @@ export const CommissionAnalyticsDashboard = () => {
           .eq("payment_status", "completed")
           .gte("completed_at", fromISO)
           .lte("completed_at", toISO),
+        // Chama commissions are booked to company_earnings ("Chama ..." descriptions)
+        supabase.from("company_earnings")
+          .select("amount, description, source")
+          .ilike("source", "commission")
+          .ilike("description", "Chama%")
+          .gte("created_at", fromISO)
+          .lte("created_at", toISO),
       ]);
 
       const mchangoTotal = (mchangoRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
       const orgTotal = (orgRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
       const welfareTotal = (welfareRes.data || []).reduce((s, d) => s + Number(d.commission_amount || 0), 0);
+      const chamaTotal = (chamaRes.data || []).reduce((s, d) => s + Number(d.amount || 0), 0);
 
       setLiveVerification({
         mchangoDonations: mchangoTotal,
         orgDonations: orgTotal,
         welfareContributions: welfareTotal,
-        chamaContributions: 0, // chama commissions live in financial_ledger only
-        totalLive: mchangoTotal + orgTotal + welfareTotal,
+        chamaContributions: chamaTotal,
+        totalLive: mchangoTotal + orgTotal + welfareTotal + chamaTotal,
       });
+
     } catch (err) {
       console.error("Live verification error:", err);
     }
@@ -203,7 +212,30 @@ export const CommissionAnalyticsDashboard = () => {
         else if (e.source_type === "organization") { s.orgCommission += c; s.orgGross += g; }
         else if (e.source_type === "welfare") { s.welfareCommission += c; s.welfareGross += g; }
       }
+
+      // Chama commission is booked on dedicated `commission` ledger rows
+      // (their `contribution_summary` inflow rows carry 0 commission), so add
+      // those in — but only for sources whose inflow rows recorded none, to
+      // avoid double-counting mirrored rows.
+      const inflowCommissionBySource: Record<string, number> = {};
+      for (const e of inflows) {
+        inflowCommissionBySource[e.source_type] =
+          (inflowCommissionBySource[e.source_type] || 0) + (Number(e.commission_amount) || 0);
+      }
+      for (const e of all) {
+        if (String(e.transaction_type || "").toLowerCase() !== "commission") continue;
+        if ((inflowCommissionBySource[e.source_type] || 0) > 0) continue;
+        const c = Number(e.commission_amount) || Number(e.gross_amount) || 0;
+        if (!c) continue;
+        s.totalCommission += c;
+        if (e.source_type === "mchango") s.mchangoCommission += c;
+        else if (e.source_type === "chama") s.chamaCommission += c;
+        else if (e.source_type === "organization") s.orgCommission += c;
+        else if (e.source_type === "welfare") s.welfareCommission += c;
+      }
+
       setSummary(s);
+
     } catch (err: any) {
       console.error(err);
       toast({ title: "Error", description: "Failed to load commission data", variant: "destructive" });
@@ -235,10 +267,13 @@ export const CommissionAnalyticsDashboard = () => {
 
     const points: TrendPoint[] = intervals.map(iv => {
       const bucket = ledgerData.filter(e => {
-        if (!isInflowRow(e)) return false;
+        const tt = String(e.transaction_type || "").toLowerCase();
+        // chama commission lives on dedicated `commission` rows
+        if (!isInflowRow(e) && !(tt === "commission" && e.source_type === "chama")) return false;
         const d = parseISO(e.created_at);
         return isWithinInterval(d, { start: iv.start, end: iv.end });
       });
+
       const mchango = bucket.filter(e => e.source_type === "mchango").reduce((s, e) => s + Number(e.commission_amount), 0);
       const chama = bucket.filter(e => e.source_type === "chama").reduce((s, e) => s + Number(e.commission_amount), 0);
       const organizations = bucket.filter(e => e.source_type === "organization").reduce((s, e) => s + Number(e.commission_amount), 0);
@@ -527,7 +562,7 @@ export const CommissionAnalyticsDashboard = () => {
           { label: "Mchango",      ledger: summary.mchangoCommission, live: liveVerification.mchangoDonations },
           { label: "Organizations",ledger: summary.orgCommission,     live: liveVerification.orgDonations },
           { label: "Welfare",      ledger: summary.welfareCommission, live: liveVerification.welfareContributions },
-          { label: "Chama",        ledger: summary.chamaCommission,   live: null as number | null },
+          { label: "Chama",        ledger: summary.chamaCommission,   live: liveVerification.chamaContributions as number | null },
         ];
         const fmt = (n: number) => `KES ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const allMatch = rows.every(r => r.live === null || Math.abs(r.ledger - r.live) <= TOL);
@@ -539,7 +574,7 @@ export const CommissionAnalyticsDashboard = () => {
                 Live Data Cross-Verification
               </CardTitle>
               <CardDescription className="text-xs">
-                Comparing ledger totals with live tables for {dateFrom === dateTo ? "today" : "selected period"}. Chama commissions live in the ledger only.
+                Comparing ledger totals with live tables for {dateFrom === dateTo ? "today" : "selected period"}. Chama commissions are cross-checked against recorded platform earnings.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -581,9 +616,10 @@ export const CommissionAnalyticsDashboard = () => {
                     <tr className="font-semibold">
                       <td className="py-2 pr-4">Total</td>
                       <td className="py-2 pr-4 text-right font-mono">{fmt(summary.totalCommission)}</td>
-                      <td className="py-2 pr-4 text-right font-mono">{fmt(liveVerification.totalLive + summary.chamaCommission)}</td>
+                      <td className="py-2 pr-4 text-right font-mono">{fmt(liveVerification.totalLive)}</td>
                       <td className="py-2 pr-4 text-right font-mono">
-                        {(summary.totalCommission - (liveVerification.totalLive + summary.chamaCommission)).toFixed(2)}
+                        {(summary.totalCommission - liveVerification.totalLive).toFixed(2)}
+
                       </td>
                       <td className="py-2 text-right">
                         {allMatch ? (
