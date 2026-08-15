@@ -616,9 +616,10 @@ export const CommissionAnalyticsDashboard = () => {
                     <tr className="font-semibold">
                       <td className="py-2 pr-4">Total</td>
                       <td className="py-2 pr-4 text-right font-mono">{fmt(summary.totalCommission)}</td>
-                      <td className="py-2 pr-4 text-right font-mono">{fmt(liveVerification.totalLive + summary.chamaCommission)}</td>
+                      <td className="py-2 pr-4 text-right font-mono">{fmt(liveVerification.totalLive)}</td>
                       <td className="py-2 pr-4 text-right font-mono">
-                        {(summary.totalCommission - (liveVerification.totalLive + summary.chamaCommission)).toFixed(2)}
+                        {(summary.totalCommission - liveVerification.totalLive).toFixed(2)}
+
                       </td>
                       <td className="py-2 text-right">
                         {allMatch ? (
