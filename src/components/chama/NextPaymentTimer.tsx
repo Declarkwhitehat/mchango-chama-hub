@@ -151,25 +151,35 @@ export function NextPaymentTimer({ chamaId, memberId, refreshKey = 0 }: NextPaym
   const urgent = !state.isPaidForCurrent && remaining > 0 && remaining < 4 * 60 * 60 * 1000;
   const passed = remaining <= 0;
 
+  const paidUp = state.isPaidForCurrent;
+
   return (
-    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 flex items-start gap-3">
-      {state.isPaidForCurrent ? (
-        <CheckCircle2 className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+    <div
+      className={cn(
+        "rounded-md border px-4 py-3 flex items-start gap-3",
+        paidUp
+          ? "border-primary/30 bg-primary/5"
+          : "border-destructive/40 bg-destructive/10",
+      )}
+    >
+      {paidUp ? (
+        <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 shrink-0" />
       ) : (
         <Clock className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
       )}
       <div className="space-y-0.5">
-        <p className="text-sm font-medium text-destructive">
-          {state.isPaidForCurrent ? "Next payment due in" : "Time left to pay this cycle"}
+        <p className={cn("text-sm font-medium", paidUp ? "text-primary" : "text-destructive")}>
+          {paidUp ? "You're paid up for this cycle — next payment due in" : "Time left to pay this cycle"}
         </p>
-        <p className="text-lg font-bold tabular-nums text-destructive">
+        <p className={cn("text-lg font-bold tabular-nums", paidUp ? "text-primary" : "text-destructive")}>
           {formatRemaining(remaining)}
         </p>
-        <p className="text-xs text-destructive/80">
+        <p className={cn("text-xs", paidUp ? "text-muted-foreground" : "text-destructive/80")}>
           Deadline: {state.deadline.toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" })}
         </p>
       </div>
     </div>
   );
+
 }
 
