@@ -82,6 +82,7 @@ export const CommissionAnalyticsDashboard = () => {
   const { rates } = usePlatformCommission();
   const MCHANGO_COMMISSION_RATE = rates.mchango;
   const ORGANIZATION_COMMISSION_RATE = rates.organization;
+  const WELFARE_COMMISSION_RATE = rates.welfare;
   const [loading, setLoading] = useState(true);
   const [ledgerData, setLedgerData] = useState<LedgerEntry[]>([]);
   const [summary, setSummary] = useState<SummaryData>({
