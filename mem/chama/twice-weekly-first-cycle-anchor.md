@@ -8,6 +8,6 @@ For `twice_weekly` chamas, the FIRST cycle always closes on the chama's **first 
 
 - Mon & Fri started Wednesday -> cycle 1 closes the coming **Monday**; cycle 2 Friday; alternating after that.
 - Starting **on** the anchor weekday rolls a full 7 days (next week's Monday).
-- Deadline time stays 21:00 EAT (18:00 UTC) for first cycles; later cycles close 22:00 EAT.
+- Deadline time is 21:00 EAT (18:00 UTC) for every cycle, first or later.
 
 Implemented in `getTwiceWeeklyFirstDeadline` (`supabase/functions/_shared/chamaDeadlines.ts`, mirrored in `src/utils/chamaDeadlines.ts`). Managers see a live "If you start today" preview plus a confirmation dialog with cycle 1 / cycle 2 dates in `PreStartDashboard.tsx`.
