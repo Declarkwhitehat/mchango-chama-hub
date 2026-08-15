@@ -57,9 +57,6 @@ export function frequencyLabel(
   }
 }
 
-const KENYA_OFFSET_MS = 3 * 60 * 60 * 1000;
-const DEADLINE_UTC_HOUR = 18; // 21:00 EAT
-
 interface ChamaScheduleOpts {
   frequency: string;
   everyNDaysCount?: number | null;
@@ -71,8 +68,8 @@ interface ChamaScheduleOpts {
 }
 
 function deadlineAtKenyaDay(year: number, month: number, day: number): Date {
-  // 21:00 EAT == 18:00 UTC on the same Kenya calendar day.
-  return new Date(Date.UTC(year, month, day, DEADLINE_UTC_HOUR, 0, 0, 0));
+  // 21:00 EAT on the given Kenya calendar day.
+  return kenyaDateTime(year, month, day, 21, 0);
 }
 
 /**
@@ -91,35 +88,20 @@ export function addCyclesToDeadline(
   // Twice-weekly: hop to the next chosen weekday, alternating between the two.
   if (frequency === "twice_weekly") {
     const [d1, d2] = normalizeWeeklyDays(weeklyDay, weeklyDay2);
-    const days = [d1, d2].sort((a, b) => a - b);
-    const kenya = new Date(fromDeadline.getTime() + KENYA_OFFSET_MS);
-    let year = kenya.getUTCFullYear();
-    let month = kenya.getUTCMonth();
-    let day = kenya.getUTCDate();
+    let cursor: Date = fromDeadline;
     for (let i = 0; i < cyclesAhead; i++) {
-      const base = new Date(Date.UTC(year, month, day));
-      const dow = base.getUTCDay();
-      const deltas = days.map((d) => {
-        const raw = (d - dow + 7) % 7;
-        return raw === 0 ? 7 : raw;
-      });
-      const advance = Math.min(...deltas);
-      const next = new Date(Date.UTC(year, month, day + advance));
-      year = next.getUTCFullYear();
-      month = next.getUTCMonth();
-      day = next.getUTCDate();
+      cursor = nextKenyaWeekdayOfPairAt(cursor, d1, d2, 21, 0)!;
     }
-    return deadlineAtKenyaDay(year, month, day);
+    return cursor;
   }
 
   // Twice-monthly with two chosen days: alternate between the two days.
   if (frequency === "twice_monthly" && monthlyDay && monthlyDay2) {
     const days = [monthlyDay, monthlyDay2].sort((a, b) => a - b);
-    // Express fromDeadline in Kenya clock to know which chosen day it is.
-    const kenya = new Date(fromDeadline.getTime() + KENYA_OFFSET_MS);
-    let year = kenya.getUTCFullYear();
-    let month = kenya.getUTCMonth();
-    let dayIdx = days.indexOf(kenya.getUTCDate());
+    const kenya = kenyaParts(fromDeadline)!;
+    let year = kenya.year;
+    let month = kenya.month;
+    let dayIdx = days.indexOf(kenya.day);
     if (dayIdx === -1) {
       // fromDeadline isn't on a chosen day — snap to the earliest chosen day from now.
       dayIdx = 0;
@@ -137,15 +119,15 @@ export function addCyclesToDeadline(
 
   // Monthly with chosen day.
   if (frequency === "monthly" && monthlyDay) {
-    const kenya = new Date(fromDeadline.getTime() + KENYA_OFFSET_MS);
-    let year = kenya.getUTCFullYear();
-    let month = kenya.getUTCMonth() + cyclesAhead;
+    const kenya = kenyaParts(fromDeadline)!;
+    let year = kenya.year;
+    let month = kenya.month + cyclesAhead;
     year += Math.floor(month / 12);
     month = ((month % 12) + 12) % 12;
     return deadlineAtKenyaDay(year, month, monthlyDay);
   }
 
-  // Day-based frequencies — add N * cycleLength days.
+  // Day-based frequencies — add N * cycleLength Kenya days.
   let cycleLength: number;
   switch (frequency) {
     case "daily": cycleLength = 1; break;
@@ -154,8 +136,6 @@ export function addCyclesToDeadline(
     case "every_n_days": cycleLength = everyNDaysCount || 7; break;
     default: cycleLength = 7;
   }
-  const result = new Date(fromDeadline);
-  result.setUTCDate(result.getUTCDate() + cyclesAhead * cycleLength);
-  return result;
+  return addKenyaDays(fromDeadline, cyclesAhead * cycleLength)!;
 }
 
