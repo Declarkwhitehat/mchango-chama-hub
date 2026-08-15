@@ -154,8 +154,8 @@ Deno.serve(async (req) => {
 
         const dueTime = formatEatDeadline(cycle.end_date);
 
-        // Create in-app notification if user_id exists
-        if (userId) {
+        // In-app + native push notification (8 AM, 11 AM, 8 PM EAT slots only)
+        if (userId && isPushSlot) {
           const notificationData = NotificationTemplates.paymentReminder(
             payment.amount_due,
             chama.name,
@@ -173,10 +173,8 @@ Deno.serve(async (req) => {
           console.log(`In-app notification created for ${member.member_code}`);
         }
 
-        // Send SMS via the platform-standard send-transactional-sms (Onfon).
-        // SMS only fires on the 4:00 PM EAT slot; other slots are push + in-app only.
-        if (profile?.phone && slot === '1600') {
-          const firstName = (profile.full_name || '').split(' ')[0] || 'Member';
+        // SMS via send-transactional-sms (Onfon) — only two per day: 1 PM and 5 PM EAT.
+        if (profile?.phone && isSmsSlot) {
           // Determine if "today" (Kenya date) equals the deadline date
           const eatToday = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
           const eatDeadlineDate = new Date(new Date(cycle.end_date).getTime() + 3 * 60 * 60 * 1000)
@@ -186,11 +184,12 @@ Deno.serve(async (req) => {
             timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short',
           });
           const slotLabel = isDeadlineDay
-            ? (slot === '1815'
+            ? (slot === '1700'
                 ? `Final reminder: pay before ${dueTime} today.`
                 : `Deadline: ${dueTime} today.`)
             : `Pay by ${deadlineDateStr} at ${dueTime}.`;
           const message = `Your KES ${Number(payment.amount_due).toLocaleString()} contribution to "${chama.name}" is due. ${slotLabel} Pay via Paybill 4015351, Account ${member.member_code}.`;
+
 
           try {
             const { error: smsError } = await supabase.functions.invoke('send-transactional-sms', {
