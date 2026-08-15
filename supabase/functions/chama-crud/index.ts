@@ -528,14 +528,8 @@ serve(async (req) => {
         }
       }
       if (body.contribution_frequency === 'twice_monthly') {
-        if (!body.monthly_contribution_day || !body.monthly_contribution_day_2) {
-          return new Response(JSON.stringify({ error: 'Both contribution days are required for twice monthly frequency' }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        if (body.monthly_contribution_day_2 < 1 || body.monthly_contribution_day_2 > 28) {
-          return new Response(JSON.stringify({ error: 'Second contribution day must be between 1 and 28' }), {
+        if (!validMonthDay(body.monthly_contribution_day) || !validMonthDay(body.monthly_contribution_day_2)) {
+          return new Response(JSON.stringify({ error: 'Both contribution days are required and must be between 1 and 28' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
