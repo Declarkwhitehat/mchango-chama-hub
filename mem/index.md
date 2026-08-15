@@ -2,7 +2,7 @@
 
 ## Core
 - Native Android APK (Capacitor) + Lovable Cloud Backend. PWA removed.
-- Safaricom STK/C2B only. Deadlines strictly 22:00 EAT (UTC+3).
+- Safaricom STK/C2B only. Chama deadlines & payouts strictly 21:00 EAT (UTC+3); no early payouts.
 - Deductive commission: Net = Gross - Commission. Never modify gross payments.
 - Auth: 5-digit PIN, SMS OTP for resets. `check_signup_uniqueness` for unauth.
 - Financial Idempotency: Centralized settlement engine, strict FIFO, unique M-Pesa receipts.
@@ -29,7 +29,8 @@
 - [UI Error Transparency](mem://architecture/ui-error-transparency-pattern) — Direct fetch with auth headers to expose JSON errors
 - [PWA Native Distribution](mem://architecture/pwa-native-distribution-strategy) — Capacitor APK, remote server URL, SW removal
 - [Frontend Performance](mem://architecture/frontend-performance-and-caching-standard) — React Query aggressive defaults, 50-record limit
-- [Chama Deadline Timezone](mem://architecture/chama-deadline-timezone-standard) — 22:00 EAT (UTC+3) strictly enforced
+- [Chama Deadline Timezone](mem://architecture/chama-deadline-timezone-standard) — 21:00 EAT (UTC+3) strictly enforced
+- [Scheduled 9PM Payout](mem://chama/scheduled-2100-payout) — cycles pay out at 21:00 EAT paid-or-not; instant/early payouts removed
 - [Cycle-End Manager Notifications](mem://architecture/cycle-end-manager-notifications) — SMS summary at cycle close: all-paid or missed list
 - [Withdrawals Profile Link](mem://architecture/withdrawals-to-profiles-link) — Foreign key enables PostgREST embedded joins
 - [Welfare Deduction Timing](mem://architecture/welfare-balance-deduction-timing) — Deduct on dual approval, refund on cancel
@@ -56,7 +57,7 @@
 - [Automated Governance](mem://chama/automated-governance-and-payout-logic) — Auto-completion, daily cron, auto-removal
 - [Activation Sequence](mem://features/chama-activation-sequence) — Join, Start, Contribution phases and Fisher-Yates shuffling
 - [First Payment Guard](mem://chama/first-payment-activation-guard) — Order re-assignment strictly for pending chamas
-- [Activation Grace Period](mem://chama/activation-grace-period) — First payment due by 10:00 PM next day
+- [Activation Grace Period](mem://chama/activation-grace-period) — First payment due by 9:00 PM next day
 - [Lifecycle & Completion](mem://chama/lifecycle-and-completion-policy) — Bounded to active member count, unified rejoin summary
 - [Restart & Reshuffling](mem://features/chama-cycle-restart-with-reshuffling) — Chama lifecycle auto-cleanup, reshuffling
 - [Manager Auto-Succession](mem://chama/manager-auto-succession-policy) — Auto-promotes highest score active member

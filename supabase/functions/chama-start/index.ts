@@ -389,7 +389,7 @@ serve(async (req) => {
       const payoutStr = fmtEAT(payoutDate);
       const aheadLine = i === 0 ? 'You are first in line.' : `Members ahead of you: ${memberIndex - 1}.`;
 
-      const message = `"${chama.name}" has started. You are Member #${memberIndex} of ${sortedMembers.length}. First payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr}, 10:00 PM. Paybill 4015351, Account ${member.member_code}. ${aheadLine} Your expected payout date: ${payoutStr}.`;
+      const message = `"${chama.name}" has started. You are Member #${memberIndex} of ${sortedMembers.length}. First payment of KES ${chama.contribution_amount.toLocaleString()} is due by ${graceDeadlineStr}, 9:00 PM. Paybill 4015351, Account ${member.member_code}. ${aheadLine} Your expected payout date: ${payoutStr}.`;
 
       if (member.profiles?.phone) {
         try {

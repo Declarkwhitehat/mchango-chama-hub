@@ -26,10 +26,10 @@ export const KENYA_CUTOFFS = {
   graceReminder: { hour: 12, minute: 1 },
   /** 9:00 PM EAT — first-cycle payment cutoff. */
   firstCycleCutoff: { hour: 21, minute: 0 },
-  /** 9:30 PM EAT — on-time payment cutoff. */
-  onTimeCutoff: { hour: 21, minute: 30 },
-  /** 10:00 PM EAT — cycle deadline / payout processing. */
-  cycleDeadline: { hour: 22, minute: 0 },
+  /** 9:00 PM EAT — on-time payment cutoff (same instant as the payout). */
+  onTimeCutoff: { hour: 21, minute: 0 },
+  /** 9:00 PM EAT — cycle deadline / payout processing. */
+  cycleDeadline: { hour: 21, minute: 0 },
 } as const;
 
 export interface KenyaParts {
