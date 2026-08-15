@@ -562,7 +562,7 @@ export const CommissionAnalyticsDashboard = () => {
           { label: "Mchango",      ledger: summary.mchangoCommission, live: liveVerification.mchangoDonations },
           { label: "Organizations",ledger: summary.orgCommission,     live: liveVerification.orgDonations },
           { label: "Welfare",      ledger: summary.welfareCommission, live: liveVerification.welfareContributions },
-          { label: "Chama",        ledger: summary.chamaCommission,   live: null as number | null },
+          { label: "Chama",        ledger: summary.chamaCommission,   live: liveVerification.chamaContributions as number | null },
         ];
         const fmt = (n: number) => `KES ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const allMatch = rows.every(r => r.live === null || Math.abs(r.ledger - r.live) <= TOL);
