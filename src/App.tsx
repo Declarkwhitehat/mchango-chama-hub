@@ -169,24 +169,25 @@ const AppContent = () => {
             <Route path="/kyc-upload" element={<ProtectedRoute><KYCUpload /></ProtectedRoute>} />
             <Route path="/pin-setup" element={<ProtectedRoute><PinSetup /></ProtectedRoute>} />
             <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-            <Route path="/mchango" element={<MchangoList />} />
+            <Route path="/mchango" element={<ProtectedRoute><MchangoList /></ProtectedRoute>} />
             <Route path="/mchango/create" element={<ProtectedRoute requireKYC><MchangoCreate /></ProtectedRoute>} />
             <Route path="/mchango/:id" element={<MchangoDetail />} />
-            <Route path="/explore/mchango" element={<MchangoExplore />} />
-            <Route path="/organizations" element={<OrganizationList />} />
+            <Route path="/explore/mchango" element={<ProtectedRoute><MchangoExplore /></ProtectedRoute>} />
+            <Route path="/organizations" element={<ProtectedRoute><OrganizationList /></ProtectedRoute>} />
             <Route path="/organizations/create" element={<ProtectedRoute requireKYC><OrganizationCreate /></ProtectedRoute>} />
             <Route path="/organizations/:id" element={<OrganizationDetail />} />
-            <Route path="/chama" element={<ChamaList />} />
+            <Route path="/chama" element={<ProtectedRoute><ChamaList /></ProtectedRoute>} />
             <Route path="/chama/create" element={<ProtectedRoute requireKYC><ChamaCreate /></ProtectedRoute>} />
-            <Route path="/chama/join/:slug" element={<ChamaJoin />} />
-            <Route path="/chama/:id" element={<ChamaDetail />} />
+            <Route path="/chama/join/:slug" element={<ProtectedRoute><ChamaJoin /></ProtectedRoute>} />
+            <Route path="/chama/:id" element={<ProtectedRoute><ChamaDetail /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/security" element={<ProtectedRoute><Security /></ProtectedRoute>} />
             <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
-            <Route path="/welfare" element={<WelfareList />} />
+            <Route path="/welfare" element={<ProtectedRoute><WelfareList /></ProtectedRoute>} />
             <Route path="/welfare/create" element={<ProtectedRoute requireKYC><WelfareCreate /></ProtectedRoute>} />
-            <Route path="/welfare/join/:slug" element={<WelfareJoin />} />
-            <Route path="/welfare/:id" element={<WelfareDetail />} />
+            <Route path="/welfare/join/:slug" element={<ProtectedRoute><WelfareJoin /></ProtectedRoute>} />
+            <Route path="/welfare/:id" element={<ProtectedRoute><WelfareDetail /></ProtectedRoute>} />
+
             <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
             <Route path="/admin/kyc" element={<AdminProtectedRoute><AdminKYC /></AdminProtectedRoute>} />
             <Route path="/admin/users" element={<AdminProtectedRoute><AdminUsers /></AdminProtectedRoute>} />
