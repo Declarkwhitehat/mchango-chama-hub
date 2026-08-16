@@ -352,7 +352,25 @@ serve(async (req) => {
       } else {
         console.log(`Created ${memberPayments.length} member_cycle_payments for cycle 1`);
       }
+
+      // Apply any money members paid BEFORE the chama started (offline/Paybill
+      // deposits sit in chama_overpayment_wallet / late-payment buffer as net
+      // credit). These must land on cycle 1 immediately so nobody who already
+      // paid shows as unpaid after the start reshuffle.
+      try {
+        const preStartApplied = await applyPendingWalletToCycle(
+          supabaseAdmin,
+          chamaId,
+          firstCycle.id,
+          Number(chama.contribution_amount),
+          Number(chama.commission_rate ?? 0.05),
+        );
+        console.log('Pre-start wallet credits applied to cycle 1:', preStartApplied);
+      } catch (walletErr) {
+        console.error('Failed applying pre-start wallet credits:', (walletErr as Error).message);
+      }
     }
+
 
     // ============================================
     // SEND START NOTIFICATIONS TO ALL MEMBERS
