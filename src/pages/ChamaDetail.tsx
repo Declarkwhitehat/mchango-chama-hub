@@ -13,6 +13,7 @@ import { MemberDashboard } from "@/components/MemberDashboard";
 import { CommissionDisplay } from "@/components/CommissionDisplay";
 import { ChamaPaymentForm } from "@/components/ChamaPaymentForm";
 import { OverpaymentWallet } from "@/components/chama/OverpaymentWallet";
+import { EarlyPaymentsCard } from "@/components/chama/EarlyPaymentsCard";
 import { CurrentCyclePool } from "@/components/chama/CurrentCyclePool";
 
 import { CycleCompleteBanner } from "@/components/chama/CycleCompleteBanner";
@@ -746,6 +747,11 @@ const ChamaDetail = () => {
             </div>
           );
         })()}
+
+        {/* Early / pre-start payments — managers and admins */}
+        {(isManager || isAdmin) && <EarlyPaymentsCard chamaId={chama.id} />}
+
+
 
         {/* Pending Join Requests - Visible to all members and admins */}
         {hasViewAccess && (
