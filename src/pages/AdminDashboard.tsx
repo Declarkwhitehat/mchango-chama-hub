@@ -86,7 +86,7 @@ const AdminDashboard = () => {
         supabase.from('company_earnings').select('amount'),
         supabase.from('chama_members').select('user_id').eq('status', 'active').not('user_id', 'is', null),
         supabase.from('welfare_members').select('user_id').eq('status', 'active').not('user_id', 'is', null),
-        supabase.from('mchango').select('user_id').not('user_id', 'is', null),
+        supabase.from('mchango').select('created_by').not('created_by', 'is', null),
         supabase.from('organizations').select('created_by').not('created_by', 'is', null),
         (supabase as any).from('daily_limit_increase_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ]);
@@ -105,7 +105,7 @@ const AdminDashboard = () => {
       };
       addIds(activeChamaMembersResult.data as any[], 'user_id');
       addIds(activeWelfareMembersResult.data as any[], 'user_id');
-      addIds(mchangoCreatorsResult.data as any[], 'user_id');
+      addIds(mchangoCreatorsResult.data as any[], 'created_by');
       addIds(organizationCreatorsResult.data as any[], 'created_by');
 
 
