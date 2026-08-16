@@ -105,7 +105,7 @@ const AdminDashboard = () => {
       };
       addIds(activeChamaMembersResult.data as any[], 'user_id');
       addIds(activeWelfareMembersResult.data as any[], 'user_id');
-      addIds(mchangoCreatorsResult.data as any[], 'user_id');
+      addIds(mchangoCreatorsResult.data as any[], 'created_by');
       addIds(organizationCreatorsResult.data as any[], 'created_by');
 
 
