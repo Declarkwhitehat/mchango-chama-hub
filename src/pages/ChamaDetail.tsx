@@ -747,6 +747,11 @@ const ChamaDetail = () => {
           );
         })()}
 
+        {/* Early / pre-start payments — managers and admins */}
+        {(isManager || isAdmin) && <EarlyPaymentsCard chamaId={chama.id} />}
+
+
+
         {/* Pending Join Requests - Visible to all members and admins */}
         {hasViewAccess && (
           <ChamaPendingRequests 
