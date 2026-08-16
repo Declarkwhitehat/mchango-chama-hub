@@ -256,8 +256,19 @@ serve(async (req) => {
         recipientPhone = (pm as any)?.phone_number || (pm as any)?.account_number || '';
       } catch (_e) { /* ignore */ }
     }
-    if (!recipientPhone && recipientPhoneLast9) {
-      recipientPhone = `+254${recipientPhoneLast9}`;
+    if (!recipientPhone) {
+      // Fallback: derive from the callback's ReceiverPartyPublicName
+      let last9 = '';
+      const params = result?.ResultParameters?.ResultParameter;
+      if (Array.isArray(params)) {
+        for (const param of params) {
+          if (param?.Key === 'ReceiverPartyPublicName') {
+            last9 = String(param.Value || '').split(' - ')[0].replace(/\D/g, '').slice(-9);
+            break;
+          }
+        }
+      }
+      if (last9.length === 9) recipientPhone = `+254${last9}`;
     }
     if (recipientPhone && !recipientPhone.startsWith('+')) {
       const digits = recipientPhone.replace(/\D/g, '').slice(-9);
