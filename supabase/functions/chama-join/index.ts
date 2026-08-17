@@ -168,13 +168,25 @@ serve(async (req) => {
           });
         }
 
+        const chamaStatus = member.chama?.status;
+
+        // Once a chama is running, no new members can be admitted
+        if (isApproved && chamaStatus === 'active') {
+          return new Response(JSON.stringify({
+            error: 'Chama already started',
+            details: 'This chama has already started, so new members can no longer be approved. Reject the request instead.'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         // Update membership status
         // For pending/cycle_complete chamas, set active immediately (no payment gate)
-        // For active chamas (shouldn't reach here but safety), keep inactive until first payment
-        const chamaStatus = member.chama?.status;
         const memberStatus = isApproved 
           ? (chamaStatus === 'pending' || chamaStatus === 'cycle_complete' ? 'active' : 'inactive')
           : 'inactive';
+
 
         const { data: updatedMember, error: updateError } = await supabaseClient
           .from('chama_members')
