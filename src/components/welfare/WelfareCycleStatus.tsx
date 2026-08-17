@@ -240,13 +240,14 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
             {paidRows.length === members.length ? (
               <Badge className="bg-green-500 text-white">All Paid</Badge>
             ) : (
-              <Badge variant="destructive">{unpaidRows.length + underpaidRows.length} outstanding</Badge>
+              <Badge variant="destructive">{unpaidRows.length} outstanding</Badge>
             )}
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Every member pays KES {cycleAmount.toLocaleString()} this cycle. Anyone who pays more holds extra shares.
+            The executives set a guide amount of KES {cycleAmount.toLocaleString()} this cycle. Any payment counts you as fully paid — anyone who pays more simply holds extra shares.
           </p>
+
 
           {/* Members who paid extra shares */}
           {paidRows.some(r => r.extra > 0) && (
