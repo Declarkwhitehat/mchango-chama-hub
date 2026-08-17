@@ -21,6 +21,8 @@ interface Overview {
   shares: number;
   payment_rate: number;
   months_member: number;
+  days_member?: number;
+  days_to_eligible?: number;
   min_months: number;
   min_rate: number;
   eligible: boolean;
@@ -169,7 +171,10 @@ export const WelfareLoans = ({ welfareId, welfareName }: Props) => {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Membership</p>
-              <p className="text-lg font-bold">{data.months_member} mo</p>
+              <p className="text-lg font-bold">
+                {data.months_member} mo {Math.max(0, Math.floor((data.days_member ?? 0) - data.months_member * 30.44))} d
+              </p>
+              <p className="text-[11px] text-muted-foreground">{data.days_member ?? 0} days total</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Payment record</p>
@@ -180,9 +185,15 @@ export const WelfareLoans = ({ welfareId, welfareName }: Props) => {
               <p className="text-lg font-bold font-mono">{data.member_code}</p>
             </div>
           </div>
-          <Progress value={Math.round(data.payment_rate * 100)} className="h-2" />
+          <Progress
+            value={Math.min(100, Math.round(((data.days_member ?? 0) / Math.max(1, data.min_months * 30.44)) * 100))}
+            className="h-2"
+          />
           <p className="text-xs text-muted-foreground">
             You need {data.min_months} months of membership and a {Math.round(data.min_rate * 100)}% payment record to qualify.
+            {(data.days_to_eligible ?? 0) > 0
+              ? ` ${data.days_to_eligible} day(s) left before you can borrow.`
+              : " Membership requirement met."}
           </p>
         </CardContent>
       </Card>

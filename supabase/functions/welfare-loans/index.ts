@@ -59,8 +59,9 @@ async function loadEligibility(db: any, welfareId: string, userId: string) {
     .reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
   const paymentRate = expected > 0 ? Math.min(shares / expected, 1) : 1;
 
+  const daysMember = Math.max(0, Math.floor((Date.now() - joined.getTime()) / (1000 * 60 * 60 * 24)));
   const monthsMember = (Date.now() - joined.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
-  const minMonths = Number(welfare.loan_min_membership_months ?? 6);
+  const minMonths = Number(welfare.loan_min_membership_months ?? 3);
   const minRate = Number(welfare.loan_min_payment_rate ?? 0.95);
   const regCleared =
     member.registration_status === "confirmed" ||
@@ -72,7 +73,7 @@ async function loadEligibility(db: any, welfareId: string, userId: string) {
   if (member.status !== "active") reasons.push("Only active members can borrow.");
   if (!regCleared) reasons.push("Clear your registration fee first.");
   if (monthsMember < minMonths)
-    reasons.push(`You must be a member for at least ${minMonths} months (currently ${Math.floor(monthsMember)}).`);
+    reasons.push(`You must be a member for at least ${minMonths} months. You have been a member for ${Math.floor(monthsMember)} month(s) ${Math.floor(daysMember - Math.floor(monthsMember) * 30.44)} day(s) — ${Math.max(0, Math.ceil(minMonths * 30.44 - daysMember))} day(s) to go.`);
   if (paymentRate < minRate)
     reasons.push(`You must have paid at least ${Math.round(minRate * 100)}% of your contributions (currently ${Math.round(paymentRate * 100)}%).`);
   if ((openLoans || []).length > 0) reasons.push("You already have a loan that is not fully repaid.");
@@ -85,6 +86,7 @@ async function loadEligibility(db: any, welfareId: string, userId: string) {
     expected,
     paymentRate,
     monthsMember,
+    daysMember,
     minMonths,
     minRate,
     eligible: reasons.length === 0,
@@ -146,6 +148,8 @@ serve(async (req) => {
         shares: el.shares,
         payment_rate: el.paymentRate,
         months_member: Math.floor(el.monthsMember),
+        days_member: el.daysMember,
+        days_to_eligible: Math.max(0, Math.ceil(el.minMonths * 30.44 - el.daysMember)),
         min_months: el.minMonths,
         min_rate: el.minRate,
         eligible: el.eligible,

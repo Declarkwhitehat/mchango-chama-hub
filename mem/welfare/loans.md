@@ -20,7 +20,7 @@ Two products, both 1-month term, defined in `_shared/loanTerms.ts` + `src/utils/
 - Overdue: outstanding recovered from the member's shares; loan marked defaulted if a gap remains.
 
 ## Eligibility (per welfare, configurable on `welfares`)
-- `loan_min_membership_months` (default 6), `loan_min_payment_rate` (default 0.95).
+- `loan_min_membership_months` (default 3), `loan_min_payment_rate` (default 0.95).
 - Active member, registration fee cleared, no other open loan, shares > 0, `loans_enabled` true.
 - Shares = completed welfare_contributions excluding `registration_fee`.
 
