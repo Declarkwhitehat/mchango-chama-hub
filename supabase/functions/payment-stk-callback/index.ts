@@ -531,7 +531,8 @@ serve(async (req) => {
 
       if (member?.id) {
         await supabaseClient.from('welfare_members').update({
-          total_contributed: (member.total_contributed || 0) + grossAmount,
+          // Shares are credited NET of platform commission (policy from 17 Aug 2026)
+          total_contributed: (member.total_contributed || 0) + netAmount,
         }).eq('id', member.id);
       }
 
