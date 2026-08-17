@@ -116,19 +116,23 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
       paid,
       required: cycleAmount,
       extra: Math.max(paid - cycleAmount, 0),
-      remaining: Math.max(cycleAmount - paid, 0),
+      // Policy: the cycle amount is a guide set by the executives. Any payment
+      // in this cycle counts the member as fully paid (100%), whether they paid
+      // less or more than the guide amount.
+      remaining: paid > 0 ? 0 : cycleAmount,
     };
   });
 
-  const paidRows = rows.filter(r => r.remaining === 0);
-  const underpaidRows = rows.filter(r => r.remaining > 0 && r.paid > 0);
+  const paidRows = rows.filter(r => r.paid > 0);
+  const belowTargetRows = rows.filter(r => r.paid > 0 && r.paid < cycleAmount);
   const unpaidRows = rows.filter(r => r.paid === 0);
 
   const currentUserRow = rows.find(r => r.member.user_id === user?.id);
-  const currentUserPaid = currentUserRow ? currentUserRow.remaining === 0 : false;
+  const currentUserPaid = currentUserRow ? currentUserRow.paid > 0 : false;
   const currentUserRemaining = currentUserRow?.remaining ?? 0;
   const currentUserExtra = currentUserRow?.extra ?? 0;
   const currentUserOwes = !!currentUserRow && !currentUserPaid;
+
 
   // Live countdown to the cycle deadline (deadline = end of the end_date day)
   const isFinalDay = msLeft > 0 && msLeft <= 24 * 60 * 60 * 1000;
