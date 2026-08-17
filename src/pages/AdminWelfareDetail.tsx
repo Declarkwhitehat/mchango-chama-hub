@@ -39,12 +39,12 @@ const AdminWelfareDetail = () => {
             .order("member_code"),
           supabase
             .from("welfare_contribution_cycles")
-            .select("id, amount, start_date, status")
+            .select("id, amount, start_date, end_date, status")
             .eq("welfare_id", id)
             .order("start_date"),
           supabase
             .from("welfare_contributions")
-            .select("id, member_id, gross_amount, payment_status, category")
+            .select("id, member_id, gross_amount, net_amount, created_at, payment_status, category")
             .eq("welfare_id", id)
             .eq("payment_status", "completed")
             .neq("category", "registration_fee"),
