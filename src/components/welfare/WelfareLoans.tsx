@@ -21,6 +21,8 @@ interface Overview {
   shares: number;
   payment_rate: number;
   months_member: number;
+  days_member?: number;
+  days_to_eligible?: number;
   min_months: number;
   min_rate: number;
   eligible: boolean;
