@@ -149,10 +149,11 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
         currentUserPaid ? (
           <Alert className="border-green-500/50 bg-green-500/10">
             <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertTitle>{isFinalDay ? "1 day remaining — you're fully paid" : "You're fully paid"}</AlertTitle>
+            <AlertTitle>{isFinalDay ? "1 day remaining — you're marked as paid" : "You're marked as paid"}</AlertTitle>
             <AlertDescription>
-              This cycle closes in {countdownText}. You have already paid your KES {cycleAmount.toLocaleString()} — nothing more is required.
+              This cycle closes in {countdownText}. Your payment of KES {(currentUserRow?.paid ?? 0).toLocaleString()} has been received — nothing more is required.
             </AlertDescription>
+
           </Alert>
         ) : (
           <Alert className="border-orange-500/60 bg-orange-500/10">
