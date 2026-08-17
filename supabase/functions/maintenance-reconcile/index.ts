@@ -30,7 +30,7 @@ async function sweepChama(since: string) {
   // Pending STK/c2b transactions for chama in the window
   const { data: txns } = await admin
     .from("transactions")
-    .select("id, status, created_at, metadata")
+    .select("id, status, created_at")
     .eq("status", "pending")
     .gte("created_at", since)
     .limit(500);

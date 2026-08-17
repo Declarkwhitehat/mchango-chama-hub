@@ -977,7 +977,7 @@ serve(async (req) => {
     const { data: transactions } = await supabaseClient
       .from('transactions')
       .select('*')
-      .eq('metadata->>checkout_request_id', checkoutRequestId);
+      .eq('payment_reference', checkoutRequestId);
 
     if (!transactions || transactions.length === 0) {
       console.error('Transaction not found for checkout request:', checkoutRequestId);
@@ -1003,12 +1003,6 @@ serve(async (req) => {
       .update({
         status: transactionStatus,
         mpesa_receipt_number: mpesaReceiptNumber,
-        metadata: {
-          ...transaction.metadata,
-          result_code: resultCode,
-          result_desc: resultDesc,
-          callback_metadata: stkCallback.CallbackMetadata,
-        },
       })
       .eq('id', transaction.id)
       .select()
