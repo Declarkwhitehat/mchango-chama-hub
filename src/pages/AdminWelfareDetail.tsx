@@ -39,12 +39,12 @@ const AdminWelfareDetail = () => {
             .order("member_code"),
           supabase
             .from("welfare_contribution_cycles")
-            .select("id, amount, start_date, status")
+            .select("id, amount, start_date, end_date, status")
             .eq("welfare_id", id)
             .order("start_date"),
           supabase
             .from("welfare_contributions")
-            .select("id, member_id, gross_amount, payment_status, category")
+            .select("id, member_id, gross_amount, net_amount, created_at, payment_status, category")
             .eq("welfare_id", id)
             .eq("payment_status", "completed")
             .neq("category", "registration_fee"),
@@ -86,10 +86,31 @@ const AdminWelfareDetail = () => {
       const paidFromContribs = memberContribs.reduce((s, x) => s + Number(x.gross_amount || 0), 0);
       const paid = paidFromContribs > 0 ? paidFromContribs : Number(m.total_contributed || 0);
 
-      const pct = expected > 0
-        ? (paid >= expected ? 100 : Math.round((paid / expected) * 100))
+      // Policy: the cycle amount is a guide set by the executives. A member who pays
+      // ANY amount within a cycle is credited for that cycle in full — the same as
+      // members who overpay.
+      const requirements: boolean[] = [];
+      if (regFee > 0) {
+        requirements.push(
+          String((m as any).registration_status || "") === "confirmed" ||
+          Number((m as any).registration_fee_paid || 0) > 0
+        );
+      }
+      eligibleCycles.forEach((c) => {
+        const start = new Date(c.start_date).getTime();
+        const end = new Date(c.end_date || c.start_date).getTime() + 24 * 60 * 60 * 1000;
+        const paidInCycle = memberContribs.some((x) => {
+          const t = x.created_at ? new Date(x.created_at).getTime() : NaN;
+          return !Number.isNaN(t) && t >= start && t <= end && Number(x.gross_amount || 0) > 0;
+        });
+        requirements.push(paidInCycle);
+      });
+
+      const pct = requirements.length > 0
+        ? Math.round((requirements.filter(Boolean).length / requirements.length) * 100)
         : (paid > 0 ? 100 : 0);
       const overpaid = expected > 0 && paid > expected ? paid - expected : 0;
+
 
       return {
         ...m,

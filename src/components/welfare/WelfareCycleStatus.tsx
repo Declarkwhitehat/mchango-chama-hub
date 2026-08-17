@@ -116,19 +116,23 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
       paid,
       required: cycleAmount,
       extra: Math.max(paid - cycleAmount, 0),
-      remaining: Math.max(cycleAmount - paid, 0),
+      // Policy: the cycle amount is a guide set by the executives. Any payment
+      // in this cycle counts the member as fully paid (100%), whether they paid
+      // less or more than the guide amount.
+      remaining: paid > 0 ? 0 : cycleAmount,
     };
   });
 
-  const paidRows = rows.filter(r => r.remaining === 0);
-  const underpaidRows = rows.filter(r => r.remaining > 0 && r.paid > 0);
+  const paidRows = rows.filter(r => r.paid > 0);
+  const belowTargetRows = rows.filter(r => r.paid > 0 && r.paid < cycleAmount);
   const unpaidRows = rows.filter(r => r.paid === 0);
 
   const currentUserRow = rows.find(r => r.member.user_id === user?.id);
-  const currentUserPaid = currentUserRow ? currentUserRow.remaining === 0 : false;
+  const currentUserPaid = currentUserRow ? currentUserRow.paid > 0 : false;
   const currentUserRemaining = currentUserRow?.remaining ?? 0;
   const currentUserExtra = currentUserRow?.extra ?? 0;
   const currentUserOwes = !!currentUserRow && !currentUserPaid;
+
 
   // Live countdown to the cycle deadline (deadline = end of the end_date day)
   const isFinalDay = msLeft > 0 && msLeft <= 24 * 60 * 60 * 1000;
@@ -145,10 +149,11 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
         currentUserPaid ? (
           <Alert className="border-green-500/50 bg-green-500/10">
             <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertTitle>{isFinalDay ? "1 day remaining — you're fully paid" : "You're fully paid"}</AlertTitle>
+            <AlertTitle>{isFinalDay ? "1 day remaining — you're marked as paid" : "You're marked as paid"}</AlertTitle>
             <AlertDescription>
-              This cycle closes in {countdownText}. You have already paid your KES {cycleAmount.toLocaleString()} — nothing more is required.
+              This cycle closes in {countdownText}. Your payment of KES {(currentUserRow?.paid ?? 0).toLocaleString()} has been received — nothing more is required.
             </AlertDescription>
+
           </Alert>
         ) : (
           <Alert className="border-orange-500/60 bg-orange-500/10">
@@ -236,13 +241,14 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
             {paidRows.length === members.length ? (
               <Badge className="bg-green-500 text-white">All Paid</Badge>
             ) : (
-              <Badge variant="destructive">{unpaidRows.length + underpaidRows.length} outstanding</Badge>
+              <Badge variant="destructive">{unpaidRows.length} outstanding</Badge>
             )}
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Every member pays KES {cycleAmount.toLocaleString()} this cycle. Anyone who pays more holds extra shares.
+            The executives set a guide amount of KES {cycleAmount.toLocaleString()} this cycle. Any payment counts you as fully paid — anyone who pays more simply holds extra shares.
           </p>
+
 
           {/* Members who paid extra shares */}
           {paidRows.some(r => r.extra > 0) && (
@@ -293,27 +299,28 @@ export const WelfareCycleStatus = ({ welfareId, members }: Props) => {
             </Collapsible>
           )}
 
-          {underpaidRows.length > 0 && (
+          {belowTargetRows.length > 0 && (
             <Collapsible>
               <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                <span className="text-sm font-medium text-orange-600">Underpaid Members ({underpaidRows.length})</span>
+                <span className="text-sm font-medium text-muted-foreground">Paid below the guide amount ({belowTargetRows.length}) — counted as paid</span>
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-1 mt-2">
-                {underpaidRows.map(({ member: m, paid }) => (
-                  <div key={m.id} className="flex items-center justify-between p-2 rounded bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20">
+                {belowTargetRows.map(({ member: m, paid }) => (
+                  <div key={m.id} className="flex items-center justify-between p-2 rounded bg-muted/40 border border-border">
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-3 w-3 text-orange-500" />
+                      <CheckCircle className="h-3 w-3 text-green-600" />
                       <span className="text-sm">{m.profiles?.full_name || 'Unknown'}</span>
                     </div>
-                    <Badge variant="outline" className="text-orange-600 border-orange-400 text-xs">
-                      KES {paid.toLocaleString()} / {cycleAmount.toLocaleString()}
+                    <Badge variant="outline" className="text-xs">
+                      KES {paid.toLocaleString()} paid
                     </Badge>
                   </div>
                 ))}
               </CollapsibleContent>
             </Collapsible>
           )}
+
         </CardContent>
       </Card>
     </div>

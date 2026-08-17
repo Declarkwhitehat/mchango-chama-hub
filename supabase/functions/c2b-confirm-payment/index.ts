@@ -1025,7 +1025,8 @@ async function handleCallback(callbackData: any): Promise<Response> {
         // Update member total_contributed
         await supabase
           .from('welfare_members')
-          .update({ total_contributed: (memberFull?.total_contributed || 0) + grossAmount })
+          // Shares are credited NET of platform commission (policy from 17 Aug 2026)
+          .update({ total_contributed: (memberFull?.total_contributed || 0) + totalNetForBalances })
           .eq('id', matchedMember.id);
 
         if (regFullyPaid) {
