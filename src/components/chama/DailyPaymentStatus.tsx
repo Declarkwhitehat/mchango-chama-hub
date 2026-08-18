@@ -348,10 +348,6 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
                       </div>
                     );
                   })}
-
-                      </div>
-                    );
-                  })}
                 </div>
               </CardContent>
             </CollapsibleContent>
