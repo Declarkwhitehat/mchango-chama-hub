@@ -210,15 +210,26 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
   const allPaid = paidCount === totalCount;
   const unpaidMembers = payments.filter(p => !p.is_paid);
 
-  // Display base amount (no commission markup) — deductive model
-  const displayTotalPayable = currentUserPaid
-    ? (totalOutstanding > 0 ? totalOutstanding : 0)
-    : (totalOutstanding + cycleInfo.due_amount);
+  // A cycle only counts as "missed" once its deadline has actually passed.
+  // Open cycles are Pending / Partially Paid, never Missed.
+  const resolveStatus = (cycle: CycleHistoryItem): 'paid' | 'late' | 'missed' | 'partial' | 'pending' => {
+    const mp = cycle.member_payment;
+    if (cycle.status === 'paid' || cycle.status === 'late') return cycle.status;
+    const deadlinePassed = new Date(cycle.end_date).getTime() <= Date.now();
+    const paid = Number(mp?.amount_paid || 0);
+    const remaining = Number(mp?.amount_remaining ?? cycle.due_amount);
+    if (paid > 0 && remaining > 0) return deadlinePassed ? 'missed' : 'partial';
+    if (!deadlinePassed) return 'pending';
+    return cycle.status === 'missed' ? 'missed' : 'pending';
+  };
+
+  const genuinelyMissedCount = cycleHistory.filter(c => resolveStatus(c) === 'missed').length;
+  const showMissedAlert = !isGracePeriod && missedCyclesCount > 0 && genuinelyMissedCount > 0;
 
   return (
     <div className="space-y-4">
-      {/* Outstanding Missed Cycles Alert — suppressed during grace period */}
-      {!isGracePeriod && missedCyclesCount > 0 && (
+      {/* Outstanding Missed Cycles Alert — only after a deadline has actually passed */}
+      {showMissedAlert && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
@@ -227,16 +238,17 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-destructive">
-                  {missedCyclesCount} Missed Cycle{missedCyclesCount > 1 ? 's' : ''} - KES {totalOutstanding.toLocaleString()} Outstanding
+                  {genuinelyMissedCount} Missed Cycle{genuinelyMissedCount > 1 ? 's' : ''} - KES {totalOutstanding.toLocaleString()} Outstanding
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  You have unpaid cycles. Your next payment will clear the oldest missed cycle first.
+                  You have unpaid cycles past their deadline. Your next payment will clear the oldest missed cycle first.
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
+
 
       {/* Countdown Timer */}
       <PaymentCountdownTimer
