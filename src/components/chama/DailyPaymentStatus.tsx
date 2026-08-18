@@ -298,14 +298,16 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
               <CardContent>
                 <div className="space-y-2">
                   {cycleHistory.slice(0, 10).map((cycle) => {
-                    const displayStatus = isGracePeriod && cycle.status === 'missed' ? 'pending' : cycle.status;
+                    const resolved = resolveStatus(cycle);
+                    const displayStatus = isGracePeriod && resolved === 'missed' ? 'pending' : resolved;
+                    const remaining = Number(cycle.member_payment?.amount_remaining ?? cycle.due_amount);
                     return (
                       <div
                         key={cycle.id}
                         className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
                           displayStatus === 'paid' ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
                           displayStatus === 'missed' ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
-                          displayStatus === 'late' ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' :
+                          displayStatus === 'late' || displayStatus === 'partial' ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' :
                           'border-border'
                         }`}
                       >
@@ -329,6 +331,10 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
                             <Badge variant="outline" className="gap-1 text-xs border-yellow-500 text-yellow-700">
                               <AlertCircle className="h-3 w-3" />Late
                             </Badge>
+                          ) : displayStatus === 'partial' ? (
+                            <Badge variant="outline" className="gap-1 text-xs border-yellow-500 text-yellow-700">
+                              <AlertCircle className="h-3 w-3" />Partially Paid · KES {remaining.toLocaleString()} left
+                            </Badge>
                           ) : displayStatus === 'missed' ? (
                             <Badge variant="destructive" className="gap-1 text-xs">
                               <XCircle className="h-3 w-3" />Missed
@@ -339,6 +345,10 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
                             </Badge>
                           )}
                         </div>
+                      </div>
+                    );
+                  })}
+
                       </div>
                     );
                   })}
