@@ -165,6 +165,16 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
   // settled and must not nag the user across the app.
   const showDebtWarnings = !isGracePeriod && !isCycleComplete && !isChamaDeleted;
 
+  // Open-cycle payment state (used to show "Partially Paid" instead of "missed")
+  const cyclePaid = Number(current_cycle?.amount_paid ?? 0);
+  const cycleRemaining = Number(
+    current_cycle?.amount_remaining ?? Math.max(0, Number(current_cycle?.amount_due ?? 0) - cyclePaid)
+  );
+  const cycleEnd = current_cycle?.end_date ? new Date(current_cycle.end_date) : null;
+  const cycleDeadlinePassed = !!cycleEnd && cycleEnd.getTime() <= Date.now();
+  const cycleDeadlineLabel = cycleEnd ? formatDate(cycleEnd.toISOString()) : '';
+
+
   return (
     <div className="space-y-4">
       {/* Frozen banner */}
