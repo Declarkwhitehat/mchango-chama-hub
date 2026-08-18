@@ -58,17 +58,34 @@ async function previewAllocation(
     .in('status', ['outstanding', 'partial'])
     .order('created_at', { ascending: true });
 
-  // Load current active cycle
-  const now = new Date().toISOString().split('T')[0];
-  const { data: cycle } = await supabase
+  // Load current active cycle. If "now" falls in the gap between one cycle's
+  // 21:00 EAT close and the next cycle's 00:01 EAT open, fall back to the next
+  // open cycle so the money lands on a real cycle instead of the wallet.
+  const nowIso = new Date().toISOString();
+  let { data: cycle } = await supabase
     .from('contribution_cycles')
     .select('*, member_cycle_payments!inner(amount_due, amount_paid, amount_remaining)')
     .eq('chama_id', chamaId)
-    .lte('start_date', now)
-    .gte('end_date', now)
+    .lte('start_date', nowIso)
+    .gte('end_date', nowIso)
     .eq('payout_processed', false)
     .eq('member_cycle_payments.member_id', memberId)
     .maybeSingle();
+
+  if (!cycle) {
+    const { data: upcoming } = await supabase
+      .from('contribution_cycles')
+      .select('*, member_cycle_payments!inner(amount_due, amount_paid, amount_remaining)')
+      .eq('chama_id', chamaId)
+      .gte('end_date', nowIso)
+      .eq('payout_processed', false)
+      .eq('member_cycle_payments.member_id', memberId)
+      .order('cycle_number', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    cycle = upcoming;
+  }
+
 
   const allocations: AllocationLine[] = [];
   let remaining = grossAmount;
