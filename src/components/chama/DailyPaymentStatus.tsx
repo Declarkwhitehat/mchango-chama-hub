@@ -210,15 +210,32 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
   const allPaid = paidCount === totalCount;
   const unpaidMembers = payments.filter(p => !p.is_paid);
 
+  // A cycle only counts as "missed" once its deadline has actually passed.
+  // Open cycles are Pending / Partially Paid, never Missed.
+  const resolveStatus = (cycle: CycleHistoryItem): 'paid' | 'late' | 'missed' | 'partial' | 'pending' => {
+    const mp = cycle.member_payment;
+    if (cycle.status === 'paid' || cycle.status === 'late') return cycle.status;
+    const deadlinePassed = new Date(cycle.end_date).getTime() <= Date.now();
+    const paid = Number(mp?.amount_paid || 0);
+    const remaining = Number(mp?.amount_remaining ?? cycle.due_amount);
+    if (paid > 0 && remaining > 0) return deadlinePassed ? 'missed' : 'partial';
+    if (!deadlinePassed) return 'pending';
+    return cycle.status === 'missed' ? 'missed' : 'pending';
+  };
+
+  const genuinelyMissedCount = cycleHistory.filter(c => resolveStatus(c) === 'missed').length;
+  const showMissedAlert = !isGracePeriod && missedCyclesCount > 0 && genuinelyMissedCount > 0;
+
   // Display base amount (no commission markup) — deductive model
   const displayTotalPayable = currentUserPaid
     ? (totalOutstanding > 0 ? totalOutstanding : 0)
     : (totalOutstanding + cycleInfo.due_amount);
 
+
   return (
     <div className="space-y-4">
-      {/* Outstanding Missed Cycles Alert — suppressed during grace period */}
-      {!isGracePeriod && missedCyclesCount > 0 && (
+      {/* Outstanding Missed Cycles Alert — only after a deadline has actually passed */}
+      {showMissedAlert && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
@@ -227,16 +244,17 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-destructive">
-                  {missedCyclesCount} Missed Cycle{missedCyclesCount > 1 ? 's' : ''} - KES {totalOutstanding.toLocaleString()} Outstanding
+                  {genuinelyMissedCount} Missed Cycle{genuinelyMissedCount > 1 ? 's' : ''} - KES {totalOutstanding.toLocaleString()} Outstanding
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  You have unpaid cycles. Your next payment will clear the oldest missed cycle first.
+                  You have unpaid cycles past their deadline. Your next payment will clear the oldest missed cycle first.
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
+
 
       {/* Countdown Timer */}
       <PaymentCountdownTimer
@@ -280,14 +298,16 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
               <CardContent>
                 <div className="space-y-2">
                   {cycleHistory.slice(0, 10).map((cycle) => {
-                    const displayStatus = isGracePeriod && cycle.status === 'missed' ? 'pending' : cycle.status;
+                    const resolved = resolveStatus(cycle);
+                    const displayStatus = isGracePeriod && resolved === 'missed' ? 'pending' : resolved;
+                    const remaining = Number(cycle.member_payment?.amount_remaining ?? cycle.due_amount);
                     return (
                       <div
                         key={cycle.id}
                         className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
                           displayStatus === 'paid' ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
                           displayStatus === 'missed' ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
-                          displayStatus === 'late' ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' :
+                          displayStatus === 'late' || displayStatus === 'partial' ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' :
                           'border-border'
                         }`}
                       >
@@ -310,6 +330,10 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
                           ) : displayStatus === 'late' ? (
                             <Badge variant="outline" className="gap-1 text-xs border-yellow-500 text-yellow-700">
                               <AlertCircle className="h-3 w-3" />Late
+                            </Badge>
+                          ) : displayStatus === 'partial' ? (
+                            <Badge variant="outline" className="gap-1 text-xs border-yellow-500 text-yellow-700">
+                              <AlertCircle className="h-3 w-3" />Partially Paid · KES {remaining.toLocaleString()} left
                             </Badge>
                           ) : displayStatus === 'missed' ? (
                             <Badge variant="destructive" className="gap-1 text-xs">
