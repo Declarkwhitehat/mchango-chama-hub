@@ -185,7 +185,26 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
         </Card>
       )}
 
+      {/* Partially paid on the OPEN cycle — never labelled as a missed payment */}
+      {!isChamaDeleted && !isCycleComplete && cyclePaid > 0 && cycleRemaining > 0 && !cycleDeadlinePassed && (
+        <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-yellow-700 dark:text-yellow-400">Partially Paid</p>
+                <p className="text-sm text-muted-foreground">
+                  You have paid KES {cyclePaid.toLocaleString()} of KES {(cyclePaid + cycleRemaining).toLocaleString()} for this cycle.
+                  KES {cycleRemaining.toLocaleString()} is still due{cycleDeadlineLabel ? ` by ${cycleDeadlineLabel}` : ''}.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Missed Payments Warning — suppressed during grace period and on deleted chamas */}
+
       {showDebtWarnings && missedCount >= 2 && (member as any).status !== 'frozen' && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="pt-4 pb-4">
