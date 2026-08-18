@@ -66,6 +66,8 @@
 - [Manager Auto-Succession](mem://chama/manager-auto-succession-policy) — Auto-promotes highest score active member
 - [Payout Scheduling](mem://chama/payout-scheduling-logic) — Anchored to start_date, handles deferred turns
 - [Cycle Collision Avoidance](mem://chama/cycle-collision-avoidance) — Strict date-range checks for unique active cycles
+- [Cycle Gap-Window Allocation](mem://chama/cycle-gap-window-allocation) — 21:00–00:01 payments credit the next open cycle; reminders quote only the remaining amount
+
 - [Member Auto-Removal](mem://chama/member-auto-removal-logic) — Day-1 first-cycle only; otherwise see freeze policy
 - [Member Freeze Policy](mem://chama/member-freeze-policy) — 3 misses → frozen; auto-unfreeze on dues + 10% fee
 - [Custom Frequencies](mem://chama/custom-contribution-frequencies) — specific day-of-month (1-28) cycle boundaries
