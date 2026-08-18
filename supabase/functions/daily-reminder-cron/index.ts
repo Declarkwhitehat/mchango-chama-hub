@@ -153,18 +153,30 @@ Deno.serve(async (req) => {
         }
 
         const dueTime = formatEatDeadline(cycle.end_date);
+        // Only remind for what is actually still outstanding — partial payments count.
+        const outstanding = Math.max(
+          0,
+          Number(payment.amount_due || 0) - Number(payment.amount_paid || 0),
+        );
+        if (outstanding <= 0) continue;
+
+        const eatToday = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const eatDeadlineDate = new Date(new Date(cycle.end_date).getTime() + 3 * 60 * 60 * 1000)
+          .toISOString().split('T')[0];
+        const isDeadlineDay = eatToday === eatDeadlineDate;
+        const deadlineDateStr = new Date(cycle.end_date).toLocaleDateString('en-KE', {
+          timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short',
+        });
+        const dueLabel = isDeadlineDay ? `${dueTime} today` : `${dueTime} on ${deadlineDateStr}`;
 
         // In-app + native push notification (8 AM, 11 AM, 8 PM EAT slots only)
         if (userId && isPushSlot) {
-          const notificationData = NotificationTemplates.paymentReminder(
-            payment.amount_due,
-            chama.name,
-            dueTime
-          );
-
           await createNotification(supabase, {
             userId,
-            ...notificationData,
+            title: 'Payment due',
+            message: `Pay KES ${outstanding.toLocaleString()} to "${chama.name}" before ${dueLabel}.`,
+            type: 'warning',
+            category: 'reminder',
             relatedEntityId: chama.id,
             relatedEntityType: 'chama',
           });
@@ -175,20 +187,13 @@ Deno.serve(async (req) => {
 
         // SMS via send-transactional-sms (Onfon) — only two per day: 1 PM and 5 PM EAT.
         if (profile?.phone && isSmsSlot) {
-          // Determine if "today" (Kenya date) equals the deadline date
-          const eatToday = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
-          const eatDeadlineDate = new Date(new Date(cycle.end_date).getTime() + 3 * 60 * 60 * 1000)
-            .toISOString().split('T')[0];
-          const isDeadlineDay = eatToday === eatDeadlineDate;
-          const deadlineDateStr = new Date(cycle.end_date).toLocaleDateString('en-KE', {
-            timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short',
-          });
           const slotLabel = isDeadlineDay
             ? (slot === '1700'
                 ? `Final reminder: pay before ${dueTime} today.`
                 : `Deadline: ${dueTime} today.`)
             : `Pay by ${deadlineDateStr} at ${dueTime}.`;
-          const message = `Your KES ${Number(payment.amount_due).toLocaleString()} contribution to "${chama.name}" is due. ${slotLabel} Pay via Paybill 4015351, Account ${member.member_code}.`;
+          const message = `Your KES ${outstanding.toLocaleString()} contribution to "${chama.name}" is due. ${slotLabel} Pay via Paybill 4015351, Account ${member.member_code}.`;
+
 
 
           try {
