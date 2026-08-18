@@ -505,7 +505,7 @@ async function settleDebts(
   const nowISO = now.toISOString();
 
   // Use full timestamp comparison instead of date-only to handle grace period correctly
-  const { data: cycle } = await supabase
+  let { data: cycle } = await supabase
     .from('contribution_cycles')
     .select('*, member_cycle_payments!inner(id, amount_due, amount_paid, amount_remaining, fully_paid, payment_allocations)')
     .eq('chama_id', chamaId)
@@ -514,6 +514,24 @@ async function settleDebts(
     .eq('payout_processed', false)
     .eq('member_cycle_payments.member_id', memberId)
     .maybeSingle();
+
+  // Gap window: a cycle closes at 21:00 EAT but the next one opens at 00:01 EAT.
+  // Payments made in between must still credit the next open cycle (on-time),
+  // never sit in the overpayment wallet as if the member had not paid.
+  if (!cycle) {
+    const { data: upcomingCycle } = await supabase
+      .from('contribution_cycles')
+      .select('*, member_cycle_payments!inner(id, amount_due, amount_paid, amount_remaining, fully_paid, payment_allocations)')
+      .eq('chama_id', chamaId)
+      .gte('end_date', nowISO)
+      .eq('payout_processed', false)
+      .eq('member_cycle_payments.member_id', memberId)
+      .order('cycle_number', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    cycle = upcomingCycle;
+  }
+
 
   if (remaining > 0 && cycle) {
     const cyclePayment = cycle.member_cycle_payments?.[0];
