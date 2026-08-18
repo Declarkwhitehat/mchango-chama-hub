@@ -226,6 +226,12 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
   const genuinelyMissedCount = cycleHistory.filter(c => resolveStatus(c) === 'missed').length;
   const showMissedAlert = !isGracePeriod && missedCyclesCount > 0 && genuinelyMissedCount > 0;
 
+  // Display base amount (no commission markup) — deductive model
+  const displayTotalPayable = currentUserPaid
+    ? (totalOutstanding > 0 ? totalOutstanding : 0)
+    : (totalOutstanding + cycleInfo.due_amount);
+
+
   return (
     <div className="space-y-4">
       {/* Outstanding Missed Cycles Alert — only after a deadline has actually passed */}
