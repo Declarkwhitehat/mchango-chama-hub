@@ -1252,12 +1252,12 @@ const ChamaDetail = () => {
                         )}
                         {upcoming.length === 0 && !currentRecipient ? (
                           <p className="text-sm text-muted-foreground text-center py-3">All members have been paid out.</p>
-                        ) : upcoming.map((m, idx) => (
+                        ) : upcoming.map((m) => (
                           <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate">Position #{idx + (currentRecipient ? 2 : 1)} · {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
+                                <p className="font-medium text-foreground truncate">Position #{effectivePosition(m)} · {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{m.member_code}{nextTurnDates[m.id] ? ` · ${formatDate(nextTurnDates[m.id])}` : ''}</p>
                               </div>
                             </div>
