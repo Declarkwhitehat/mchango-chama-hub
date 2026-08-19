@@ -1193,7 +1193,7 @@ const ChamaDetail = () => {
                       <CardContent className="space-y-2">
                         {received.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-3">No payouts made yet.</p>
-                        ) : received.map((m, idx) => {
+                        ) : received.map((m) => {
                           const actual = payoutAmountByMember[m.id] ?? netPayout;
                           const shortfall = netPayout - actual;
                           return (
@@ -1201,7 +1201,7 @@ const ChamaDetail = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate">#{idx + 1} {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
+                                <p className="font-medium text-foreground truncate">#{effectivePosition(m)} {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{m.member_code}</p>
                               </div>
                             </div>
