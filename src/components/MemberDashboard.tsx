@@ -163,7 +163,7 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
   // active. A deleted chama can still carry historical balance_deficit /
   // missed_payments_count rows from before deletion; those debts can't be
   // settled and must not nag the user across the app.
-  const showDebtWarnings = !isGracePeriod && !isCycleComplete && !isChamaDeleted;
+  const baseShowDebtWarnings = !isGracePeriod && !isCycleComplete && !isChamaDeleted;
 
   // Open-cycle payment state (used to show "Partially Paid" instead of "missed")
   const cyclePaid = Number(current_cycle?.amount_paid ?? 0);
@@ -173,6 +173,11 @@ export const MemberDashboard = ({ chamaId, onPayNow }: MemberDashboardProps) => 
   const cycleEnd = current_cycle?.end_date ? new Date(current_cycle.end_date) : null;
   const cycleDeadlinePassed = !!cycleEnd && cycleEnd.getTime() <= Date.now();
   const cycleDeadlineLabel = cycleEnd ? formatDate(cycleEnd.toISOString()) : '';
+
+  // "Missed" wording is only allowed once a deadline has genuinely passed with
+  // money still owed. A stale missed_payments_count alone must never trigger it.
+  const hasGenuineOverdue = (cycleDeadlinePassed && cycleRemaining > 0) || totalOutstanding > 0;
+  const showDebtWarnings = baseShowDebtWarnings && hasGenuineOverdue;
 
 
   return (

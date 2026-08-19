@@ -1164,11 +1164,12 @@ const ChamaDetail = () => {
                 const grossPayout = contribution * totalMembers;
                 const netPayout = grossPayout * (1 - commissionRate);
 
-                const sortedByPosition = [...approvedMembers].sort((a, b) => {
-                  const posA = (a.was_skipped && a.rescheduled_to_position) ? a.rescheduled_to_position : (a.order_index || 0);
-                  const posB = (b.was_skipped && b.rescheduled_to_position) ? b.rescheduled_to_position : (b.order_index || 0);
-                  return posA - posB;
-                });
+                const effectivePosition = (m: any) =>
+                  (m.was_skipped && m.rescheduled_to_position) ? m.rescheduled_to_position : (m.order_index || 0);
+
+                const sortedByPosition = [...approvedMembers].sort(
+                  (a, b) => effectivePosition(a) - effectivePosition(b)
+                );
 
                 const received = sortedByPosition.filter(m => paidOutMemberIds.has(m.id));
                 const currentRecipient = sortedByPosition.find(m => m.id === currentTurnMemberId && !paidOutMemberIds.has(m.id));
@@ -1192,7 +1193,7 @@ const ChamaDetail = () => {
                       <CardContent className="space-y-2">
                         {received.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-3">No payouts made yet.</p>
-                        ) : received.map((m, idx) => {
+                        ) : received.map((m) => {
                           const actual = payoutAmountByMember[m.id] ?? netPayout;
                           const shortfall = netPayout - actual;
                           return (
@@ -1200,7 +1201,7 @@ const ChamaDetail = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate">#{idx + 1} {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
+                                <p className="font-medium text-foreground truncate">#{effectivePosition(m)} {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{m.member_code}</p>
                               </div>
                             </div>
@@ -1232,7 +1233,7 @@ const ChamaDetail = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-10 w-10"><AvatarFallback>{currentRecipient.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-semibold text-foreground truncate">{currentRecipient.profiles?.full_name || 'Member'} {currentRecipient.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
+                                <p className="font-semibold text-foreground truncate">Position #{effectivePosition(currentRecipient)} · {currentRecipient.profiles?.full_name || 'Member'} {currentRecipient.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{currentRecipient.member_code}</p>
                                 {(() => {
                                   const d = nextTurnDates[currentRecipient.id];
@@ -1251,12 +1252,12 @@ const ChamaDetail = () => {
                         )}
                         {upcoming.length === 0 && !currentRecipient ? (
                           <p className="text-sm text-muted-foreground text-center py-3">All members have been paid out.</p>
-                        ) : upcoming.map((m, idx) => (
+                        ) : upcoming.map((m) => (
                           <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-9 w-9"><AvatarFallback>{m.profiles?.full_name?.charAt(0) || '?'}</AvatarFallback></Avatar>
                               <div className="min-w-0">
-                                <p className="font-medium text-foreground truncate">Position #{idx + (currentRecipient ? 2 : 1)} · {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
+                                <p className="font-medium text-foreground truncate">Position #{effectivePosition(m)} · {m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">{m.member_code}{nextTurnDates[m.id] ? ` · ${formatDate(nextTurnDates[m.id])}` : ''}</p>
                               </div>
                             </div>
