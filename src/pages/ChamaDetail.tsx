@@ -980,7 +980,8 @@ const ChamaDetail = () => {
 
             <TabsContent value="members" className="space-y-4">
           {isManager && (() => {
-            const debtorMembers = approvedMembers.filter(m => Number(m.balance_deficit || 0) > 0 || Number(m.missed_payments_count || 0) > 0);
+            // Only real money still owed counts — a stale missed counter must never raise the alert
+            const debtorMembers = approvedMembers.filter(m => Number(m.balance_deficit || 0) > 0);
             const totalOwed = debtorMembers.reduce((sum, m) => sum + Number(m.balance_deficit || 0), 0);
             if (debtorMembers.length === 0) return null;
             return (
@@ -1090,7 +1091,7 @@ const ChamaDetail = () => {
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {member.member_code} • Position #{(member.was_skipped && member.rescheduled_to_position) ? member.rescheduled_to_position : member.order_index}
-                                {(member.missed_payments_count || 0) > 0 && (
+                                {(member.missed_payments_count || 0) > 0 && Number(member.balance_deficit || 0) > 0 && (
                                   <span className="text-destructive font-medium ml-2">
                                     • {member.missed_payments_count} missed
                                   </span>
@@ -1175,7 +1176,7 @@ const ChamaDetail = () => {
                 const currentRecipient = sortedByPosition.find(m => m.id === currentTurnMemberId && !paidOutMemberIds.has(m.id));
                 const upcoming = sortedByPosition.filter(m => !paidOutMemberIds.has(m.id) && m.id !== currentTurnMemberId);
                 const debtors = approvedMembers
-                  .filter(m => (m.balance_deficit && Number(m.balance_deficit) > 0) || (m.missed_payments_count && Number(m.missed_payments_count) > 0))
+                  .filter(m => Number(m.balance_deficit || 0) > 0)
                   .sort((a, b) => (Number(b.balance_deficit) || 0) - (Number(a.balance_deficit) || 0));
 
                 const fmt = (n: number) => `KES ${Math.round(n).toLocaleString()}`;
@@ -1289,7 +1290,7 @@ const ChamaDetail = () => {
                                 <p className="font-medium text-foreground truncate">{m.profiles?.full_name || 'Member'} {m.profiles?.is_verified && <VerifiedBadge size="sm" />}</p>
                                 <p className="text-xs text-muted-foreground">
                                   {m.member_code}
-                                  {m.missed_payments_count ? ` · ${m.missed_payments_count} missed` : ''}
+                                  {m.missed_payments_count && Number(m.balance_deficit || 0) > 0 ? ` · ${m.missed_payments_count} missed` : ''}
                                 </p>
                               </div>
                             </div>
