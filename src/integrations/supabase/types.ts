@@ -4814,6 +4814,7 @@ export type Database = {
         }
         Returns: Json
       }
+      purge_old_logs: { Args: never; Returns: Json }
       recompute_chama_member_balance: {
         Args: { p_member_id: string }
         Returns: undefined
