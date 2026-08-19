@@ -333,7 +333,7 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
                             </Badge>
                           ) : displayStatus === 'partial' ? (
                             <Badge variant="outline" className="gap-1 text-xs border-yellow-500 text-yellow-700">
-                              <AlertCircle className="h-3 w-3" />Partially Paid · KES {remaining.toLocaleString()} left
+                              <AlertCircle className="h-3 w-3" />Partially Paid · KES {remaining.toLocaleString()} left · due {formatDate(cycle.end_date)}
                             </Badge>
                           ) : displayStatus === 'missed' ? (
                             <Badge variant="destructive" className="gap-1 text-xs">
@@ -341,7 +341,7 @@ export function CyclePaymentStatus({ chamaId, frequency, chamaStartDate, onPayNo
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="gap-1 text-xs">
-                              <Clock className="h-3 w-3" />Pending
+                              <Clock className="h-3 w-3" />Pending · due {formatDate(cycle.end_date)}
                             </Badge>
                           )}
                         </div>
