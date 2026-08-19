@@ -9,9 +9,15 @@ type: feature
 - Daily cron `purge-cron-run-details-daily` (01:00 UTC) deletes run history older than 3 days. Never remove it.
 
 ## Cron frequency (reduced for cost, functionality unchanged)
-- `mchango-expiry-reminders-hourly` → every 4 hours
-- `chama-grace-reminders-every-30min` → every 4 hours
-- `process-document-deletions-hourly` → every 12 hours
+- `mchango-expiry-reminders-hourly` → daily 06:00 UTC
+- `chama-grace-reminders-every-30min` → every 6 hours
+- `process-document-deletions-hourly` → daily 04:00 UTC
+- `kyc-auto-cleanup-36h` → daily 02:00 UTC
+- Never slow down `daily-payout-2100-eat`, `chama-auto-maintenance-2hr`, or the reminder SMS/push jobs — they are user-visible.
+
+## Log retention
+- `purge_old_logs()` deletes rows older than 90 days from `audit_logs`, `admin_action_log`, `reconciliation_logs`, and resolved `fraud_events`.
+- Scheduled weekly as `purge-old-logs-weekly` (Sun 02:30 UTC).
 
 ## Compute
 - Instance size is **Mini**. Earlier "Cloud compute large" charges are historical, not current run rate.
