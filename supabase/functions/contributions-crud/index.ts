@@ -140,7 +140,9 @@ async function previewAllocation(
 
   // Phase 2: Current cycle contribution (deductive — commission extracted from within)
   if (remaining > 0 && cycle) {
-    const amountDue = cycle.member_cycle_payments?.[0]?.amount_remaining || contributionAmount;
+    // A zero remaining balance means this cycle is already paid. Preserve that
+    // zero so the deposit continues to Phase 3 as overpayment wallet credit.
+    const amountDue = cycle.member_cycle_payments?.[0]?.amount_remaining ?? contributionAmount;
     const grossNeeded = amountDue; // member pays the base amount
     const toApply = Math.min(remaining, grossNeeded);
     const commission = toApply * ONTIME_RATE; // deducted from within
