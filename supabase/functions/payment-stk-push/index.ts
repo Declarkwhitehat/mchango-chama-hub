@@ -119,7 +119,6 @@ serve(async (req) => {
         );
       }
 
-      const baseContribution = Number(chamaRow.contribution_amount || 0);
       let owedFromLive = 0;
       let walletCredit = 0;
 
@@ -137,8 +136,11 @@ serve(async (req) => {
       }
 
       const owedAfterCredit = Math.max(owedFromLive - walletCredit, 0);
-      // If no debts and no unpaid cycles, allow base contribution as the minimum
-      const required = owedFromLive > 0 ? owedAfterCredit : baseContribution;
+      // Only enforce a minimum while this member actually owes money. Once all
+      // open cycles/debts are covered, any valid amount is an intentional
+      // overpayment and the settlement engine stores its net value in the
+      // overpayment wallet for the next cycle.
+      const required = owedFromLive > 0 ? owedAfterCredit : 0;
 
       if (required > 0 && body.amount < required) {
         console.warn('[security] STK push rejected — chama amount below required', {
