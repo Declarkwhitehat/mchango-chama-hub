@@ -253,7 +253,8 @@ serve(async (req) => {
 
 
 
-    // Assign sequential order indices and generate member codes
+    // Assign payout order indices ONLY. Member IDs (member_code) are permanent
+    // once issued and are never renumbered to match the payout position.
     for (let i = 0; i < sortedMembers.length; i++) {
       const member = sortedMembers[i];
       const newIndex = i + 1;
@@ -262,23 +263,28 @@ serve(async (req) => {
         memberId: member.id,
         name: member.profiles?.full_name,
         newIndex: newIndex,
+        memberCode: member.member_code,
         joinedAt: member.joined_at
       });
 
-      // Generate new member code using DB function
-      const { data: newMemberCode } = await supabaseClient
-        .rpc('generate_member_code', {
-          p_chama_id: chamaId,
-          p_order_index: newIndex
-        });
+      const update: Record<string, unknown> = {
+        order_index: newIndex,
+        status: 'active',
+      };
+
+      // Only issue a code if this member has never had one.
+      if (!member.member_code) {
+        const { data: newMemberCode } = await supabaseClient
+          .rpc('generate_member_code', {
+            p_chama_id: chamaId,
+            p_order_index: newIndex
+          });
+        if (newMemberCode) update.member_code = newMemberCode;
+      }
 
       await supabaseClient
         .from('chama_members')
-        .update({
-          order_index: newIndex,
-          member_code: newMemberCode || member.member_code,
-          status: 'active'
-        })
+        .update(update)
         .eq('id', member.id);
     }
 
