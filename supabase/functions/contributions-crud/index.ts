@@ -1243,7 +1243,7 @@ serve(async (req) => {
             first_payment_completed: true,
             first_payment_at: new Date().toISOString(),
             order_index: assignedOrderIndex,
-            member_code: assignedMemberCode,
+            ...(assignedMemberCode ? { member_code: assignedMemberCode } : {}),
             status: 'active',
           }).eq('id', member.id);
         } else {
