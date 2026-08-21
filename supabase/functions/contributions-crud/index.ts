@@ -1228,10 +1228,16 @@ serve(async (req) => {
 
           assignedOrderIndex = nextIndex || 1;
 
-          const { data: memberCode } = await supabaseClient
-            .rpc('generate_member_code', { p_chama_id: member.chama_id, p_order_index: assignedOrderIndex });
+          // Member IDs are permanent: only mint one if this member has none yet.
+          if (member.member_code) {
+            assignedMemberCode = member.member_code;
+          } else {
+            const { data: memberCode } = await supabaseClient
+              .rpc('generate_member_code', { p_chama_id: member.chama_id, p_order_index: assignedOrderIndex });
+            assignedMemberCode = memberCode || null;
+          }
 
-          assignedMemberCode = memberCode || member.member_code;
+
 
           await supabaseClient.from('chama_members').update({
             first_payment_completed: true,
