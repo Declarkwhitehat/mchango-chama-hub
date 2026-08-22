@@ -185,8 +185,16 @@ Deno.serve(async (req) => {
           console.log(`In-app notification created for ${member.member_code}`);
         }
 
-        // SMS via send-transactional-sms (Onfon) — only two per day: 1 PM and 5 PM EAT.
-        if (profile?.phone && isSmsSlot) {
+        // SMS via send-transactional-sms (Onfon).
+        // Daily chamas: two SMS per day (1 PM + 5 PM EAT).
+        // Non-daily chamas: only ONE SMS per day (1 PM) except on the deadline
+        // day itself, where both the 1 PM and 5 PM reminders still go out.
+        const isDailyChama = chama.contribution_frequency === 'daily';
+        const smsAllowedForFrequency =
+          isDailyChama || isDeadlineDay || slot === '1300';
+
+        if (profile?.phone && isSmsSlot && smsAllowedForFrequency) {
+
           const slotLabel = isDeadlineDay
             ? (slot === '1700'
                 ? `Final reminder: pay before ${dueTime} today.`
